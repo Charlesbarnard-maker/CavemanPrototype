@@ -3,70 +3,81 @@ using UnityEngine;
 namespace Caveman
 {
     /// <summary>
-    /// A harvestable object (rock, tree). Depletes on each harvest, then respawns
-    /// after a delay so the world doesn't run dry. Highlights when targetable.
+    /// A resource patch (rock, tree) holding a finite, slowly-regenerating amount.
+    /// Both manual gathering and production buildings draw from the same pool, so
+    /// over-harvesting a patch starves whatever depends on it — the first bit of
+    /// emergent spatial pressure that pushes the player to expand.
     /// </summary>
     [RequireComponent(typeof(Collider2D))]
     [RequireComponent(typeof(SpriteRenderer))]
     public class ResourceNode : MonoBehaviour
     {
         public ItemDefinition yields;
-        public int yieldPerHit = 1;
-        public int maxHits = 5;
-        [Tooltip("Seconds to regrow after being fully harvested. 0 = never respawn.")]
-        public float respawnSeconds = 8f;
+        public int capacity = 30;
+        public int regenAmount = 1;
+        [Tooltip("Seconds between each regeneration tick.")]
+        public float regenInterval = 1.5f;
 
-        private int _hitsRemaining;
+        private int _amount;
+        private float _regenTimer;
         private Vector3 _baseScale;
         private Color _baseColor;
         private SpriteRenderer _sr;
-        private Collider2D _col;
 
-        public bool IsAvailable => _hitsRemaining > 0 && _col != null && _col.enabled;
+        public bool HasResource => _amount > 0;
+        public int Amount => _amount;
 
         void Awake()
         {
             _sr = GetComponent<SpriteRenderer>();
-            _col = GetComponent<Collider2D>();
             _baseScale = transform.localScale;
             _baseColor = _sr != null ? _sr.color : Color.white;
-            _hitsRemaining = maxHits;
+            _amount = capacity;
+            ApplyScale();
         }
 
-        /// <summary>Harvest one hit's worth (scaled by gather power) into the inventory.</summary>
-        public bool Harvest(Inventory inventory, int power = 1)
+        void Update()
         {
-            if (inventory == null || yields == null || _hitsRemaining <= 0) return false;
+            if (_amount >= capacity) return;
+            _regenTimer += Time.deltaTime;
+            if (_regenTimer >= regenInterval)
+            {
+                _regenTimer -= regenInterval;
+                _amount = Mathf.Min(capacity, _amount + regenAmount);
+                ApplyScale();
+            }
+        }
 
-            inventory.Add(yields, yieldPerHit * Mathf.Max(1, power));
-            _hitsRemaining--;
+        /// <summary>Pull up to `requested` units out; returns how many were actually taken.</summary>
+        public int Extract(int requested)
+        {
+            if (requested <= 0 || _amount <= 0) return 0;
+            int taken = Mathf.Min(requested, _amount);
+            _amount -= taken;
+            ApplyScale();
+            return taken;
+        }
 
-            // Cheap juice: shrink as it depletes so harvesting feels responsive.
-            transform.localScale *= 0.88f;
-
-            if (_hitsRemaining <= 0) Deplete();
+        /// <summary>Manual harvest of `per` units into an inventory.</summary>
+        public bool Harvest(Inventory inventory, int per = 1)
+        {
+            if (inventory == null || yields == null) return false;
+            int taken = Extract(per);
+            if (taken <= 0) return false;
+            inventory.Add(yields, taken);
             return true;
         }
 
-        private void Deplete()
+        private void ApplyScale()
         {
-            if (_sr != null) _sr.enabled = false;
-            if (_col != null) _col.enabled = false;
-            if (respawnSeconds > 0f) Invoke(nameof(Respawn), respawnSeconds);
+            float f = capacity > 0 ? (float)_amount / capacity : 0f;
+            transform.localScale = _baseScale * Mathf.Lerp(0.35f, 1f, f);
         }
 
-        private void Respawn()
-        {
-            _hitsRemaining = maxHits;
-            transform.localScale = _baseScale;
-            if (_sr != null) { _sr.enabled = true; _sr.color = _baseColor; }
-            if (_col != null) _col.enabled = true;
-        }
-
-        /// <summary>Brighten the sprite when the player can target this node.</summary>
+        /// <summary>Brighten the patch when the player can target it.</summary>
         public void SetHighlighted(bool on)
         {
-            if (_sr == null || !_sr.enabled) return;
+            if (_sr == null) return;
             _sr.color = on ? Color.Lerp(_baseColor, Color.white, 0.45f) : _baseColor;
         }
     }

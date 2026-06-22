@@ -26,6 +26,13 @@ namespace Caveman
             if (_cam == null) _cam = Camera.main;
             if (_cam == null) return;
 
+            // Don't gather while a building is being placed (same mouse button).
+            if (BuildController.IsPlacing)
+            {
+                if (_highlighted != null) { _highlighted.SetHighlighted(false); _highlighted = null; }
+                return;
+            }
+
             var mouse = Mouse.current;
             if (mouse == null) return;
 
