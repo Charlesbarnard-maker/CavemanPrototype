@@ -50,22 +50,32 @@ mechanical → belts.
 Scene is built entirely in code by `GameBootstrap` (one component on one GameObject —
 no Inspector wiring). Scripts in `Assets/Scripts/`:
 
-- **Manual gathering:** click resource patches (`ResourceNode`) which hold a finite,
-  slowly-regenerating amount; player carries the result (`PlayerGatherer`).
-- **Collectors** (`ProductionBuilding`): placed on a patch, harvest into a small buffer,
-  push into an adjacent matching **Storage** (`StorageBuilding`). Full buffer with no
-  storage → stalls (backpressure).
-- **Placement** (`BuildController`): number keys 1–4, ghost preview, green=valid;
-  collectors need a nearby patch, storage places anywhere; `X` demolishes (half refund).
-- **Economy** (`Economy`): combined carried + all buffers/storage.
-- Camera follows the player (`CameraFollow`); HUD via `OnGUI` (`InventoryHud`).
+- **Manual gathering:** click resource patches (`ResourceNode`) — finite, slowly
+  regenerating, recoil/shake when chopped; player carries the result (`PlayerGatherer`).
+  Patches are placeholder shapes (`PlaceholderArt`): trees=triangles, rocks=hexagons,
+  bushes=circles.
+- **Collectors** (`ProductionBuilding`): bind to a nearby patch and require ASSIGNED
+  workers — each assigned worker is one `Worker` NPC that walks out, chops, and carries
+  loads back to the building buffer, which is pushed into an adjacent matching
+  **Storage** (`StorageBuilding`). Unstaffed/full → idle (backpressure).
+- **Settlement** (`Colony`): population grows toward the housing cap while fed, declines
+  (starvation) when food runs out. `HousingBuilding` (Town Hall pre-placed houses 3,
+  House +2) sets the cap. Workers are the shared labour pool (free vs assigned).
+- **Food:** Food item, bushes, Forager Hut, Granary; Colony eats Population food/tick.
+- **Placement/staffing** (`BuildController`): number keys 1–N, ghost preview; collectors
+  need a nearby patch, storage/housing place anywhere; auto-assign one worker on place;
+  hover + `[` / `]` to adjust workers; `X` demolishes (half refund, frees workers).
+- **Economy** (`Economy`): combined pool = carried + all buffers/storage. Camera follows
+  the player (`CameraFollow`); HUD via `OnGUI` (`InventoryHud`).
 
 ## Next steps
-1. **NPC Haulers** — a worker that carries resources between buildings that aren't
-   adjacent (the "human chain"; first visible across-distance automation).
+1. **NPC Haulers** — workers that carry resources between buildings that aren't adjacent
+   (distance logistics without belts; the "human chain").
 2. First **production chain** (e.g. Wood → Planks via a workshop) so one building feeds
-   another.
-3. First **age unlock** that changes *how* you build (e.g. unlocks gravity ramps).
+   another — and **age-based routing** (where output goes changes as you evolve).
+3. First **age unlock** that changes *how* you build (e.g. gravity ramps → pulleys →
+   conveyors). Manual worker assignment polish (priorities), multiple workers tuning.
+4. Later: the **art pass** (turn placeholder shapes into real sprites).
 
 ## Dev environment / repo
 - Unity `6000.5.0f1`, 2D (URP). Repo lives at `C:\Users\charl\Projects\CavemanPrototype`
