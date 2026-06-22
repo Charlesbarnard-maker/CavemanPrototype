@@ -3,10 +3,10 @@ using UnityEngine;
 namespace Caveman
 {
     /// <summary>
-    /// A collector bound to a nearby ResourceNode. It harvests the patch into its
-    /// own small buffer, then pushes that buffer into an adjacent matching
-    /// StorageBuilding ("drop pile" transfer — the Stone-Age logistics tier).
-    /// If the buffer fills and there's nowhere to push, it stalls (backpressure).
+    /// A collector. It binds to a nearby ResourceNode and spawns a Worker that
+    /// physically walks out, harvests the patch, and carries loads back into this
+    /// building's buffer. The building then pushes its buffer into an adjacent
+    /// matching StorageBuilding ("drop pile" transfer — the Stone-Age tier).
     /// </summary>
     public class ProductionBuilding : MonoBehaviour
     {
@@ -14,13 +14,13 @@ namespace Caveman
         public ItemDefinition produces;
         public int outputPerCycle = 1;
         public float interval = 2f;
-        public float sourceRange = 2.5f;
+        public float sourceRange = 6f;   // worker can commute this far
         public float transferRange = 2.0f;
 
         public Inventory Buffer { get; private set; }
+        public ResourceNode Source => _source;
 
         private ResourceNode _source;
-        private float _timer;
         private float _flash;
         private SpriteRenderer _sr;
         private Color _baseColor;
@@ -46,6 +46,8 @@ namespace Caveman
             pb.interval = def.interval;
             pb.Buffer = new Inventory { capacity = Mathf.Max(1, def.capacity) };
             pb.Bind();
+
+            Worker.Spawn(pb);
             return pb;
         }
 
@@ -55,7 +57,7 @@ namespace Caveman
             if (_sr != null) _baseColor = _sr.color;
         }
 
-        /// <summary>Find the nearest matching resource patch in range.</summary>
+        /// <summary>Find the nearest matching resource patch in commute range.</summary>
         public void Bind()
         {
             ResourceNode best = null;
@@ -69,44 +71,25 @@ namespace Caveman
             _source = best;
         }
 
+        /// <summary>Called by the worker when it deposits a load.</summary>
+        public void Pulse() => _flash = 0.25f;
+
         void Update()
         {
-            bool hasBufferSpace = Buffer.Total() < Buffer.capacity;
-            bool canProduce = _source != null && _source.HasResource && hasBufferSpace;
-
-            // 1. Harvest the patch into our own buffer.
-            if (canProduce)
-            {
-                _timer += Time.deltaTime;
-                if (_timer >= interval)
-                {
-                    _timer -= interval;
-                    int got = _source.Extract(outputPerCycle);
-                    if (got > 0)
-                    {
-                        Buffer.Add(produces, got);
-                        _flash = 0.25f;
-                    }
-                }
-            }
-            else
-            {
-                _timer = 0f;
-            }
-
-            // 2. Push buffer into an adjacent matching storage (drop-pile transfer).
             PushToStorage();
 
-            // Stalled = nothing to harvest, or buffer full with nowhere to go.
-            bool stalled = (_source == null || !_source.HasResource) && Buffer.Total() == 0
-                           || (!hasBufferSpace && Buffer.Total() > 0 && FindNearestStorage() == null);
-            UpdateVisual(working: !stalled);
+            bool working = (_source != null && _source.HasResource) || Buffer.Total() > 0;
+            UpdateVisual(working);
         }
 
         private void PushToStorage()
         {
             int have = Buffer.Count(produces);
-            if (have <= 0) return;
+            if (have <= 0)
+            {
+                if (_link != null) _link.enabled = false;
+                return;
+            }
 
             var store = FindNearestStorage();
             if (store == null)

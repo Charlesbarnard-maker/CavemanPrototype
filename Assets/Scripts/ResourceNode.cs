@@ -20,9 +20,12 @@ namespace Caveman
 
         private int _amount;
         private float _regenTimer;
+        private float _shake;
         private Vector3 _baseScale;
         private Color _baseColor;
         private SpriteRenderer _sr;
+
+        private const float ShakeDur = 0.3f;
 
         public bool HasResource => _amount > 0;
         public int Amount => _amount;
@@ -38,15 +41,34 @@ namespace Caveman
 
         void Update()
         {
-            if (_amount >= capacity) return;
-            _regenTimer += Time.deltaTime;
-            if (_regenTimer >= regenInterval)
+            // Chop recoil: brief wobble when struck (the "knock it down" feel).
+            if (_shake > 0f)
             {
-                _regenTimer -= regenInterval;
-                _amount = Mathf.Min(capacity, _amount + regenAmount);
-                ApplyScale();
+                _shake -= Time.deltaTime;
+                float t = Mathf.Max(0f, _shake) / ShakeDur;
+                float ang = Mathf.Sin(_shake * 50f) * 10f * t;
+                transform.rotation = Quaternion.Euler(0f, 0f, ang);
+            }
+            else if (transform.rotation != Quaternion.identity)
+            {
+                transform.rotation = Quaternion.identity;
+            }
+
+            // Slow regeneration back up to capacity.
+            if (_amount < capacity)
+            {
+                _regenTimer += Time.deltaTime;
+                if (_regenTimer >= regenInterval)
+                {
+                    _regenTimer -= regenInterval;
+                    _amount = Mathf.Min(capacity, _amount + regenAmount);
+                    ApplyScale();
+                }
             }
         }
+
+        /// <summary>Trigger the chop recoil wobble.</summary>
+        public void Nudge() => _shake = ShakeDur;
 
         /// <summary>Pull up to `requested` units out; returns how many were actually taken.</summary>
         public int Extract(int requested)

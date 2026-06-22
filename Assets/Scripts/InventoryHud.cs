@@ -62,7 +62,7 @@ namespace Caveman
 
             GUILayout.Space(12);
             GUILayout.Label("WASD/arrows move · left-click patch to gather", _style);
-            GUILayout.Label("<color=#ffd24d>Place a collector on a patch, then storage next to it — it fills hands-free.</color>", _style);
+            GUILayout.Label("<color=#ffd24d>Place a collector near a patch — its worker harvests for you. Put storage beside the collector.</color>", _style);
 
             GUILayout.EndArea();
         }
