@@ -56,6 +56,26 @@ namespace Caveman
             }
         }
 
+        /// <summary>Spends up to `amount` from the pool; returns how many were actually spent.</summary>
+        public static int SpendUpTo(ItemDefinition item, int amount, Inventory carried)
+        {
+            if (item == null || amount <= 0) return 0;
+            int remaining = amount;
+            if (carried != null) remaining -= carried.RemoveUpTo(item, remaining);
+            if (remaining <= 0) return amount;
+            foreach (var s in Object.FindObjectsByType<StorageBuilding>())
+            {
+                remaining -= s.Store.RemoveUpTo(item, remaining);
+                if (remaining <= 0) return amount;
+            }
+            foreach (var p in Object.FindObjectsByType<ProductionBuilding>())
+            {
+                remaining -= p.Buffer.RemoveUpTo(item, remaining);
+                if (remaining <= 0) return amount;
+            }
+            return amount - remaining;
+        }
+
         /// <summary>Combined totals of every resource across carried + all buildings.</summary>
         public static Dictionary<ItemDefinition, int> Totals(Inventory carried)
         {

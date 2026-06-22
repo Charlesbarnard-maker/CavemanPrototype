@@ -4,13 +4,10 @@ using UnityEngine;
 namespace Caveman
 {
     /// <summary>
-    /// Builds the entire MVP scene in code so there's no Inspector wiring: camera
-    /// (follows player), player, spread-out resource patches, the build system,
-    /// and the HUD. Add this component to one empty GameObject and press Play.
-    ///
-    /// Loop: gather manually to bootstrap -> place a collector near a patch (its
-    /// worker walks out, chops, and hauls back) -> place matching storage next to
-    /// the collector -> stockpile grows hands-free -> the pool funds more buildings.
+    /// Builds the entire MVP scene in code so there's no Inspector wiring: camera,
+    /// player, Colony (population), a pre-placed Town Hall, resource/food patches,
+    /// the build system, and the HUD. Add this component to one empty GameObject
+    /// and press Play.
     /// </summary>
     public class GameBootstrap : MonoBehaviour
     {
@@ -19,16 +16,23 @@ namespace Caveman
             // --- Items ---
             var stone = MakeItem("stone", "Stone", new Color(0.55f, 0.55f, 0.62f));
             var wood = MakeItem("wood", "Wood", new Color(0.52f, 0.34f, 0.16f));
+            var food = MakeItem("food", "Food", new Color(0.85f, 0.35f, 0.35f));
 
             // --- Buildings ---
-            var woodHut = MakeCollector("Wood Hut", wood, 1, 2.0f, 12, new Color(0.80f, 0.52f, 0.25f),
+            var woodHut = MakeCollector("Wood Hut", wood, 1, 2.0f, 2, 12, new Color(0.80f, 0.52f, 0.25f),
                 new ItemAmount(wood, 5), new ItemAmount(stone, 3));
-            var stonePit = MakeCollector("Stone Pit", stone, 1, 2.5f, 12, new Color(0.45f, 0.52f, 0.62f),
+            var stonePit = MakeCollector("Stone Pit", stone, 1, 2.5f, 2, 12, new Color(0.45f, 0.52f, 0.62f),
                 new ItemAmount(wood, 5), new ItemAmount(stone, 5));
+            var foragerHut = MakeCollector("Forager Hut", food, 1, 2.0f, 2, 12, new Color(0.78f, 0.40f, 0.40f),
+                new ItemAmount(wood, 4));
             var woodStore = MakeStorage("Wood Warehouse", wood, 100, new Color(0.62f, 0.40f, 0.20f),
                 new ItemAmount(wood, 8));
             var stoneStore = MakeStorage("Stone Storage", stone, 100, new Color(0.40f, 0.43f, 0.50f),
                 new ItemAmount(wood, 8));
+            var foodStore = MakeStorage("Granary", food, 100, new Color(0.70f, 0.45f, 0.35f),
+                new ItemAmount(wood, 8));
+            var house = MakeHousing("House", 2, new Color(0.72f, 0.62f, 0.45f),
+                new ItemAmount(wood, 10), new ItemAmount(stone, 4));
 
             // --- Camera (follows the player) ---
             var cam = Camera.main;
@@ -38,7 +42,7 @@ namespace Caveman
                 cam = camGo.AddComponent<Camera>();
             }
             cam.orthographic = true;
-            cam.orthographicSize = 7.5f;
+            cam.orthographicSize = 8f;
             cam.transform.position = new Vector3(0f, 0f, -10f);
             cam.backgroundColor = new Color(0.16f, 0.19f, 0.16f);
 
@@ -48,32 +52,48 @@ namespace Caveman
             var gatherer = player.AddComponent<PlayerGatherer>();
             var builder = player.AddComponent<BuildController>();
             builder.gatherer = gatherer;
-            builder.placeNodeRange = 6f; // matches the worker commute range
-            builder.buildables = new List<BuildingDefinition> { woodHut, stonePit, woodStore, stoneStore };
+            builder.placeNodeRange = 6f;
+            builder.buildables = new List<BuildingDefinition>
+            { woodHut, stonePit, foragerHut, woodStore, stoneStore, foodStore, house };
 
             var follow = cam.GetComponent<CameraFollow>();
             if (follow == null) follow = cam.gameObject.AddComponent<CameraFollow>();
             follow.target = player.transform;
+
+            // --- Colony (population) ---
+            var colony = new GameObject("Colony").AddComponent<Colony>();
+            colony.foodItem = food;
+            colony.carried = gatherer.Inventory;
+            colony.SetStartingPopulation(3);
+            gatherer.Inventory.Add(food, 25); // starting larder so you don't instantly starve
+
+            // --- Town Hall (pre-placed, houses 3) ---
+            var townHallDef = MakeHousing("Town Hall", 3, new Color(0.60f, 0.50f, 0.70f));
+            HousingBuilding.Spawn(townHallDef, new Vector2(0f, -1.6f));
 
             // --- HUD ---
             var hud = new GameObject("HUD").AddComponent<InventoryHud>();
             hud.gatherer = gatherer;
             hud.builder = builder;
 
-            // --- Resource patches: trees (green triangles) right, rocks (grey hexagons) left ---
+            // --- Resource patches ---
             var treeColor = new Color(0.27f, 0.55f, 0.22f);
             SpawnNode("Tree", wood, treeColor, new Vector2(5f, 2.5f), 1.3f, PlaceholderArt.Triangle());
             SpawnNode("Tree", wood, treeColor, new Vector2(7f, 1f), 1.2f, PlaceholderArt.Triangle());
             SpawnNode("Tree", wood, treeColor, new Vector2(6f, -1.5f), 1.4f, PlaceholderArt.Triangle());
             SpawnNode("Tree", wood, treeColor, new Vector2(8.5f, 2.2f), 1.1f, PlaceholderArt.Triangle());
-            SpawnNode("Tree", wood, treeColor, new Vector2(4.5f, -2.8f), 1.3f, PlaceholderArt.Triangle());
 
             var rockColor = new Color(0.55f, 0.55f, 0.6f);
             SpawnNode("Rock", stone, rockColor, new Vector2(-5f, 2.5f), 1.2f, PlaceholderArt.Hexagon());
             SpawnNode("Rock", stone, rockColor, new Vector2(-7f, 1f), 1.1f, PlaceholderArt.Hexagon());
             SpawnNode("Rock", stone, rockColor, new Vector2(-6f, -1.5f), 1.3f, PlaceholderArt.Hexagon());
             SpawnNode("Rock", stone, rockColor, new Vector2(-8.5f, 2.2f), 1.0f, PlaceholderArt.Hexagon());
-            SpawnNode("Rock", stone, rockColor, new Vector2(-4.5f, -2.8f), 1.2f, PlaceholderArt.Hexagon());
+
+            // Bushes (food) — bottom of the map
+            var bushColor = new Color(0.45f, 0.55f, 0.25f);
+            SpawnNode("Bush", food, bushColor, new Vector2(-1.5f, -5f), 0.8f, PlaceholderArt.Circle());
+            SpawnNode("Bush", food, bushColor, new Vector2(0.5f, -5.5f), 0.8f, PlaceholderArt.Circle());
+            SpawnNode("Bush", food, bushColor, new Vector2(2.5f, -4.5f), 0.8f, PlaceholderArt.Circle());
         }
 
         private static ItemDefinition MakeItem(string id, string name, Color color)
@@ -86,7 +106,7 @@ namespace Caveman
         }
 
         private static BuildingDefinition MakeCollector(string name, ItemDefinition item, int output,
-            float interval, int capacity, Color color, params ItemAmount[] cost)
+            float interval, int maxWorkers, int capacity, Color color, params ItemAmount[] cost)
         {
             var def = ScriptableObject.CreateInstance<BuildingDefinition>();
             def.displayName = name;
@@ -94,6 +114,7 @@ namespace Caveman
             def.item = item;
             def.outputPerCycle = output;
             def.interval = interval;
+            def.maxWorkers = maxWorkers;
             def.capacity = capacity;
             def.color = color;
             def.cost = new List<ItemAmount>(cost);
@@ -108,6 +129,17 @@ namespace Caveman
             def.kind = BuildingKind.Storage;
             def.item = item;
             def.capacity = capacity;
+            def.color = color;
+            def.cost = new List<ItemAmount>(cost);
+            return def;
+        }
+
+        private static BuildingDefinition MakeHousing(string name, int houseCapacity, Color color, params ItemAmount[] cost)
+        {
+            var def = ScriptableObject.CreateInstance<BuildingDefinition>();
+            def.displayName = name;
+            def.kind = BuildingKind.Housing;
+            def.houseCapacity = houseCapacity;
             def.color = color;
             def.cost = new List<ItemAmount>(cost);
             return def;

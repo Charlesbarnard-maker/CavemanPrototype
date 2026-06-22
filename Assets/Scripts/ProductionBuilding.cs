@@ -1,12 +1,13 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace Caveman
 {
     /// <summary>
-    /// A collector. It binds to a nearby ResourceNode and spawns a Worker that
-    /// physically walks out, harvests the patch, and carries loads back into this
-    /// building's buffer. The building then pushes its buffer into an adjacent
-    /// matching StorageBuilding ("drop pile" transfer — the Stone-Age tier).
+    /// A collector. It binds to a nearby ResourceNode. Each ASSIGNED worker spawns
+    /// a Worker NPC that walks out, harvests the patch, and carries loads back into
+    /// this building's buffer. With no workers assigned it sits idle. The building
+    /// pushes its buffer into an adjacent matching StorageBuilding.
     /// </summary>
     public class ProductionBuilding : MonoBehaviour
     {
@@ -14,12 +15,15 @@ namespace Caveman
         public ItemDefinition produces;
         public int outputPerCycle = 1;
         public float interval = 2f;
+        public int maxWorkers = 2;
         public float sourceRange = 6f;   // worker can commute this far
         public float transferRange = 2.0f;
 
         public Inventory Buffer { get; private set; }
         public ResourceNode Source => _source;
+        public int AssignedWorkers { get; private set; }
 
+        private readonly List<Worker> _workers = new();
         private ResourceNode _source;
         private float _flash;
         private SpriteRenderer _sr;
@@ -37,17 +41,16 @@ namespace Caveman
             sr.color = def.color;
             sr.sortingOrder = 5;
 
-            go.AddComponent<BoxCollider2D>(); // clickable for demolish
+            go.AddComponent<BoxCollider2D>(); // clickable for demolish / staffing
 
             var pb = go.AddComponent<ProductionBuilding>();
             pb.def = def;
             pb.produces = def.item;
             pb.outputPerCycle = def.outputPerCycle;
             pb.interval = def.interval;
+            pb.maxWorkers = Mathf.Max(1, def.maxWorkers);
             pb.Buffer = new Inventory { capacity = Mathf.Max(1, def.capacity) };
             pb.Bind();
-
-            Worker.Spawn(pb);
             return pb;
         }
 
@@ -57,7 +60,6 @@ namespace Caveman
             if (_sr != null) _baseColor = _sr.color;
         }
 
-        /// <summary>Find the nearest matching resource patch in commute range.</summary>
         public void Bind()
         {
             ResourceNode best = null;
@@ -71,14 +73,42 @@ namespace Caveman
             _source = best;
         }
 
-        /// <summary>Called by the worker when it deposits a load.</summary>
+        /// <summary>Assign one worker if there's a free person and a free slot.</summary>
+        public bool TryAssign()
+        {
+            if (AssignedWorkers >= maxWorkers) return false;
+            if (Colony.Instance == null || Colony.Instance.FreeWorkers <= 0) return false;
+            AssignedWorkers++;
+            RefreshWorkers();
+            return true;
+        }
+
+        public void Unassign()
+        {
+            if (AssignedWorkers <= 0) return;
+            AssignedWorkers--;
+            RefreshWorkers();
+        }
+
+        private void RefreshWorkers()
+        {
+            _workers.RemoveAll(w => w == null);
+            while (_workers.Count < AssignedWorkers) _workers.Add(Worker.Spawn(this));
+            while (_workers.Count > AssignedWorkers)
+            {
+                var w = _workers[_workers.Count - 1];
+                _workers.RemoveAt(_workers.Count - 1);
+                if (w != null) Destroy(w.gameObject);
+            }
+        }
+
         public void Pulse() => _flash = 0.25f;
 
         void Update()
         {
             PushToStorage();
 
-            bool working = (_source != null && _source.HasResource) || Buffer.Total() > 0;
+            bool working = AssignedWorkers > 0 && ((_source != null && _source.HasResource) || Buffer.Total() > 0);
             UpdateVisual(working);
         }
 
@@ -100,7 +130,6 @@ namespace Caveman
 
             int accepted = store.Store.Add(produces, have);
             if (accepted > 0) Buffer.RemoveUpTo(produces, accepted);
-
             DrawLink(store.transform.position);
         }
 

@@ -20,14 +20,12 @@ namespace Caveman
 
     public enum BuildingKind
     {
-        Collector, // auto-harvests a nearby resource patch into its buffer
+        Collector, // auto-harvests a nearby resource patch (needs workers assigned)
         Storage,   // holds a large amount of one resource type
+        Housing,   // raises the population cap
     }
 
-    /// <summary>
-    /// Data for a placeable structure. Collectors harvest a patch into a small
-    /// buffer and push to adjacent storage; Storage holds a large amount.
-    /// </summary>
+    /// <summary>Data for a placeable structure.</summary>
     [CreateAssetMenu(fileName = "Building", menuName = "Caveman/Building Definition")]
     public class BuildingDefinition : ScriptableObject
     {
@@ -41,6 +39,12 @@ namespace Caveman
         public int outputPerCycle = 1;
         [Tooltip("Seconds between each automatic harvest.")]
         public float interval = 2f;
+        [Tooltip("Max workers that can be assigned (each is one harvesting NPC).")]
+        public int maxWorkers = 2;
+
+        [Header("Housing")]
+        [Tooltip("How many people this houses (adds to population cap).")]
+        public int houseCapacity = 0;
 
         [Header("Capacity")]
         [Tooltip("Collector buffer size, or storage size.")]

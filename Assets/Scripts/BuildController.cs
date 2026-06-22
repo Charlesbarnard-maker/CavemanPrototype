@@ -5,21 +5,22 @@ using UnityEngine.InputSystem;
 namespace Caveman
 {
     /// <summary>
-    /// Placement-mode building. Number keys pick a building; a ghost follows the
-    /// cursor and turns green only when placement is valid. Collectors must be
-    /// near a matching resource patch; storage can go anywhere. Costs are spent
-    /// from the combined Economy pool. X demolishes (half refund into carried).
+    /// Placement-mode building + worker staffing. Number keys pick a building; a
+    /// ghost follows the cursor (green = valid). Collectors need a nearby patch;
+    /// storage/housing place anywhere. New collectors auto-assign one free worker.
+    /// Hover a collector and press '[' / ']' to remove/add workers. 'X' demolishes.
     /// </summary>
     public class BuildController : MonoBehaviour
     {
         public PlayerGatherer gatherer;
         public List<BuildingDefinition> buildables = new();
         [Tooltip("How close a matching resource patch must be to place a collector.")]
-        public float placeNodeRange = 2.5f;
+        public float placeNodeRange = 6f;
 
         public int BuildingsPlaced { get; private set; }
         public int PendingIndex { get; private set; } = -1;
         public bool PlacementValid { get; private set; }
+        public ProductionBuilding Hovered { get; private set; }
 
         public static bool IsPlacing { get; private set; }
 
@@ -37,17 +38,29 @@ namespace Caveman
             var mouse = Mouse.current;
             if (kb == null) return;
 
-            if (kb.digit1Key.wasPressedThisFrame) Select(0);
-            else if (kb.digit2Key.wasPressedThisFrame) Select(1);
-            else if (kb.digit3Key.wasPressedThisFrame) Select(2);
-            else if (kb.digit4Key.wasPressedThisFrame) Select(3);
+            // Number keys select a buildable.
+            for (int i = 0; i < buildables.Count && i < 9; i++)
+            {
+                if (kb[Key.Digit1 + i].wasPressedThisFrame) { Select(i); break; }
+            }
 
             if (kb.escapeKey.wasPressedThisFrame) CancelPlacement();
 
             if (PendingIndex >= 0)
+            {
                 UpdatePlacement(mouse);
-            else if (mouse != null && kb.xKey.wasPressedThisFrame)
-                TryRemoveUnderCursor(mouse);
+                Hovered = null;
+            }
+            else
+            {
+                Hovered = BuildingUnderCursor(mouse);
+                if (mouse != null && kb.xKey.wasPressedThisFrame) TryRemoveUnderCursor(mouse);
+                if (Hovered != null)
+                {
+                    if (kb.rightBracketKey.wasPressedThisFrame) Hovered.TryAssign();
+                    if (kb.leftBracketKey.wasPressedThisFrame) Hovered.Unassign();
+                }
+            }
         }
 
         private void Select(int index)
@@ -78,7 +91,7 @@ namespace Caveman
             Vector3 world = _cam.ScreenToWorldPoint(mouse.position.ReadValue());
             world.z = 0f;
             _ghost.transform.position = world;
-            _ghost.transform.localScale = Vector3.one * (def.kind == BuildingKind.Storage ? 1.0f : 0.9f);
+            _ghost.transform.localScale = Vector3.one * (def.kind == BuildingKind.Collector ? 0.9f : 1.1f);
 
             bool affordable = Economy.CanAfford(def.cost, Carried);
             bool placeOk = def.kind != BuildingKind.Collector
@@ -92,8 +105,19 @@ namespace Caveman
             if (mouse.leftButton.wasPressedThisFrame && PlacementValid)
             {
                 Economy.Spend(def.cost, Carried);
-                if (def.kind == BuildingKind.Storage) StorageBuilding.Spawn(def, world);
-                else ProductionBuilding.Spawn(def, world);
+                switch (def.kind)
+                {
+                    case BuildingKind.Storage:
+                        StorageBuilding.Spawn(def, world);
+                        break;
+                    case BuildingKind.Housing:
+                        HousingBuilding.Spawn(def, world);
+                        break;
+                    default:
+                        var pb = ProductionBuilding.Spawn(def, world);
+                        pb.TryAssign(); // auto-staff one worker if available
+                        break;
+                }
                 BuildingsPlaced++;
                 CancelPlacement();
             }
@@ -112,6 +136,14 @@ namespace Caveman
         }
 
         public bool CanAfford(BuildingDefinition def) => def != null && Economy.CanAfford(def.cost, Carried);
+
+        private ProductionBuilding BuildingUnderCursor(Mouse mouse)
+        {
+            if (_cam == null || mouse == null) return null;
+            Vector3 world = _cam.ScreenToWorldPoint(mouse.position.ReadValue());
+            Collider2D hit = Physics2D.OverlapPoint(world);
+            return hit != null ? hit.GetComponent<ProductionBuilding>() : null;
+        }
 
         private static bool HasMatchingNodeNear(Vector3 pos, ItemDefinition item, float range)
         {
@@ -133,11 +165,13 @@ namespace Caveman
 
             var pb = hit.GetComponent<ProductionBuilding>();
             var sb = hit.GetComponent<StorageBuilding>();
-            BuildingDefinition rdef = pb != null ? pb.def : (sb != null ? sb.def : null);
-            GameObject target = pb != null ? pb.gameObject : (sb != null ? sb.gameObject : null);
+            var hb = hit.GetComponent<HousingBuilding>();
+            BuildingDefinition rdef = pb != null ? pb.def : sb != null ? sb.def : hb != null ? hb.def : null;
+            GameObject target = pb != null ? pb.gameObject : sb != null ? sb.gameObject : hb != null ? hb.gameObject : null;
             if (rdef == null || target == null) return;
 
-            // Half refund into carried inventory.
+            if (pb != null) while (pb.AssignedWorkers > 0) pb.Unassign(); // free the workers
+
             if (Carried != null)
                 foreach (var c in rdef.cost)
                     Carried.Add(c.item, Mathf.Max(0, c.amount / 2));
