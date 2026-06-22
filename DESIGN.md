@@ -1,0 +1,76 @@
+# CavemanPrototype — Design & Direction
+
+A 2D PC automation/factory game (Unity 6, URP) where you start as a caveman doing
+everything by hand and evolve across historical ages into self-running, factory-like
+systems. Inspirations: **Factorio** (production chains), **Satisfactory** (factory
+scaling), **Spore** (evolution across stages).
+
+## Core pillar
+> Players should evolve from **manual survival → to systems that play the game for them.**
+
+Manual early game → partial automation mid → fully optimized systems late.
+Emotional hook: *"I started with nothing and built a self-running civilization."*
+
+## The design rule (test every mechanic against it)
+> **Does this reduce manual work, or just make manual work faster?**
+
+- Only speeds up manual work (e.g. "better axe → +20% wood") → ❌ reject. It keeps the
+  player doing manual labour longer, delays automation, and turns the game into a
+  generic survival grind.
+- Removes manual work (a hut auto-produces, an NPC hauls for you) → ✅ keep.
+
+> ⚠️ Mistake already made & corrected: an early build added a Stone Axe tool-upgrade.
+> It was removed. Do **not** reintroduce tool tiers as "progression."
+
+## Progression spine = logistics evolution
+The progression axis is **better ways for systems to move resources without player
+input** — NOT better tools. Each age changes the *shape* of the factory, not just stats.
+
+1. **Manual** — player carries everything (manual gathering bootstraps the economy).
+2. **Primitive logistics (Stone/Tribal):** drop piles + **NPC haulers** (human chains
+   passing items hand-to-hand) + gravity (logs roll downhill, stone drops into trenches).
+3. **Mechanical (first "real" automation):** ramps, rolling logs, pulleys, simple
+   directional flow.
+4. **True conveyors (Industrial):** belts, splitters, factory logic.
+
+Do **not** introduce modern conveyor belts early — they evolve gravity → human →
+mechanical → belts.
+
+## Locked technical decisions
+- **Transport model:** abstract throughput. Buildings have storage buffers; links/
+  haulers move X items/sec. Items are NOT individually simulated. Belts/haulers are
+  visual; the sim is logical. (Chosen for tractability + scale.)
+- **Economy:** combined pool. Build costs spend from the player's carried inventory +
+  ALL building buffers/storage. Manual gathering fills carried; collectors fill their
+  own buffer then push to adjacent storage.
+- **Art:** placeholder shapes (squares/circles) until systems are locked, then one art
+  pass. Don't build art on top of changing mechanics.
+
+## Current implementation state
+Scene is built entirely in code by `GameBootstrap` (one component on one GameObject —
+no Inspector wiring). Scripts in `Assets/Scripts/`:
+
+- **Manual gathering:** click resource patches (`ResourceNode`) which hold a finite,
+  slowly-regenerating amount; player carries the result (`PlayerGatherer`).
+- **Collectors** (`ProductionBuilding`): placed on a patch, harvest into a small buffer,
+  push into an adjacent matching **Storage** (`StorageBuilding`). Full buffer with no
+  storage → stalls (backpressure).
+- **Placement** (`BuildController`): number keys 1–4, ghost preview, green=valid;
+  collectors need a nearby patch, storage places anywhere; `X` demolishes (half refund).
+- **Economy** (`Economy`): combined carried + all buffers/storage.
+- Camera follows the player (`CameraFollow`); HUD via `OnGUI` (`InventoryHud`).
+
+## Next steps
+1. **NPC Haulers** — a worker that carries resources between buildings that aren't
+   adjacent (the "human chain"; first visible across-distance automation).
+2. First **production chain** (e.g. Wood → Planks via a workshop) so one building feeds
+   another.
+3. First **age unlock** that changes *how* you build (e.g. unlocks gravity ramps).
+
+## Dev environment / repo
+- Unity `6000.5.0f1`, 2D (URP). Repo lives at `C:\Users\charl\Projects\CavemanPrototype`
+  (outside OneDrive so the `Library/` cache isn't synced).
+- Private GitHub repo `Charlesbarnard-maker/CavemanPrototype`. The remote URL embeds the
+  username; auth is via a Personal Access Token stored in Windows Credential Manager
+  (not browser OAuth — that picks the wrong account on this multi-account machine).
+  Per-repo commit identity: `Caveman Dev` / `charles.barnard@hotmail.com`.
