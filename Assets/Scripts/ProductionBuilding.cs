@@ -58,7 +58,7 @@ namespace Caveman
         {
             ResourceNode best = null;
             float bestSq = sourceRange * sourceRange;
-            foreach (var n in FindObjectsByType<ResourceNode>(FindObjectsSortMode.None))
+            foreach (var n in FindObjectsByType<ResourceNode>())
             {
                 if (n == null || n.yields != produces) continue;
                 float sq = ((Vector2)(n.transform.position - transform.position)).sqrMagnitude;
