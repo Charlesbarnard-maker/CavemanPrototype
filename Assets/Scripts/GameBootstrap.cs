@@ -5,30 +5,26 @@ namespace Caveman
 {
     /// <summary>
     /// Builds the entire MVP scene in code so there's no Inspector wiring:
-    /// camera, player, rocks/trees, crafting, and the HUD. Placeholder art is
-    /// tinted squares (rocks) and circles (trees/player). Add this component to
-    /// one empty GameObject and press Play.
+    /// camera, player, rocks/trees, the build system, and the HUD. Placeholder
+    /// art is tinted squares/circles. Add this component to one empty GameObject
+    /// and press Play.
+    ///
+    /// Design intent: manual gathering is just the bootstrap. The real loop is
+    /// spending gathered resources to place buildings that gather automatically.
     /// </summary>
     public class GameBootstrap : MonoBehaviour
     {
-        private static Sprite _square;
-        private static Sprite _circle;
-
         void Start()
         {
-            // --- Item definitions (runtime instances for now; become .asset files later) ---
+            // --- Items ---
             var stone = MakeItem("stone", "Stone", new Color(0.55f, 0.55f, 0.62f));
             var wood = MakeItem("wood", "Wood", new Color(0.52f, 0.34f, 0.16f));
 
-            // --- A craftable tool: 3 Wood + 2 Stone -> Stone Axe (gather x2) ---
-            var axe = ScriptableObject.CreateInstance<ToolDefinition>();
-            axe.displayName = "Stone Axe";
-            axe.gatherPower = 2;
-            axe.cost = new List<ItemAmount>
-            {
-                new ItemAmount(wood, 3),
-                new ItemAmount(stone, 2),
-            };
+            // --- Buildings (the automation: gather FOR you, don't speed up manual work) ---
+            var woodHut = MakeBuilding("Wood Hut", wood, 1, 2.0f, new Color(0.80f, 0.52f, 0.25f),
+                new ItemAmount(wood, 5), new ItemAmount(stone, 3));
+            var stonePit = MakeBuilding("Stone Pit", stone, 1, 2.5f, new Color(0.45f, 0.52f, 0.62f),
+                new ItemAmount(wood, 5), new ItemAmount(stone, 5));
 
             // --- Camera ---
             var cam = Camera.main;
@@ -46,14 +42,14 @@ namespace Caveman
             var player = MakeSprite("Player", new Color(0.92f, 0.82f, 0.25f), Vector2.zero, 0.7f, 10, circle: true);
             player.AddComponent<PlayerController>();
             var gatherer = player.AddComponent<PlayerGatherer>();
-            var crafter = player.AddComponent<PlayerCrafter>();
-            crafter.recipe = axe;
-            crafter.gatherer = gatherer;
+            var builder = player.AddComponent<BuildController>();
+            builder.gatherer = gatherer;
+            builder.buildables = new List<BuildingDefinition> { woodHut, stonePit };
 
             // --- HUD ---
             var hud = new GameObject("HUD").AddComponent<InventoryHud>();
             hud.gatherer = gatherer;
-            hud.crafter = crafter;
+            hud.builder = builder;
 
             // --- Resource nodes: rocks (grey squares), trees (green circles) ---
             SpawnNode("Rock", stone, new Color(0.55f, 0.55f, 0.6f), new Vector2(-3f, 2f), circle: false);
@@ -69,6 +65,19 @@ namespace Caveman
             item.displayName = name;
             item.color = color;
             return item;
+        }
+
+        private static BuildingDefinition MakeBuilding(string name, ItemDefinition produces, int output,
+            float interval, Color color, params ItemAmount[] cost)
+        {
+            var def = ScriptableObject.CreateInstance<BuildingDefinition>();
+            def.displayName = name;
+            def.produces = produces;
+            def.outputPerCycle = output;
+            def.interval = interval;
+            def.color = color;
+            def.cost = new List<ItemAmount>(cost);
+            return def;
         }
 
         private static void SpawnNode(string name, ItemDefinition item, Color color, Vector2 pos, bool circle)
@@ -88,44 +97,10 @@ namespace Caveman
             go.transform.position = pos;
             go.transform.localScale = Vector3.one * size;
             var sr = go.AddComponent<SpriteRenderer>();
-            sr.sprite = circle ? CircleSprite() : SquareSprite();
+            sr.sprite = circle ? PlaceholderArt.Circle() : PlaceholderArt.Square();
             sr.color = color;
             sr.sortingOrder = sortingOrder;
             return go;
-        }
-
-        // 1x1 white sprite (1 px-per-unit => 1 world unit). Tinted per-renderer.
-        private static Sprite SquareSprite()
-        {
-            if (_square != null) return _square;
-            var tex = new Texture2D(1, 1);
-            tex.SetPixel(0, 0, Color.white);
-            tex.Apply();
-            _square = Sprite.Create(tex, new Rect(0, 0, 1, 1), new Vector2(0.5f, 0.5f), 1f);
-            return _square;
-        }
-
-        // A filled white circle, 64px => 1 world unit.
-        private static Sprite CircleSprite()
-        {
-            if (_circle != null) return _circle;
-            const int s = 64;
-            var tex = new Texture2D(s, s);
-            var pixels = new Color[s * s];
-            float c = (s - 1) / 2f;
-            float r = s / 2f;
-            for (int y = 0; y < s; y++)
-            {
-                for (int x = 0; x < s; x++)
-                {
-                    float dx = x - c, dy = y - c;
-                    pixels[y * s + x] = (dx * dx + dy * dy <= r * r) ? Color.white : new Color(0, 0, 0, 0);
-                }
-            }
-            tex.SetPixels(pixels);
-            tex.Apply();
-            _circle = Sprite.Create(tex, new Rect(0, 0, s, s), new Vector2(0.5f, 0.5f), s);
-            return _circle;
         }
     }
 }

@@ -5,12 +5,13 @@ namespace Caveman
 {
     /// <summary>
     /// Minimal debug HUD via OnGUI (no Canvas wiring needed yet). Shows the
-    /// inventory and the current crafting status. Replace with proper UI later.
+    /// inventory and the BUILD menu — the path from manual gathering into
+    /// automation. Replace with proper UI later.
     /// </summary>
     public class InventoryHud : MonoBehaviour
     {
         public PlayerGatherer gatherer;
-        public PlayerCrafter crafter;
+        public BuildController builder;
         private GUIStyle _style;
 
         void OnGUI()
@@ -18,7 +19,7 @@ namespace Caveman
             if (gatherer == null) return;
             _style ??= new GUIStyle(GUI.skin.label) { fontSize = 22, richText = true };
 
-            GUILayout.BeginArea(new Rect(14, 12, 480, 540));
+            GUILayout.BeginArea(new Rect(14, 12, 560, 600));
 
             GUILayout.Label("<b>Inventory</b>", _style);
             foreach (var kv in gatherer.Inventory.Items)
@@ -26,34 +27,37 @@ namespace Caveman
 
             GUILayout.Space(12);
 
-            if (crafter != null && crafter.recipe != null)
+            if (builder != null && builder.buildables.Count > 0)
             {
-                if (crafter.Owned)
+                GUILayout.Label("<b>Build</b>  (places next to you)", _style);
+                for (int i = 0; i < builder.buildables.Count; i++)
                 {
-                    GUILayout.Label($"<b>{crafter.recipe.displayName}</b> equipped  " +
-                                    $"<color=#9f9>(gather x{crafter.recipe.gatherPower})</color>", _style);
+                    var def = builder.buildables[i];
+                    if (def == null) continue;
+                    string color = builder.CanAfford(def) ? "#9f9" : "#f99";
+                    GUILayout.Label(
+                        $"[{i + 1}] {def.displayName} — <color={color}>{CostText(def)}</color> " +
+                        $"<color=#bbb>(+{def.outputPerCycle} {Name(def.produces)} / {def.interval:0.#}s)</color>",
+                        _style);
                 }
-                else
-                {
-                    string color = crafter.CanCraft() ? "#9f9" : "#f99";
-                    GUILayout.Label($"Press <b>C</b> to craft {crafter.recipe.displayName}", _style);
-                    GUILayout.Label($"<color={color}>Needs {CostText(crafter.recipe)}</color>", _style);
-                }
+                GUILayout.Label($"Buildings running: {builder.BuildingsPlaced}", _style);
             }
 
             GUILayout.Space(12);
-            GUILayout.Label("WASD / arrows to move", _style);
-            GUILayout.Label("Left-click a highlighted rock/tree to gather", _style);
+            GUILayout.Label("WASD/arrows move · left-click rock/tree to gather", _style);
+            GUILayout.Label("<color=#ffd24d>Gather enough, then build a hut — it gathers for you.</color>", _style);
 
             GUILayout.EndArea();
         }
 
-        private static string CostText(ToolDefinition tool)
+        private static string Name(ItemDefinition item) => item != null ? item.displayName : "?";
+
+        private static string CostText(BuildingDefinition def)
         {
             var parts = new List<string>();
-            foreach (var c in tool.cost)
+            foreach (var c in def.cost)
                 if (c.item != null) parts.Add($"{c.amount} {c.item.displayName}");
-            return string.Join(", ", parts);
+            return parts.Count > 0 ? string.Join(", ", parts) : "free";
         }
     }
 }

@@ -4,16 +4,16 @@ using UnityEngine.InputSystem;
 namespace Caveman
 {
     /// <summary>
-    /// Click-to-gather. Highlights the node under the cursor when it's in reach,
-    /// and harvests it on left-click. GatherPower (raised by crafting a tool)
-    /// multiplies how much each hit yields. Owns the player's Inventory.
+    /// Click-to-gather for the EARLY (manual) game only. Highlights the node under
+    /// the cursor when it's in reach and harvests it on left-click. Owns the
+    /// player's Inventory. Manual gathering is meant to be the bootstrap that funds
+    /// your first automation — it is deliberately NOT upgraded to be faster.
     /// </summary>
     public class PlayerGatherer : MonoBehaviour
     {
         [Tooltip("How close the player must be to a node to harvest it (world units).")]
         public float reach = 4f;
 
-        public int GatherPower { get; set; } = 1;
         public Inventory Inventory { get; } = new Inventory();
 
         private Camera _cam;
@@ -46,7 +46,7 @@ namespace Caveman
             }
 
             if (inReach && mouse.leftButton.wasPressedThisFrame)
-                node.Harvest(Inventory, GatherPower);
+                node.Harvest(Inventory);
         }
     }
 }
