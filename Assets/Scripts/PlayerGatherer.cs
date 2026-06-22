@@ -4,39 +4,49 @@ using UnityEngine.InputSystem;
 namespace Caveman
 {
     /// <summary>
-    /// Click-to-gather. On left-click, finds the ResourceNode under the cursor and,
-    /// if the player is within reach, harvests it into the player's Inventory.
-    /// Owns the player's Inventory for the MVP.
+    /// Click-to-gather. Highlights the node under the cursor when it's in reach,
+    /// and harvests it on left-click. GatherPower (raised by crafting a tool)
+    /// multiplies how much each hit yields. Owns the player's Inventory.
     /// </summary>
     public class PlayerGatherer : MonoBehaviour
     {
         [Tooltip("How close the player must be to a node to harvest it (world units).")]
         public float reach = 4f;
 
+        public int GatherPower { get; set; } = 1;
         public Inventory Inventory { get; } = new Inventory();
 
         private Camera _cam;
+        private ResourceNode _highlighted;
 
         void Awake() => _cam = Camera.main;
 
         void Update()
         {
-            var mouse = Mouse.current;
-            if (mouse == null || !mouse.leftButton.wasPressedThisFrame) return;
-
             if (_cam == null) _cam = Camera.main;
             if (_cam == null) return;
 
+            var mouse = Mouse.current;
+            if (mouse == null) return;
+
             Vector2 world = _cam.ScreenToWorldPoint(mouse.position.ReadValue());
             Collider2D hit = Physics2D.OverlapPoint(world);
-            if (hit == null) return;
+            ResourceNode node = hit != null ? hit.GetComponent<ResourceNode>() : null;
 
-            var node = hit.GetComponent<ResourceNode>();
-            if (node == null) return;
+            bool inReach = node != null &&
+                           Vector2.Distance(transform.position, node.transform.position) <= reach;
 
-            if (Vector2.Distance(transform.position, node.transform.position) > reach) return;
+            // Keep exactly one node highlighted at a time.
+            ResourceNode target = inReach ? node : null;
+            if (target != _highlighted)
+            {
+                if (_highlighted != null) _highlighted.SetHighlighted(false);
+                _highlighted = target;
+                if (_highlighted != null) _highlighted.SetHighlighted(true);
+            }
 
-            node.Harvest(Inventory);
+            if (inReach && mouse.leftButton.wasPressedThisFrame)
+                node.Harvest(Inventory, GatherPower);
         }
     }
 }
