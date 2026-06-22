@@ -65,7 +65,7 @@ namespace Caveman
             colony.foodItem = food;
             colony.carried = gatherer.Inventory;
             colony.SetStartingPopulation(3);
-            gatherer.Inventory.Add(food, 25); // starting larder so you don't instantly starve
+            gatherer.Inventory.Add(food, 50); // generous starting larder while you learn the ropes
 
             // --- Town Hall (pre-placed, houses 3) ---
             var townHallDef = MakeHousing("Town Hall", 3, new Color(0.60f, 0.50f, 0.70f));
@@ -75,6 +75,9 @@ namespace Caveman
             var hud = new GameObject("HUD").AddComponent<InventoryHud>();
             hud.gatherer = gatherer;
             hud.builder = builder;
+            hud.woodItem = wood;
+            hud.stoneItem = stone;
+            hud.foodItem = food;
 
             // --- Resource patches ---
             var treeColor = new Color(0.27f, 0.55f, 0.22f);

@@ -19,9 +19,9 @@ namespace Caveman
         public bool Starving { get; private set; }
 
         [Header("Tuning")]
-        public float foodTick = 3f;     // every N seconds each person eats 1 food
-        public float growthTick = 10f;  // every N seconds +1 pop if well fed and space
-        public float starveTick = 8f;   // every N seconds -1 pop while starving
+        public float foodTick = 7f;     // every N seconds each person eats 1 food (gentle early)
+        public float growthTick = 12f;  // every N seconds +1 pop if well fed and space
+        public float starveTick = 12f;  // every N seconds -1 pop while starving
 
         private float _foodT, _growthT, _starveT;
 

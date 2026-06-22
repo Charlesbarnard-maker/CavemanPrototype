@@ -135,13 +135,14 @@ namespace Caveman
 
         private StorageBuilding FindNearestStorage()
         {
+            // Any matching storage anywhere accepts this resource (no adjacency needed).
             StorageBuilding best = null;
-            float bestSq = transferRange * transferRange;
+            float bestSq = float.MaxValue;
             foreach (var s in FindObjectsByType<StorageBuilding>())
             {
                 if (s == null || s.accepts != produces) continue;
                 float sq = ((Vector2)(s.transform.position - transform.position)).sqrMagnitude;
-                if (sq <= bestSq) { bestSq = sq; best = s; }
+                if (sq < bestSq) { bestSq = sq; best = s; }
             }
             return best;
         }

@@ -26,8 +26,8 @@ namespace Caveman
             if (_cam == null) _cam = Camera.main;
             if (_cam == null) return;
 
-            // Don't gather while a building is being placed (same mouse button).
-            if (BuildController.IsPlacing)
+            // Don't gather while placing a building or clicking on the HUD.
+            if (BuildController.IsPlacing || InventoryHud.PointerOverUI)
             {
                 if (_highlighted != null) { _highlighted.SetHighlighted(false); _highlighted = null; }
                 return;
