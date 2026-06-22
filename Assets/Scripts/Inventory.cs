@@ -5,27 +5,48 @@ using UnityEngine;
 namespace Caveman
 {
     /// <summary>
-    /// Plain C# (no MonoBehaviour): the pure simulation side. Knows nothing about
-    /// rendering or input. This separation is what lets the systems scale toward a
-    /// factory game and even port to 3D later.
+    /// Plain C# (no MonoBehaviour): the pure simulation side. Used both for the
+    /// player's carried items and for each building's internal buffer/store.
+    /// An optional capacity caps the TOTAL item count (0 = unlimited).
     /// </summary>
     public class Inventory
     {
         private readonly Dictionary<ItemDefinition, int> _items = new();
 
-        /// <summary>Fired whenever a count changes (HUD listens to this).</summary>
         public event Action Changed;
+
+        /// <summary>Max total item count across all types. 0 = unlimited.</summary>
+        public int capacity = 0;
 
         public IReadOnlyDictionary<ItemDefinition, int> Items => _items;
 
-        public void Add(ItemDefinition item, int amount = 1)
+        public int Total()
         {
-            if (item == null || amount <= 0) return;
-            _items.TryGetValue(item, out int current);
-            _items[item] = Mathf.Min(current + amount, item.maxStack);
-            Changed?.Invoke();
+            int t = 0;
+            foreach (var kv in _items) t += kv.Value;
+            return t;
         }
 
+        /// <summary>Adds up to `amount`, respecting capacity. Returns the amount actually added.</summary>
+        public int Add(ItemDefinition item, int amount = 1)
+        {
+            if (item == null || amount <= 0) return 0;
+
+            int accepted = amount;
+            if (capacity > 0)
+            {
+                int space = capacity - Total();
+                if (space <= 0) return 0;
+                accepted = Mathf.Min(accepted, space);
+            }
+
+            _items.TryGetValue(item, out int current);
+            _items[item] = current + accepted;
+            Changed?.Invoke();
+            return accepted;
+        }
+
+        /// <summary>Removes exactly `amount` if available; otherwise removes nothing.</summary>
         public bool TryRemove(ItemDefinition item, int amount = 1)
         {
             if (item == null || amount <= 0) return false;
@@ -34,6 +55,20 @@ namespace Caveman
             _items[item] = current - amount;
             Changed?.Invoke();
             return true;
+        }
+
+        /// <summary>Removes up to `amount`; returns how many were actually removed.</summary>
+        public int RemoveUpTo(ItemDefinition item, int amount)
+        {
+            if (item == null || amount <= 0) return 0;
+            _items.TryGetValue(item, out int current);
+            int taken = Mathf.Min(current, amount);
+            if (taken > 0)
+            {
+                _items[item] = current - taken;
+                Changed?.Invoke();
+            }
+            return taken;
         }
 
         public int Count(ItemDefinition item)

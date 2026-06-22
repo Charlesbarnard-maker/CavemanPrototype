@@ -1,0 +1,53 @@
+using UnityEngine;
+
+namespace Caveman
+{
+    /// <summary>
+    /// A storage structure that holds a large amount of one resource type
+    /// (Wood Warehouse, Stone Storage). Collectors placed next to it drop their
+    /// buffer into it. Brightens as it fills.
+    /// </summary>
+    public class StorageBuilding : MonoBehaviour
+    {
+        public BuildingDefinition def;
+        public ItemDefinition accepts;
+        public Inventory Store { get; private set; }
+
+        private SpriteRenderer _sr;
+        private Color _baseColor;
+
+        public static StorageBuilding Spawn(BuildingDefinition def, Vector3 pos)
+        {
+            var go = new GameObject(def.displayName);
+            go.transform.position = new Vector3(pos.x, pos.y, 0f);
+            go.transform.localScale = Vector3.one * 1.0f;
+
+            var sr = go.AddComponent<SpriteRenderer>();
+            sr.sprite = PlaceholderArt.Square();
+            sr.color = def.color;
+            sr.sortingOrder = 3;
+
+            go.AddComponent<BoxCollider2D>(); // clickable for demolish
+
+            var sb = go.AddComponent<StorageBuilding>();
+            sb.def = def;
+            sb.accepts = def.item;
+            sb.Store = new Inventory { capacity = Mathf.Max(1, def.capacity) };
+            return sb;
+        }
+
+        void Awake()
+        {
+            _sr = GetComponent<SpriteRenderer>();
+            if (_sr != null) _baseColor = _sr.color;
+        }
+
+        void Update()
+        {
+            if (_sr == null || def == null) return;
+            float f = def.capacity > 0 ? (float)Store.Total() / def.capacity : 0f;
+            Color empty = Color.Lerp(_baseColor, Color.black, 0.55f);
+            _sr.color = Color.Lerp(empty, _baseColor, Mathf.Clamp01(0.15f + 0.85f * f));
+        }
+    }
+}

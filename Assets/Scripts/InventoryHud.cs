@@ -4,8 +4,8 @@ using UnityEngine;
 namespace Caveman
 {
     /// <summary>
-    /// Minimal debug HUD via OnGUI (no Canvas wiring needed yet). Shows inventory,
-    /// the build menu, and the current placement state.
+    /// Minimal debug HUD via OnGUI. Shows the combined resource pool (carried +
+    /// all buffers/storage), the build menu, and the current placement state.
     /// </summary>
     public class InventoryHud : MonoBehaviour
     {
@@ -18,10 +18,12 @@ namespace Caveman
             if (gatherer == null) return;
             _style ??= new GUIStyle(GUI.skin.label) { fontSize = 22, richText = true };
 
-            GUILayout.BeginArea(new Rect(14, 12, 640, 640));
+            GUILayout.BeginArea(new Rect(14, 12, 700, 680));
 
-            GUILayout.Label("<b>Inventory</b>", _style);
-            foreach (var kv in gatherer.Inventory.Items)
+            GUILayout.Label("<b>Resources</b>  <color=#bbb>(carried + stored)</color>", _style);
+            var totals = Economy.Totals(gatherer.Inventory);
+            if (totals.Count == 0) GUILayout.Label("<color=#bbb>nothing yet — gather some!</color>", _style);
+            foreach (var kv in totals)
                 GUILayout.Label($"{kv.Key.displayName}: {kv.Value}", _style);
 
             GUILayout.Space(12);
@@ -31,8 +33,9 @@ namespace Caveman
                 if (builder.PendingIndex >= 0)
                 {
                     var def = builder.buildables[builder.PendingIndex];
-                    string ok = builder.PlacementValid ? "<color=#9f9>VALID — left-click to place</color>"
-                                                       : "<color=#f99>invalid — move near a matching patch</color>";
+                    string ok = builder.PlacementValid
+                        ? "<color=#9f9>VALID — left-click to place</color>"
+                        : "<color=#f99>invalid — check cost / position</color>";
                     GUILayout.Label($"<b>Placing {def.displayName}</b>  ({ok})", _style);
                     GUILayout.Label("Right-click or Esc to cancel", _style);
                 }
@@ -44,12 +47,14 @@ namespace Caveman
                         var def = builder.buildables[i];
                         if (def == null) continue;
                         string color = builder.CanAfford(def) ? "#9f9" : "#f99";
+                        string role = def.kind == BuildingKind.Storage
+                            ? $"stores {Name(def.item)} (cap {def.capacity})"
+                            : $"+{def.outputPerCycle} {Name(def.item)}/{def.interval:0.#}s · near {Name(def.item)}";
                         GUILayout.Label(
-                            $"[{i + 1}] {def.displayName} — <color={color}>{CostText(def)}</color>  " +
-                            $"<color=#bbb>(+{def.outputPerCycle} {Name(def.produces)}/{def.interval:0.#}s · place near {Name(def.produces)})</color>",
+                            $"[{i + 1}] {def.displayName} — <color={color}>{CostText(def)}</color>  <color=#bbb>({role})</color>",
                             _style);
                     }
-                    GUILayout.Label("<color=#bbb>X = demolish building under cursor (half refund)</color>", _style);
+                    GUILayout.Label("<color=#bbb>X = demolish under cursor (half refund)</color>", _style);
                 }
 
                 GUILayout.Label($"Buildings: {builder.BuildingsPlaced}", _style);
@@ -57,7 +62,7 @@ namespace Caveman
 
             GUILayout.Space(12);
             GUILayout.Label("WASD/arrows move · left-click patch to gather", _style);
-            GUILayout.Label("<color=#ffd24d>Gather, then place a hut on a patch — it harvests for you.</color>", _style);
+            GUILayout.Label("<color=#ffd24d>Place a collector on a patch, then storage next to it — it fills hands-free.</color>", _style);
 
             GUILayout.EndArea();
         }

@@ -18,20 +18,35 @@ namespace Caveman
         }
     }
 
+    public enum BuildingKind
+    {
+        Collector, // auto-harvests a nearby resource patch into its buffer
+        Storage,   // holds a large amount of one resource type
+    }
+
     /// <summary>
-    /// A placeable structure that produces a resource automatically over time.
-    /// This is the heart of the game: spend manually-gathered resources to build
-    /// something that gathers FOR you — removing manual work, not speeding it up.
+    /// Data for a placeable structure. Collectors harvest a patch into a small
+    /// buffer and push to adjacent storage; Storage holds a large amount.
     /// </summary>
     [CreateAssetMenu(fileName = "Building", menuName = "Caveman/Building Definition")]
     public class BuildingDefinition : ScriptableObject
     {
         public string displayName = "Wood Hut";
-        public ItemDefinition produces;
+        public BuildingKind kind = BuildingKind.Collector;
+
+        [Tooltip("Collector: the resource it produces. Storage: the resource it holds.")]
+        public ItemDefinition item;
+
+        [Header("Collector")]
         public int outputPerCycle = 1;
-        [Tooltip("Seconds between each automatic output.")]
+        [Tooltip("Seconds between each automatic harvest.")]
         public float interval = 2f;
-        [Tooltip("Placeholder tint for the building.")]
+
+        [Header("Capacity")]
+        [Tooltip("Collector buffer size, or storage size.")]
+        public int capacity = 10;
+
+        [Header("Visuals / cost")]
         public Color color = Color.white;
         public List<ItemAmount> cost = new();
     }
