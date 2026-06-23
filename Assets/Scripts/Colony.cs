@@ -60,6 +60,10 @@ namespace Caveman
         public int growthFoodCost = 8;
 
         private float _foodT, _waterT, _growthT, _starveT;
+        private float _fedBonus = 1f;
+
+        /// <summary>Global work-speed multiplier: lower when starving/thirsty, higher with varied food.</summary>
+        public float Productivity => (Starving || Thirsty) ? 0.6f : _fedBonus;
 
         public int Capacity
         {
@@ -153,6 +157,12 @@ namespace Caveman
                 {
                     Starving = false;
                 }
+
+                // Food variety -> productivity bonus (a varied, well-fed colony works faster).
+                var t = Economy.Totals(carried);
+                int variety = 0;
+                foreach (var kv in t) if (kv.Key != null && kv.Key.foodValue > 0 && kv.Value > 0) variety++;
+                _fedBonus = 1f + 0.1f * Mathf.Clamp(variety - 1, 0, 3); // up to +30% with 4 food types
             }
 
             // --- Water consumption ---

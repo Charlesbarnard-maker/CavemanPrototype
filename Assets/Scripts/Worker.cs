@@ -68,7 +68,7 @@ namespace Caveman
 
                 case State.Chopping:
                     if (node == null || !node.HasResource) { _state = State.ToHome; break; }
-                    _chopTimer += Time.deltaTime;
+                    _chopTimer += Time.deltaTime * Prod;
                     _nudgeTimer -= Time.deltaTime;
                     if (_nudgeTimer <= 0f) { node.Nudge(); _nudgeTimer = 0.3f; }
                     if (_chopTimer >= chopTime)
@@ -98,11 +98,13 @@ namespace Caveman
             UpdateColor();
         }
 
+        private static float Prod => Colony.Instance != null ? Colony.Instance.Productivity : 1f;
+
         private bool MoveTo(Vector3 target)
         {
             Vector3 p = transform.position;
             target.z = 0f; p.z = 0f;
-            transform.position = Vector3.MoveTowards(p, target, moveSpeed * Time.deltaTime);
+            transform.position = Vector3.MoveTowards(p, target, moveSpeed * Prod * Time.deltaTime);
             return (transform.position - target).sqrMagnitude < 0.04f;
         }
 

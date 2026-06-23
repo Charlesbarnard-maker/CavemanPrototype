@@ -82,6 +82,9 @@ no Inspector wiring). Scripts in `Assets/Scripts/`:
   TransportHub) that hauls faster than a hand-transporter. Unlocks in Bronze.
 - **Transporter priorities** — each transport building can be set to prioritise a
   resource (cycled in its panel), the first real logistics "choice".
+- **Productivity from food** — a global work-speed multiplier: starving/thirsty slows
+  everything to 60%; food *variety* (berries/meat/cooked/bread) boosts it up to +30%.
+  Makes the whole food chain matter for output (shown as "Output %" in the status).
 - **Ground backdrop** (placeholder terrain) behind the world.
 - **Exploration — fog of war** (`FogOfWar`): the map starts dark and is permanently
   revealed in a radius around the player as they move; the M overview shows what's

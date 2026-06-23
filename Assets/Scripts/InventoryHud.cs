@@ -132,7 +132,9 @@ namespace Caveman
                 if (c.Starving) flags += "   <color=#f55>STARVING</color>";
                 if (c.Thirsty) flags += "   <color=#5cf>THIRSTY</color>";
                 int working = c.Population - c.FreeWorkers; // assigned + builders + transporters
-                GUILayout.Label($"<b>Population</b> {c.Population}/{c.Capacity}   <b>Working</b> {working}   <b>Free</b> {c.FreeWorkers}   <color=#cda>{c.AgeName}</color>{flags}", _s);
+                int prod = Mathf.RoundToInt(c.Productivity * 100f);
+                string prodCol = prod >= 100 ? "#9cf" : "#f99";
+                GUILayout.Label($"<b>Population</b> {c.Population}/{c.Capacity}   <b>Working</b> {working}   <b>Free</b> {c.FreeWorkers}   <color=#cda>{c.AgeName}</color>   <color={prodCol}>Output {prod}%</color>{flags}", _s);
             }
             GUILayout.EndArea();
         }

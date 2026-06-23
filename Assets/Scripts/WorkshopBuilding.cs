@@ -81,7 +81,8 @@ namespace Caveman
 
             if (AssignedWorkers > 0 && output != null && Buffer.Total() < Buffer.capacity)
             {
-                _timer += Time.deltaTime * AssignedWorkers; // more workers = faster
+                float prod = Colony.Instance != null ? Colony.Instance.Productivity : 1f;
+                _timer += Time.deltaTime * AssignedWorkers * prod; // more workers / well-fed = faster
                 if (_timer >= processTime)
                 {
                     if (Economy.CanAfford(inputs, carried))

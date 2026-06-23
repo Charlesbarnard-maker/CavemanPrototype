@@ -56,9 +56,10 @@ A running record so progress/problems don't get lost. Newest first. Move items t
   building registries each frame — fine for now, revisit if building counts get large.
 
 ## Open — design
-- **Too automated / not enough choice.** Once set up, the colony runs itself. Needs
-  player decisions: worker/transporter priorities, layout that matters, branching
-  tech/age unlocks, manual overrides. (See DESIGN.md "More player choice".)
+- **Too automated / not enough choice** — *partly addressed*: ages now force choices
+  (what to build toward, advance when ready), transporter **priorities** added, and
+  food **variety→productivity** rewards decisions. Still want: worker job priorities,
+  layout that matters more, branching (not just linear) tech.
 
 ## Open — onboarding / UX
 - **Too much at once at the start.** All buildings/categories are visible immediately,
