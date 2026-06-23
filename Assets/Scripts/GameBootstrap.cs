@@ -30,6 +30,8 @@ namespace Caveman
             var flour = MakeItem("flour", "Flour", new Color(0.90f, 0.86f, 0.72f));
             var bread = MakeItem("bread", "Bread", new Color(0.80f, 0.58f, 0.30f)); bread.foodValue = 4;
             var ore = MakeItem("ore", "Ore", new Color(0.62f, 0.58f, 0.42f)); // rare — found far from base
+            var metal = MakeItem("metal", "Metal", new Color(0.66f, 0.68f, 0.74f));
+            var tools = MakeItem("tools", "Tools", new Color(0.55f, 0.60f, 0.68f));
 
             // --- Buildings ---
             var woodHut = MakeCollector("Wood Hut", wood, 1, 2.0f, 2, 12, new Color(0.80f, 0.52f, 0.25f),
@@ -117,6 +119,14 @@ namespace Caveman
                 new ItemAmount(wood, 6), new ItemAmount(stone, 4)); mine.unlockAge = 1;
             var oreStore = MakeStorage("Ore Stockpile", ore, 100, new Color(0.52f, 0.50f, 0.42f),
                 new ItemAmount(wood, 8)); oreStore.unlockAge = 1;
+            // Smelting: Ore + Charcoal -> Metal (charcoal is shared with the Kiln -> cascade).
+            var smelter = MakeWorkshop("Smelter", metal, 1, 3.5f, 2, 12, new Color(0.55f, 0.50f, 0.50f),
+                new List<ItemAmount> { new ItemAmount(ore, 1), new ItemAmount(charcoal, 1) },
+                new ItemAmount(stone, 10), new ItemAmount(clay, 6)); smelter.unlockAge = 2;
+            // Toolmaker: Metal + Planks -> Tools (an Iron-age comfort good).
+            var toolmaker = MakeWorkshop("Toolmaker", tools, 1, 4.0f, 2, 12, new Color(0.50f, 0.55f, 0.60f),
+                new List<ItemAmount> { new ItemAmount(metal, 1), new ItemAmount(planks, 1) },
+                new ItemAmount(planks, 8), new ItemAmount(bricks, 6)); toolmaker.unlockAge = 3;
 
             // --- Camera (follows the player) ---
             var cam = Camera.main;
@@ -145,7 +155,7 @@ namespace Caveman
               woodStore, stoneStore, foodStore, waterStore, warehouse, house,
               hunter, clayPit, charcoalBurner, clayStore, smokehouse, longhouse,
               kiln, farm, mill, bakery, brickStore, woodBelt, fastBelt,
-              mine, oreStore, depot, caravan };
+              mine, oreStore, smelter, toolmaker, depot, caravan };
 
             var follow = cam.GetComponent<CameraFollow>();
             if (follow == null) follow = cam.gameObject.AddComponent<CameraFollow>();
@@ -168,12 +178,14 @@ namespace Caveman
                 new Colony.AgeReq { pop = 8,  cost = new List<ItemAmount> { new ItemAmount(wood, 40), new ItemAmount(stone, 25) } },
                 new Colony.AgeReq { pop = 12, cost = new List<ItemAmount> { new ItemAmount(planks, 25), new ItemAmount(clay, 20), new ItemAmount(stone, 30) } },
                 new Colony.AgeReq { pop = 18, cost = new List<ItemAmount> { new ItemAmount(bricks, 30), new ItemAmount(planks, 30), new ItemAmount(ore, 20) } },
+                new Colony.AgeReq { pop = 28, cost = new List<ItemAmount> { new ItemAmount(metal, 30), new ItemAmount(tools, 15), new ItemAmount(planks, 40) } },
             };
             // Comfort goods (the demand sink): people want better food as the colony evolves.
             colony.comforts = new List<Colony.Comfort>
             {
                 new Colony.Comfort { item = cookedFood, unlockAge = 1 }, // Tribal: want cooked food
                 new Colony.Comfort { item = bread,      unlockAge = 2 }, // Bronze: want bread too
+                new Colony.Comfort { item = tools,      unlockAge = 3 }, // Iron: want tools
             };
 
             // --- Town Hall (pre-placed, houses 3) ---
@@ -190,7 +202,7 @@ namespace Caveman
             hud.foodItem = food;
             hud.waterItem = water;
             hud.debugItems = new List<ItemDefinition>
-            { wood, stone, food, water, planks, cookedFood, meat, clay, charcoal, bricks, grain, flour, bread, ore };
+            { wood, stone, food, water, planks, cookedFood, meat, clay, charcoal, bricks, grain, flour, bread, ore, metal, tools };
 
             // --- Guided objectives ladder (the "what next / why advance" hook) ---
             var carriedInv = gatherer.Inventory;
