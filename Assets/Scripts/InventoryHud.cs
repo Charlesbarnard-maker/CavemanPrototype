@@ -19,9 +19,21 @@ namespace Caveman
         /// <summary>True when the cursor is over an interactive HUD panel.</summary>
         public static bool PointerOverUI { get; private set; }
 
-        private GUIStyle _s, _small, _big;
+        private GUIStyle _s, _small, _big, _btn;
         private bool _paused;
         private bool _showHelp;
+        private Vector2 _buildScroll;
+        private Rect _buildRect, _selRect;
+        private bool _buildShown, _selShown;
+
+        private static readonly (BuildingKind kind, string label)[] Cats =
+        {
+            (BuildingKind.Collector, "Gathering"),
+            (BuildingKind.Workshop, "Workshops"),
+            (BuildingKind.Logistics, "Logistics"),
+            (BuildingKind.Storage, "Storage"),
+            (BuildingKind.Housing, "Housing"),
+        };
 
         void Update()
         {
@@ -43,14 +55,22 @@ namespace Caveman
             _s ??= new GUIStyle(GUI.skin.label) { fontSize = 20, richText = true };
             _small ??= new GUIStyle(GUI.skin.label) { fontSize = 15, richText = true };
             _big ??= new GUIStyle(GUI.skin.label) { fontSize = 40, richText = true, alignment = TextAnchor.MiddleCenter };
+            _btn ??= new GUIStyle(GUI.skin.button) { richText = true, alignment = TextAnchor.MiddleLeft, fontSize = 13 };
 
             DrawStatus();
             DrawObjective();
-            if (builder != null) DrawBuildBarOrPlacement();
-            DrawSelectedPanel();      // also sets PointerOverUI
+            if (builder != null) DrawBuildMenu();
+            DrawSelectedPanel();
             DrawFooter();
             if (_showHelp) DrawHelp();
             if (_paused) GUI.Label(new Rect(0, 60, Screen.width, 60), "<b>PAUSED</b>  <size=18>(space)</size>", _big);
+
+            // Block world clicks when the cursor is over an interactive panel.
+            if (Event.current.type == EventType.Repaint)
+            {
+                var m = Event.current.mousePosition;
+                PointerOverUI = (_buildShown && _buildRect.Contains(m)) || (_selShown && _selRect.Contains(m));
+            }
         }
 
         // ---- Top-left: status ----
@@ -85,39 +105,56 @@ namespace Caveman
         private string CurrentObjective()
         {
             int wood = Avail(woodItem);
-            if (!HasCollector("food") && wood < 4) return "Click the green trees to gather Wood.";
-            if (!HasCollector("food")) return "Press 3, then click near the bushes (bottom) to place a Forager Hut — food keeps people alive.";
-            if (!HasCollector("wood")) return "Press 1, then click near the trees to place a Wood Hut.";
-            if (!HasStorage("wood")) return "Press 4 to place a Wood Warehouse (collects wood from anywhere).";
-            if (HousingCount() <= 1) return "Press 7 to build a House so your population can grow.";
+            if (!HasCollector("food") && wood < 4) return "Click the green trees/bushes to gather by hand.";
+            if (!HasCollector("food")) return "Build a Forager Hut near the bushes (bottom) — food keeps people alive.";
+            if (!HasCollector("wood")) return "Build a Wood Hut near the trees.";
+            if (!HasStorage("wood")) return "Build a Wood Warehouse to stockpile wood.";
+            if (TransportHub.All.Count == 0) return "Build a Mammoth Shack — its transporters carry goods from huts to storage.";
+            if (HousingCount() <= 1) return "Build a House (needs Planks from a Sawmill) so your population can grow.";
             return "Settlement running! Click a building to manage its workers; expand at will.";
         }
 
-        // ---- Build bar / placement (bottom-left) ----
-        private void DrawBuildBarOrPlacement()
+        // ---- Build menu (left, categorised + scrollable + clickable) ----
+        private void DrawBuildMenu()
         {
-            float h = builder.PendingIndex >= 0 ? 60 : (builder.buildables.Count * 20 + 34);
-            GUILayout.BeginArea(new Rect(12, Screen.height - h - 8, 420, h));
-
             if (builder.PendingIndex >= 0)
             {
+                _buildShown = false;
                 var def = builder.buildables[builder.PendingIndex];
                 string ok = builder.PlacementValid ? "<color=#9f9>click to place</color>" : "<color=#f99>move to a valid spot</color>";
+                GUILayout.BeginArea(new Rect(12, Screen.height - 58, 480, 50));
                 GUILayout.Label($"<b>Placing {def.displayName}</b> — {ok}", _s);
-                GUILayout.Label("<size=15>right-click / Esc to cancel</size>", _s);
+                GUILayout.Label("<size=14>right-click / Esc to cancel</size>", _small);
+                GUILayout.EndArea();
+                return;
             }
-            else
+
+            const float top = 100f;
+            float height = Mathf.Min(Screen.height - top - 16f, 470f);
+            _buildRect = new Rect(12, top, 268, height);
+            _buildShown = true;
+            GUI.Box(_buildRect, GUIContent.none);
+
+            GUILayout.BeginArea(new Rect(_buildRect.x + 8, _buildRect.y + 8, _buildRect.width - 16, _buildRect.height - 16));
+            GUILayout.Label("<b>Build</b>  <size=12>(click, then click the map)</size>", _small);
+            _buildScroll = GUILayout.BeginScrollView(_buildScroll);
+
+            foreach (var cat in Cats)
             {
-                GUILayout.Label("<b>Build</b>  <size=14>(press number, then click)</size>", _small);
+                bool header = false;
                 for (int i = 0; i < builder.buildables.Count; i++)
                 {
                     var def = builder.buildables[i];
-                    if (def == null) continue;
+                    if (def == null || def.kind != cat.kind) continue;
+                    if (!header) { GUILayout.Label($"<b><color=#d8c8a0>{cat.label}</color></b>", _small); header = true; }
                     string col = builder.CanAfford(def) ? "#9f9" : "#f99";
-                    string key = i < 9 ? (i + 1).ToString() : "0";
-                    GUILayout.Label($"[{key}] {def.displayName}  <color={col}>{CostText(def)}</color>", _small);
+                    string key = i < 9 ? (i + 1).ToString() : i == 9 ? "0" : "·";
+                    if (GUILayout.Button($"<size=12>[{key}] {def.displayName}  <color={col}>{CostText(def)}</color></size>", _btn))
+                        builder.BeginPlacement(i);
                 }
             }
+
+            GUILayout.EndScrollView();
             GUILayout.EndArea();
         }
 
@@ -125,11 +162,11 @@ namespace Caveman
         private void DrawSelectedPanel()
         {
             var sel = builder != null ? builder.Selected : null;
-            if (sel == null) { PointerOverUI = false; return; }
+            if (sel == null) { _selShown = false; return; }
 
             var rect = new Rect(Screen.width - 290, Screen.height - 200, 278, 188);
-            if (Event.current.type == EventType.Repaint)
-                PointerOverUI = rect.Contains(Event.current.mousePosition);
+            _selRect = rect;
+            _selShown = true;
 
             GUI.Box(rect, GUIContent.none);
             GUILayout.BeginArea(new Rect(rect.x + 12, rect.y + 10, rect.width - 24, rect.height - 20));
@@ -209,14 +246,14 @@ namespace Caveman
             GUILayout.BeginArea(new Rect(r.x + 16, r.y + 12, r.width - 32, r.height - 24));
             GUILayout.Label("<b>How to play</b>", _s);
             GUILayout.Label("<size=15>" +
-                "• WASD / arrows to move.\n" +
+                "• WASD / arrows to move.  Mouse wheel = zoom, M = map.\n" +
                 "• Left-click a tree/rock/bush to gather by hand.\n" +
-                "• Press a number, then click, to place a building site.\n" +
-                "• A free worker hauls the materials there, then builds it.\n" +
-                "• Collectors need WORKERS to run — each is one person.\n" +
-                "• Click a building to manage it (add/remove workers, demolish).\n" +
-                "• People need Food and Housing. Build foragers + houses.\n" +
-                "• Space = pause.  Esc = cancel/deselect.  X = demolish selected.\n" +
+                "• Click a building in the Build menu (left), then click the map.\n" +
+                "• Builders (from the HQ) haul materials there, then build it.\n" +
+                "• Collectors/workshops need WORKERS — each is one person.\n" +
+                "• A Mammoth Shack's transporters carry goods from huts to storage.\n" +
+                "• Click a building to manage it (workers, demolish).\n" +
+                "• People need Food + Housing. Space = pause, Esc = cancel, X = demolish.\n" +
                 "</size>", _small);
             GUILayout.Label("<size=15>Press H to close.</size>", _small);
             GUILayout.EndArea();

@@ -22,8 +22,10 @@ A running record so progress/problems don't get lost. Newest first. Move items t
   Buffer→storage is now physical (Transporters), but a workshop's *inputs* and a
   build site's *materials* are taken from the combined pool regardless of distance.
   Next: route inputs through transport too (and conveyors).
-- **Build menu doesn't scale.** Flat number-key list; 10th building is on key `0` as a
-  stopgap. Needs a categorised, clickable menu (see DESIGN.md).
+- *(Fixed 2026-06-23)* ~~Build menu doesn't scale~~ — now a categorised, scrollable,
+  clickable menu (Gathering / Workshops / Logistics / Storage / Housing). Number keys
+  1–9 + 0 remain as shortcuts. Categories are derived from building kind for now;
+  finer "industries" sub-grouping can come later.
 - **No food variety yet.** Only one Food type. Planned: berries (bushes) + meat
   (animals) with distinct gathering + storage.
 - **Reducing builders mid-haul wastes a little.** A removed builder drops its claim
