@@ -184,7 +184,7 @@ namespace Caveman
         private static bool HasMatchingNodeNear(Vector3 pos, ItemDefinition item, float range)
         {
             float rsq = range * range;
-            foreach (var n in FindObjectsByType<ResourceNode>())
+            foreach (var n in ResourceNode.All)
             {
                 if (n == null || n.yields != item) continue;
                 if (((Vector2)(n.transform.position - pos)).sqrMagnitude <= rsq) return true;

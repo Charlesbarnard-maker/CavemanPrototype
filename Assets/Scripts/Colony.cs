@@ -30,7 +30,7 @@ namespace Caveman
             get
             {
                 int c = 0;
-                foreach (var h in FindObjectsByType<HousingBuilding>()) c += h.houseCapacity;
+                foreach (var h in HousingBuilding.All) c += h.houseCapacity;
                 return c;
             }
         }
@@ -40,7 +40,7 @@ namespace Caveman
             get
             {
                 int a = 0;
-                foreach (var p in FindObjectsByType<ProductionBuilding>()) a += p.AssignedWorkers;
+                foreach (var p in ProductionBuilding.All) a += p.AssignedWorkers;
                 return a;
             }
         }
@@ -118,7 +118,7 @@ namespace Caveman
         {
             int over = AssignedTotal - Population;
             if (over <= 0) return;
-            foreach (var p in FindObjectsByType<ProductionBuilding>())
+            foreach (var p in ProductionBuilding.All)
             {
                 while (over > 0 && p.AssignedWorkers > 0) { p.Unassign(); over--; }
                 if (over <= 0) break;

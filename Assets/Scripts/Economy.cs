@@ -15,9 +15,9 @@ namespace Caveman
         {
             if (item == null) return 0;
             int total = carried != null ? carried.Count(item) : 0;
-            foreach (var s in Object.FindObjectsByType<StorageBuilding>())
+            foreach (var s in StorageBuilding.All)
                 total += s.Store.Count(item);
-            foreach (var p in Object.FindObjectsByType<ProductionBuilding>())
+            foreach (var p in ProductionBuilding.All)
                 total += p.Buffer.Count(item);
             return total;
         }
@@ -44,12 +44,12 @@ namespace Caveman
             if (carried != null) remaining -= carried.RemoveUpTo(item, remaining);
             if (remaining <= 0) return;
 
-            foreach (var s in Object.FindObjectsByType<StorageBuilding>())
+            foreach (var s in StorageBuilding.All)
             {
                 remaining -= s.Store.RemoveUpTo(item, remaining);
                 if (remaining <= 0) return;
             }
-            foreach (var p in Object.FindObjectsByType<ProductionBuilding>())
+            foreach (var p in ProductionBuilding.All)
             {
                 remaining -= p.Buffer.RemoveUpTo(item, remaining);
                 if (remaining <= 0) return;
@@ -63,12 +63,12 @@ namespace Caveman
             int remaining = amount;
             if (carried != null) remaining -= carried.RemoveUpTo(item, remaining);
             if (remaining <= 0) return amount;
-            foreach (var s in Object.FindObjectsByType<StorageBuilding>())
+            foreach (var s in StorageBuilding.All)
             {
                 remaining -= s.Store.RemoveUpTo(item, remaining);
                 if (remaining <= 0) return amount;
             }
-            foreach (var p in Object.FindObjectsByType<ProductionBuilding>())
+            foreach (var p in ProductionBuilding.All)
             {
                 remaining -= p.Buffer.RemoveUpTo(item, remaining);
                 if (remaining <= 0) return amount;
@@ -92,8 +92,8 @@ namespace Caveman
             }
 
             AddAll(carried);
-            foreach (var s in Object.FindObjectsByType<StorageBuilding>()) AddAll(s.Store);
-            foreach (var p in Object.FindObjectsByType<ProductionBuilding>()) AddAll(p.Buffer);
+            foreach (var s in StorageBuilding.All) AddAll(s.Store);
+            foreach (var p in ProductionBuilding.All) AddAll(p.Buffer);
             return totals;
         }
     }

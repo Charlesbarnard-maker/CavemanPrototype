@@ -5,18 +5,18 @@ namespace Caveman
 {
     /// <summary>
     /// A building under construction. It claims a free worker as a builder, who
-    /// hauls the required materials here one load at a time (consuming them from
-    /// the pool on pickup), then constructs the building over a short build time.
-    /// On completion it spawns the real building and the builder is freed.
+    /// hauls the required materials here a few units at a time (consuming them from
+    /// the pool on pickup), then constructs the building over a build time. On
+    /// completion it spawns the real building and the builder is freed.
     /// </summary>
     public class ConstructionSite : MonoBehaviour
     {
         public BuildingDefinition def;
-        public float buildTime = 2.5f;
+        public float buildTime = 4f;
 
-        public readonly List<ItemAmount> remaining = new(); // materials not yet delivered
-        public int totalLoads;
-        public int deliveredLoads;
+        public readonly List<ItemAmount> remaining = new(); // materials still to deliver
+        public int totalUnits;
+        public int deliveredUnits;
         public float buildProgress;
         public bool HasBuilder { get; private set; }
 
@@ -46,20 +46,25 @@ namespace Caveman
             site._sr = sr;
             site._baseColor = def.color;
             foreach (var c in def.cost)
-                if (c.item != null && c.amount > 0) site.remaining.Add(new ItemAmount(c.item, c.amount));
-            site.totalLoads = Mathf.Max(1, site.remaining.Count);
+            {
+                if (c.item == null || c.amount <= 0) continue;
+                site.remaining.Add(new ItemAmount(c.item, c.amount));
+                site.totalUnits += c.amount;
+            }
+            site.totalUnits = Mathf.Max(1, site.totalUnits);
             return site;
         }
 
+        /// <summary>The current material the builder should fetch (first outstanding line).</summary>
         public ItemAmount NextNeeded() => remaining.Count > 0 ? remaining[0] : null;
 
-        public void DeliverFirst()
+        /// <summary>Deliver `qty` units toward the current material line.</summary>
+        public void DeliverUnits(int qty)
         {
-            if (remaining.Count > 0)
-            {
-                remaining.RemoveAt(0);
-                deliveredLoads++;
-            }
+            if (qty <= 0 || remaining.Count == 0) return;
+            remaining[0].amount -= qty;
+            deliveredUnits += qty;
+            if (remaining[0].amount <= 0) remaining.RemoveAt(0);
         }
 
         public void AddBuildProgress(float dt)
@@ -71,7 +76,6 @@ namespace Caveman
 
         void Update()
         {
-            // Acquire a builder when one is free.
             if (!HasBuilder && Colony.Instance != null && Colony.Instance.ClaimWorker())
             {
                 HasBuilder = true;
@@ -103,7 +107,6 @@ namespace Caveman
 
         void OnDestroy()
         {
-            // If demolished mid-build, free the builder/claim.
             if (HasBuilder) { Colony.Instance?.ReleaseWorker(); HasBuilder = false; }
             if (_builder != null) Destroy(_builder.gameObject);
         }
@@ -111,7 +114,7 @@ namespace Caveman
         private void UpdateVisual()
         {
             if (_sr == null) return;
-            float frac = (deliveredLoads + BuildFraction) / (totalLoads + 1f);
+            float frac = ((float)deliveredUnits / totalUnits + BuildFraction) * 0.5f;
             _sr.color = new Color(_baseColor.r, _baseColor.g, _baseColor.b, Mathf.Lerp(0.3f, 0.95f, frac));
         }
     }

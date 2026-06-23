@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace Caveman
@@ -17,6 +18,10 @@ namespace Caveman
         public int regenAmount = 1;
         [Tooltip("Seconds between each regeneration tick.")]
         public float regenInterval = 1.5f;
+
+        public static readonly List<ResourceNode> All = new();
+        void OnEnable() => All.Add(this);
+        void OnDisable() => All.Remove(this);
 
         private int _amount;
         private float _regenTimer;

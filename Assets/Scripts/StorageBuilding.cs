@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace Caveman
@@ -12,6 +13,10 @@ namespace Caveman
         public BuildingDefinition def;
         public ItemDefinition accepts;
         public Inventory Store { get; private set; }
+
+        public static readonly List<StorageBuilding> All = new();
+        void OnEnable() => All.Add(this);
+        void OnDisable() => All.Remove(this);
 
         private SpriteRenderer _sr;
         private Color _baseColor;

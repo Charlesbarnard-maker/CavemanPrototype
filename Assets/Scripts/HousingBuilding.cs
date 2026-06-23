@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace Caveman
@@ -10,6 +11,10 @@ namespace Caveman
     {
         public BuildingDefinition def;
         public int houseCapacity = 3;
+
+        public static readonly List<HousingBuilding> All = new();
+        void OnEnable() => All.Add(this);
+        void OnDisable() => All.Remove(this);
 
         public static HousingBuilding Spawn(BuildingDefinition def, Vector3 pos)
         {

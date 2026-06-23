@@ -54,6 +54,10 @@ namespace Caveman
             return pb;
         }
 
+        public static readonly List<ProductionBuilding> All = new();
+        void OnEnable() => All.Add(this);
+        void OnDisable() => All.Remove(this);
+
         void Awake()
         {
             _sr = GetComponent<SpriteRenderer>();
@@ -64,7 +68,7 @@ namespace Caveman
         {
             ResourceNode best = null;
             float bestSq = sourceRange * sourceRange;
-            foreach (var n in FindObjectsByType<ResourceNode>())
+            foreach (var n in ResourceNode.All)
             {
                 if (n == null || n.yields != produces) continue;
                 float sq = ((Vector2)(n.transform.position - transform.position)).sqrMagnitude;
@@ -138,7 +142,7 @@ namespace Caveman
             // Any matching storage anywhere accepts this resource (no adjacency needed).
             StorageBuilding best = null;
             float bestSq = float.MaxValue;
-            foreach (var s in FindObjectsByType<StorageBuilding>())
+            foreach (var s in StorageBuilding.All)
             {
                 if (s == null || s.accepts != produces) continue;
                 float sq = ((Vector2)(s.transform.position - transform.position)).sqrMagnitude;

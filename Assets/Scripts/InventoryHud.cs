@@ -162,7 +162,7 @@ namespace Caveman
             else if (cs != null)
             {
                 if (!cs.MaterialsDone)
-                    GUILayout.Label($"<size=15>Materials: {cs.deliveredLoads}/{cs.totalLoads}{(cs.HasBuilder ? "" : "  (waiting for a free worker)")}</size>", _small);
+                    GUILayout.Label($"<size=15>Materials: {cs.deliveredUnits}/{cs.totalUnits}{(cs.HasBuilder ? "" : "  (waiting for a free worker)")}</size>", _small);
                 else
                     GUILayout.Label($"<size=15>Building… {(int)(cs.BuildFraction * 100)}%</size>", _small);
             }
@@ -212,19 +212,19 @@ namespace Caveman
 
         private static bool HasCollector(string itemId)
         {
-            foreach (var p in FindObjectsByType<ProductionBuilding>())
+            foreach (var p in ProductionBuilding.All)
                 if (p.produces != null && p.produces.id == itemId) return true;
             return false;
         }
 
         private static bool HasStorage(string itemId)
         {
-            foreach (var s in FindObjectsByType<StorageBuilding>())
+            foreach (var s in StorageBuilding.All)
                 if (s.accepts != null && s.accepts.id == itemId) return true;
             return false;
         }
 
-        private static int HousingCount() => FindObjectsByType<HousingBuilding>().Length;
+        private static int HousingCount() => HousingBuilding.All.Count;
 
         private static string CostText(BuildingDefinition def)
         {
