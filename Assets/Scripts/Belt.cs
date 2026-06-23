@@ -22,6 +22,7 @@ namespace Caveman
 
         private float _timer;
         private SpriteRenderer _sr;
+        private SpriteRenderer _dot; // visible item sliding along the belt
         private readonly Color _baseColor = new Color(0.58f, 0.50f, 0.34f);
         private Vector2Int _cell;
 
@@ -63,7 +64,11 @@ namespace Caveman
         }
 
         void OnEnable() { _cell = CellOf(transform.position); Grid[_cell] = this; }
-        void OnDisable() { if (Grid.TryGetValue(_cell, out var b) && b == this) Grid.Remove(_cell); }
+        void OnDisable()
+        {
+            if (Grid.TryGetValue(_cell, out var b) && b == this) Grid.Remove(_cell);
+            if (_dot != null) Destroy(_dot.gameObject);
+        }
 
         public bool CanAccept(ItemDefinition i) => count < capacity && (item == null || item == i);
         public void Receive(ItemDefinition i) { item = i; count++; }
@@ -115,9 +120,34 @@ namespace Caveman
             if (_sr != null)
             {
                 if (!connected) _sr.color = new Color(0.55f, 0.25f, 0.25f); // dead end — not connected
-                else if (count > 0 && item != null) _sr.color = Color.Lerp(_baseColor, item.color, 0.6f);
                 else _sr.color = _baseColor;
             }
+
+            UpdateDot();
+        }
+
+        // A small sprite that slides from the back of the cell to the front each tick,
+        // so you can see goods physically moving along the belt.
+        private void UpdateDot()
+        {
+            if (_dot == null)
+            {
+                var go = new GameObject("BeltItem");
+                var sr = go.AddComponent<SpriteRenderer>();
+                sr.sprite = PlaceholderArt.Circle();
+                sr.sortingOrder = 2;
+                go.transform.localScale = Vector3.one * 0.24f;
+                _dot = sr;
+            }
+
+            bool show = count > 0 && item != null;
+            _dot.enabled = show;
+            if (!show) return;
+
+            float progress = interval > 0f ? Mathf.Clamp01(_timer / interval) : 0f;
+            Vector3 d = new Vector3(Step(dir).x, Step(dir).y, 0f);
+            _dot.transform.position = transform.position - d * 0.35f + d * (0.7f * progress);
+            _dot.color = item.color;
         }
 
         // Is the cell ahead a belt, an accepting storage, or a workshop that wants this item?
