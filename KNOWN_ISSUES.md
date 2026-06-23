@@ -45,6 +45,11 @@ A running record so progress/problems don't get lost. Newest first. Move items t
   (The big per-frame `FindObjectsByType` allocations were already replaced with
   static registries.)
 
+## Open — onboarding / UX
+- **Too much at once at the start.** All buildings/categories are visible immediately,
+  which is a lot for a new player. Plan: progressive unlock (via ages) so early game
+  shows only a few options, plus a cleaner first-run / tidier build panel.
+
 ## Open — content / polish (deliberately deferred)
 - Placeholder art (code-drawn shapes, debug `OnGUI` HUD). One real art pass once
   the systems are locked.

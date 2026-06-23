@@ -76,11 +76,11 @@ namespace Caveman
             var colony = new GameObject("Colony").AddComponent<Colony>();
             colony.foodItem = food;
             colony.carried = gatherer.Inventory;
-            colony.SetStartingPopulation(3);
+            colony.SetStartingPopulation(5);
             gatherer.Inventory.Add(food, 50); // generous starting larder while you learn the ropes
 
             // --- Town Hall (pre-placed, houses 3) ---
-            var townHallDef = MakeHousing("Town Hall", 3, new Color(0.60f, 0.50f, 0.70f));
+            var townHallDef = MakeHousing("Town Hall", 5, new Color(0.60f, 0.50f, 0.70f));
             var townHall = HousingBuilding.Spawn(townHallDef, new Vector2(0f, -1.6f));
             townHall.isHQ = true; // builders are managed from here
 

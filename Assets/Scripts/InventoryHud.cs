@@ -81,7 +81,8 @@ namespace Caveman
             if (c != null)
             {
                 string starve = c.Starving ? "   <color=#f55>STARVING</color>" : "";
-                GUILayout.Label($"<b>People</b> {c.Population}/{c.Capacity}   <b>Free</b> {c.FreeWorkers}   <b>Builders</b> {c.Builders}/{c.MaxBuilders}{starve}", _s);
+                int working = c.Population - c.FreeWorkers; // assigned + builders + transporters
+                GUILayout.Label($"<b>Population</b> {c.Population}/{c.Capacity}   <b>Working</b> {working}   <b>Free</b> {c.FreeWorkers}{starve}", _s);
             }
             var totals = Economy.Totals(gatherer.Inventory);
             GUILayout.Label(ResLine(totals), _s);
