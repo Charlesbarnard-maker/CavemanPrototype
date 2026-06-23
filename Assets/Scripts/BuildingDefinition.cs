@@ -53,6 +53,8 @@ namespace Caveman
         [Header("Capacity")]
         [Tooltip("Collector buffer size, or storage size.")]
         public int capacity = 10;
+        [Tooltip("Storage: player chooses which resource it holds (a generic warehouse).")]
+        public bool configurable = false;
 
         [Header("Progression")]
         [Tooltip("Age at which this becomes buildable (0 = Stone Age, available from the start).")]

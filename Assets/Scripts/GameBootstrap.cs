@@ -54,6 +54,9 @@ namespace Caveman
                 new ItemAmount(wood, 8));
             var waterStore = MakeStorage("Water Barrel", water, 100, new Color(0.35f, 0.50f, 0.72f),
                 new ItemAmount(wood, 8));
+            // Generic warehouse: the player picks what it stores (e.g. Planks, Cooked Food).
+            var warehouse = MakeStorage("Warehouse", null, 120, new Color(0.55f, 0.52f, 0.45f),
+                new ItemAmount(wood, 10)); warehouse.configurable = true;
             var house = MakeHousing("House", 2, new Color(0.72f, 0.62f, 0.45f),
                 new ItemAmount(wood, 8), new ItemAmount(stone, 4), new ItemAmount(planks, 3));
             var mammothShack = MakeLogistics("Mammoth Shack", 2, new Color(0.46f, 0.40f, 0.55f),
@@ -116,7 +119,7 @@ namespace Caveman
             builder.placeNodeRange = 6f;
             builder.buildables = new List<BuildingDefinition>
             { woodHut, stonePit, foragerHut, waterHole, sawmill, campfire,
-              woodStore, stoneStore, foodStore, waterStore, house, mammothShack,
+              woodStore, stoneStore, foodStore, waterStore, warehouse, house, mammothShack,
               hunter, clayPit, charcoalBurner, clayStore, smokehouse, longhouse,
               kiln, farm, mill, bakery, brickStore, roller };
 
@@ -157,23 +160,23 @@ namespace Caveman
             hud.foodItem = food;
             hud.waterItem = water;
 
-            // --- Resource patches: pushed out to the edges, leaving the centre clear
-            //     as open ground for the player to build up their base/processing. ---
-            const float baseClear = 8f;
-            SpawnPatches("Tree", wood, new Color(0.27f, 0.55f, 0.22f), 8,
-                new Vector2(14f, 2f), new Vector2(5f, 7f), new Vector2(1.0f, 1.5f), PlaceholderArt.Triangle(), 30, baseClear);
-            SpawnPatches("Rock", stone, new Color(0.55f, 0.55f, 0.6f), 8,
-                new Vector2(-14f, 2f), new Vector2(5f, 7f), new Vector2(1.0f, 1.5f), PlaceholderArt.Hexagon(), 30, baseClear);
-            SpawnPatches("Bush", food, new Color(0.45f, 0.55f, 0.25f), 6,
-                new Vector2(0f, -13f), new Vector2(9f, 3f), new Vector2(0.7f, 1.0f), PlaceholderArt.Circle(), 30, baseClear);
-            // Water is a big body (a lake), not small scattered patches.
-            SpawnPatches("Lake", water, new Color(0.30f, 0.55f, 0.85f), 2,
-                new Vector2(2f, 14f), new Vector2(3.5f, 2.5f), new Vector2(3.0f, 4.0f), PlaceholderArt.Circle(), 240, baseClear);
-            // Animal herds (meat — Tribal age) and clay deposits (Bronze age).
-            SpawnPatches("Herd", meat, new Color(0.66f, 0.34f, 0.34f), 5,
-                new Vector2(15f, -10f), new Vector2(5f, 5f), new Vector2(0.8f, 1.2f), PlaceholderArt.Circle(), 30, baseClear);
-            SpawnPatches("Clay", clay, new Color(0.68f, 0.46f, 0.36f), 6,
-                new Vector2(-15f, -10f), new Vector2(5f, 5f), new Vector2(1.0f, 1.4f), PlaceholderArt.Hexagon(), 40, baseClear);
+            // --- Resource patches: spread WIDE across the map so you must explore.
+            //     A clear central area stays open as the player's base/processing yard. ---
+            const float baseClear = 11f;
+            SpawnPatches("Tree", wood, new Color(0.27f, 0.55f, 0.22f), 12,
+                new Vector2(24f, 4f), new Vector2(18f, 18f), new Vector2(1.0f, 1.5f), PlaceholderArt.Triangle(), 30, baseClear);
+            SpawnPatches("Rock", stone, new Color(0.55f, 0.55f, 0.6f), 12,
+                new Vector2(-24f, 4f), new Vector2(18f, 18f), new Vector2(1.0f, 1.5f), PlaceholderArt.Hexagon(), 30, baseClear);
+            SpawnPatches("Bush", food, new Color(0.45f, 0.55f, 0.25f), 9,
+                new Vector2(0f, -24f), new Vector2(20f, 10f), new Vector2(0.7f, 1.0f), PlaceholderArt.Circle(), 30, baseClear);
+            // Water bodies (lakes) scattered around the map.
+            SpawnPatches("Lake", water, new Color(0.30f, 0.55f, 0.85f), 4,
+                new Vector2(6f, 26f), new Vector2(22f, 8f), new Vector2(3.0f, 4.2f), PlaceholderArt.Circle(), 240, baseClear);
+            // Animal herds (meat — Tribal age) and clay deposits (Bronze age), spread out.
+            SpawnPatches("Herd", meat, new Color(0.66f, 0.34f, 0.34f), 8,
+                new Vector2(26f, -18f), new Vector2(14f, 12f), new Vector2(0.8f, 1.2f), PlaceholderArt.Circle(), 30, baseClear);
+            SpawnPatches("Clay", clay, new Color(0.68f, 0.46f, 0.36f), 9,
+                new Vector2(-26f, -18f), new Vector2(14f, 12f), new Vector2(1.0f, 1.4f), PlaceholderArt.Hexagon(), 40, baseClear);
         }
 
         // Scatters `count` patches around `center`, jittered by ±spread, random size,

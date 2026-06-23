@@ -284,10 +284,26 @@ namespace Caveman
                     string pn = th.priorityItem != null ? th.priorityItem.displayName : "Any";
                     if (GUILayout.Button($"<size=12>Haul priority: {pn}</size>", _btn)) th.CyclePriority();
                 }
+
+                // What this collector/workshop currently holds in its buffer.
+                var pbb = sel.GetComponent<ProductionBuilding>();
+                if (pbb != null && pbb.produces != null)
+                    GUILayout.Label($"<size=12>Holds: {pbb.produces.displayName} {pbb.Buffer.Count(pbb.produces)}/{pbb.Buffer.capacity}</size>", _small);
+                else if (wb != null && wb.output != null)
+                    GUILayout.Label($"<size=12>Holds: {wb.output.displayName} {wb.Buffer.Count(wb.output)}/{wb.Buffer.capacity}</size>", _small);
             }
             else if (sb != null)
             {
-                GUILayout.Label($"<size=15>Stores {sb.accepts.displayName}: {sb.Store.Total()}/{sb.def.capacity}</size>", _small);
+                string acc = sb.accepts != null ? sb.accepts.displayName : "(not set)";
+                GUILayout.Label($"<size=15>Stores {acc}: {sb.Store.Total()}/{sb.def.capacity}</size>", _small);
+                if (sb.configurable)
+                {
+                    if (sb.Store.Total() == 0)
+                    {
+                        if (GUILayout.Button($"<size=12>Store: {acc} (change)</size>", _btn)) sb.CycleAccepts();
+                    }
+                    else GUILayout.Label("<size=11><color=#888>empty it to change type</color></size>", _small);
+                }
             }
             else if (hb != null)
             {

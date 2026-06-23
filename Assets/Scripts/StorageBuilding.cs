@@ -12,7 +12,21 @@ namespace Caveman
     {
         public BuildingDefinition def;
         public ItemDefinition accepts;
+        public bool configurable;
         public Inventory Store { get; private set; }
+
+        /// <summary>Choose which resource this (configurable) warehouse holds — only while empty.</summary>
+        public void CycleAccepts()
+        {
+            if (!configurable || Store.Total() > 0) return;
+            var items = new List<ItemDefinition>();
+            void Add(ItemDefinition i) { if (i != null && !items.Contains(i)) items.Add(i); }
+            foreach (var p in ProductionBuilding.All) Add(p.produces);
+            foreach (var w in WorkshopBuilding.All) Add(w.output);
+            if (items.Count == 0) return;
+            int idx = items.IndexOf(accepts);
+            accepts = items[(idx + 1) % items.Count];
+        }
 
         public static readonly List<StorageBuilding> All = new();
         void OnEnable() => All.Add(this);
@@ -36,7 +50,8 @@ namespace Caveman
 
             var sb = go.AddComponent<StorageBuilding>();
             sb.def = def;
-            sb.accepts = def.item;
+            sb.accepts = def.item; // null for a configurable warehouse until the player sets it
+            sb.configurable = def.configurable;
             sb.Store = new Inventory { capacity = Mathf.Max(1, def.capacity) };
             return sb;
         }

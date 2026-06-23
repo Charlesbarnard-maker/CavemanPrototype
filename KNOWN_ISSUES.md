@@ -22,6 +22,13 @@ A running record so progress/problems don't get lost. Newest first. Move items t
   water consumption, bigger starting buffers (90 each), slower decline (more grace),
   and a big on-screen ⚠ warning when out of food/water.
 
+## Open — design (high priority)
+- **Transport is abstract, not spatial — kills the "factory" itch.** Haulers/rollers
+  auto-pick nearest source→storage, so there's no belt-routing puzzle to plan. Want
+  real **directional conveyor belts** you place segment-by-segment, with abstract
+  haulers made limited (range/throughput) so belts become necessary. See DESIGN.md
+  "Spatial conveyor belts". This is the headline next system.
+
 ## Open — bugs / behaviour
 - **Workshop inputs & build costs still pull from the global pool, not hauled.**
   Buffer→storage is now physical (Transporters), but a workshop's *inputs* and a

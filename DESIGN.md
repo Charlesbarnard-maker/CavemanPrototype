@@ -70,6 +70,12 @@ no Inspector wiring). Scripts in `Assets/Scripts/`:
   the player (`CameraFollow`); HUD via `OnGUI` (`InventoryHud`).
 
 ## Recently built
+- **Configurable Warehouse** — a generic storage where the player picks the resource
+  it holds (e.g. Planks, Cooked Food). Building panels now show **contents**
+  (Holds/Stores X of Y). Workers **haul their own load to storage when their buffer is
+  full** instead of stalling.
+- **Bigger world + wide-spread, randomised resources** + smaller fog reveal → real
+  exploration. **M = full-map overview**; max zoom raised.
 - **Ages & tech progression** (`Colony.Age`, `BuildingDefinition.unlockAge`): Stone →
   Tribal → Bronze → … Advancing costs resources + population; the build menu shows the
   current age, an Advance button, and locks/greys future buildings (hides far ones).
@@ -149,12 +155,19 @@ moves / depletes differently), etc. Meat and berries store differently (e.g. a s
 cold store vs a basket), spoil differently, and feed cooking recipes. Needs the build
 menu first (more buildings).
 
-**Conveyors / automated transport (the long-term goal).** The transport tiers above
-Transporters: **wooden rollers** (slow, early-mechanical) → carts/animals → belts,
-**gradually unlocked** across ages. The Mammoth Shack stays as the cheap early helper.
-Both transporters and conveyors need **priorities / filters** — *what* to collect,
-which source and which destination, and ordering when demand exceeds supply. This
-routing/priority layer is the core optimisation challenge.
+**Spatial conveyor belts (the real factory itch) — IMPORTANT direction.** Current
+transport (Mammoth Shack/Transporters and the Wooden Roller) is *abstract*: a hauler
+picks the nearest source→storage job, so there's no spatial routing puzzle. The player
+wants the Factorio itch: **place directional belt segments** that physically carry
+items along a path you lay out, connect source→belt→machine→storage, and **plan/solve
+routing messes**. Plan:
+- Belts are **placed segments with a direction**; items ride them; you must connect
+  things up. Junctions/splitters/undergrounds later.
+- **Limit the abstract haulers** so they don't "take over": short range and/or low
+  throughput, so beyond a small base you *must* build belts. Haulers stay the Stone/
+  Tribal stopgap; belts are the Mechanical-age payoff and the core optimisation game.
+- Belts gated by age; upgrade tiers (wood rollers → better belts) increase speed.
+This is the headline next system — design it deliberately, don't rush it.
 
 **More player choice (less full-auto).** Right now the loop runs itself once set up;
 it needs meaningful decisions: **worker & transporter priorities** (what to prioritise

@@ -15,9 +15,9 @@ namespace Caveman
         public float smoothTime = 0.12f;
 
         public float minZoom = 4f;
-        public float maxZoom = 26f;
+        public float maxZoom = 55f;
         public float zoomStep = 1.5f;
-        public float overviewZoom = 20f;
+        public float overviewZoom = 48f; // M = full map overview
 
         private Camera _cam;
         private Vector3 _vel;
