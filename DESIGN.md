@@ -68,6 +68,35 @@ no Inspector wiring). Scripts in `Assets/Scripts/`:
 - **Economy** (`Economy`): combined pool = carried + all buffers/storage. Camera follows
   the player (`CameraFollow`); HUD via `OnGUI` (`InventoryHud`).
 
+## Planned systems (designed, not yet built)
+
+**Food → cooking → worker buffs.** Food is currently a single resource that just
+prevents starvation. The plan: many food *types* and **cooking recipes** (raw →
+cooked at a campfire/kitchen). Better/more varied food gives workers stronger
+**stat boosts** (work speed, carry, etc.); a well-fed colony outperforms a
+barely-fed one. Starvation still causes population decline. Workers gain a small
+**stats** model that these buffs feed into.
+
+**Balanced population growth (partly done).** Growth now needs housing space AND a
+stored-food **surplus** above a threshold, and each new citizen **costs** stored
+food — so houses no longer instantly fill; population reflects real food progress.
+Future: tie growth rate / happiness to food *variety* and cooked meals.
+
+**Production chains, gated by age.** The core long-term challenge is *getting the
+right resources to the right place to keep production optimal* — i.e. logistics.
+Chains deepen each age (rough plan, to refine):
+- **Stone Age:** raw gathering (wood/stone/food) + first processing: **Campfire**
+  (raw Food → Cooked Food). Simple, 1-input.
+- **Tribal:** **Sawmill** (Logs → Planks), pottery (Clay → Pots), basic farming.
+  First "output of A feeds B" chains.
+- **Medieval:** smelting (Ore → Metal), milling (Grain → Flour → Bread) —
+  multi-stage, multi-input.
+- **Industrial:** factories/assembly, many-input recipes, conveyors/roads for
+  throughput.
+- **Future:** large-scale optimization.
+Each age also upgrades *logistics* (haulers → carts/animals → ramps/pulleys →
+conveyors → roads), which is the real progression axis.
+
 ## Next steps
 1. **NPC Haulers** — workers that carry resources between buildings that aren't adjacent
    (distance logistics without belts; the "human chain").

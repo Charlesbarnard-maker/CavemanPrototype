@@ -20,8 +20,12 @@ namespace Caveman
 
         [Header("Tuning")]
         public float foodTick = 7f;     // every N seconds each person eats 1 food (gentle early)
-        public float growthTick = 12f;  // every N seconds +1 pop if well fed and space
+        public float growthTick = 15f;  // every N seconds +1 pop (needs surplus, see below)
         public float starveTick = 12f;  // every N seconds -1 pop while starving
+        [Tooltip("Stored food needed before population will grow at all.")]
+        public int growthFoodThreshold = 12;
+        [Tooltip("Stored food consumed to raise each new citizen.")]
+        public int growthFoodCost = 8;
 
         private float _foodT, _growthT, _starveT;
 
@@ -85,11 +89,21 @@ namespace Caveman
                 }
             }
 
-            // --- Growth (needs surplus food + housing space) ---
-            if (!Starving && Population < Capacity)
+            // --- Growth: needs housing space AND a real food surplus; each new
+            //     citizen costs stored food, so growth reflects food-economy progress
+            //     (no more instant house-fill). ---
+            bool canGrow = !Starving
+                           && Population < Capacity
+                           && foodItem != null
+                           && Economy.Available(foodItem, carried) >= growthFoodThreshold;
+            if (canGrow)
             {
                 _growthT += dt;
-                if (_growthT >= growthTick) { _growthT -= growthTick; Population++; }
+                if (_growthT >= growthTick)
+                {
+                    _growthT -= growthTick;
+                    if (Economy.SpendUpTo(foodItem, growthFoodCost, carried) > 0) Population++;
+                }
             }
             else
             {
