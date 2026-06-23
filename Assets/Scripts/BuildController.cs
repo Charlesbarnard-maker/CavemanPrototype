@@ -109,6 +109,8 @@ namespace Caveman
 
             var def = buildables[PendingIndex];
             Vector3 world = _cam.ScreenToWorldPoint(mouse.position.ReadValue());
+            world.x = Mathf.Round(world.x); // snap buildings to the same grid as belts
+            world.y = Mathf.Round(world.y);
             world.z = 0f;
             _ghost.transform.position = world;
             _ghost.transform.rotation = Quaternion.identity;

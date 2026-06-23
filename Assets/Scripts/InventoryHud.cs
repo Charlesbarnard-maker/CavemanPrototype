@@ -219,7 +219,7 @@ namespace Caveman
             if (col != null)
             {
                 GUILayout.Label($"<b><color=#cda>{col.AgeName}</color></b>", _small);
-                if (col.NextAgeName != null)
+                if (col.NextReq != null) // guard: last age has no requirement (was crashing the menu)
                 {
                     var r = col.NextReq;
                     string c = col.CanAdvance() ? "#9f9" : "#f99";
