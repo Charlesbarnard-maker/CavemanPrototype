@@ -132,7 +132,7 @@ namespace Caveman
                 if (c.Starving) flags += "   <color=#f55>STARVING</color>";
                 if (c.Thirsty) flags += "   <color=#5cf>THIRSTY</color>";
                 int working = c.Population - c.FreeWorkers; // assigned + builders + transporters
-                GUILayout.Label($"<b>Population</b> {c.Population}/{c.Capacity}   <b>Working</b> {working}   <b>Free</b> {c.FreeWorkers}{flags}", _s);
+                GUILayout.Label($"<b>Population</b> {c.Population}/{c.Capacity}   <b>Working</b> {working}   <b>Free</b> {c.FreeWorkers}   <color=#cda>{c.AgeName}</color>{flags}", _s);
             }
             GUILayout.EndArea();
         }
@@ -188,9 +188,25 @@ namespace Caveman
             GUI.Box(_buildRect, GUIContent.none);
 
             GUILayout.BeginArea(new Rect(_buildRect.x + 8, _buildRect.y + 8, _buildRect.width - 16, _buildRect.height - 16));
-            GUILayout.Label("<b>Build</b>  <size=12>(click, then click the map)</size>", _small);
+
+            // --- Age + advance ---
+            var col = Colony.Instance;
+            if (col != null)
+            {
+                GUILayout.Label($"<b><color=#cda>{col.AgeName}</color></b>", _small);
+                if (col.NextAgeName != null)
+                {
+                    var r = col.NextReq;
+                    string c = col.CanAdvance() ? "#9f9" : "#f99";
+                    if (GUILayout.Button($"<size=12>▲ Advance to {col.NextAgeName}\n<color={c}>(pop {r.pop}, {CostList(r.cost)})</color></size>", _btn))
+                        col.AdvanceAge();
+                }
+            }
+            GUILayout.Space(4);
+            GUILayout.Label("<b>Build</b>  <size=11>(click, then click the map)</size>", _small);
             _buildScroll = GUILayout.BeginScrollView(_buildScroll);
 
+            int curAge = col != null ? col.Age : 0;
             foreach (var cat in Cats)
             {
                 bool header = false;
@@ -198,10 +214,19 @@ namespace Caveman
                 {
                     var def = builder.buildables[i];
                     if (def == null || def.kind != cat.kind) continue;
+                    if (def.unlockAge > curAge + 1) continue; // hide far-future buildings
                     if (!header) { GUILayout.Label($"<b><color=#d8c8a0>{cat.label}</color></b>", _small); header = true; }
-                    string col = builder.CanAfford(def) ? "#9f9" : "#f99";
+
+                    if (!builder.IsUnlocked(def))
+                    {
+                        string ageName = def.unlockAge < Colony.AgeNames.Length ? Colony.AgeNames[def.unlockAge] : "later";
+                        GUILayout.Label($"<size=11><color=#888>🔒 {def.displayName} — {ageName}</color></size>", _small);
+                        continue;
+                    }
+
+                    string costCol = builder.CanAfford(def) ? "#9f9" : "#f99";
                     string key = i < 9 ? (i + 1).ToString() : i == 9 ? "0" : "·";
-                    if (GUILayout.Button($"<size=12>[{key}] {def.displayName}  <color={col}>{CostText(def)}</color></size>", _btn))
+                    if (GUILayout.Button($"<size=12>[{key}] {def.displayName}  <color={costCol}>{CostText(def)}</color></size>", _btn))
                         builder.BeginPlacement(i);
                 }
             }
@@ -330,11 +355,14 @@ namespace Caveman
 
         private static int HousingCount() => HousingBuilding.All.Count;
 
-        private static string CostText(BuildingDefinition def)
+        private static string CostText(BuildingDefinition def) => CostList(def.cost);
+
+        private static string CostList(List<ItemAmount> cost)
         {
             var parts = new List<string>();
-            foreach (var c in def.cost)
-                if (c.item != null) parts.Add($"{c.amount} {c.item.displayName}");
+            if (cost != null)
+                foreach (var c in cost)
+                    if (c.item != null) parts.Add($"{c.amount} {c.item.displayName}");
             return parts.Count > 0 ? string.Join(", ", parts) : "free";
         }
 

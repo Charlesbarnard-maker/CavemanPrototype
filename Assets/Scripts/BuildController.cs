@@ -72,9 +72,13 @@ namespace Caveman
         public IStaffable SelectedStaffable =>
             Selected != null ? Selected.GetComponent<IStaffable>() : null;
 
+        public bool IsUnlocked(BuildingDefinition def) =>
+            def != null && (Colony.Instance == null || def.unlockAge <= Colony.Instance.Age);
+
         public void BeginPlacement(int index)
         {
             if (index < 0 || index >= buildables.Count || buildables[index] == null) return;
+            if (!IsUnlocked(buildables[index])) return; // locked until a later age
             PendingIndex = index;
             IsPlacing = true;
             Selected = null;

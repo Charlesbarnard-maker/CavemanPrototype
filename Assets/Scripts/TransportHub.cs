@@ -13,6 +13,7 @@ namespace Caveman
     {
         public BuildingDefinition def;
         public int maxWorkers = 2;
+        public bool mechanical; // runs a transporter with no worker (a conveyor)
 
         public int AssignedWorkers { get; private set; }
         public int MaxWorkers => maxWorkers;
@@ -42,6 +43,13 @@ namespace Caveman
             var h = go.AddComponent<TransportHub>();
             h.def = def;
             h.maxWorkers = Mathf.Max(1, def.maxWorkers);
+            h.mechanical = def.mechanical;
+            if (h.mechanical)
+            {
+                var t = Transporter.Spawn(h); // a conveyor runs itself, no worker needed
+                t.moveSpeed = 4.5f;            // faster than a hand-hauler
+                h._transporters.Add(t);
+            }
             return h;
         }
 
@@ -53,6 +61,7 @@ namespace Caveman
 
         public bool TryAssign()
         {
+            if (mechanical) return false; // conveyors run themselves
             if (AssignedWorkers >= maxWorkers) return false;
             if (Colony.Instance == null || Colony.Instance.FreeWorkers <= 0) return false;
             AssignedWorkers++;
@@ -88,7 +97,7 @@ namespace Caveman
         void Update()
         {
             if (_sr == null) return;
-            bool working = AssignedWorkers > 0;
+            bool working = mechanical || AssignedWorkers > 0;
             _sr.color = working ? _baseColor : Color.Lerp(_baseColor, Color.black, 0.5f);
         }
     }

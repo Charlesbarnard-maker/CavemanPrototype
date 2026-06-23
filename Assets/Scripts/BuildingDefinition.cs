@@ -54,6 +54,14 @@ namespace Caveman
         [Tooltip("Collector buffer size, or storage size.")]
         public int capacity = 10;
 
+        [Header("Progression")]
+        [Tooltip("Age at which this becomes buildable (0 = Stone Age, available from the start).")]
+        public int unlockAge = 0;
+
+        [Header("Logistics")]
+        [Tooltip("Transport that runs WITHOUT a worker (a conveyor / wooden roller).")]
+        public bool mechanical = false;
+
         [Header("Visuals / cost")]
         public Color color = Color.white;
         public List<ItemAmount> cost = new();

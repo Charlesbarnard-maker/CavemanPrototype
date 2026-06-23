@@ -22,6 +22,13 @@ namespace Caveman
             var cookedFood = MakeItem("cooked", "Cooked Food", new Color(0.92f, 0.56f, 0.30f));
             cookedFood.foodValue = 3; // cooking turns 2 raw food into 1 cooked worth 3 — a real gain
             var water = MakeItem("water", "Water", new Color(0.30f, 0.55f, 0.85f)); // survival + crafting
+            var meat = MakeItem("meat", "Meat", new Color(0.72f, 0.30f, 0.30f)); meat.foodValue = 2;
+            var clay = MakeItem("clay", "Clay", new Color(0.70f, 0.45f, 0.35f));
+            var charcoal = MakeItem("charcoal", "Charcoal", new Color(0.24f, 0.24f, 0.27f));
+            var bricks = MakeItem("bricks", "Bricks", new Color(0.74f, 0.40f, 0.32f));
+            var grain = MakeItem("grain", "Grain", new Color(0.86f, 0.76f, 0.36f));
+            var flour = MakeItem("flour", "Flour", new Color(0.90f, 0.86f, 0.72f));
+            var bread = MakeItem("bread", "Bread", new Color(0.80f, 0.58f, 0.30f)); bread.foodValue = 4;
 
             // --- Buildings ---
             var woodHut = MakeCollector("Wood Hut", wood, 1, 2.0f, 2, 12, new Color(0.80f, 0.52f, 0.25f),
@@ -52,6 +59,39 @@ namespace Caveman
             var mammothShack = MakeLogistics("Mammoth Shack", 2, new Color(0.46f, 0.40f, 0.55f),
                 new ItemAmount(wood, 6), new ItemAmount(stone, 2));
 
+            // --- Age 1: Tribal ---
+            var hunter = MakeCollector("Hunter's Hut", meat, 1, 2.5f, 2, 12, new Color(0.66f, 0.34f, 0.34f),
+                new ItemAmount(wood, 6)); hunter.unlockAge = 1;
+            var clayPit = MakeCollector("Clay Pit", clay, 1, 2.5f, 2, 12, new Color(0.68f, 0.46f, 0.36f),
+                new ItemAmount(wood, 5)); clayPit.unlockAge = 1;
+            var charcoalBurner = MakeWorkshop("Charcoal Burner", charcoal, 1, 3.0f, 2, 12, new Color(0.30f, 0.30f, 0.33f),
+                new List<ItemAmount> { new ItemAmount(wood, 2) },
+                new ItemAmount(wood, 6), new ItemAmount(stone, 4)); charcoalBurner.unlockAge = 1;
+            var clayStore = MakeStorage("Clay Pile", clay, 100, new Color(0.60f, 0.42f, 0.34f),
+                new ItemAmount(wood, 8)); clayStore.unlockAge = 1;
+            var smokehouse = MakeStorage("Smokehouse", meat, 100, new Color(0.55f, 0.32f, 0.30f),
+                new ItemAmount(wood, 8), new ItemAmount(stone, 2)); smokehouse.unlockAge = 1;
+            var longhouse = MakeHousing("Longhouse", 5, new Color(0.66f, 0.56f, 0.42f),
+                new ItemAmount(wood, 14), new ItemAmount(planks, 6)); longhouse.unlockAge = 1;
+
+            // --- Age 2: Bronze ---
+            var kiln = MakeWorkshop("Kiln", bricks, 1, 3.5f, 2, 12, new Color(0.70f, 0.42f, 0.34f),
+                new List<ItemAmount> { new ItemAmount(clay, 2), new ItemAmount(charcoal, 1) },
+                new ItemAmount(wood, 8), new ItemAmount(stone, 6)); kiln.unlockAge = 2;
+            var farm = MakeWorkshop("Farm", grain, 2, 3.0f, 3, 16, new Color(0.80f, 0.72f, 0.38f),
+                new List<ItemAmount> { new ItemAmount(water, 1) },
+                new ItemAmount(wood, 8)); farm.unlockAge = 2;
+            var mill = MakeWorkshop("Mill", flour, 1, 2.5f, 2, 12, new Color(0.85f, 0.80f, 0.65f),
+                new List<ItemAmount> { new ItemAmount(grain, 2) },
+                new ItemAmount(wood, 8), new ItemAmount(planks, 4)); mill.unlockAge = 2;
+            var bakery = MakeWorkshop("Bakery", bread, 1, 3.5f, 2, 12, new Color(0.82f, 0.60f, 0.34f),
+                new List<ItemAmount> { new ItemAmount(flour, 1), new ItemAmount(water, 1) },
+                new ItemAmount(planks, 5), new ItemAmount(bricks, 4)); bakery.unlockAge = 2;
+            var brickStore = MakeStorage("Brick Yard", bricks, 100, new Color(0.66f, 0.40f, 0.34f),
+                new ItemAmount(wood, 8)); brickStore.unlockAge = 2;
+            var roller = MakeLogistics("Wooden Roller", 1, new Color(0.60f, 0.45f, 0.30f),
+                new ItemAmount(planks, 4)); roller.unlockAge = 2; roller.mechanical = true;
+
             // --- Camera (follows the player) ---
             var cam = Camera.main;
             if (cam == null)
@@ -73,7 +113,9 @@ namespace Caveman
             builder.placeNodeRange = 6f;
             builder.buildables = new List<BuildingDefinition>
             { woodHut, stonePit, foragerHut, waterHole, sawmill, campfire,
-              woodStore, stoneStore, foodStore, waterStore, house, mammothShack };
+              woodStore, stoneStore, foodStore, waterStore, house, mammothShack,
+              hunter, clayPit, charcoalBurner, clayStore, smokehouse, longhouse,
+              kiln, farm, mill, bakery, brickStore, roller };
 
             var follow = cam.GetComponent<CameraFollow>();
             if (follow == null) follow = cam.gameObject.AddComponent<CameraFollow>();
@@ -91,6 +133,12 @@ namespace Caveman
             colony.SetStartingPopulation(5);
             gatherer.Inventory.Add(food, 90);   // generous starting larder while you learn the ropes
             gatherer.Inventory.Add(water, 90);  // generous starting water
+            colony.ageReqs = new List<Colony.AgeReq>
+            {
+                new Colony.AgeReq { pop = 8,  cost = new List<ItemAmount> { new ItemAmount(wood, 40), new ItemAmount(stone, 25) } },
+                new Colony.AgeReq { pop = 12, cost = new List<ItemAmount> { new ItemAmount(planks, 25), new ItemAmount(clay, 20), new ItemAmount(stone, 30) } },
+                new Colony.AgeReq { pop = 18, cost = new List<ItemAmount> { new ItemAmount(bricks, 30), new ItemAmount(planks, 30), new ItemAmount(bread, 10) } },
+            };
 
             // --- Town Hall (pre-placed, houses 3) ---
             var townHallDef = MakeHousing("Town Hall", 5, new Color(0.60f, 0.50f, 0.70f));
@@ -118,6 +166,11 @@ namespace Caveman
             // Water is a big body (a lake), not small scattered patches.
             SpawnPatches("Lake", water, new Color(0.30f, 0.55f, 0.85f), 2,
                 new Vector2(2f, 14f), new Vector2(3.5f, 2.5f), new Vector2(3.0f, 4.0f), PlaceholderArt.Circle(), 240, baseClear);
+            // Animal herds (meat — Tribal age) and clay deposits (Bronze age).
+            SpawnPatches("Herd", meat, new Color(0.66f, 0.34f, 0.34f), 5,
+                new Vector2(15f, -10f), new Vector2(5f, 5f), new Vector2(0.8f, 1.2f), PlaceholderArt.Circle(), 30, baseClear);
+            SpawnPatches("Clay", clay, new Color(0.68f, 0.46f, 0.36f), 6,
+                new Vector2(-15f, -10f), new Vector2(5f, 5f), new Vector2(1.0f, 1.4f), PlaceholderArt.Hexagon(), 40, baseClear);
         }
 
         // Scatters `count` patches around `center`, jittered by ±spread, random size,

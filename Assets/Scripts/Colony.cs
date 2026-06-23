@@ -21,6 +21,34 @@ namespace Caveman
         public bool Starving { get; private set; }
         public bool Thirsty { get; private set; }
 
+        // --- Ages / progression ---
+        public int Age { get; private set; }
+        public static readonly string[] AgeNames =
+            { "Stone Age", "Tribal Age", "Bronze Age", "Iron Age", "Industrial Age" };
+        public string AgeName => Age >= 0 && Age < AgeNames.Length ? AgeNames[Age] : $"Age {Age}";
+
+        [System.Serializable]
+        public class AgeReq { public int pop; public List<ItemAmount> cost = new(); }
+        /// <summary>Requirements to advance FROM each age (index = current age). Set by GameBootstrap.</summary>
+        public List<AgeReq> ageReqs = new();
+
+        public AgeReq NextReq => (ageReqs != null && Age < ageReqs.Count) ? ageReqs[Age] : null;
+        public string NextAgeName => (Age + 1) < AgeNames.Length ? AgeNames[Age + 1] : null;
+
+        public bool CanAdvance()
+        {
+            var r = NextReq;
+            if (r == null) return false;
+            return Population >= r.pop && Economy.CanAfford(r.cost, carried);
+        }
+
+        public void AdvanceAge()
+        {
+            if (!CanAdvance()) return;
+            Economy.Spend(NextReq.cost, carried);
+            Age++;
+        }
+
         [Header("Tuning")]
         public float foodTick = 11f;    // every N seconds each person eats 1 food (gentle)
         public float waterTick = 11f;   // every N seconds each person drinks 1 water
