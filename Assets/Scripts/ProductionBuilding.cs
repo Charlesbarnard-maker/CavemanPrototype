@@ -26,8 +26,9 @@ namespace Caveman
         public string StaffLabel => def != null ? def.displayName : "Collector";
 
         public static readonly List<ProductionBuilding> All = new();
-        void OnEnable() => All.Add(this);
-        void OnDisable() => All.Remove(this);
+        private Vector2Int _gridCell;
+        void OnEnable() { All.Add(this); _gridCell = Belt.CellOf(transform.position); WorldGrid.Collectors[_gridCell] = this; }
+        void OnDisable() { All.Remove(this); WorldGrid.Remove(WorldGrid.Collectors, _gridCell, this); }
 
         private readonly List<Worker> _workers = new();
         private ResourceNode _source;

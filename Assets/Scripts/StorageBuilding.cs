@@ -29,8 +29,9 @@ namespace Caveman
         }
 
         public static readonly List<StorageBuilding> All = new();
-        void OnEnable() => All.Add(this);
-        void OnDisable() => All.Remove(this);
+        private Vector2Int _gridCell;
+        void OnEnable() { All.Add(this); _gridCell = Belt.CellOf(transform.position); WorldGrid.Storages[_gridCell] = this; }
+        void OnDisable() { All.Remove(this); WorldGrid.Remove(WorldGrid.Storages, _gridCell, this); }
 
         private SpriteRenderer _sr;
         private Color _baseColor;

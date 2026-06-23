@@ -54,6 +54,11 @@ A running record so progress/problems don't get lost. Newest first. Move items t
 - **HQ (Town Hall) can be demolished**, which would break builder management and
   drop the starting pop cap. Should be protected from demolition.
 
+## Optimisation done
+- *(2026-06-23)* Belts no longer scan every building each tick — buildings register
+  their cell in `WorldGrid` (cell→building dicts) so belt pickup/delivery/connection
+  checks are O(1). Item-on-belt shown as one pooled sliding dot per belt (cheap).
+
 ## Open — optimisation / redundancy
 - **Collector/Workshop duplication [biggest].** `ProductionBuilding` and
   `WorkshopBuilding` duplicate `PushToStorage` / `DrawLink` / `UpdateVisual` / flash

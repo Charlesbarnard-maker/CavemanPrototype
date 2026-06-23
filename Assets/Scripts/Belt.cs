@@ -89,21 +89,9 @@ namespace Caveman
             transform.rotation = Quaternion.Euler(0f, 0f, Angle(d));
         }
 
-        public static bool IsStorageCell(Vector2Int c)
-        {
-            foreach (var s in StorageBuilding.All)
-                if (s != null && CellOf(s.transform.position) == c) return true;
-            return false;
-        }
-
-        public static bool IsSourceCell(Vector2Int c)
-        {
-            foreach (var p in ProductionBuilding.All)
-                if (p != null && CellOf(p.transform.position) == c) return true;
-            foreach (var w in WorkshopBuilding.All)
-                if (w != null && CellOf(w.transform.position) == c) return true;
-            return false;
-        }
+        public static bool IsStorageCell(Vector2Int c) => WorldGrid.Storages.ContainsKey(c);
+        public static bool IsSourceCell(Vector2Int c) =>
+            WorldGrid.Collectors.ContainsKey(c) || WorldGrid.Workshops.ContainsKey(c);
 
         void Update()
         {
@@ -155,11 +143,10 @@ namespace Caveman
         {
             var ahead = _cell + Step(dir);
             if (At(ahead) != null) return true;
-            foreach (var s in StorageBuilding.All)
-                if (s != null && CellOf(s.transform.position) == ahead
-                    && (item == null || s.accepts == null || s.accepts == item)) return true;
-            foreach (var w in WorkshopBuilding.All)
-                if (w != null && CellOf(w.transform.position) == ahead && (item == null || w.WantsInput(item))) return true;
+            if (WorldGrid.Storages.TryGetValue(ahead, out var s) && s != null
+                && (item == null || s.accepts == null || s.accepts == item)) return true;
+            if (WorldGrid.Workshops.TryGetValue(ahead, out var w) && w != null
+                && (item == null || w.WantsInput(item))) return true;
             return false;
         }
 
@@ -176,23 +163,22 @@ namespace Caveman
             }
 
             // No belt ahead — drop into a storage in that cell...
-            foreach (var s in StorageBuilding.All)
+            if (WorldGrid.Storages.TryGetValue(ahead, out var s) && s != null && s.accepts == item)
             {
-                if (s == null || s.accepts != item) continue;
-                if (CellOf(s.transform.position) != ahead) continue;
                 if (s.def != null && s.Store.Total() >= s.def.capacity) return;
                 s.Store.Add(item, 1); count--; if (count <= 0) item = null; return;
             }
 
             // ...or into a workshop's input buffer, if it uses this item.
-            foreach (var w in WorkshopBuilding.All)
+            if (WorkshopAt(ahead) is WorkshopBuilding w && w.WantsInput(item))
             {
-                if (w == null || !w.WantsInput(item)) continue;
-                if (CellOf(w.transform.position) != ahead) continue;
                 if (w.InBuffer.Total() >= w.InBuffer.capacity) return;
                 w.InBuffer.Add(item, 1); count--; if (count <= 0) item = null; return;
             }
         }
+
+        private static WorkshopBuilding WorkshopAt(Vector2Int c)
+            => WorldGrid.Workshops.TryGetValue(c, out var w) ? w : null;
 
         private void PullFromNeighbour()
         {
@@ -201,21 +187,15 @@ namespace Caveman
             {
                 var c = _cell + Step((Dir)di);
 
-                foreach (var p in ProductionBuilding.All)
+                if (WorldGrid.Collectors.TryGetValue(c, out var p) && p != null && p.produces != null
+                    && (item == null || item == p.produces) && p.Buffer.Count(p.produces) > 0)
                 {
-                    if (p == null || p.produces == null) continue;
-                    if (CellOf(p.transform.position) != c) continue;
-                    if (item != null && item != p.produces) continue;
-                    if (p.Buffer.Count(p.produces) <= 0) continue;
                     if (p.Buffer.RemoveUpTo(p.produces, 1) > 0) { item = p.produces; count++; return; }
                 }
 
-                foreach (var w in WorkshopBuilding.All)
+                if (WorldGrid.Workshops.TryGetValue(c, out var w) && w != null && w.output != null
+                    && (item == null || item == w.output) && w.Buffer.Count(w.output) > 0)
                 {
-                    if (w == null || w.output == null) continue;
-                    if (CellOf(w.transform.position) != c) continue;
-                    if (item != null && item != w.output) continue;
-                    if (w.Buffer.Count(w.output) <= 0) continue;
                     if (w.Buffer.RemoveUpTo(w.output, 1) > 0) { item = w.output; count++; return; }
                 }
             }

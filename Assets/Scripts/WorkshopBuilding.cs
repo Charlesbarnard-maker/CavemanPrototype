@@ -25,8 +25,9 @@ namespace Caveman
         public string StaffLabel => def != null ? def.displayName : "Workshop";
 
         public static readonly List<WorkshopBuilding> All = new();
-        void OnEnable() => All.Add(this);
-        void OnDisable() => All.Remove(this);
+        private Vector2Int _gridCell;
+        void OnEnable() { All.Add(this); _gridCell = Belt.CellOf(transform.position); WorldGrid.Workshops[_gridCell] = this; }
+        void OnDisable() { All.Remove(this); WorldGrid.Remove(WorldGrid.Workshops, _gridCell, this); }
 
         private float _timer, _flash;
         private SpriteRenderer _sr;
