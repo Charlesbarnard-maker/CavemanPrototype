@@ -22,13 +22,14 @@ A running record so progress/problems don't get lost. Newest first. Move items t
   water consumption, bigger starting buffers (90 each), slower decline (more grace),
   and a big on-screen ⚠ warning when out of food/water.
 
-## Open — belts (MVP built — iterate)
-- Directional belts now exist (place/rotate/drag, building→belt→storage), and haulers
-  are range-limited. **Remaining:** belts should feed **workshop inputs** spatially
-  (right now workshops still pull inputs from the global pool); **splitters/junctions/
-  undergrounds**; visible **item dots** riding the belt; belt **speed tiers** by age;
-  smarter loading (pull from the cell behind only). Building↔belt adjacency uses cell
-  rounding — keep buildings roughly grid-aligned.
+## Open — belts (strong now — iterate)
+- Belts: place/drag with **auto-direction** (path + corners), building→belt→storage
+  **and** building→belt→**workshop input** (workshops consume belt-fed inputs before
+  the pool). Buildings snap to the belt grid. Haulers range-limited.
+- **Remaining:** **splitters/junctions/undergrounds**; visible **item dots** on belts;
+  belt **speed tiers** by age; explicit **output/input port sides** with markers (right
+  now a belt pulls from any adjacent source cell / delivers to any adjacent sink cell);
+  re-gate belts to a later age after review.
 
 ## Open — bugs / behaviour
 - **Workshop inputs & build costs still pull from the global pool, not hauled.**

@@ -77,6 +77,11 @@ no Inspector wiring). Scripts in `Assets/Scripts/`:
   (1 wood/segment); demolish by selecting + X.
 - **Abstract haulers limited** — Mammoth Shack/Transporters now only serve sources
   within ~14 units of the hub, so beyond a small base you *must* lay belts.
+- **Belts improved**: drag-to-route with **auto-direction** (corners flow), buildings
+  **snap to the belt grid**, and belts now feed **workshop inputs** (a workshop eats
+  belt-delivered inputs from its InBuffer before the global pool) — so you can wire
+  collector → belt → workshop → belt → storage chains spatially.
+- **Sandbox/test hotkeys** (F1 resources, F2 pop, F3 age, F4 free build, F5 speed).
 - **Configurable Warehouse** — a generic storage where the player picks the resource
   it holds (e.g. Planks, Cooked Food). Building panels now show **contents**
   (Holds/Stores X of Y). Workers **haul their own load to storage when their buffer is

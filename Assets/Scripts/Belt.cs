@@ -125,13 +125,22 @@ namespace Caveman
                 return;
             }
 
-            // No belt ahead — try to drop into a storage sitting in that cell.
+            // No belt ahead — drop into a storage in that cell...
             foreach (var s in StorageBuilding.All)
             {
                 if (s == null || s.accepts != item) continue;
                 if (CellOf(s.transform.position) != ahead) continue;
                 if (s.def != null && s.Store.Total() >= s.def.capacity) return;
                 s.Store.Add(item, 1); count--; if (count <= 0) item = null; return;
+            }
+
+            // ...or into a workshop's input buffer, if it uses this item.
+            foreach (var w in WorkshopBuilding.All)
+            {
+                if (w == null || !w.WantsInput(item)) continue;
+                if (CellOf(w.transform.position) != ahead) continue;
+                if (w.InBuffer.Total() >= w.InBuffer.capacity) return;
+                w.InBuffer.Add(item, 1); count--; if (count <= 0) item = null; return;
             }
         }
 

@@ -18,7 +18,8 @@ namespace Caveman
         public int maxWorkers = 2;
         public List<ItemAmount> inputs = new();
 
-        public Inventory Buffer { get; private set; }
+        public Inventory Buffer { get; private set; }      // finished output
+        public Inventory InBuffer { get; private set; }     // inputs delivered by belts
         public int AssignedWorkers { get; private set; }
         public int MaxWorkers => maxWorkers;
         public string StaffLabel => def != null ? def.displayName : "Workshop";
@@ -52,6 +53,7 @@ namespace Caveman
             w.maxWorkers = Mathf.Max(1, def.maxWorkers);
             w.inputs = def.inputs;
             w.Buffer = new Inventory { capacity = Mathf.Max(1, def.capacity) };
+            w.InBuffer = new Inventory { capacity = 24 };
             return w;
         }
 
@@ -74,6 +76,36 @@ namespace Caveman
             if (AssignedWorkers > 0) AssignedWorkers--;
         }
 
+        /// <summary>Is this item one of the recipe inputs (so a belt may deliver it here)?</summary>
+        public bool WantsInput(ItemDefinition i)
+        {
+            foreach (var c in inputs) if (c != null && c.item == i) return true;
+            return false;
+        }
+
+        // Inputs come from the local InBuffer (belt-fed) first, then the global pool.
+        private bool CanMake(Inventory carried)
+        {
+            if (Economy.FreeBuild) return true;
+            foreach (var c in inputs)
+            {
+                if (c.item == null) continue;
+                if (InBuffer.Count(c.item) + Economy.Available(c.item, carried) < c.amount) return false;
+            }
+            return true;
+        }
+
+        private void ConsumeInputs(Inventory carried)
+        {
+            if (Economy.FreeBuild) return;
+            foreach (var c in inputs)
+            {
+                if (c.item == null) continue;
+                int need = c.amount - InBuffer.RemoveUpTo(c.item, c.amount);
+                if (need > 0) Economy.SpendUpTo(c.item, need, carried);
+            }
+        }
+
         void Update()
         {
             var carried = Colony.Instance != null ? Colony.Instance.carried : null;
@@ -85,10 +117,10 @@ namespace Caveman
                 _timer += Time.deltaTime * AssignedWorkers * prod; // more workers / well-fed = faster
                 if (_timer >= processTime)
                 {
-                    if (Economy.CanAfford(inputs, carried))
+                    if (CanMake(carried))
                     {
                         _timer -= processTime;
-                        Economy.Spend(inputs, carried);
+                        ConsumeInputs(carried);
                         Buffer.Add(output, outputPerCycle);
                         _flash = 0.25f;
                         produced = true;

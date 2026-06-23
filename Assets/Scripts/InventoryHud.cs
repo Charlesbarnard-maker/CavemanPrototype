@@ -285,7 +285,10 @@ namespace Caveman
 
             bool add = false, rem = false, demo, close;
             if (wb != null)
+            {
                 GUILayout.Label($"<size=15>{RecipeText(wb)}</size>", _small);
+                GUILayout.Label($"<size=11><color=#bbb>Belt inputs: {InStockText(wb)}</color></size>", _small);
+            }
 
             if (staff != null)
             {
@@ -422,6 +425,14 @@ namespace Caveman
                 foreach (var c in cost)
                     if (c.item != null) parts.Add($"{c.amount} {c.item.displayName}");
             return parts.Count > 0 ? string.Join(", ", parts) : "free";
+        }
+
+        private static string InStockText(WorkshopBuilding w)
+        {
+            var parts = new List<string>();
+            foreach (var c in w.inputs)
+                if (c.item != null) parts.Add($"{c.item.displayName} {w.InBuffer.Count(c.item)}");
+            return parts.Count > 0 ? string.Join(" · ", parts) : "—";
         }
 
         private static string RecipeText(WorkshopBuilding w)
