@@ -30,8 +30,10 @@ namespace Caveman
         void OnDisable() { All.Remove(this); WorldGrid.Remove(WorldGrid.Workshops, _gridCell, this); }
 
         private float _timer, _flash;
+        private bool _starved;
         private SpriteRenderer _sr;
         private Color _baseColor;
+        private SpriteRenderer _statusDot;
 
         public static WorkshopBuilding Spawn(BuildingDefinition def, Vector3 pos)
         {
@@ -125,10 +127,12 @@ namespace Caveman
                         Buffer.Add(output, outputPerCycle);
                         _flash = 0.25f;
                         produced = true;
+                        _starved = false;
                     }
                     else
                     {
                         _timer = processTime; // inputs missing — wait
+                        _starved = true;
                     }
                 }
             }
@@ -139,6 +143,18 @@ namespace Caveman
 
             bool working = AssignedWorkers > 0 && (produced || Buffer.Total() > 0);
             UpdateVisual(working);
+            UpdateStatus();
+        }
+
+        private void UpdateStatus()
+        {
+            if (_statusDot == null) _statusDot = Status.MakeDot(transform);
+            Color col;
+            if (AssignedWorkers == 0) col = Status.Idle;
+            else if (Buffer.Total() >= Buffer.capacity) col = Status.BackedUp;
+            else if (_starved) col = Status.Starved;
+            else col = Status.Working;
+            _statusDot.color = col;
         }
 
         private void UpdateVisual(bool working)

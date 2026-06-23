@@ -35,6 +35,7 @@ namespace Caveman
         private float _flash;
         private SpriteRenderer _sr;
         private Color _baseColor;
+        private SpriteRenderer _statusDot;
 
         public static ProductionBuilding Spawn(BuildingDefinition def, Vector3 pos)
         {
@@ -114,6 +115,18 @@ namespace Caveman
             bool working = AssignedWorkers > 0 && _source != null && _source.HasResource
                            && Buffer.Total() < Buffer.capacity;
             UpdateVisual(working);
+            UpdateStatus();
+        }
+
+        private void UpdateStatus()
+        {
+            if (_statusDot == null) _statusDot = Status.MakeDot(transform);
+            Color col;
+            if (AssignedWorkers == 0) col = Status.Idle;
+            else if (Buffer.Total() >= Buffer.capacity) col = Status.BackedUp;
+            else if (_source == null || !_source.HasResource) col = Status.Starved;
+            else col = Status.Working;
+            _statusDot.color = col;
         }
 
         private void UpdateVisual(bool working)
