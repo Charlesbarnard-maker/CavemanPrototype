@@ -113,16 +113,9 @@ namespace Caveman
 
             if (mouse.leftButton.wasPressedThisFrame && PlacementValid)
             {
-                Economy.Spend(def.cost, Carried);
-                switch (def.kind)
-                {
-                    case BuildingKind.Storage: StorageBuilding.Spawn(def, world); break;
-                    case BuildingKind.Housing: HousingBuilding.Spawn(def, world); break;
-                    default:
-                        var pb = ProductionBuilding.Spawn(def, world);
-                        pb.TryAssign();
-                        break;
-                }
+                // Don't spend now — a builder hauls the materials to the site and
+                // consumes them on pickup, then constructs the building.
+                ConstructionSite.Spawn(def, world);
                 BuildingsPlaced++;
                 CancelPlacement();
             }
@@ -150,6 +143,15 @@ namespace Caveman
         {
             if (Selected == null) return;
 
+            // Cancelling a construction site: undelivered materials were never
+            // spent, so there's nothing to refund — just remove it.
+            if (Selected.GetComponent<ConstructionSite>() != null)
+            {
+                Destroy(Selected);
+                Selected = null;
+                return;
+            }
+
             var pb = Selected.GetComponent<ProductionBuilding>();
             var sb = Selected.GetComponent<StorageBuilding>();
             var hb = Selected.GetComponent<HousingBuilding>();
@@ -174,7 +176,8 @@ namespace Caveman
             if (hit == null) return null;
             bool isBuilding = hit.GetComponent<ProductionBuilding>() != null
                               || hit.GetComponent<StorageBuilding>() != null
-                              || hit.GetComponent<HousingBuilding>() != null;
+                              || hit.GetComponent<HousingBuilding>() != null
+                              || hit.GetComponent<ConstructionSite>() != null;
             return isBuilding ? hit.gameObject : null;
         }
 

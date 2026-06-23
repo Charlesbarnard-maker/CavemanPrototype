@@ -45,7 +45,20 @@ namespace Caveman
             }
         }
 
-        public int FreeWorkers => Mathf.Max(0, Population - AssignedTotal);
+        // Workers temporarily claimed for construction (builders).
+        private int _claimed;
+
+        public int FreeWorkers => Mathf.Max(0, Population - AssignedTotal - _claimed);
+
+        /// <summary>Claim a free worker (e.g. as a builder). Returns false if none free.</summary>
+        public bool ClaimWorker()
+        {
+            if (FreeWorkers <= 0) return false;
+            _claimed++;
+            return true;
+        }
+
+        public void ReleaseWorker() => _claimed = Mathf.Max(0, _claimed - 1);
 
         void Awake() => Instance = this;
         void OnDestroy() { if (Instance == this) Instance = null; }

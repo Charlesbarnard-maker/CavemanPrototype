@@ -136,8 +136,11 @@ namespace Caveman
             var pb = sel.GetComponent<ProductionBuilding>();
             var sb = sel.GetComponent<StorageBuilding>();
             var hb = sel.GetComponent<HousingBuilding>();
-            string name = pb != null ? pb.def.displayName : sb != null ? sb.def.displayName : hb != null ? hb.def.displayName : "Building";
-            GUILayout.Label($"<b>{name}</b>", _s);
+            var cs = sel.GetComponent<ConstructionSite>();
+            string name = pb != null ? pb.def.displayName : sb != null ? sb.def.displayName
+                : hb != null ? hb.def.displayName : cs != null ? cs.def.displayName : "Building";
+            string tag = cs != null ? "  <size=14><color=#bbb>(building)</color></size>" : "";
+            GUILayout.Label($"<b>{name}</b>{tag}", _s);
 
             bool add = false, rem = false, demo, close;
             if (pb != null)
@@ -155,6 +158,13 @@ namespace Caveman
             else if (hb != null)
             {
                 GUILayout.Label($"<size=15>Houses {hb.houseCapacity} people</size>", _small);
+            }
+            else if (cs != null)
+            {
+                if (!cs.MaterialsDone)
+                    GUILayout.Label($"<size=15>Materials: {cs.deliveredLoads}/{cs.totalLoads}{(cs.HasBuilder ? "" : "  (waiting for a free worker)")}</size>", _small);
+                else
+                    GUILayout.Label($"<size=15>Building… {(int)(cs.BuildFraction * 100)}%</size>", _small);
             }
 
             GUILayout.FlexibleSpace();
@@ -186,8 +196,9 @@ namespace Caveman
             GUILayout.Label("<size=15>" +
                 "• WASD / arrows to move.\n" +
                 "• Left-click a tree/rock/bush to gather by hand.\n" +
-                "• Press a number, then click, to place a building.\n" +
-                "• Collectors need WORKERS — each is one person.\n" +
+                "• Press a number, then click, to place a building site.\n" +
+                "• A free worker hauls the materials there, then builds it.\n" +
+                "• Collectors need WORKERS to run — each is one person.\n" +
                 "• Click a building to manage it (add/remove workers, demolish).\n" +
                 "• People need Food and Housing. Build foragers + houses.\n" +
                 "• Space = pause.  Esc = cancel/deselect.  X = demolish selected.\n" +
