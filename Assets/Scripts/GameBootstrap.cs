@@ -94,10 +94,16 @@ namespace Caveman
                 new ItemAmount(wood, 8)); brickStore.unlockAge = 2;
             var roller = MakeLogistics("Wooden Roller", 1, new Color(0.60f, 0.45f, 0.30f),
                 new ItemAmount(planks, 4)); roller.unlockAge = 2; roller.mechanical = true;
-            var belt = ScriptableObject.CreateInstance<BuildingDefinition>();
-            belt.displayName = "Conveyor Belt"; belt.kind = BuildingKind.Belt; belt.unlockAge = 0; // available early for now (will gate to a later age in balancing)
-            belt.color = new Color(0.60f, 0.50f, 0.35f);
-            belt.cost = new List<ItemAmount> { new ItemAmount(wood, 1) };
+            var woodBelt = ScriptableObject.CreateInstance<BuildingDefinition>();
+            woodBelt.displayName = "Wooden Belt"; woodBelt.kind = BuildingKind.Belt; woodBelt.unlockAge = 0;
+            woodBelt.interval = 1.1f; // slow — the early tier
+            woodBelt.color = new Color(0.60f, 0.50f, 0.35f);
+            woodBelt.cost = new List<ItemAmount> { new ItemAmount(wood, 1) };
+            var fastBelt = ScriptableObject.CreateInstance<BuildingDefinition>();
+            fastBelt.displayName = "Conveyor Belt"; fastBelt.kind = BuildingKind.Belt; fastBelt.unlockAge = 2;
+            fastBelt.interval = 0.45f; // fast — the upgrade
+            fastBelt.color = new Color(0.72f, 0.63f, 0.40f);
+            fastBelt.cost = new List<ItemAmount> { new ItemAmount(planks, 1) };
 
             // --- Camera (follows the player) ---
             var cam = Camera.main;
@@ -125,7 +131,7 @@ namespace Caveman
             { woodHut, stonePit, foragerHut, waterHole, sawmill, campfire,
               woodStore, stoneStore, foodStore, waterStore, warehouse, house, mammothShack,
               hunter, clayPit, charcoalBurner, clayStore, smokehouse, longhouse,
-              kiln, farm, mill, bakery, brickStore, roller, belt };
+              kiln, farm, mill, bakery, brickStore, roller, woodBelt, fastBelt };
 
             var follow = cam.GetComponent<CameraFollow>();
             if (follow == null) follow = cam.gameObject.AddComponent<CameraFollow>();

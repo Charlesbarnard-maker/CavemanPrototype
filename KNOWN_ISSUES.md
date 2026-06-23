@@ -26,10 +26,12 @@ A running record so progress/problems don't get lost. Newest first. Move items t
 - Belts: place/drag with **auto-direction** (path + corners), building→belt→storage
   **and** building→belt→**workshop input** (workshops consume belt-fed inputs before
   the pool). Buildings snap to the belt grid. Haulers range-limited.
+- Belts now: **don't run when disconnected** (dead-end = red, won't pull), **two speed
+  tiers** (Wooden/Conveyor), and build-menu **tooltips** explain each building.
 - **Remaining:** **splitters/junctions/undergrounds**; visible **item dots** on belts;
-  belt **speed tiers** by age; explicit **output/input port sides** with markers (right
-  now a belt pulls from any adjacent source cell / delivers to any adjacent sink cell);
-  re-gate belts to a later age after review.
+  explicit **output/input port sides** with markers; **collector tiers** (manual→machine,
+  slow→fast, to mirror the belt upgrade path); **item groups** so a storage can hold a
+  category (e.g. all "lumber"); re-gate belts to a later age after review.
 
 ## Open — bugs / behaviour
 - **Workshop inputs & build costs still pull from the global pool, not hauled.**

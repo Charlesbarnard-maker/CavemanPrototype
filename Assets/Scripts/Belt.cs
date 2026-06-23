@@ -41,7 +41,7 @@ namespace Caveman
 
         public static float Angle(Dir d) => d switch { Dir.N => 0f, Dir.E => -90f, Dir.S => 180f, _ => 90f };
 
-        public static Belt Spawn(Vector2Int cell, Dir dir)
+        public static Belt Spawn(Vector2Int cell, Dir dir, float interval = 0.5f)
         {
             var go = new GameObject("Belt");
             go.transform.position = new Vector3(cell.x, cell.y, 0f);
@@ -56,6 +56,7 @@ namespace Caveman
 
             var b = go.AddComponent<Belt>();
             b.dir = dir;
+            b.interval = Mathf.Max(0.05f, interval);
             b._sr = sr;
             sr.color = b._baseColor;
             return b;
@@ -101,16 +102,35 @@ namespace Caveman
 
         void Update()
         {
+            bool connected = HasForwardTarget();
+
             _timer += Time.deltaTime;
             if (_timer >= interval)
             {
                 _timer -= interval;
                 PushForward();
-                PullFromNeighbour();
+                if (connected) PullFromNeighbour(); // don't pull goods onto a belt that leads nowhere
             }
 
             if (_sr != null)
-                _sr.color = (count > 0 && item != null) ? Color.Lerp(_baseColor, item.color, 0.6f) : _baseColor;
+            {
+                if (!connected) _sr.color = new Color(0.55f, 0.25f, 0.25f); // dead end — not connected
+                else if (count > 0 && item != null) _sr.color = Color.Lerp(_baseColor, item.color, 0.6f);
+                else _sr.color = _baseColor;
+            }
+        }
+
+        // Is the cell ahead a belt, an accepting storage, or a workshop that wants this item?
+        private bool HasForwardTarget()
+        {
+            var ahead = _cell + Step(dir);
+            if (At(ahead) != null) return true;
+            foreach (var s in StorageBuilding.All)
+                if (s != null && CellOf(s.transform.position) == ahead
+                    && (item == null || s.accepts == null || s.accepts == item)) return true;
+            foreach (var w in WorkshopBuilding.All)
+                if (w != null && CellOf(w.transform.position) == ahead && (item == null || w.WantsInput(item))) return true;
+            return false;
         }
 
         private void PushForward()

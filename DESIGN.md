@@ -81,7 +81,19 @@ no Inspector wiring). Scripts in `Assets/Scripts/`:
   **snap to the belt grid**, and belts now feed **workshop inputs** (a workshop eats
   belt-delivered inputs from its InBuffer before the global pool) — so you can wire
   collector → belt → workshop → belt → storage chains spatially.
+- **Belt clarity + tiers**: build-menu **hover tooltips** explain what each building
+  produces/stores (and that the Warehouse stores any one resource you pick). Belts now
+  **don't pull goods into a dead end** (a disconnected belt turns red and won't run).
+  Two tiers: slow **Wooden Belt** (early) and faster **Conveyor Belt** (Bronze) — the
+  reason to upgrade.
 - **Sandbox/test hotkeys** (F1 resources, F2 pop, F3 age, F4 free build, F5 speed).
+
+## North-star (reference)
+Target depth ≈ **Workers & Resources: Soviet Republic** logistics, but stone-age → up:
+a **hybrid of conveyors and people** moving goods. People (population) are both the
+workforce (staffing buildings) and an early transport tier (haulers/carriers); belts/
+mechanisation gradually take over. Later transport tiers evolve toward the reference's
+trucks/trains/etc. Population is the thread tying building, hauling, and survival together.
 - **Configurable Warehouse** — a generic storage where the player picks the resource
   it holds (e.g. Planks, Cooked Food). Building panels now show **contents**
   (Holds/Stores X of Y). Workers **haul their own load to storage when their buffer is

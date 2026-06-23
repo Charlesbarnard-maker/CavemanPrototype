@@ -181,7 +181,7 @@ namespace Caveman
                     dir = Belt.FromTo(_dragLast, cell);
                 }
                 Economy.Spend(def.cost, Carried);
-                Belt.Spawn(cell, dir);
+                Belt.Spawn(cell, dir, def.interval);
                 BuildingsPlaced++;
                 _dragging = true;
                 _dragLast = cell;

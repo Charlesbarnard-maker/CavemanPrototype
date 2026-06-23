@@ -251,13 +251,47 @@ namespace Caveman
 
                     string costCol = builder.CanAfford(def) ? "#9f9" : "#f99";
                     string key = i < 9 ? (i + 1).ToString() : i == 9 ? "0" : "·";
-                    if (GUILayout.Button($"<size=12>[{key}] {def.displayName}  <color={costCol}>{CostText(def)}</color></size>", _btn))
+                    var label = new GUIContent($"<size=12>[{key}] {def.displayName}  <color={costCol}>{CostText(def)}</color></size>", Describe(def));
+                    if (GUILayout.Button(label, _btn))
                         builder.BeginPlacement(i);
                 }
             }
 
             GUILayout.EndScrollView();
             GUILayout.EndArea();
+
+            // Tooltip describing the hovered build entry.
+            if (!string.IsNullOrEmpty(GUI.tooltip))
+            {
+                var tr = new Rect(_buildRect.xMax + 6, _buildRect.y, 250, 120);
+                GUI.Box(tr, GUIContent.none);
+                GUI.Label(new Rect(tr.x + 8, tr.y + 6, tr.width - 16, tr.height - 12), $"<size=13>{GUI.tooltip}</size>", _small);
+            }
+        }
+
+        private static string Describe(BuildingDefinition def)
+        {
+            switch (def.kind)
+            {
+                case BuildingKind.Collector:
+                    return $"Collector — produces {Name(def.item)}. Place near a {Name(def.item)} source; needs workers.";
+                case BuildingKind.Workshop:
+                    return $"Workshop — {CostList(def.inputs)} → {def.outputPerCycle} {Name(def.item)}. Needs workers; belts can feed its inputs.";
+                case BuildingKind.Storage:
+                    return def.configurable
+                        ? "Warehouse — stores ONE resource you choose (set it in the building's panel). Good for Planks, Cooked Food, etc."
+                        : $"Stores {Name(def.item)} only.";
+                case BuildingKind.Housing:
+                    return $"Housing — raises population cap by {def.houseCapacity}.";
+                case BuildingKind.Logistics:
+                    return def.mechanical
+                        ? "Conveyor hub — auto-hauls nearby goods to storage, no worker."
+                        : "Hauler hut — assign workers to carry nearby goods to storage (short range).";
+                case BuildingKind.Belt:
+                    return $"Belt — carries items in its direction ({(def.interval <= 0.6f ? "fast" : "slow")}). Drag to route; feeds storage or workshop inputs.";
+                default:
+                    return def.displayName;
+            }
         }
 
         // ---- Selected building manage panel (bottom-right) ----
