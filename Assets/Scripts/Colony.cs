@@ -49,6 +49,10 @@ namespace Caveman
             Age++;
         }
 
+        // --- Debug / sandbox ---
+        public void DebugAdvanceAge() { if (Age + 1 < AgeNames.Length) Age++; }
+        public void DebugAddPopulation(int n) { Population = Mathf.Max(0, Population + n); }
+
         [Header("Tuning")]
         public float foodTick = 11f;    // every N seconds each person eats 1 food (gentle)
         public float waterTick = 11f;   // every N seconds each person drinks 1 water

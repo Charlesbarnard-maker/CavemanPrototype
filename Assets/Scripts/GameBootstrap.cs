@@ -163,6 +163,8 @@ namespace Caveman
             hud.stoneItem = stone;
             hud.foodItem = food;
             hud.waterItem = water;
+            hud.debugItems = new List<ItemDefinition>
+            { wood, stone, food, water, planks, cookedFood, meat, clay, charcoal, bricks, grain, flour, bread };
 
             // --- Resource patches: spread WIDE across the map so you must explore.
             //     A clear central area stays open as the player's base/processing yard. ---

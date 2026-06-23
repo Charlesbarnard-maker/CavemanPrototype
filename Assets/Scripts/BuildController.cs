@@ -126,9 +126,8 @@ namespace Caveman
 
             if (mouse.leftButton.wasPressedThisFrame && PlacementValid)
             {
-                // Don't spend now — a builder hauls the materials to the site and
-                // consumes them on pickup, then constructs the building.
-                ConstructionSite.Spawn(def, world);
+                if (Economy.FreeBuild) ConstructionSite.SpawnFinished(def, world); // sandbox: instant
+                else ConstructionSite.Spawn(def, world); // builders haul materials, then construct
                 BuildingsPlaced++;
                 CancelPlacement();
             }

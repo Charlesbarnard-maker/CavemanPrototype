@@ -15,6 +15,8 @@ namespace Caveman
         public PlayerGatherer gatherer;
         public BuildController builder;
         public ItemDefinition woodItem, stoneItem, foodItem, waterItem;
+        public List<ItemDefinition> debugItems; // all resources, for the sandbox resource dump
+        private float _speed = 1f;
 
         /// <summary>True when the cursor is over an interactive HUD panel.</summary>
         public static bool PointerOverUI { get; private set; }
@@ -45,10 +47,22 @@ namespace Caveman
             if (kb.spaceKey.wasPressedThisFrame)
             {
                 _paused = !_paused;
-                Time.timeScale = _paused ? 0f : 1f;
+                Time.timeScale = _paused ? 0f : _speed;
             }
             if (kb.hKey.wasPressedThisFrame) _showHelp = !_showHelp;
             if (kb.bKey.wasPressedThisFrame) _showBuild = !_showBuild;
+
+            // --- Sandbox / debug hotkeys ---
+            if (kb.f1Key.wasPressedThisFrame && debugItems != null)
+                foreach (var it in debugItems) if (it != null) gatherer.Inventory.Add(it, 500);
+            if (kb.f2Key.wasPressedThisFrame && Colony.Instance != null) Colony.Instance.DebugAddPopulation(5);
+            if (kb.f3Key.wasPressedThisFrame && Colony.Instance != null) Colony.Instance.DebugAdvanceAge();
+            if (kb.f4Key.wasPressedThisFrame) Economy.FreeBuild = !Economy.FreeBuild;
+            if (kb.f5Key.wasPressedThisFrame)
+            {
+                _speed = _speed >= 4f ? 1f : _speed * 2f;
+                if (!_paused) Time.timeScale = _speed;
+            }
 
             // Cache the resource totals once per frame (OnGUI runs twice/frame).
             if (gatherer != null) _totals = Economy.Totals(gatherer.Inventory);
@@ -351,14 +365,16 @@ namespace Caveman
 
         private void DrawFooter()
         {
-            GUILayout.BeginArea(new Rect(Screen.width - 260, 10, 250, 28));
-            GUILayout.Label("<size=15>B build  ·  Space pause  ·  H help</size>", _small);
+            GUILayout.BeginArea(new Rect(Screen.width - 330, 10, 320, 50));
+            GUILayout.Label("<size=15>B build · Space pause · H help</size>", _small);
+            string sandbox = Economy.FreeBuild ? "<color=#9f9>SANDBOX</color> · " : "";
+            GUILayout.Label($"<size=12>{sandbox}Speed x{_speed:0} · F1–F5 sandbox</size>", _small);
             GUILayout.EndArea();
         }
 
         private void DrawHelp()
         {
-            var r = new Rect(Screen.width / 2f - 230, Screen.height / 2f - 150, 460, 300);
+            var r = new Rect(Screen.width / 2f - 240, Screen.height / 2f - 175, 480, 360);
             GUI.Box(r, GUIContent.none);
             GUILayout.BeginArea(new Rect(r.x + 16, r.y + 12, r.width - 32, r.height - 24));
             GUILayout.Label("<b>How to play</b>", _s);
@@ -371,6 +387,8 @@ namespace Caveman
                 "• A Mammoth Shack's transporters carry goods from huts to storage.\n" +
                 "• Click a building to manage it (workers, demolish).\n" +
                 "• People need Food + Housing. Space = pause, Esc = cancel, X = demolish.\n" +
+                "\n<b>Sandbox:</b> F1 +resources · F2 +5 people · F3 advance age · " +
+                "F4 free build · F5 game speed.\n" +
                 "</size>", _small);
             GUILayout.Label("<size=15>Press H to close.</size>", _small);
             GUILayout.EndArea();

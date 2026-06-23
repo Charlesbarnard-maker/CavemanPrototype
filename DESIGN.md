@@ -209,6 +209,9 @@ smoker/cold store) and different spoilage, feeding cooking recipes.
   Per-repo commit identity: `Caveman Dev` / `charles.barnard@hotmail.com`.
 
 ## Dev process
+- **Sandbox/test hotkeys** (in-play): **F1** +500 of every resource · **F2** +5 people ·
+  **F3** advance age · **F4** toggle free/instant build · **F5** cycle game speed (1/2/4×).
+  Lets you jump straight to testing without grinding. (Strip or gate before release.)
 - **`KNOWN_ISSUES.md`** is the running log of bugs + cleanup items — keep it current.
 - Every few feature batches, run a quick **optimisation/redundancy pass** and append
   findings to `KNOWN_ISSUES.md`; fix the safe ones, log the rest.

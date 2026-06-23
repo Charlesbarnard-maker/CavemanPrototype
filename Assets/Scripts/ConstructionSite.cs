@@ -111,15 +111,21 @@ namespace Caveman
 
         private void Complete()
         {
+            SpawnFinished(def, transform.position);
+            Destroy(gameObject);
+        }
+
+        /// <summary>Spawn the finished building of the given kind at a position (no construction).</summary>
+        public static void SpawnFinished(BuildingDefinition def, Vector3 pos)
+        {
             switch (def.kind)
             {
-                case BuildingKind.Storage: StorageBuilding.Spawn(def, transform.position); break;
-                case BuildingKind.Housing: HousingBuilding.Spawn(def, transform.position); break;
-                case BuildingKind.Workshop: WorkshopBuilding.Spawn(def, transform.position).TryAssign(); break;
-                case BuildingKind.Logistics: TransportHub.Spawn(def, transform.position).TryAssign(); break;
-                default: ProductionBuilding.Spawn(def, transform.position).TryAssign(); break;
+                case BuildingKind.Storage: StorageBuilding.Spawn(def, pos); break;
+                case BuildingKind.Housing: HousingBuilding.Spawn(def, pos); break;
+                case BuildingKind.Workshop: WorkshopBuilding.Spawn(def, pos).TryAssign(); break;
+                case BuildingKind.Logistics: TransportHub.Spawn(def, pos).TryAssign(); break;
+                default: ProductionBuilding.Spawn(def, pos).TryAssign(); break;
             }
-            Destroy(gameObject);
         }
 
         private void UpdateVisual()

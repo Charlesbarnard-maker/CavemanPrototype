@@ -10,6 +10,9 @@ namespace Caveman
     /// </summary>
     public static class Economy
     {
+        /// <summary>Sandbox: building/age costs are free and instant.</summary>
+        public static bool FreeBuild;
+
         public static int Available(ItemDefinition item, Inventory carried)
         {
             if (item == null) return 0;
@@ -22,7 +25,7 @@ namespace Caveman
 
         public static bool CanAfford(List<ItemAmount> cost, Inventory carried)
         {
-            if (cost == null) return true;
+            if (FreeBuild || cost == null) return true;
             foreach (var c in cost)
                 if (c.item == null || Available(c.item, carried) < c.amount) return false;
             return true;
@@ -30,7 +33,7 @@ namespace Caveman
 
         public static void Spend(List<ItemAmount> cost, Inventory carried)
         {
-            if (cost == null) return;
+            if (FreeBuild || cost == null) return;
             foreach (var c in cost) SpendUpTo(c.item, c.amount, carried);
         }
 
