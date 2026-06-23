@@ -4,18 +4,17 @@ using UnityEngine;
 namespace Caveman
 {
     /// <summary>
-    /// A building under construction. It claims up to `maxBuilders` free workers,
-    /// who haul the required materials here a few units at a time (consuming them
-    /// from the pool on pickup) and then construct the building together — more
-    /// builders = faster. On completion it spawns the real building.
+    /// A building under construction. It just holds the outstanding materials and
+    /// build progress — the Colony's shared builder squad (based at the HQ) comes
+    /// and services it: hauling materials (consumed from the pool on pickup) then
+    /// building. On completion it spawns the real building.
     /// </summary>
     public class ConstructionSite : MonoBehaviour
     {
         public BuildingDefinition def;
         public float buildTime = 4f;
-        public int maxBuilders = 3;
 
-        /// <summary>A material line: how many still needed, and how many are already claimed in-transit.</summary>
+        /// <summary>A material line: how many still needed, and how many are reserved in-transit.</summary>
         public class Mat { public ItemDefinition item; public int needed; public int claimed; }
 
         public readonly List<Mat> materials = new();
@@ -23,12 +22,14 @@ namespace Caveman
         public int deliveredUnits;
         public float buildProgress;
 
-        public int BuilderCount => _builders.Count;
+        public static readonly List<ConstructionSite> All = new();
+        void OnEnable() => All.Add(this);
+        void OnDisable() => All.Remove(this);
+
         public bool MaterialsDone => materials.Count == 0;
         public bool IsComplete => MaterialsDone && buildProgress >= buildTime;
         public float BuildFraction => Mathf.Clamp01(buildProgress / Mathf.Max(0.01f, buildTime));
 
-        private readonly List<BuilderWorker> _builders = new();
         private SpriteRenderer _sr;
         private Color _baseColor;
 
@@ -59,7 +60,6 @@ namespace Caveman
             return site;
         }
 
-        /// <summary>First material with units still un-claimed (to fetch next).</summary>
         public Mat NextFetchable()
         {
             foreach (var m in materials)
@@ -74,7 +74,6 @@ namespace Caveman
             return null;
         }
 
-        /// <summary>Reserve up to `qty` of `item` as in-transit; returns the amount reserved.</summary>
         public int Claim(ItemDefinition item, int qty)
         {
             var m = MatFor(item);
@@ -84,7 +83,13 @@ namespace Caveman
             return q;
         }
 
-        /// <summary>Deliver reserved units; reduces both needed and claimed.</summary>
+        /// <summary>Release an in-transit reservation (e.g. a builder was removed mid-haul).</summary>
+        public void Unclaim(ItemDefinition item, int qty)
+        {
+            var m = MatFor(item);
+            if (m != null) m.claimed = Mathf.Max(0, m.claimed - qty);
+        }
+
         public void Deliver(ItemDefinition item, int qty)
         {
             var m = MatFor(item);
@@ -102,44 +107,19 @@ namespace Caveman
             if (IsComplete) Complete();
         }
 
-        void Update()
-        {
-            // Claim free workers as builders, up to the cap, while there's work left.
-            if (!IsComplete)
-            {
-                while (_builders.Count < maxBuilders && Colony.Instance != null && Colony.Instance.ClaimWorker())
-                    _builders.Add(BuilderWorker.Spawn(this));
-            }
-            _builders.RemoveAll(b => b == null);
-            UpdateVisual();
-        }
+        void Update() => UpdateVisual();
 
         private void Complete()
         {
-            ReleaseBuilders();
             switch (def.kind)
             {
                 case BuildingKind.Storage: StorageBuilding.Spawn(def, transform.position); break;
                 case BuildingKind.Housing: HousingBuilding.Spawn(def, transform.position); break;
-                case BuildingKind.Workshop:
-                    WorkshopBuilding.Spawn(def, transform.position).TryAssign();
-                    break;
-                default:
-                    ProductionBuilding.Spawn(def, transform.position).TryAssign();
-                    break;
+                case BuildingKind.Workshop: WorkshopBuilding.Spawn(def, transform.position).TryAssign(); break;
+                default: ProductionBuilding.Spawn(def, transform.position).TryAssign(); break;
             }
             Destroy(gameObject);
         }
-
-        private void ReleaseBuilders()
-        {
-            int n = _builders.Count;
-            foreach (var b in _builders) if (b != null) Destroy(b.gameObject);
-            _builders.Clear();
-            for (int i = 0; i < n; i++) Colony.Instance?.ReleaseWorker();
-        }
-
-        void OnDestroy() => ReleaseBuilders();
 
         private void UpdateVisual()
         {

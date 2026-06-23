@@ -79,7 +79,8 @@ namespace Caveman
 
             // --- Town Hall (pre-placed, houses 3) ---
             var townHallDef = MakeHousing("Town Hall", 3, new Color(0.60f, 0.50f, 0.70f));
-            HousingBuilding.Spawn(townHallDef, new Vector2(0f, -1.6f));
+            var townHall = HousingBuilding.Spawn(townHallDef, new Vector2(0f, -1.6f));
+            townHall.isHQ = true; // builders are managed from here
 
             // --- HUD ---
             var hud = new GameObject("HUD").AddComponent<InventoryHud>();

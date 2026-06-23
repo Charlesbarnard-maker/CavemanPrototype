@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace Caveman
@@ -50,20 +51,52 @@ namespace Caveman
             }
         }
 
-        // Workers temporarily claimed for construction (builders).
-        private int _claimed;
+        // --- Builders: a capped HQ job, auto-filled when there's construction,
+        //     but manually adjustable so they don't hog your gatherers. ---
+        [Header("Builders")]
+        public int MaxBuilders = 2;
+        public int Builders { get; private set; }
+        private bool _builderManual;
+        private readonly List<BuilderWorker> _builderSquad = new();
 
-        public int FreeWorkers => Mathf.Max(0, Population - AssignedTotal - _claimed);
+        public int FreeWorkers => Mathf.Max(0, Population - AssignedTotal - Builders);
 
-        /// <summary>Claim a free worker (e.g. as a builder). Returns false if none free.</summary>
-        public bool ClaimWorker()
+        public void AddBuilder()
         {
-            if (FreeWorkers <= 0) return false;
-            _claimed++;
-            return true;
+            _builderManual = true;
+            if (Builders < MaxBuilders && FreeWorkers > 0) { Builders++; SyncSquad(); }
         }
 
-        public void ReleaseWorker() => _claimed = Mathf.Max(0, _claimed - 1);
+        public void RemoveBuilder()
+        {
+            _builderManual = true;
+            if (Builders > 0) { Builders--; SyncSquad(); }
+        }
+
+        private void ManageBuilders()
+        {
+            if (!_builderManual)
+            {
+                int target = ConstructionSite.All.Count > 0 ? MaxBuilders : 0;
+                while (Builders < target && FreeWorkers > 0) Builders++;
+                while (Builders > target && Builders > 0) Builders--;
+            }
+            int maxPossible = Mathf.Max(0, Population - AssignedTotal);
+            if (Builders > maxPossible) Builders = maxPossible;
+            SyncSquad();
+        }
+
+        private void SyncSquad()
+        {
+            _builderSquad.RemoveAll(b => b == null);
+            while (_builderSquad.Count < Builders) _builderSquad.Add(BuilderWorker.Spawn());
+            while (_builderSquad.Count > Builders)
+            {
+                var b = _builderSquad[_builderSquad.Count - 1];
+                _builderSquad.RemoveAt(_builderSquad.Count - 1);
+                if (b != null) Destroy(b.gameObject);
+            }
+        }
 
         void Awake() => Instance = this;
         void OnDestroy() { if (Instance == this) Instance = null; }
@@ -125,6 +158,8 @@ namespace Caveman
             {
                 _starveT = 0f;
             }
+
+            ManageBuilders();
         }
 
         /// <summary>If more workers are assigned than we have people, unassign the surplus.</summary>

@@ -11,6 +11,8 @@ namespace Caveman
     {
         public BuildingDefinition def;
         public int houseCapacity = 3;
+        [Tooltip("The HQ (Town Hall) — builders are managed from here.")]
+        public bool isHQ;
 
         public static readonly List<HousingBuilding> All = new();
         void OnEnable() => All.Add(this);

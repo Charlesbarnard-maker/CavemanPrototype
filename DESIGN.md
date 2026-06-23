@@ -122,3 +122,8 @@ conveyors → roads), which is the real progression axis.
   username; auth is via a Personal Access Token stored in Windows Credential Manager
   (not browser OAuth — that picks the wrong account on this multi-account machine).
   Per-repo commit identity: `Caveman Dev` / `charles.barnard@hotmail.com`.
+
+## Dev process
+- **`KNOWN_ISSUES.md`** is the running log of bugs + cleanup items — keep it current.
+- Every few feature batches, run a quick **optimisation/redundancy pass** and append
+  findings to `KNOWN_ISSUES.md`; fix the safe ones, log the rest.

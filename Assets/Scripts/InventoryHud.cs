@@ -61,7 +61,7 @@ namespace Caveman
             if (c != null)
             {
                 string starve = c.Starving ? "   <color=#f55>STARVING</color>" : "";
-                GUILayout.Label($"<b>People</b> {c.Population}/{c.Capacity}    <b>Free</b> {c.FreeWorkers}{starve}", _s);
+                GUILayout.Label($"<b>People</b> {c.Population}/{c.Capacity}   <b>Free</b> {c.FreeWorkers}   <b>Builders</b> {c.Builders}/{c.MaxBuilders}{starve}", _s);
             }
             var totals = Economy.Totals(gatherer.Inventory);
             GUILayout.Label(ResLine(totals), _s);
@@ -162,16 +162,22 @@ namespace Caveman
             else if (hb != null)
             {
                 GUILayout.Label($"<size=15>Houses {hb.houseCapacity} people</size>", _small);
+                if (hb.isHQ && Colony.Instance != null)
+                {
+                    var col = Colony.Instance;
+                    GUILayout.Label($"<b>Builders: {col.Builders}/{col.MaxBuilders}</b>   <size=14>(free: {col.FreeWorkers})</size>", _small);
+                    GUILayout.BeginHorizontal();
+                    rem = GUILayout.Button("- builder", GUILayout.Height(30));
+                    add = GUILayout.Button("+ builder", GUILayout.Height(30));
+                    GUILayout.EndHorizontal();
+                }
             }
             else if (cs != null)
             {
                 if (!cs.MaterialsDone)
-                {
-                    string b = cs.BuilderCount > 0 ? $"  ({cs.BuilderCount} hauling)" : "  (waiting for a free worker)";
-                    GUILayout.Label($"<size=15>Materials: {cs.deliveredUnits}/{cs.totalUnits}{b}</size>", _small);
-                }
+                    GUILayout.Label($"<size=15>Materials: {cs.deliveredUnits}/{cs.totalUnits}</size>", _small);
                 else
-                    GUILayout.Label($"<size=15>Building… {(int)(cs.BuildFraction * 100)}%  ({cs.BuilderCount} workers)</size>", _small);
+                    GUILayout.Label($"<size=15>Building… {(int)(cs.BuildFraction * 100)}%</size>", _small);
             }
 
             GUILayout.FlexibleSpace();
@@ -181,8 +187,9 @@ namespace Caveman
             GUILayout.EndHorizontal();
             GUILayout.EndArea();
 
-            if (add) builder.AssignSelected();
-            if (rem) builder.UnassignSelected();
+            bool hq = hb != null && hb.isHQ;
+            if (add) { if (hq) Colony.Instance?.AddBuilder(); else builder.AssignSelected(); }
+            if (rem) { if (hq) Colony.Instance?.RemoveBuilder(); else builder.UnassignSelected(); }
             if (demo) builder.DemolishSelected();
             if (close) builder.Deselect();
         }

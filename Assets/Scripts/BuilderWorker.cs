@@ -3,30 +3,29 @@ using UnityEngine;
 namespace Caveman
 {
     /// <summary>
-    /// A builder assigned to a ConstructionSite. Originates from the Town Hall
-    /// (nearest housing). Hauls a small load per trip (consuming materials from the
-    /// pool on pickup, reserving them so multiple builders don't over-fetch), then
-    /// helps construct. Several builders on one site finish it faster. Drawn square
-    /// to tell it apart from the round gatherer workers.
+    /// A builder from the Colony's HQ builder squad. It picks the nearest active
+    /// construction site, hauls its materials (a small load per trip, consumed from
+    /// the pool on pickup and reserved so builders don't over-fetch), then helps
+    /// build. Idle builders wait at the HQ. Square sprite to distinguish from the
+    /// round gatherer workers.
     /// </summary>
     public class BuilderWorker : MonoBehaviour
     {
-        public ConstructionSite site;
         public float moveSpeed = 3.2f;
         public int carryCapacity = 2;
 
-        private enum State { ToDepot, ToSite }
-        private State _state = State.ToDepot;
-        private ItemDefinition _targetItem;  // item this trip is fetching
+        private ConstructionSite _site;
+        private ItemDefinition _targetItem; // what this fetch trip is going for
         private ItemDefinition _carryItem;
         private int _carryQty;
+
         private SpriteRenderer _sr;
         private readonly Color _baseColor = new Color(0.85f, 0.86f, 0.95f);
 
-        public static BuilderWorker Spawn(ConstructionSite site)
+        public static BuilderWorker Spawn()
         {
             var go = new GameObject("Builder");
-            go.transform.position = NearestHousing(site.transform.position);
+            go.transform.position = NearestHousing(Vector3.zero);
             go.transform.localScale = Vector3.one * 0.34f;
 
             var sr = go.AddComponent<SpriteRenderer>();
@@ -34,7 +33,6 @@ namespace Caveman
             sr.sortingOrder = 13;
 
             var b = go.AddComponent<BuilderWorker>();
-            b.site = site;
             b._sr = sr;
             sr.color = b._baseColor;
             return b;
@@ -42,58 +40,84 @@ namespace Caveman
 
         void Update()
         {
-            if (site == null) { Destroy(gameObject); return; }
-
-            // Once all materials are delivered, everyone helps build.
-            if (site.MaterialsDone)
+            // Acquire / re-acquire a site when not committed to one.
+            if (_site == null || _site.IsComplete)
             {
-                if (MoveTo(site.transform.position)) site.AddBuildProgress(Time.deltaTime);
+                DropClaim();
+                _site = NearestActiveSite();
+                _targetItem = null;
+            }
+
+            if (_site == null) { MoveTo(NearestHousing(transform.position)); UpdateColor(); return; } // idle at HQ
+
+            if (_site.MaterialsDone)
+            {
+                if (MoveTo(_site.transform.position)) _site.AddBuildProgress(Time.deltaTime);
                 UpdateColor();
                 return;
             }
 
-            if (_state == State.ToDepot)
+            if (_carryQty > 0) // carrying — deliver
+            {
+                if (MoveTo(_site.transform.position))
+                {
+                    _site.Deliver(_carryItem, _carryQty);
+                    _carryItem = null;
+                    _carryQty = 0;
+                }
+            }
+            else // empty — fetch
             {
                 if (_targetItem == null)
                 {
-                    var m = site.NextFetchable();
-                    if (m == null) { MoveTo(site.transform.position); UpdateColor(); return; } // wait near site
+                    var m = _site.NextFetchable();
+                    if (m == null) { MoveTo(_site.transform.position); UpdateColor(); return; } // wait to build
                     _targetItem = m.item;
                 }
 
                 if (MoveTo(DepotFor(_targetItem)))
                 {
-                    var m = site.MatFor(_targetItem);
+                    var m = _site.MatFor(_targetItem);
                     int avail = m != null ? m.needed - m.claimed : 0;
-                    if (avail <= 0) { _targetItem = null; }   // someone else took it — re-pick
+                    if (avail <= 0) { _targetItem = null; }
                     else
                     {
                         int want = Mathf.Min(carryCapacity, avail);
                         int got = Economy.SpendUpTo(_targetItem, want, Carried());
                         if (got > 0)
                         {
-                            site.Claim(_targetItem, got);
+                            _site.Claim(_targetItem, got);
                             _carryItem = _targetItem;
                             _carryQty = got;
                             _targetItem = null;
-                            _state = State.ToSite;
                         }
-                        // else: pool empty — wait here and retry next frame.
                     }
-                }
-            }
-            else // ToSite
-            {
-                if (MoveTo(site.transform.position))
-                {
-                    site.Deliver(_carryItem, _carryQty);
-                    _carryQty = 0;
-                    _carryItem = null;
-                    _state = State.ToDepot;
                 }
             }
 
             UpdateColor();
+        }
+
+        private void DropClaim()
+        {
+            if (_site != null && _carryQty > 0 && _carryItem != null) _site.Unclaim(_carryItem, _carryQty);
+            _carryItem = null;
+            _carryQty = 0;
+        }
+
+        void OnDestroy() => DropClaim();
+
+        private ConstructionSite NearestActiveSite()
+        {
+            ConstructionSite best = null;
+            float bestSq = float.MaxValue;
+            foreach (var s in ConstructionSite.All)
+            {
+                if (s == null || s.IsComplete) continue;
+                float sq = ((Vector2)(s.transform.position - transform.position)).sqrMagnitude;
+                if (sq < bestSq) { bestSq = sq; best = s; }
+            }
+            return best;
         }
 
         private bool MoveTo(Vector3 target)
@@ -115,7 +139,7 @@ namespace Caveman
                 if (sq < bestSq) { bestSq = sq; bestStore = s; }
             }
             if (bestStore != null) return bestStore.transform.position;
-            return NearestHousing(transform.position); // fallback: the Town Hall
+            return NearestHousing(transform.position); // fallback: the HQ acts as the depot
         }
 
         private static Vector3 NearestHousing(Vector3 from)
