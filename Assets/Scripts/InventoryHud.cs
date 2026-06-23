@@ -264,11 +264,24 @@ namespace Caveman
 
             if (staff != null)
             {
-                GUILayout.Label($"Workers: {staff.AssignedWorkers}/{staff.MaxWorkers}    <size=14>(free: {(Colony.Instance != null ? Colony.Instance.FreeWorkers : 0)})</size>", _small);
-                GUILayout.BeginHorizontal();
-                rem = GUILayout.Button("- worker", GUILayout.Height(30));
-                add = GUILayout.Button("+ worker", GUILayout.Height(30));
-                GUILayout.EndHorizontal();
+                var th = sel.GetComponent<TransportHub>();
+                if (th != null && th.mechanical)
+                {
+                    GUILayout.Label("<size=14>Automatic conveyor (no worker)</size>", _small);
+                }
+                else
+                {
+                    GUILayout.Label($"Workers: {staff.AssignedWorkers}/{staff.MaxWorkers}    <size=14>(free: {(Colony.Instance != null ? Colony.Instance.FreeWorkers : 0)})</size>", _small);
+                    GUILayout.BeginHorizontal();
+                    rem = GUILayout.Button("- worker", GUILayout.Height(28));
+                    add = GUILayout.Button("+ worker", GUILayout.Height(28));
+                    GUILayout.EndHorizontal();
+                }
+                if (th != null)
+                {
+                    string pn = th.priorityItem != null ? th.priorityItem.displayName : "Any";
+                    if (GUILayout.Button($"<size=12>Haul priority: {pn}</size>", _btn)) th.CyclePriority();
+                }
             }
             else if (sb != null)
             {

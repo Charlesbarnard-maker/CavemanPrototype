@@ -75,12 +75,24 @@ namespace Caveman
 
         private bool FindJob()
         {
+            var pref = hub != null ? hub.priorityItem : null;
+            if (pref != null && ScanFor(pref)) { _hasJob = true; return true; }
+            if (ScanFor(null)) { _hasJob = true; return true; }
+            _hasJob = false;
+            return false;
+        }
+
+        // Finds the nearest source buffer (optionally restricted to `only`) that has a
+        // valid destination storage; records it as the current job.
+        private bool ScanFor(ItemDefinition only)
+        {
             float bestSq = float.MaxValue;
             bool found = false;
 
             void Consider(Inventory buf, ItemDefinition item, Transform t)
             {
                 if (buf == null || item == null || buf.Count(item) <= 0) return;
+                if (only != null && item != only) return;
                 var store = StorageFor(item);
                 if (store == null) return;
                 float sq = ((Vector2)(t.position - transform.position)).sqrMagnitude;
@@ -94,8 +106,6 @@ namespace Caveman
 
             foreach (var p in ProductionBuilding.All) if (p != null) Consider(p.Buffer, p.produces, p.transform);
             foreach (var w in WorkshopBuilding.All) if (w != null) Consider(w.Buffer, w.output, w.transform);
-
-            _hasJob = found;
             return found;
         }
 

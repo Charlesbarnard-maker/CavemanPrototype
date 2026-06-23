@@ -70,6 +70,19 @@ no Inspector wiring). Scripts in `Assets/Scripts/`:
   the player (`CameraFollow`); HUD via `OnGUI` (`InventoryHud`).
 
 ## Recently built
+- **Ages & tech progression** (`Colony.Age`, `BuildingDefinition.unlockAge`): Stone →
+  Tribal → Bronze → … Advancing costs resources + population; the build menu shows the
+  current age, an Advance button, and locks/greys future buildings (hides far ones).
+  This is the progressive-unlock that also fixes early-game clutter.
+- **Tribal content:** Hunter's Hut (meat), Clay Pit (clay), Charcoal Burner
+  (wood→charcoal), Clay/Meat storage, Longhouse.
+- **Bronze content:** Kiln (clay+charcoal→bricks), Farm (water→grain), Mill
+  (grain→flour), Bakery (flour+water→bread, foodValue 4), Brick Yard.
+- **Wooden Roller** — first automated transport: a worker-free conveyor (mechanical
+  TransportHub) that hauls faster than a hand-transporter. Unlocks in Bronze.
+- **Transporter priorities** — each transport building can be set to prioritise a
+  resource (cycled in its panel), the first real logistics "choice".
+- **Ground backdrop** (placeholder terrain) behind the world.
 - **Exploration — fog of war** (`FogOfWar`): the map starts dark and is permanently
   revealed in a radius around the player as they move; the M overview shows what's
   been discovered. Encourages scouting for resources.

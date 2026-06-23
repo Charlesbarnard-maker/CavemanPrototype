@@ -14,6 +14,18 @@ namespace Caveman
         public BuildingDefinition def;
         public int maxWorkers = 2;
         public bool mechanical; // runs a transporter with no worker (a conveyor)
+        public ItemDefinition priorityItem; // null = haul anything (nearest); else prefer this
+
+        /// <summary>Cycle the priority through the resources currently being produced (+ Any).</summary>
+        public void CyclePriority()
+        {
+            var items = new List<ItemDefinition> { null }; // null = Any
+            void Add(ItemDefinition i) { if (i != null && !items.Contains(i)) items.Add(i); }
+            foreach (var p in ProductionBuilding.All) Add(p.produces);
+            foreach (var w in WorkshopBuilding.All) Add(w.output);
+            int idx = items.IndexOf(priorityItem);
+            priorityItem = items[(idx + 1) % items.Count];
+        }
 
         public int AssignedWorkers { get; private set; }
         public int MaxWorkers => maxWorkers;
