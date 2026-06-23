@@ -70,13 +70,36 @@ no Inspector wiring). Scripts in `Assets/Scripts/`:
   the player (`CameraFollow`); HUD via `OnGUI` (`InventoryHud`).
 
 ## Recently built
+- **The hook — depth pass (5 systems).** Built the "just one more thing" loop the game
+  was missing:
+  1. **Population demand sink + happiness.** Citizens consume **comfort goods** beyond
+     survival — cooked food (Tribal), bread (Bronze), tools (Iron) — at a rate that
+     scales with population. How much you can supply sets **Happiness (0–1)**, which
+     boosts/throttles **Productivity** and **growth rate**. Growth raises demand →
+     the escalating consumer that makes scaling production worthwhile. Shown as
+     "Happy %" in the status bar.
+  2. **Bottleneck feedback.** Every collector/workshop shows a **status dot**:
+     🟢 working · 🟡 output full (needs transport) · 🔴 starved (no input) · ⚪ no worker.
+     Bottlenecks are now visible at a glance (`Status` helper; legend in H help).
+  3. **Finite rich resources.** Ore veins are **finite** (no regen) — they deplete and
+     **vanish**, so local ore runs out and you must keep exploring outward, expanding
+     logistics. (`SpawnNode`/`SpawnPatches` gained a `regen` param; 0 = finite.)
+  4. **Shared-intermediate chain.** **Smelter** (Ore + Charcoal → Metal, Bronze) and
+     **Toolmaker** (Metal + Planks → Tools, Iron). Charcoal now feeds **both** the Kiln
+     (bricks) and the Smelter (metal) — scaling one starves the other (cascade). Tools
+     are an Iron-age comfort good and gate the new **Industrial Age** (metal 30, tools
+     15, planks 40, pop 28).
+  5. **Mass placement.** Normal building placement **stays in mode** and supports
+     **hold-and-drag** to stamp a whole row (one per cell, occupancy-checked); **C**
+     copies the selected building's type for quick repeats. The mid-game tedium-killer.
 - **The hook — guided objectives ladder.** A running list of escalating goals (gather
   → forage → grow → advance age → planks → belts → routes → cook → mine ore → Iron Age
-  → thrive) shown top-right. Completing one pays a small **reward**, pops a celebratory
-  **toast**, and reveals the next — constant direction + dopamine. Reaching a new **age
-  pops a toast listing what it unlocked** (advancement feels like a power-up).
-  *Next hook layers:* a growing population **demand sink**, a prosperity **score**, and
-  a long-term **win goal** (a Monument / the Future age) so the pull is endless.
+  → smelt metal → craft tools → keep people happy → Industrial Age → thrive) shown
+  top-right. Completing one pays a small **reward**, pops a celebratory **toast**, and
+  reveals the next — constant direction + dopamine. Reaching a new **age pops a toast
+  listing what it unlocked** (advancement feels like a power-up).
+  *Next hook layers:* a prosperity **score** and a long-term **win goal** (a Monument /
+  the Future age) so the pull is endless.
 - **Logistics reworked → belts (local) + caravan routes (long distance).** Removed the
   abstract haulers. **Depots** are transfer stations (hold one resource, belt in/out);
   a **Caravan route** links two depots with an **elephant** that physically shuttles
