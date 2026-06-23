@@ -82,6 +82,7 @@ namespace Caveman
             int taken = Mathf.Min(requested, _amount);
             _amount -= taken;
             ApplyScale();
+            if (_amount <= 0 && regenAmount <= 0) Destroy(gameObject); // finite vein exhausted
             return taken;
         }
 

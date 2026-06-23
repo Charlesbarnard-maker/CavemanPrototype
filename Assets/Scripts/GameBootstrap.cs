@@ -237,15 +237,15 @@ namespace Caveman
                 new Vector2(-26f, -18f), new Vector2(14f, 12f), new Vector2(1.0f, 1.4f), PlaceholderArt.Hexagon(), 40, baseClear);
             // Ore veins — rare, far from base (must explore to find them), high yield.
             SpawnPatches("Ore Vein", ore, new Color(0.62f, 0.58f, 0.42f), 4,
-                new Vector2(46f, 34f), new Vector2(12f, 12f), new Vector2(1.1f, 1.5f), PlaceholderArt.Hexagon(), 60, 26f);
+                new Vector2(46f, 34f), new Vector2(12f, 12f), new Vector2(1.1f, 1.5f), PlaceholderArt.Hexagon(), 60, 26f, 0);
             SpawnPatches("Ore Vein", ore, new Color(0.62f, 0.58f, 0.42f), 4,
-                new Vector2(-46f, -34f), new Vector2(12f, 12f), new Vector2(1.1f, 1.5f), PlaceholderArt.Hexagon(), 60, 26f);
+                new Vector2(-46f, -34f), new Vector2(12f, 12f), new Vector2(1.1f, 1.5f), PlaceholderArt.Hexagon(), 60, 26f, 0);
         }
 
         // Scatters `count` patches around `center`, jittered by ±spread, random size,
         // and kept at least `minClear` from the origin so the base area stays open.
         private static void SpawnPatches(string name, ItemDefinition item, Color color, int count,
-            Vector2 center, Vector2 spread, Vector2 sizeRange, Sprite sprite, int capacity, float minClear)
+            Vector2 center, Vector2 spread, Vector2 sizeRange, Sprite sprite, int capacity, float minClear, int regen = 1)
         {
             for (int i = 0; i < count; i++)
             {
@@ -254,7 +254,7 @@ namespace Caveman
                 float size = Random.Range(sizeRange.x, sizeRange.y);
                 float b = Random.Range(0.9f, 1.1f); // slight colour variation
                 var c = new Color(Mathf.Clamp01(color.r * b), Mathf.Clamp01(color.g * b), Mathf.Clamp01(color.b * b));
-                SpawnNode(name, item, c, pos, size, sprite, capacity);
+                SpawnNode(name, item, c, pos, size, sprite, capacity, regen);
             }
         }
 
@@ -335,14 +335,14 @@ namespace Caveman
             return def;
         }
 
-        private static void SpawnNode(string name, ItemDefinition item, Color color, Vector2 pos, float size, Sprite sprite, int capacity = 30)
+        private static void SpawnNode(string name, ItemDefinition item, Color color, Vector2 pos, float size, Sprite sprite, int capacity = 30, int regen = 1)
         {
             var go = MakeSprite(name, color, pos, size, 0, sprite);
             go.AddComponent<BoxCollider2D>();
             var node = go.AddComponent<ResourceNode>();
             node.yields = item;
             node.capacity = capacity;
-            node.regenAmount = 1;
+            node.regenAmount = regen; // 0 = finite (depletes and vanishes)
             node.regenInterval = 1.5f;
         }
 
