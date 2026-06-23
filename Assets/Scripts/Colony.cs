@@ -22,10 +22,10 @@ namespace Caveman
         public bool Thirsty { get; private set; }
 
         [Header("Tuning")]
-        public float foodTick = 7f;     // every N seconds each person eats 1 food (gentle early)
-        public float waterTick = 7f;    // every N seconds each person drinks 1 water
+        public float foodTick = 11f;    // every N seconds each person eats 1 food (gentle)
+        public float waterTick = 11f;   // every N seconds each person drinks 1 water
         public float growthTick = 15f;  // every N seconds +1 pop (needs surplus, see below)
-        public float starveTick = 12f;  // every N seconds -1 pop while starving/thirsty
+        public float starveTick = 20f;  // every N seconds -1 pop while starving/thirsty (lots of grace)
         [Tooltip("Stored food needed before population will grow at all.")]
         public int growthFoodThreshold = 12;
         [Tooltip("Stored food consumed to raise each new citizen.")]

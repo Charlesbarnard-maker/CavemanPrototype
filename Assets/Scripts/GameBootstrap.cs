@@ -79,14 +79,18 @@ namespace Caveman
             if (follow == null) follow = cam.gameObject.AddComponent<CameraFollow>();
             follow.target = player.transform;
 
+            // --- Fog of war (explore to reveal the map) ---
+            var fog = new GameObject("FogOfWar").AddComponent<FogOfWar>();
+            fog.target = player.transform;
+
             // --- Colony (population) ---
             var colony = new GameObject("Colony").AddComponent<Colony>();
             colony.foodItem = food;
             colony.waterItem = water;
             colony.carried = gatherer.Inventory;
             colony.SetStartingPopulation(5);
-            gatherer.Inventory.Add(food, 50);   // starting larder while you learn the ropes
-            gatherer.Inventory.Add(water, 40);  // starting water
+            gatherer.Inventory.Add(food, 90);   // generous starting larder while you learn the ropes
+            gatherer.Inventory.Add(water, 90);  // generous starting water
 
             // --- Town Hall (pre-placed, houses 3) ---
             var townHallDef = MakeHousing("Town Hall", 5, new Color(0.60f, 0.50f, 0.70f));

@@ -17,6 +17,11 @@ A running record so progress/problems don't get lost. Newest first. Move items t
 - **2026-06-23 — Two scenes** (empty `SampleScene` vs working scene). Removed the
   unused template; `UnitySave.unity` is the working scene.
 
+## Fixed (continued)
+- **2026-06-23 — Population died fast & silently (ran out of water).** Slowed food/
+  water consumption, bigger starting buffers (90 each), slower decline (more grace),
+  and a big on-screen ⚠ warning when out of food/water.
+
 ## Open — bugs / behaviour
 - **Workshop inputs & build costs still pull from the global pool, not hauled.**
   Buffer→storage is now physical (Transporters), but a workshop's *inputs* and a
@@ -49,6 +54,11 @@ A running record so progress/problems don't get lost. Newest first. Move items t
   (was ~2×/frame), and the build menu only runs its per-building affordability checks
   while it's open (B-toggled). Remaining: per-idle-transporter `FindJob` scans the
   building registries each frame — fine for now, revisit if building counts get large.
+
+## Open — design
+- **Too automated / not enough choice.** Once set up, the colony runs itself. Needs
+  player decisions: worker/transporter priorities, layout that matters, branching
+  tech/age unlocks, manual overrides. (See DESIGN.md "More player choice".)
 
 ## Open — onboarding / UX
 - **Too much at once at the start.** All buildings/categories are visible immediately,

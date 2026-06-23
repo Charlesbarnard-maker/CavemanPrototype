@@ -70,6 +70,11 @@ no Inspector wiring). Scripts in `Assets/Scripts/`:
   the player (`CameraFollow`); HUD via `OnGUI` (`InventoryHud`).
 
 ## Recently built
+- **Exploration — fog of war** (`FogOfWar`): the map starts dark and is permanently
+  revealed in a radius around the player as they move; the M overview shows what's
+  been discovered. Encourages scouting for resources.
+- **Survival tuned gentler**: slower food/water consumption, bigger starting buffers,
+  slower decline, and a big on-screen ⚠ warning so running out can't sneak up on you.
 - **Water** (survival + crafting): ponds → **Water Hole** collector → **Water Barrel**.
   The colony **drinks water** each tick (THIRSTY → population decline, like starving).
   **Campfire** now needs **Wood (fuel) + Water** to cook, not just raw food.
@@ -134,6 +139,13 @@ Transporters: **wooden rollers** (slow, early-mechanical) → carts/animals → 
 Both transporters and conveyors need **priorities / filters** — *what* to collect,
 which source and which destination, and ordering when demand exceeds supply. This
 routing/priority layer is the core optimisation challenge.
+
+**More player choice (less full-auto).** Right now the loop runs itself once set up;
+it needs meaningful decisions: **worker & transporter priorities** (what to prioritise
+when demand > supply), **placement/layout** that actually matters (distance, routing),
+**branching tech/age unlocks** (choose a path), and **manual overrides**. The game
+should pose trade-offs — which resource to favour, where to expand, what to research —
+rather than playing itself. This is the key "make it a game, not a watch-it" gap.
 
 **Terrain & paths.** Ground tiles (grass/dirt/water edges) for visual variety, and
 **paths/roads** the player lays down — initially cosmetic, later functional (speed up

@@ -72,6 +72,15 @@ namespace Caveman
             if (_showHelp) DrawHelp();
             if (_paused) GUI.Label(new Rect(0, 60, Screen.width, 60), "<b>PAUSED</b>  <size=18>(space)</size>", _big);
 
+            var col = Colony.Instance;
+            if (col != null && !_paused && (col.Starving || col.Thirsty))
+            {
+                string need = col.Starving && col.Thirsty ? "NO FOOD OR WATER"
+                            : col.Thirsty ? "OUT OF WATER" : "OUT OF FOOD";
+                GUI.Label(new Rect(0, 96, Screen.width, 44),
+                    $"<size=26><color=#ff5555><b>⚠ {need} — your people are dying!</b></color></size>", _big);
+            }
+
             // Block world clicks when the cursor is over an interactive panel.
             if (Event.current.type == EventType.Repaint)
             {
