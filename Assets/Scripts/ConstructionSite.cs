@@ -4,29 +4,33 @@ using UnityEngine;
 namespace Caveman
 {
     /// <summary>
-    /// A building under construction. It claims a free worker as a builder, who
-    /// hauls the required materials here a few units at a time (consuming them from
-    /// the pool on pickup), then constructs the building over a build time. On
-    /// completion it spawns the real building and the builder is freed.
+    /// A building under construction. It claims up to `maxBuilders` free workers,
+    /// who haul the required materials here a few units at a time (consuming them
+    /// from the pool on pickup) and then construct the building together — more
+    /// builders = faster. On completion it spawns the real building.
     /// </summary>
     public class ConstructionSite : MonoBehaviour
     {
         public BuildingDefinition def;
         public float buildTime = 4f;
+        public int maxBuilders = 3;
 
-        public readonly List<ItemAmount> remaining = new(); // materials still to deliver
+        /// <summary>A material line: how many still needed, and how many are already claimed in-transit.</summary>
+        public class Mat { public ItemDefinition item; public int needed; public int claimed; }
+
+        public readonly List<Mat> materials = new();
         public int totalUnits;
         public int deliveredUnits;
         public float buildProgress;
-        public bool HasBuilder { get; private set; }
 
-        private SpriteRenderer _sr;
-        private Color _baseColor;
-        private BuilderWorker _builder;
-
-        public bool MaterialsDone => remaining.Count == 0;
+        public int BuilderCount => _builders.Count;
+        public bool MaterialsDone => materials.Count == 0;
         public bool IsComplete => MaterialsDone && buildProgress >= buildTime;
         public float BuildFraction => Mathf.Clamp01(buildProgress / Mathf.Max(0.01f, buildTime));
+
+        private readonly List<BuilderWorker> _builders = new();
+        private SpriteRenderer _sr;
+        private Color _baseColor;
 
         public static ConstructionSite Spawn(BuildingDefinition def, Vector3 pos)
         {
@@ -39,7 +43,7 @@ namespace Caveman
             sr.color = new Color(def.color.r, def.color.g, def.color.b, 0.3f);
             sr.sortingOrder = 2;
 
-            go.AddComponent<BoxCollider2D>(); // clickable for select/cancel
+            go.AddComponent<BoxCollider2D>(); // clickable to cancel
 
             var site = go.AddComponent<ConstructionSite>();
             site.def = def;
@@ -48,23 +52,47 @@ namespace Caveman
             foreach (var c in def.cost)
             {
                 if (c.item == null || c.amount <= 0) continue;
-                site.remaining.Add(new ItemAmount(c.item, c.amount));
+                site.materials.Add(new Mat { item = c.item, needed = c.amount, claimed = 0 });
                 site.totalUnits += c.amount;
             }
             site.totalUnits = Mathf.Max(1, site.totalUnits);
             return site;
         }
 
-        /// <summary>The current material the builder should fetch (first outstanding line).</summary>
-        public ItemAmount NextNeeded() => remaining.Count > 0 ? remaining[0] : null;
-
-        /// <summary>Deliver `qty` units toward the current material line.</summary>
-        public void DeliverUnits(int qty)
+        /// <summary>First material with units still un-claimed (to fetch next).</summary>
+        public Mat NextFetchable()
         {
-            if (qty <= 0 || remaining.Count == 0) return;
-            remaining[0].amount -= qty;
+            foreach (var m in materials)
+                if (m.needed - m.claimed > 0) return m;
+            return null;
+        }
+
+        public Mat MatFor(ItemDefinition item)
+        {
+            foreach (var m in materials)
+                if (m.item == item) return m;
+            return null;
+        }
+
+        /// <summary>Reserve up to `qty` of `item` as in-transit; returns the amount reserved.</summary>
+        public int Claim(ItemDefinition item, int qty)
+        {
+            var m = MatFor(item);
+            if (m == null || qty <= 0) return 0;
+            int q = Mathf.Clamp(qty, 0, m.needed - m.claimed);
+            m.claimed += q;
+            return q;
+        }
+
+        /// <summary>Deliver reserved units; reduces both needed and claimed.</summary>
+        public void Deliver(ItemDefinition item, int qty)
+        {
+            var m = MatFor(item);
+            if (m == null || qty <= 0) return;
+            m.needed -= qty;
+            m.claimed = Mathf.Max(0, m.claimed - qty);
             deliveredUnits += qty;
-            if (remaining[0].amount <= 0) remaining.RemoveAt(0);
+            if (m.needed <= 0) materials.Remove(m);
         }
 
         public void AddBuildProgress(float dt)
@@ -76,17 +104,19 @@ namespace Caveman
 
         void Update()
         {
-            if (!HasBuilder && Colony.Instance != null && Colony.Instance.ClaimWorker())
+            // Claim free workers as builders, up to the cap, while there's work left.
+            if (!IsComplete)
             {
-                HasBuilder = true;
-                _builder = BuilderWorker.Spawn(this);
+                while (_builders.Count < maxBuilders && Colony.Instance != null && Colony.Instance.ClaimWorker())
+                    _builders.Add(BuilderWorker.Spawn(this));
             }
+            _builders.RemoveAll(b => b == null);
             UpdateVisual();
         }
 
         private void Complete()
         {
-            ReleaseBuilder(); // free first so a finished collector can auto-staff
+            ReleaseBuilders();
             switch (def.kind)
             {
                 case BuildingKind.Storage: StorageBuilding.Spawn(def, transform.position); break;
@@ -99,17 +129,15 @@ namespace Caveman
             Destroy(gameObject);
         }
 
-        private void ReleaseBuilder()
+        private void ReleaseBuilders()
         {
-            if (_builder != null) { Destroy(_builder.gameObject); _builder = null; }
-            if (HasBuilder) { Colony.Instance?.ReleaseWorker(); HasBuilder = false; }
+            int n = _builders.Count;
+            foreach (var b in _builders) if (b != null) Destroy(b.gameObject);
+            _builders.Clear();
+            for (int i = 0; i < n; i++) Colony.Instance?.ReleaseWorker();
         }
 
-        void OnDestroy()
-        {
-            if (HasBuilder) { Colony.Instance?.ReleaseWorker(); HasBuilder = false; }
-            if (_builder != null) Destroy(_builder.gameObject);
-        }
+        void OnDestroy() => ReleaseBuilders();
 
         private void UpdateVisual()
         {

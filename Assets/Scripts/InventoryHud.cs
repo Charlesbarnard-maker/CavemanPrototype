@@ -162,9 +162,12 @@ namespace Caveman
             else if (cs != null)
             {
                 if (!cs.MaterialsDone)
-                    GUILayout.Label($"<size=15>Materials: {cs.deliveredUnits}/{cs.totalUnits}{(cs.HasBuilder ? "" : "  (waiting for a free worker)")}</size>", _small);
+                {
+                    string b = cs.BuilderCount > 0 ? $"  ({cs.BuilderCount} hauling)" : "  (waiting for a free worker)";
+                    GUILayout.Label($"<size=15>Materials: {cs.deliveredUnits}/{cs.totalUnits}{b}</size>", _small);
+                }
                 else
-                    GUILayout.Label($"<size=15>Building… {(int)(cs.BuildFraction * 100)}%</size>", _small);
+                    GUILayout.Label($"<size=15>Building… {(int)(cs.BuildFraction * 100)}%  ({cs.BuilderCount} workers)</size>", _small);
             }
 
             GUILayout.FlexibleSpace();

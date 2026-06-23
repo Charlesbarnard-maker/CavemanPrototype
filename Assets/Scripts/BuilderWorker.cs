@@ -3,10 +3,11 @@ using UnityEngine;
 namespace Caveman
 {
     /// <summary>
-    /// A builder assigned to a ConstructionSite. Spawns at (and fetches from) the
-    /// Town Hall — later, dedicated constructor stations. Carries a small load per
-    /// trip, so a building needs several trips, then constructs it. Drawn as a
-    /// square to tell it apart from the round gatherer workers.
+    /// A builder assigned to a ConstructionSite. Originates from the Town Hall
+    /// (nearest housing). Hauls a small load per trip (consuming materials from the
+    /// pool on pickup, reserving them so multiple builders don't over-fetch), then
+    /// helps construct. Several builders on one site finish it faster. Drawn square
+    /// to tell it apart from the round gatherer workers.
     /// </summary>
     public class BuilderWorker : MonoBehaviour
     {
@@ -14,8 +15,9 @@ namespace Caveman
         public float moveSpeed = 3.2f;
         public int carryCapacity = 2;
 
-        private enum State { ToDepot, ToSite, Building }
+        private enum State { ToDepot, ToSite }
         private State _state = State.ToDepot;
+        private ItemDefinition _targetItem;  // item this trip is fetching
         private ItemDefinition _carryItem;
         private int _carryQty;
         private SpriteRenderer _sr;
@@ -24,7 +26,6 @@ namespace Caveman
         public static BuilderWorker Spawn(ConstructionSite site)
         {
             var go = new GameObject("Builder");
-            // Builders originate from the Town Hall (nearest housing).
             go.transform.position = NearestHousing(site.transform.position);
             go.transform.localScale = Vector3.one * 0.34f;
 
@@ -43,35 +44,53 @@ namespace Caveman
         {
             if (site == null) { Destroy(gameObject); return; }
 
-            if (!site.MaterialsDone)
+            // Once all materials are delivered, everyone helps build.
+            if (site.MaterialsDone)
             {
-                if (_state == State.ToDepot)
+                if (MoveTo(site.transform.position)) site.AddBuildProgress(Time.deltaTime);
+                UpdateColor();
+                return;
+            }
+
+            if (_state == State.ToDepot)
+            {
+                if (_targetItem == null)
                 {
-                    var need = site.NextNeeded();
-                    if (need == null) { _state = State.Building; }
-                    else if (MoveTo(DepotFor(need.item)))
-                    {
-                        int want = Mathf.Min(carryCapacity, need.amount);
-                        int got = Economy.SpendUpTo(need.item, want, Carried());
-                        if (got > 0) { _carryItem = need.item; _carryQty = got; _state = State.ToSite; }
-                        // else: not enough in the pool yet — wait and retry.
-                    }
+                    var m = site.NextFetchable();
+                    if (m == null) { MoveTo(site.transform.position); UpdateColor(); return; } // wait near site
+                    _targetItem = m.item;
                 }
-                else // ToSite
+
+                if (MoveTo(DepotFor(_targetItem)))
                 {
-                    if (MoveTo(site.transform.position))
+                    var m = site.MatFor(_targetItem);
+                    int avail = m != null ? m.needed - m.claimed : 0;
+                    if (avail <= 0) { _targetItem = null; }   // someone else took it — re-pick
+                    else
                     {
-                        site.DeliverUnits(_carryQty);
-                        _carryQty = 0;
-                        _carryItem = null;
-                        _state = State.ToDepot;
+                        int want = Mathf.Min(carryCapacity, avail);
+                        int got = Economy.SpendUpTo(_targetItem, want, Carried());
+                        if (got > 0)
+                        {
+                            site.Claim(_targetItem, got);
+                            _carryItem = _targetItem;
+                            _carryQty = got;
+                            _targetItem = null;
+                            _state = State.ToSite;
+                        }
+                        // else: pool empty — wait here and retry next frame.
                     }
                 }
             }
-            else
+            else // ToSite
             {
                 if (MoveTo(site.transform.position))
-                    site.AddBuildProgress(Time.deltaTime);
+                {
+                    site.Deliver(_carryItem, _carryQty);
+                    _carryQty = 0;
+                    _carryItem = null;
+                    _state = State.ToDepot;
+                }
             }
 
             UpdateColor();
@@ -87,7 +106,6 @@ namespace Caveman
 
         private Vector3 DepotFor(ItemDefinition item)
         {
-            // Prefer the nearest storage that actually holds the item.
             StorageBuilding bestStore = null;
             float bestSq = float.MaxValue;
             foreach (var s in StorageBuilding.All)
@@ -97,9 +115,7 @@ namespace Caveman
                 if (sq < bestSq) { bestSq = sq; bestStore = s; }
             }
             if (bestStore != null) return bestStore.transform.position;
-
-            // Fallback: the Town Hall (nearest housing) acts as the depot.
-            return NearestHousing(transform.position);
+            return NearestHousing(transform.position); // fallback: the Town Hall
         }
 
         private static Vector3 NearestHousing(Vector3 from)

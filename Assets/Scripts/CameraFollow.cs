@@ -1,22 +1,65 @@
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 namespace Caveman
 {
     /// <summary>
-    /// Smoothly keeps the camera centred on a target (the player), preserving the
-    /// camera's Z so the orthographic view stays correct.
+    /// Follows the player smoothly (SmoothDamp — less jitter than a raw lerp) and
+    /// handles zoom: mouse wheel to zoom in/out, and M to toggle a far "map"
+    /// overview. Zoom is instant (works while paused).
     /// </summary>
+    [RequireComponent(typeof(Camera))]
     public class CameraFollow : MonoBehaviour
     {
         public Transform target;
-        public float smooth = 6f;
+        public float smoothTime = 0.12f;
+
+        public float minZoom = 4f;
+        public float maxZoom = 26f;
+        public float zoomStep = 1.5f;
+        public float overviewZoom = 20f;
+
+        private Camera _cam;
+        private Vector3 _vel;
+        private float _savedZoom;
+        private bool _overview;
+
+        void Awake() => _cam = GetComponent<Camera>();
 
         void LateUpdate()
         {
-            if (target == null) return;
-            Vector3 goal = new Vector3(target.position.x, target.position.y, transform.position.z);
-            float t = 1f - Mathf.Exp(-smooth * Time.deltaTime);
-            transform.position = Vector3.Lerp(transform.position, goal, t);
+            HandleZoom();
+
+            if (target != null)
+            {
+                Vector3 goal = new Vector3(target.position.x, target.position.y, transform.position.z);
+                transform.position = Vector3.SmoothDamp(transform.position, goal, ref _vel, smoothTime);
+            }
+        }
+
+        private void HandleZoom()
+        {
+            if (_cam == null) return;
+
+            var kb = Keyboard.current;
+            if (kb != null && kb.mKey.wasPressedThisFrame)
+            {
+                _overview = !_overview;
+                if (_overview) { _savedZoom = _cam.orthographicSize; _cam.orthographicSize = overviewZoom; }
+                else _cam.orthographicSize = _savedZoom;
+            }
+
+            var mouse = Mouse.current;
+            if (mouse != null)
+            {
+                float scroll = mouse.scroll.ReadValue().y;
+                if (Mathf.Abs(scroll) > 0.01f)
+                {
+                    float step = scroll > 0f ? -zoomStep : zoomStep; // wheel up = zoom in
+                    _cam.orthographicSize = Mathf.Clamp(_cam.orthographicSize + step, minZoom, maxZoom);
+                    _overview = false;
+                }
+            }
         }
     }
 }
