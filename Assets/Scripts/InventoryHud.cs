@@ -133,19 +133,23 @@ namespace Caveman
             GUI.Box(rect, GUIContent.none);
             GUILayout.BeginArea(new Rect(rect.x + 12, rect.y + 10, rect.width - 24, rect.height - 20));
 
-            var pb = sel.GetComponent<ProductionBuilding>();
             var sb = sel.GetComponent<StorageBuilding>();
             var hb = sel.GetComponent<HousingBuilding>();
+            var wb = sel.GetComponent<WorkshopBuilding>();
             var cs = sel.GetComponent<ConstructionSite>();
-            string name = pb != null ? pb.def.displayName : sb != null ? sb.def.displayName
+            var staff = sel.GetComponent<IStaffable>();
+            string name = staff != null ? staff.StaffLabel : sb != null ? sb.def.displayName
                 : hb != null ? hb.def.displayName : cs != null ? cs.def.displayName : "Building";
             string tag = cs != null ? "  <size=14><color=#bbb>(building)</color></size>" : "";
             GUILayout.Label($"<b>{name}</b>{tag}", _s);
 
             bool add = false, rem = false, demo, close;
-            if (pb != null)
+            if (wb != null)
+                GUILayout.Label($"<size=15>{RecipeText(wb)}</size>", _small);
+
+            if (staff != null)
             {
-                GUILayout.Label($"Workers: {pb.AssignedWorkers}/{pb.maxWorkers}    <size=14>(free: {(Colony.Instance != null ? Colony.Instance.FreeWorkers : 0)})</size>", _small);
+                GUILayout.Label($"Workers: {staff.AssignedWorkers}/{staff.MaxWorkers}    <size=14>(free: {(Colony.Instance != null ? Colony.Instance.FreeWorkers : 0)})</size>", _small);
                 GUILayout.BeginHorizontal();
                 rem = GUILayout.Button("- worker", GUILayout.Height(30));
                 add = GUILayout.Button("+ worker", GUILayout.Height(30));
@@ -235,6 +239,16 @@ namespace Caveman
             foreach (var c in def.cost)
                 if (c.item != null) parts.Add($"{c.amount} {c.item.displayName}");
             return parts.Count > 0 ? string.Join(", ", parts) : "free";
+        }
+
+        private static string RecipeText(WorkshopBuilding w)
+        {
+            var parts = new List<string>();
+            foreach (var i in w.inputs)
+                if (i.item != null) parts.Add($"{i.amount} {i.item.displayName}");
+            string ins = parts.Count > 0 ? string.Join(" + ", parts) : "—";
+            string outName = w.output != null ? w.output.displayName : "?";
+            return $"{ins} → {w.outputPerCycle} {outName}";
         }
     }
 }

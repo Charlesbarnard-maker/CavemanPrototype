@@ -45,6 +45,7 @@ namespace Caveman
             {
                 int a = 0;
                 foreach (var p in ProductionBuilding.All) a += p.AssignedWorkers;
+                foreach (var w in WorkshopBuilding.All) a += w.AssignedWorkers;
                 return a;
             }
         }
@@ -78,9 +79,9 @@ namespace Caveman
             if (_foodT >= foodTick)
             {
                 _foodT -= foodTick;
-                if (Population > 0 && foodItem != null)
+                if (Population > 0)
                 {
-                    int got = Economy.SpendUpTo(foodItem, Population, carried);
+                    int got = Economy.SpendFoodPoints(Population, carried); // raw + cooked
                     Starving = got < Population;
                 }
                 else
@@ -94,15 +95,14 @@ namespace Caveman
             //     (no more instant house-fill). ---
             bool canGrow = !Starving
                            && Population < Capacity
-                           && foodItem != null
-                           && Economy.Available(foodItem, carried) >= growthFoodThreshold;
+                           && Economy.FoodPoints(carried) >= growthFoodThreshold;
             if (canGrow)
             {
                 _growthT += dt;
                 if (_growthT >= growthTick)
                 {
                     _growthT -= growthTick;
-                    if (Economy.SpendUpTo(foodItem, growthFoodCost, carried) > 0) Population++;
+                    if (Economy.SpendFoodPoints(growthFoodCost, carried) > 0) Population++;
                 }
             }
             else
@@ -135,6 +135,11 @@ namespace Caveman
             foreach (var p in ProductionBuilding.All)
             {
                 while (over > 0 && p.AssignedWorkers > 0) { p.Unassign(); over--; }
+                if (over <= 0) return;
+            }
+            foreach (var w in WorkshopBuilding.All)
+            {
+                while (over > 0 && w.AssignedWorkers > 0) { w.Unassign(); over--; }
                 if (over <= 0) break;
             }
         }

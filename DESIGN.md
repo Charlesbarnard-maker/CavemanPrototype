@@ -68,6 +68,15 @@ no Inspector wiring). Scripts in `Assets/Scripts/`:
 - **Economy** (`Economy`): combined pool = carried + all buffers/storage. Camera follows
   the player (`CameraFollow`); HUD via `OnGUI` (`InventoryHud`).
 
+## Recently built
+- **Workshop/Processor engine** (`WorkshopBuilding`): a generic recipe building —
+  consumes inputs from the pool, produces an output over time, needs assigned
+  workers (more = faster). All chains are just recipes. First two: **Sawmill**
+  (2 Wood → 1 Planks) and **Campfire** (2 Food → 1 Cooked Food). Planks are
+  required to build Houses; Cooked Food nourishes more (foodValue 3 vs raw 1).
+- **Shared staffing** via `IStaffable` (collectors + workshops draw from one
+  worker pool). **Multi-type food** via `ItemDefinition.foodValue`.
+
 ## Planned systems (designed, not yet built)
 
 **Food → cooking → worker buffs.** Food is currently a single resource that just

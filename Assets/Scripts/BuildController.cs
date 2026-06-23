@@ -58,20 +58,20 @@ namespace Caveman
             if (mouse != null && mouse.leftButton.wasPressedThisFrame && !overUI)
                 Selected = BuildingGOUnderCursor(mouse);
 
-            var collector = SelectedCollector;
-            if (collector != null)
+            var staff = SelectedStaffable;
+            if (staff != null)
             {
-                if (kb.rightBracketKey.wasPressedThisFrame) collector.TryAssign();
-                if (kb.leftBracketKey.wasPressedThisFrame) collector.Unassign();
+                if (kb.rightBracketKey.wasPressedThisFrame) staff.TryAssign();
+                if (kb.leftBracketKey.wasPressedThisFrame) staff.Unassign();
             }
 
             if (kb.xKey.wasPressedThisFrame) DemolishSelected();
         }
 
-        public ProductionBuilding SelectedCollector =>
-            Selected != null ? Selected.GetComponent<ProductionBuilding>() : null;
+        public IStaffable SelectedStaffable =>
+            Selected != null ? Selected.GetComponent<IStaffable>() : null;
 
-        private void BeginPlacement(int index)
+        public void BeginPlacement(int index)
         {
             if (index < 0 || index >= buildables.Count || buildables[index] == null) return;
             PendingIndex = index;
@@ -135,8 +135,8 @@ namespace Caveman
 
         public bool CanAfford(BuildingDefinition def) => def != null && Economy.CanAfford(def.cost, Carried);
 
-        public void AssignSelected() { var c = SelectedCollector; if (c != null) c.TryAssign(); }
-        public void UnassignSelected() { var c = SelectedCollector; if (c != null) c.Unassign(); }
+        public void AssignSelected() { var s = SelectedStaffable; if (s != null) s.TryAssign(); }
+        public void UnassignSelected() { var s = SelectedStaffable; if (s != null) s.Unassign(); }
         public void Deselect() => Selected = null;
 
         public void DemolishSelected()
@@ -155,10 +155,12 @@ namespace Caveman
             var pb = Selected.GetComponent<ProductionBuilding>();
             var sb = Selected.GetComponent<StorageBuilding>();
             var hb = Selected.GetComponent<HousingBuilding>();
-            BuildingDefinition rdef = pb != null ? pb.def : sb != null ? sb.def : hb != null ? hb.def : null;
+            var wb = Selected.GetComponent<WorkshopBuilding>();
+            BuildingDefinition rdef = pb != null ? pb.def : sb != null ? sb.def : hb != null ? hb.def : wb != null ? wb.def : null;
             if (rdef == null) return;
 
-            if (pb != null) while (pb.AssignedWorkers > 0) pb.Unassign();
+            var staff = Selected.GetComponent<IStaffable>();
+            if (staff != null) while (staff.AssignedWorkers > 0) staff.Unassign();
             if (Carried != null)
                 foreach (var c in rdef.cost)
                     Carried.Add(c.item, Mathf.Max(0, c.amount / 2));
@@ -177,6 +179,7 @@ namespace Caveman
             bool isBuilding = hit.GetComponent<ProductionBuilding>() != null
                               || hit.GetComponent<StorageBuilding>() != null
                               || hit.GetComponent<HousingBuilding>() != null
+                              || hit.GetComponent<WorkshopBuilding>() != null
                               || hit.GetComponent<ConstructionSite>() != null;
             return isBuilding ? hit.gameObject : null;
         }

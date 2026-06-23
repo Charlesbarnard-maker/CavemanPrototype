@@ -9,7 +9,7 @@ namespace Caveman
     /// this building's buffer. With no workers assigned it sits idle. The building
     /// pushes its buffer into an adjacent matching StorageBuilding.
     /// </summary>
-    public class ProductionBuilding : MonoBehaviour
+    public class ProductionBuilding : MonoBehaviour, IStaffable
     {
         public BuildingDefinition def;
         public ItemDefinition produces;
@@ -22,6 +22,8 @@ namespace Caveman
         public Inventory Buffer { get; private set; }
         public ResourceNode Source => _source;
         public int AssignedWorkers { get; private set; }
+        public int MaxWorkers => maxWorkers;
+        public string StaffLabel => def != null ? def.displayName : "Collector";
 
         private readonly List<Worker> _workers = new();
         private ResourceNode _source;

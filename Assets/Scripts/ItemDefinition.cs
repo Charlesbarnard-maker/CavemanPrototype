@@ -16,5 +16,7 @@ namespace Caveman
         [Tooltip("Placeholder tint until we have real art.")]
         public Color color = Color.gray;
         public int maxStack = 999;
+        [Tooltip("Nourishment per unit when eaten (0 = not food). Cooked food is worth more.")]
+        public int foodValue = 0;
     }
 }

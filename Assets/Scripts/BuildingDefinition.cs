@@ -23,6 +23,7 @@ namespace Caveman
         Collector, // auto-harvests a nearby resource patch (needs workers assigned)
         Storage,   // holds a large amount of one resource type
         Housing,   // raises the population cap
+        Workshop,  // converts input resources into an output (a recipe)
     }
 
     /// <summary>Data for a placeable structure.</summary>
@@ -35,12 +36,14 @@ namespace Caveman
         [Tooltip("Collector: the resource it produces. Storage: the resource it holds.")]
         public ItemDefinition item;
 
-        [Header("Collector")]
+        [Header("Collector / Workshop")]
         public int outputPerCycle = 1;
-        [Tooltip("Seconds between each automatic harvest.")]
+        [Tooltip("Seconds between each automatic harvest / process cycle.")]
         public float interval = 2f;
-        [Tooltip("Max workers that can be assigned (each is one harvesting NPC).")]
+        [Tooltip("Max workers that can be assigned (each is one harvesting NPC / speeds processing).")]
         public int maxWorkers = 2;
+        [Tooltip("Workshop only: input resources consumed per cycle to make `item`.")]
+        public List<ItemAmount> inputs = new();
 
         [Header("Housing")]
         [Tooltip("How many people this houses (adds to population cap).")]

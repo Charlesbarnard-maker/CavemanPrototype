@@ -17,6 +17,10 @@ namespace Caveman
             var stone = MakeItem("stone", "Stone", new Color(0.55f, 0.55f, 0.62f));
             var wood = MakeItem("wood", "Wood", new Color(0.52f, 0.34f, 0.16f));
             var food = MakeItem("food", "Food", new Color(0.85f, 0.35f, 0.35f));
+            food.foodValue = 1;
+            var planks = MakeItem("planks", "Planks", new Color(0.74f, 0.58f, 0.34f));
+            var cookedFood = MakeItem("cooked", "Cooked Food", new Color(0.92f, 0.56f, 0.30f));
+            cookedFood.foodValue = 3; // cooking turns 2 raw food into 1 cooked worth 3 — a real gain
 
             // --- Buildings ---
             var woodHut = MakeCollector("Wood Hut", wood, 1, 2.0f, 2, 12, new Color(0.80f, 0.52f, 0.25f),
@@ -25,6 +29,12 @@ namespace Caveman
                 new ItemAmount(wood, 5), new ItemAmount(stone, 5));
             var foragerHut = MakeCollector("Forager Hut", food, 1, 2.0f, 2, 12, new Color(0.78f, 0.40f, 0.40f),
                 new ItemAmount(wood, 4));
+            var sawmill = MakeWorkshop("Sawmill", planks, 1, 2.5f, 2, 12, new Color(0.66f, 0.50f, 0.30f),
+                new List<ItemAmount> { new ItemAmount(wood, 2) },
+                new ItemAmount(wood, 6), new ItemAmount(stone, 4));
+            var campfire = MakeWorkshop("Campfire", cookedFood, 1, 3.0f, 2, 12, new Color(0.85f, 0.45f, 0.25f),
+                new List<ItemAmount> { new ItemAmount(food, 2) },
+                new ItemAmount(wood, 4), new ItemAmount(stone, 2));
             var woodStore = MakeStorage("Wood Warehouse", wood, 100, new Color(0.62f, 0.40f, 0.20f),
                 new ItemAmount(wood, 8));
             var stoneStore = MakeStorage("Stone Storage", stone, 100, new Color(0.40f, 0.43f, 0.50f),
@@ -32,7 +42,7 @@ namespace Caveman
             var foodStore = MakeStorage("Granary", food, 100, new Color(0.70f, 0.45f, 0.35f),
                 new ItemAmount(wood, 8));
             var house = MakeHousing("House", 2, new Color(0.72f, 0.62f, 0.45f),
-                new ItemAmount(wood, 10), new ItemAmount(stone, 4));
+                new ItemAmount(wood, 8), new ItemAmount(stone, 4), new ItemAmount(planks, 3));
 
             // --- Camera (follows the player) ---
             var cam = Camera.main;
@@ -54,7 +64,7 @@ namespace Caveman
             builder.gatherer = gatherer;
             builder.placeNodeRange = 6f;
             builder.buildables = new List<BuildingDefinition>
-            { woodHut, stonePit, foragerHut, woodStore, stoneStore, foodStore, house };
+            { woodHut, stonePit, foragerHut, sawmill, campfire, woodStore, stoneStore, foodStore, house };
 
             var follow = cam.GetComponent<CameraFollow>();
             if (follow == null) follow = cam.gameObject.AddComponent<CameraFollow>();
@@ -133,6 +143,23 @@ namespace Caveman
             def.item = item;
             def.capacity = capacity;
             def.color = color;
+            def.cost = new List<ItemAmount>(cost);
+            return def;
+        }
+
+        private static BuildingDefinition MakeWorkshop(string name, ItemDefinition output, int outPer,
+            float processTime, int maxWorkers, int capacity, Color color, List<ItemAmount> inputs, params ItemAmount[] cost)
+        {
+            var def = ScriptableObject.CreateInstance<BuildingDefinition>();
+            def.displayName = name;
+            def.kind = BuildingKind.Workshop;
+            def.item = output;
+            def.outputPerCycle = outPer;
+            def.interval = processTime;
+            def.maxWorkers = maxWorkers;
+            def.capacity = capacity;
+            def.color = color;
+            def.inputs = inputs;
             def.cost = new List<ItemAmount>(cost);
             return def;
         }

@@ -5,9 +5,8 @@ namespace Caveman
 {
     /// <summary>
     /// The combined resource pool: the player's carried inventory plus every
-    /// building buffer and storage in the world. Build costs are checked and
-    /// spent against this total, so anything you've gathered (wherever it sits)
-    /// counts toward what you can build.
+    /// building buffer, storage, and workshop output in the world. Build costs and
+    /// workshop inputs are checked/spent against this total.
     /// </summary>
     public static class Economy
     {
@@ -15,10 +14,9 @@ namespace Caveman
         {
             if (item == null) return 0;
             int total = carried != null ? carried.Count(item) : 0;
-            foreach (var s in StorageBuilding.All)
-                total += s.Store.Count(item);
-            foreach (var p in ProductionBuilding.All)
-                total += p.Buffer.Count(item);
+            foreach (var s in StorageBuilding.All) total += s.Store.Count(item);
+            foreach (var p in ProductionBuilding.All) total += p.Buffer.Count(item);
+            foreach (var w in WorkshopBuilding.All) total += w.Buffer.Count(item);
             return total;
         }
 
@@ -33,27 +31,7 @@ namespace Caveman
         public static void Spend(List<ItemAmount> cost, Inventory carried)
         {
             if (cost == null) return;
-            foreach (var c in cost) SpendItem(c.item, c.amount, carried);
-        }
-
-        private static void SpendItem(ItemDefinition item, int amount, Inventory carried)
-        {
-            if (item == null || amount <= 0) return;
-
-            int remaining = amount;
-            if (carried != null) remaining -= carried.RemoveUpTo(item, remaining);
-            if (remaining <= 0) return;
-
-            foreach (var s in StorageBuilding.All)
-            {
-                remaining -= s.Store.RemoveUpTo(item, remaining);
-                if (remaining <= 0) return;
-            }
-            foreach (var p in ProductionBuilding.All)
-            {
-                remaining -= p.Buffer.RemoveUpTo(item, remaining);
-                if (remaining <= 0) return;
-            }
+            foreach (var c in cost) SpendUpTo(c.item, c.amount, carried);
         }
 
         /// <summary>Spends up to `amount` from the pool; returns how many were actually spent.</summary>
@@ -71,6 +49,11 @@ namespace Caveman
             foreach (var p in ProductionBuilding.All)
             {
                 remaining -= p.Buffer.RemoveUpTo(item, remaining);
+                if (remaining <= 0) return amount;
+            }
+            foreach (var w in WorkshopBuilding.All)
+            {
+                remaining -= w.Buffer.RemoveUpTo(item, remaining);
                 if (remaining <= 0) return amount;
             }
             return amount - remaining;
@@ -94,7 +77,51 @@ namespace Caveman
             AddAll(carried);
             foreach (var s in StorageBuilding.All) AddAll(s.Store);
             foreach (var p in ProductionBuilding.All) AddAll(p.Buffer);
+            foreach (var w in WorkshopBuilding.All) AddAll(w.Buffer);
             return totals;
+        }
+
+        // ---- Food (supports multiple food types; cooked food is worth more) ----
+
+        private static int FoodPointsIn(Inventory inv)
+        {
+            if (inv == null) return 0;
+            int pts = 0;
+            foreach (var kv in inv.Items)
+                if (kv.Key != null && kv.Key.foodValue > 0) pts += kv.Value * kv.Key.foodValue;
+            return pts;
+        }
+
+        /// <summary>Total nourishment available across the pool (units × foodValue).</summary>
+        public static int FoodPoints(Inventory carried)
+        {
+            int pts = FoodPointsIn(carried);
+            foreach (var s in StorageBuilding.All) pts += FoodPointsIn(s.Store);
+            foreach (var p in ProductionBuilding.All) pts += FoodPointsIn(p.Buffer);
+            foreach (var w in WorkshopBuilding.All) pts += FoodPointsIn(w.Buffer);
+            return pts;
+        }
+
+        /// <summary>Eat up to `points` of nourishment, spending best (highest-value) food first.
+        /// Returns the nourishment actually consumed.</summary>
+        public static int SpendFoodPoints(int points, Inventory carried)
+        {
+            if (points <= 0) return 0;
+
+            var foods = new List<ItemDefinition>();
+            foreach (var kv in Totals(carried))
+                if (kv.Key != null && kv.Key.foodValue > 0) foods.Add(kv.Key);
+            foods.Sort((a, b) => b.foodValue.CompareTo(a.foodValue));
+
+            int covered = 0;
+            foreach (var f in foods)
+            {
+                if (covered >= points) break;
+                int unitsNeeded = Mathf.CeilToInt((points - covered) / (float)f.foodValue);
+                int spent = SpendUpTo(f, unitsNeeded, carried);
+                covered += spent * f.foodValue;
+            }
+            return covered;
         }
     }
 }
