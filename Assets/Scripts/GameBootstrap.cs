@@ -95,7 +95,7 @@ namespace Caveman
             var roller = MakeLogistics("Wooden Roller", 1, new Color(0.60f, 0.45f, 0.30f),
                 new ItemAmount(planks, 4)); roller.unlockAge = 2; roller.mechanical = true;
             var belt = ScriptableObject.CreateInstance<BuildingDefinition>();
-            belt.displayName = "Conveyor Belt"; belt.kind = BuildingKind.Belt; belt.unlockAge = 2;
+            belt.displayName = "Conveyor Belt"; belt.kind = BuildingKind.Belt; belt.unlockAge = 0; // available early for now (will gate to a later age in balancing)
             belt.color = new Color(0.60f, 0.50f, 0.35f);
             belt.cost = new List<ItemAmount> { new ItemAmount(wood, 1) };
 
