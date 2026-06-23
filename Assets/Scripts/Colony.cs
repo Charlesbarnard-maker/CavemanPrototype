@@ -15,7 +15,7 @@ namespace Caveman
 
         public ItemDefinition foodItem;
         public ItemDefinition waterItem;
-        public Inventory carried; // player's carried inventory, for Economy spending
+        [System.NonSerialized] public Inventory carried; // set at runtime; not a serialized field
 
         public int Population { get; private set; }
         public bool Starving { get; private set; }

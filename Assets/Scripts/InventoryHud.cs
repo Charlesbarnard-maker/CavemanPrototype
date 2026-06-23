@@ -450,6 +450,8 @@ namespace Caveman
 
         private static int HousingCount() => HousingBuilding.All.Count;
 
+        private static string Name(ItemDefinition item) => item != null ? item.displayName : "?";
+
         private static string CostText(BuildingDefinition def) => CostList(def.cost);
 
         private static string CostList(List<ItemAmount> cost)
