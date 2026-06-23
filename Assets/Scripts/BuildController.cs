@@ -31,6 +31,8 @@ namespace Caveman
         private Camera _cam;
         private GameObject _ghost;
         private SpriteRenderer _ghostSr;
+        private bool _dragging;
+        private Vector2Int _dragLast;
 
         void Awake() => _cam = Camera.main;
 
@@ -150,8 +152,14 @@ namespace Caveman
 
             Vector3 world = _cam.ScreenToWorldPoint(mouse.position.ReadValue());
             Vector2Int cell = Belt.CellOf(world);
+
+            // Auto-direction: along the drag path, else auto-oriented toward a sink / away from a source.
+            Belt.Dir dir = BeltDir;
+            if (_dragging && Adjacent(cell, _dragLast)) dir = Belt.FromTo(_dragLast, cell);
+            else if (!_dragging) dir = AutoBeltDir(cell);
+
             _ghost.transform.position = new Vector3(cell.x, cell.y, 0f);
-            _ghost.transform.rotation = Quaternion.Euler(0f, 0f, Belt.Angle(BeltDir));
+            _ghost.transform.rotation = Quaternion.Euler(0f, 0f, Belt.Angle(dir));
             _ghost.transform.localScale = Vector3.one * 0.8f;
             _ghostSr.sprite = PlaceholderArt.Triangle();
 
@@ -162,12 +170,22 @@ namespace Caveman
                 ? new Color(def.color.r, def.color.g, def.color.b, 0.6f)
                 : new Color(1f, 0.3f, 0.3f, 0.45f);
 
+            if (!mouse.leftButton.isPressed) _dragging = false;
+
             if (mouse.leftButton.isPressed && PlacementValid)
             {
+                if (_dragging && Adjacent(cell, _dragLast))
+                {
+                    var prev = Belt.At(_dragLast);
+                    if (prev != null) prev.SetDir(Belt.FromTo(_dragLast, cell)); // corner: previous flows into this
+                    dir = Belt.FromTo(_dragLast, cell);
+                }
                 Economy.Spend(def.cost, Carried);
-                Belt.Spawn(cell, BeltDir);
+                Belt.Spawn(cell, dir);
                 BuildingsPlaced++;
-                // stay in belt mode to keep laying
+                _dragging = true;
+                _dragLast = cell;
+                BeltDir = dir;
             }
             else if (mouse.rightButton.wasPressedThisFrame)
             {
@@ -175,11 +193,24 @@ namespace Caveman
             }
         }
 
+        private static bool Adjacent(Vector2Int a, Vector2Int b)
+        {
+            return Mathf.Abs(a.x - b.x) + Mathf.Abs(a.y - b.y) == 1;
+        }
+
+        private Belt.Dir AutoBeltDir(Vector2Int cell)
+        {
+            for (int i = 0; i < 4; i++) { var d = (Belt.Dir)i; if (Belt.IsStorageCell(cell + Belt.Step(d))) return d; }
+            for (int i = 0; i < 4; i++) { var d = (Belt.Dir)i; if (Belt.IsSourceCell(cell + Belt.Step(d))) return Belt.Opposite(d); }
+            return BeltDir;
+        }
+
         private void CancelPlacement()
         {
             PendingIndex = -1;
             PlacementValid = false;
             IsPlacing = false;
+            _dragging = false;
             if (_ghost != null) _ghost.SetActive(false);
         }
 

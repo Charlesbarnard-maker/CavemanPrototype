@@ -67,6 +67,38 @@ namespace Caveman
         public bool CanAccept(ItemDefinition i) => count < capacity && (item == null || item == i);
         public void Receive(ItemDefinition i) { item = i; count++; }
 
+        public static Dir Opposite(Dir d) => (Dir)(((int)d + 2) % 4);
+        public static Dir FromTo(Vector2Int a, Vector2Int b)
+        {
+            var d = b - a;
+            if (d.x > 0) return Dir.E;
+            if (d.x < 0) return Dir.W;
+            if (d.y > 0) return Dir.N;
+            return Dir.S;
+        }
+
+        public void SetDir(Dir d)
+        {
+            dir = d;
+            transform.rotation = Quaternion.Euler(0f, 0f, Angle(d));
+        }
+
+        public static bool IsStorageCell(Vector2Int c)
+        {
+            foreach (var s in StorageBuilding.All)
+                if (s != null && CellOf(s.transform.position) == c) return true;
+            return false;
+        }
+
+        public static bool IsSourceCell(Vector2Int c)
+        {
+            foreach (var p in ProductionBuilding.All)
+                if (p != null && CellOf(p.transform.position) == c) return true;
+            foreach (var w in WorkshopBuilding.All)
+                if (w != null && CellOf(w.transform.position) == c) return true;
+            return false;
+        }
+
         void Update()
         {
             _timer += Time.deltaTime;
