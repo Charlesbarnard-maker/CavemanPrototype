@@ -29,8 +29,10 @@ namespace Caveman
         private bool _buildShown, _selShown;
         private bool _showBuild;
         private Dictionary<ItemDefinition, int> _totals;
-        private Rect _topRect, _miniRect;
+        private Rect _topRect, _miniRect, _objRect;
         private readonly List<(string label, int value, string detail, Color color)> _chips = new();
+        private GUIStyle _toast;
+        private int _lastAge = -1;
 
         private static readonly (BuildingKind kind, string label)[] Cats =
         {
@@ -69,6 +71,26 @@ namespace Caveman
 
             // Cache the resource totals once per frame (OnGUI runs twice/frame).
             if (gatherer != null) _totals = Economy.Totals(gatherer.Inventory);
+
+            // Toasts fade out.
+            for (int i = 0; i < Toast.Items.Count; i++) Toast.Items[i].t -= Time.unscaledDeltaTime;
+            Toast.Items.RemoveAll(t => t.t <= 0f);
+
+            // Celebrate reaching a new age.
+            int age = Colony.Instance != null ? Colony.Instance.Age : 0;
+            if (_lastAge < 0) _lastAge = age;
+            else if (age > _lastAge) { _lastAge = age; AnnounceAge(age); }
+        }
+
+        private void AnnounceAge(int age)
+        {
+            var names = new List<string>();
+            if (builder != null)
+                foreach (var d in builder.buildables)
+                    if (d != null && d.unlockAge == age) names.Add(d.displayName);
+            string unlocked = names.Count > 0 ? "Unlocked: " + string.Join(", ", names) : "";
+            string an = Colony.AgeNames[Mathf.Clamp(age, 0, Colony.AgeNames.Length - 1)];
+            Toast.Show($"<color=#ffd24d>🎉 {an}!</color>  <size=14>{unlocked}</size>");
         }
 
         void OnDisable() => Time.timeScale = 1f;
@@ -80,6 +102,7 @@ namespace Caveman
             _small ??= new GUIStyle(GUI.skin.label) { fontSize = 15, richText = true };
             _big ??= new GUIStyle(GUI.skin.label) { fontSize = 40, richText = true, alignment = TextAnchor.MiddleCenter };
             _btn ??= new GUIStyle(GUI.skin.button) { richText = true, alignment = TextAnchor.MiddleLeft, fontSize = 13 };
+            _toast ??= new GUIStyle(GUI.skin.label) { richText = true, fontSize = 22, alignment = TextAnchor.MiddleCenter };
 
             DrawTopBar();
             DrawStatus();
@@ -87,6 +110,8 @@ namespace Caveman
             if (builder != null) DrawBuildMenu();
             DrawSelectedPanel();
             DrawMinimap();
+            DrawObjectives();
+            DrawToasts();
             DrawFooter();
             if (_showHelp) DrawHelp();
             if (_paused) GUI.Label(new Rect(0, 60, Screen.width, 60), "<b>PAUSED</b>  <size=18>(space)</size>", _big);
@@ -105,7 +130,7 @@ namespace Caveman
             {
                 var m = Event.current.mousePosition;
                 PointerOverUI = (_buildShown && _buildRect.Contains(m)) || (_selShown && _selRect.Contains(m))
-                                || _topRect.Contains(m) || _miniRect.Contains(m);
+                                || _topRect.Contains(m) || _miniRect.Contains(m) || _objRect.Contains(m);
             }
         }
 
@@ -477,6 +502,34 @@ namespace Caveman
             if (rem) { if (hq) Colony.Instance?.RemoveBuilder(); else builder.UnassignSelected(); }
             if (demo) builder.DemolishSelected();
             if (close) builder.Deselect();
+        }
+
+        // ---- Objectives panel (top-right) ----
+        private void DrawObjectives()
+        {
+            var o = Objectives.Instance;
+            if (o == null) { _objRect = default; return; }
+
+            var rect = new Rect(Screen.width - 300, 62, 290, 112);
+            _objRect = rect;
+            GUI.Box(rect, GUIContent.none);
+            GUILayout.BeginArea(new Rect(rect.x + 10, rect.y + 8, rect.width - 20, rect.height - 14));
+            GUILayout.Label("<b>Objectives</b>", _small);
+            bool any = false;
+            foreach (var q in o.Active(3)) { GUILayout.Label($"<size=13>▸ {q.title}</size>", _small); any = true; }
+            if (!any) GUILayout.Label("<size=13><color=#9f9>All objectives complete! 🎉</color></size>", _small);
+            GUILayout.EndArea();
+        }
+
+        // ---- Toasts (centre) ----
+        private void DrawToasts()
+        {
+            float y = 128f;
+            foreach (var t in Toast.Items)
+            {
+                GUI.Label(new Rect(0, y, Screen.width, 30), t.msg, _toast);
+                y += 30f;
+            }
         }
 
         private void DrawFooter()

@@ -186,6 +186,32 @@ namespace Caveman
             hud.debugItems = new List<ItemDefinition>
             { wood, stone, food, water, planks, cookedFood, meat, clay, charcoal, bricks, grain, flour, bread, ore };
 
+            // --- Guided objectives ladder (the "what next / why advance" hook) ---
+            var carriedInv = gatherer.Inventory;
+            int Have(ItemDefinition i) => Economy.Available(i, carriedInv);
+            bool HasCollectorOf(ItemDefinition i) { foreach (var p in ProductionBuilding.All) if (p != null && p.produces == i) return true; return false; }
+            int Pop() => Colony.Instance != null ? Colony.Instance.Population : 0;
+            int AgeNow() => Colony.Instance != null ? Colony.Instance.Age : 0;
+            var objectives = new GameObject("Objectives").AddComponent<Objectives>();
+            objectives.quests = new List<Quest>
+            {
+                new Quest { title = "Gather 12 Wood by hand",            done = () => Have(wood) >= 12,      reward = () => carriedInv.Add(stone, 8),  rewardText = "+8 Stone" },
+                new Quest { title = "Build a Forager Hut for food",      done = () => HasCollectorOf(food),  reward = () => carriedInv.Add(food, 20),  rewardText = "+20 Food" },
+                new Quest { title = "Build a Water Hole",                done = () => HasCollectorOf(water), reward = () => carriedInv.Add(water, 20), rewardText = "+20 Water" },
+                new Quest { title = "Grow your settlement to 8 people",  done = () => Pop() >= 8,            reward = () => carriedInv.Add(wood, 25),  rewardText = "+25 Wood" },
+                new Quest { title = "Advance to the Tribal Age",         done = () => AgeNow() >= 1,         reward = () => carriedInv.Add(stone, 25), rewardText = "+25 Stone" },
+                new Quest { title = "Build a Sawmill & make 25 Planks",  done = () => Have(planks) >= 25,    reward = () => carriedInv.Add(planks, 10),rewardText = "+10 Planks" },
+                new Quest { title = "Lay 5 conveyor belts",              done = () => Belt.Count >= 5,       reward = () => carriedInv.Add(wood, 15),  rewardText = "+15 Wood" },
+                new Quest { title = "Run a Caravan route (2 depots)",    done = () => RouteVehicle.All.Count >= 1, reward = () => carriedInv.Add(wood, 30), rewardText = "+30 Wood" },
+                new Quest { title = "Cook 15 Cooked Food",               done = () => Have(cookedFood) >= 15,reward = () => carriedInv.Add(stone, 15), rewardText = "+15 Stone" },
+                new Quest { title = "Grow to 12 people",                 done = () => Pop() >= 12,           reward = () => carriedInv.Add(planks, 15),rewardText = "+15 Planks" },
+                new Quest { title = "Advance to the Bronze Age",         done = () => AgeNow() >= 2,         reward = () => carriedInv.Add(stone, 30), rewardText = "+30 Stone" },
+                new Quest { title = "Bake 15 Bread",                     done = () => Have(bread) >= 15,     reward = () => carriedInv.Add(planks, 20),rewardText = "+20 Planks" },
+                new Quest { title = "Explore far & mine 25 Ore",         done = () => Have(ore) >= 25,       reward = () => carriedInv.Add(stone, 40), rewardText = "+40 Stone" },
+                new Quest { title = "Advance to the Iron Age",           done = () => AgeNow() >= 3,         reward = () => carriedInv.Add(planks, 40),rewardText = "+40 Planks" },
+                new Quest { title = "Build a thriving settlement: 25 people", done = () => Pop() >= 25 },
+            };
+
             // --- Resource patches: spread WIDE across the map so you must explore.
             //     A clear central area stays open as the player's base/processing yard. ---
             const float baseClear = 11f;

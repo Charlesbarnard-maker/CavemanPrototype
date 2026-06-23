@@ -83,6 +83,13 @@ A running record so progress/problems don't get lost. Newest first. Move items t
   while it's open (B-toggled). Remaining: per-idle-transporter `FindJob` scans the
   building registries each frame — fine for now, revisit if building counts get large.
 
+## Open — the hook (keep deepening)
+- Objectives ladder + age toasts added (gives direction + reward). To make the pull
+  *endless*, add: a **population demand sink** (people want more/better goods as they
+  grow), a visible **prosperity/output score** that climbs, and a **long-term win goal**
+  (a Monument you pour resources into / reach the Future age). Also: per-objective
+  rewards could unlock *new buildings* (tech) rather than just resources.
+
 ## Open — design
 - **Too automated / not enough choice** — *partly addressed*: ages now force choices
   (what to build toward, advance when ready), transporter **priorities** added, and

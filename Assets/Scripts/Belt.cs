@@ -28,6 +28,7 @@ namespace Caveman
 
         private static readonly Dictionary<Vector2Int, Belt> Grid = new();
 
+        public static int Count => Grid.Count;
         public static Vector2Int CellOf(Vector3 p) => new Vector2Int(Mathf.RoundToInt(p.x), Mathf.RoundToInt(p.y));
         public static Belt At(Vector2Int c) => Grid.TryGetValue(c, out var b) ? b : null;
         public static Dir RotateCW(Dir d) => (Dir)(((int)d + 1) % 4);

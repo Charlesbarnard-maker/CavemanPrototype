@@ -70,6 +70,13 @@ no Inspector wiring). Scripts in `Assets/Scripts/`:
   the player (`CameraFollow`); HUD via `OnGUI` (`InventoryHud`).
 
 ## Recently built
+- **The hook — guided objectives ladder.** A running list of escalating goals (gather
+  → forage → grow → advance age → planks → belts → routes → cook → mine ore → Iron Age
+  → thrive) shown top-right. Completing one pays a small **reward**, pops a celebratory
+  **toast**, and reveals the next — constant direction + dopamine. Reaching a new **age
+  pops a toast listing what it unlocked** (advancement feels like a power-up).
+  *Next hook layers:* a growing population **demand sink**, a prosperity **score**, and
+  a long-term **win goal** (a Monument / the Future age) so the pull is endless.
 - **Logistics reworked → belts (local) + caravan routes (long distance).** Removed the
   abstract haulers. **Depots** are transfer stations (hold one resource, belt in/out);
   a **Caravan route** links two depots with an **elephant** that physically shuttles

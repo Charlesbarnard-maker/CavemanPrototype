@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace Caveman
@@ -12,6 +13,10 @@ namespace Caveman
         public Depot a, b;
         public int capacity = 10;
         public float speed = 3.5f;
+
+        public static readonly List<RouteVehicle> All = new();
+        void OnEnable() => All.Add(this);
+        void OnDisable() => All.Remove(this);
 
         private enum State { ToA, ToB }
         private State _state = State.ToA;
