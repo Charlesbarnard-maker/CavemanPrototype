@@ -25,6 +25,8 @@ namespace Caveman
         private Vector2 _buildScroll;
         private Rect _buildRect, _selRect;
         private bool _buildShown, _selShown;
+        private bool _showBuild;
+        private Dictionary<ItemDefinition, int> _totals;
 
         private static readonly (BuildingKind kind, string label)[] Cats =
         {
@@ -45,6 +47,10 @@ namespace Caveman
                 Time.timeScale = _paused ? 0f : 1f;
             }
             if (kb.hKey.wasPressedThisFrame) _showHelp = !_showHelp;
+            if (kb.bKey.wasPressedThisFrame) _showBuild = !_showBuild;
+
+            // Cache the resource totals once per frame (OnGUI runs twice/frame).
+            if (gatherer != null) _totals = Economy.Totals(gatherer.Inventory);
         }
 
         void OnDisable() => Time.timeScale = 1f;
@@ -81,7 +87,7 @@ namespace Caveman
             GUILayout.BeginArea(new Rect(10, 5, Screen.width - 20, 22));
             GUILayout.BeginHorizontal();
 
-            var totals = Economy.Totals(gatherer.Inventory);
+            var totals = _totals ?? Economy.Totals(gatherer.Inventory);
             int Get(ItemDefinition i) { if (i == null) return 0; totals.TryGetValue(i, out int v); return v; }
 
             // Core resources always shown, then any others.
@@ -153,6 +159,15 @@ namespace Caveman
                 GUILayout.BeginArea(new Rect(12, Screen.height - 58, 480, 50));
                 GUILayout.Label($"<b>Placing {def.displayName}</b> — {ok}", _s);
                 GUILayout.Label("<size=14>right-click / Esc to cancel</size>", _small);
+                GUILayout.EndArea();
+                return;
+            }
+
+            if (!_showBuild)
+            {
+                _buildShown = false;
+                GUILayout.BeginArea(new Rect(12, Screen.height - 34, 320, 28));
+                GUILayout.Label("<size=15>Press <b>B</b> to open the build menu</size>", _small);
                 GUILayout.EndArea();
                 return;
             }
@@ -263,7 +278,7 @@ namespace Caveman
         private void DrawFooter()
         {
             GUILayout.BeginArea(new Rect(Screen.width - 260, 10, 250, 28));
-            GUILayout.Label("<size=15>Space pause  ·  H help</size>", _small);
+            GUILayout.Label("<size=15>B build  ·  Space pause  ·  H help</size>", _small);
             GUILayout.EndArea();
         }
 

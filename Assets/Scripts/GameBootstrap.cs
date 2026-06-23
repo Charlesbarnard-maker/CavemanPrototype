@@ -102,28 +102,33 @@ namespace Caveman
             hud.foodItem = food;
             hud.waterItem = water;
 
-            // --- Resource patches: spread out across the map with random jitter ---
-            SpawnPatches("Tree", wood, new Color(0.27f, 0.55f, 0.22f), 7,
-                new Vector2(7f, 1f), new Vector2(4.5f, 5f), new Vector2(1.0f, 1.5f), PlaceholderArt.Triangle());
-            SpawnPatches("Rock", stone, new Color(0.55f, 0.55f, 0.6f), 7,
-                new Vector2(-7f, 1f), new Vector2(4.5f, 5f), new Vector2(1.0f, 1.5f), PlaceholderArt.Hexagon());
-            SpawnPatches("Bush", food, new Color(0.45f, 0.55f, 0.25f), 5,
-                new Vector2(0f, -6f), new Vector2(6f, 2f), new Vector2(0.7f, 1.0f), PlaceholderArt.Circle());
-            SpawnPatches("Pond", water, new Color(0.30f, 0.55f, 0.85f), 4,
-                new Vector2(0f, 6f), new Vector2(6f, 2f), new Vector2(1.1f, 1.6f), PlaceholderArt.Circle());
+            // --- Resource patches: pushed out to the edges, leaving the centre clear
+            //     as open ground for the player to build up their base/processing. ---
+            const float baseClear = 8f;
+            SpawnPatches("Tree", wood, new Color(0.27f, 0.55f, 0.22f), 8,
+                new Vector2(14f, 2f), new Vector2(5f, 7f), new Vector2(1.0f, 1.5f), PlaceholderArt.Triangle(), 30, baseClear);
+            SpawnPatches("Rock", stone, new Color(0.55f, 0.55f, 0.6f), 8,
+                new Vector2(-14f, 2f), new Vector2(5f, 7f), new Vector2(1.0f, 1.5f), PlaceholderArt.Hexagon(), 30, baseClear);
+            SpawnPatches("Bush", food, new Color(0.45f, 0.55f, 0.25f), 6,
+                new Vector2(0f, -13f), new Vector2(9f, 3f), new Vector2(0.7f, 1.0f), PlaceholderArt.Circle(), 30, baseClear);
+            // Water is a big body (a lake), not small scattered patches.
+            SpawnPatches("Lake", water, new Color(0.30f, 0.55f, 0.85f), 2,
+                new Vector2(2f, 14f), new Vector2(3.5f, 2.5f), new Vector2(3.0f, 4.0f), PlaceholderArt.Circle(), 240, baseClear);
         }
 
-        // Scatters `count` patches around `center`, jittered by ±spread, with a random size.
+        // Scatters `count` patches around `center`, jittered by ±spread, random size,
+        // and kept at least `minClear` from the origin so the base area stays open.
         private static void SpawnPatches(string name, ItemDefinition item, Color color, int count,
-            Vector2 center, Vector2 spread, Vector2 sizeRange, Sprite sprite)
+            Vector2 center, Vector2 spread, Vector2 sizeRange, Sprite sprite, int capacity, float minClear)
         {
             for (int i = 0; i < count; i++)
             {
                 Vector2 pos = center + new Vector2(Random.Range(-spread.x, spread.x), Random.Range(-spread.y, spread.y));
+                if (pos.magnitude < minClear) pos = pos.normalized * minClear; // keep the base clear
                 float size = Random.Range(sizeRange.x, sizeRange.y);
                 float b = Random.Range(0.9f, 1.1f); // slight colour variation
                 var c = new Color(Mathf.Clamp01(color.r * b), Mathf.Clamp01(color.g * b), Mathf.Clamp01(color.b * b));
-                SpawnNode(name, item, c, pos, size, sprite);
+                SpawnNode(name, item, c, pos, size, sprite, capacity);
             }
         }
 
@@ -204,13 +209,13 @@ namespace Caveman
             return def;
         }
 
-        private static void SpawnNode(string name, ItemDefinition item, Color color, Vector2 pos, float size, Sprite sprite)
+        private static void SpawnNode(string name, ItemDefinition item, Color color, Vector2 pos, float size, Sprite sprite, int capacity = 30)
         {
             var go = MakeSprite(name, color, pos, size, 0, sprite);
             go.AddComponent<BoxCollider2D>();
             var node = go.AddComponent<ResourceNode>();
             node.yields = item;
-            node.capacity = 30;
+            node.capacity = capacity;
             node.regenAmount = 1;
             node.regenInterval = 1.5f;
         }

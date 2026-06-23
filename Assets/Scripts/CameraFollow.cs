@@ -50,7 +50,7 @@ namespace Caveman
             }
 
             var mouse = Mouse.current;
-            if (mouse != null)
+            if (mouse != null && !InventoryHud.PointerOverUI) // don't zoom while scrolling a panel
             {
                 float scroll = mouse.scroll.ReadValue().y;
                 if (Mathf.Abs(scroll) > 0.01f)

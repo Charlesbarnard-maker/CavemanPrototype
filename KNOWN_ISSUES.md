@@ -45,10 +45,10 @@ A running record so progress/problems don't get lost. Newest first. Move items t
   dedicated refactor to avoid destabilising feature batches.
 - **Worker/BuilderWorker duplication.** Shared `MoveTo` / `NearestHousing` /
   `UpdateColor` movement helpers could live in a common base.
-- **HUD allocates per frame.** `InventoryHud` calls `Economy.Totals()` (allocates a
-  Dictionary) ~2×/frame in OnGUI. Cache once per frame if GC ever shows up.
-  (The big per-frame `FindObjectsByType` allocations were already replaced with
-  static registries.)
+- *(Improved 2026-06-23)* HUD perf: `Economy.Totals()` is now cached once per frame
+  (was ~2×/frame), and the build menu only runs its per-building affordability checks
+  while it's open (B-toggled). Remaining: per-idle-transporter `FindJob` scans the
+  building registries each frame — fine for now, revisit if building counts get large.
 
 ## Open — onboarding / UX
 - **Too much at once at the start.** All buildings/categories are visible immediately,
