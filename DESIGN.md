@@ -70,6 +70,13 @@ no Inspector wiring). Scripts in `Assets/Scripts/`:
   the player (`CameraFollow`); HUD via `OnGUI` (`InventoryHud`).
 
 ## Recently built
+- **Conveyor belts (spatial logistics!)** (`Belt`): place directional belt segments on
+  a grid (R to rotate, click/drag to lay). A belt pulls from an adjacent collector/
+  workshop buffer and carries items in its facing direction belt→belt→into a storage.
+  You physically route goods — the factory-planning itch. Unlocks in Bronze; cheap
+  (1 wood/segment); demolish by selecting + X.
+- **Abstract haulers limited** — Mammoth Shack/Transporters now only serve sources
+  within ~14 units of the hub, so beyond a small base you *must* lay belts.
 - **Configurable Warehouse** — a generic storage where the player picks the resource
   it holds (e.g. Planks, Cooked Food). Building panels now show **contents**
   (Holds/Stores X of Y). Workers **haul their own load to storage when their buffer is

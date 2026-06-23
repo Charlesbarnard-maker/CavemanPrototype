@@ -15,6 +15,7 @@ namespace Caveman
         public int maxWorkers = 2;
         public bool mechanical; // runs a transporter with no worker (a conveyor)
         public ItemDefinition priorityItem; // null = haul anything (nearest); else prefer this
+        public float range = 14f; // transporters only serve sources within this of the hub (belts go further)
 
         /// <summary>Cycle the priority through the resources currently being produced (+ Any).</summary>
         public void CyclePriority()

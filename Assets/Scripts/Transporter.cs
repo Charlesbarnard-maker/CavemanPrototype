@@ -93,6 +93,8 @@ namespace Caveman
             {
                 if (buf == null || item == null || buf.Count(item) <= 0) return;
                 if (only != null && item != only) return;
+                if (hub != null && ((Vector2)(t.position - hub.transform.position)).sqrMagnitude > hub.range * hub.range)
+                    return; // out of this hub's service range — that's what belts are for
                 var store = StorageFor(item);
                 if (store == null) return;
                 float sq = ((Vector2)(t.position - transform.position)).sqrMagnitude;

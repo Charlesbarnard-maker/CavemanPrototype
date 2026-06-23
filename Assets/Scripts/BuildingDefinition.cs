@@ -25,6 +25,7 @@ namespace Caveman
         Housing,   // raises the population cap
         Workshop,  // converts input resources into an output (a recipe)
         Logistics, // houses transporters that carry goods between buildings
+        Belt,      // a directional conveyor segment placed on the grid
     }
 
     /// <summary>Data for a placeable structure.</summary>

@@ -22,12 +22,13 @@ A running record so progress/problems don't get lost. Newest first. Move items t
   water consumption, bigger starting buffers (90 each), slower decline (more grace),
   and a big on-screen ⚠ warning when out of food/water.
 
-## Open — design (high priority)
-- **Transport is abstract, not spatial — kills the "factory" itch.** Haulers/rollers
-  auto-pick nearest source→storage, so there's no belt-routing puzzle to plan. Want
-  real **directional conveyor belts** you place segment-by-segment, with abstract
-  haulers made limited (range/throughput) so belts become necessary. See DESIGN.md
-  "Spatial conveyor belts". This is the headline next system.
+## Open — belts (MVP built — iterate)
+- Directional belts now exist (place/rotate/drag, building→belt→storage), and haulers
+  are range-limited. **Remaining:** belts should feed **workshop inputs** spatially
+  (right now workshops still pull inputs from the global pool); **splitters/junctions/
+  undergrounds**; visible **item dots** riding the belt; belt **speed tiers** by age;
+  smarter loading (pull from the cell behind only). Building↔belt adjacency uses cell
+  rounding — keep buildings roughly grid-aligned.
 
 ## Open — bugs / behaviour
 - **Workshop inputs & build costs still pull from the global pool, not hauled.**

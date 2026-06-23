@@ -21,6 +21,9 @@ namespace Caveman
         public int PendingIndex { get; private set; } = -1;
         public bool PlacementValid { get; private set; }
         public GameObject Selected { get; private set; }
+        public Belt.Dir BeltDir { get; private set; } = Belt.Dir.E;
+        public BuildingDefinition PendingDef =>
+            PendingIndex >= 0 && PendingIndex < buildables.Count ? buildables[PendingIndex] : null;
 
         public static bool IsPlacing { get; private set; }
 
@@ -50,7 +53,10 @@ namespace Caveman
 
             if (PendingIndex >= 0)
             {
-                UpdatePlacement(mouse);
+                if (buildables[PendingIndex] != null && buildables[PendingIndex].kind == BuildingKind.Belt)
+                    UpdateBeltPlacement(mouse, kb);
+                else
+                    UpdatePlacement(mouse);
                 return;
             }
 
@@ -105,6 +111,8 @@ namespace Caveman
             Vector3 world = _cam.ScreenToWorldPoint(mouse.position.ReadValue());
             world.z = 0f;
             _ghost.transform.position = world;
+            _ghost.transform.rotation = Quaternion.identity;
+            _ghostSr.sprite = PlaceholderArt.Square();
             _ghost.transform.localScale = Vector3.one * (def.kind == BuildingKind.Collector ? 0.9f : 1.1f);
 
             bool affordable = Economy.CanAfford(def.cost, Carried);
@@ -123,6 +131,42 @@ namespace Caveman
                 ConstructionSite.Spawn(def, world);
                 BuildingsPlaced++;
                 CancelPlacement();
+            }
+            else if (mouse.rightButton.wasPressedThisFrame)
+            {
+                CancelPlacement();
+            }
+        }
+
+        // Belt mode: lay directional conveyor segments. R rotates, left-click places
+        // (stays in mode so you can lay a line), right-click / Esc finishes.
+        private void UpdateBeltPlacement(Mouse mouse, Keyboard kb)
+        {
+            if (_cam == null || mouse == null || _ghost == null) return;
+            var def = buildables[PendingIndex];
+
+            if (kb.rKey.wasPressedThisFrame) BeltDir = Belt.RotateCW(BeltDir);
+
+            Vector3 world = _cam.ScreenToWorldPoint(mouse.position.ReadValue());
+            Vector2Int cell = Belt.CellOf(world);
+            _ghost.transform.position = new Vector3(cell.x, cell.y, 0f);
+            _ghost.transform.rotation = Quaternion.Euler(0f, 0f, Belt.Angle(BeltDir));
+            _ghost.transform.localScale = Vector3.one * 0.8f;
+            _ghostSr.sprite = PlaceholderArt.Triangle();
+
+            bool affordable = Economy.CanAfford(def.cost, Carried);
+            bool free = Belt.At(cell) == null;
+            PlacementValid = affordable && free;
+            _ghostSr.color = PlacementValid
+                ? new Color(def.color.r, def.color.g, def.color.b, 0.6f)
+                : new Color(1f, 0.3f, 0.3f, 0.45f);
+
+            if (mouse.leftButton.isPressed && PlacementValid)
+            {
+                Economy.Spend(def.cost, Carried);
+                Belt.Spawn(cell, BeltDir);
+                BuildingsPlaced++;
+                // stay in belt mode to keep laying
             }
             else if (mouse.rightButton.wasPressedThisFrame)
             {
@@ -150,9 +194,9 @@ namespace Caveman
 
             // Cancelling a construction site: undelivered materials were never
             // spent, so there's nothing to refund — just remove it.
-            if (Selected.GetComponent<ConstructionSite>() != null)
+            if (Selected.GetComponent<ConstructionSite>() != null || Selected.GetComponent<Belt>() != null)
             {
-                Destroy(Selected);
+                Destroy(Selected); // belts & unbuilt sites: nothing to refund
                 Selected = null;
                 return;
             }
@@ -188,6 +232,7 @@ namespace Caveman
                               || hit.GetComponent<HousingBuilding>() != null
                               || hit.GetComponent<WorkshopBuilding>() != null
                               || hit.GetComponent<TransportHub>() != null
+                              || hit.GetComponent<Belt>() != null
                               || hit.GetComponent<ConstructionSite>() != null;
             return isBuilding ? hit.gameObject : null;
         }

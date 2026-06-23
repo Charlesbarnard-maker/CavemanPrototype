@@ -33,6 +33,7 @@ namespace Caveman
             (BuildingKind.Collector, "Gathering"),
             (BuildingKind.Workshop, "Workshops"),
             (BuildingKind.Logistics, "Logistics"),
+            (BuildingKind.Belt, "Belts"),
             (BuildingKind.Storage, "Storage"),
             (BuildingKind.Housing, "Housing"),
         };
@@ -166,10 +167,18 @@ namespace Caveman
             {
                 _buildShown = false;
                 var def = builder.buildables[builder.PendingIndex];
-                string ok = builder.PlacementValid ? "<color=#9f9>click to place</color>" : "<color=#f99>move to a valid spot</color>";
-                GUILayout.BeginArea(new Rect(12, Screen.height - 58, 480, 50));
-                GUILayout.Label($"<b>Placing {def.displayName}</b> — {ok}", _s);
-                GUILayout.Label("<size=14>right-click / Esc to cancel</size>", _small);
+                GUILayout.BeginArea(new Rect(12, Screen.height - 58, 520, 50));
+                if (def.kind == BuildingKind.Belt)
+                {
+                    GUILayout.Label($"<b>Laying Belt</b> — facing <color=#9cf>{builder.BeltDir}</color>  <size=14>(R to rotate)</size>", _s);
+                    GUILayout.Label("<size=14>click or drag to lay · right-click to finish</size>", _small);
+                }
+                else
+                {
+                    string ok = builder.PlacementValid ? "<color=#9f9>click to place</color>" : "<color=#f99>move to a valid spot</color>";
+                    GUILayout.Label($"<b>Placing {def.displayName}</b> — {ok}", _s);
+                    GUILayout.Label("<size=14>right-click / Esc to cancel</size>", _small);
+                }
                 GUILayout.EndArea();
                 return;
             }

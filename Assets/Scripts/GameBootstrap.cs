@@ -94,6 +94,10 @@ namespace Caveman
                 new ItemAmount(wood, 8)); brickStore.unlockAge = 2;
             var roller = MakeLogistics("Wooden Roller", 1, new Color(0.60f, 0.45f, 0.30f),
                 new ItemAmount(planks, 4)); roller.unlockAge = 2; roller.mechanical = true;
+            var belt = ScriptableObject.CreateInstance<BuildingDefinition>();
+            belt.displayName = "Conveyor Belt"; belt.kind = BuildingKind.Belt; belt.unlockAge = 2;
+            belt.color = new Color(0.60f, 0.50f, 0.35f);
+            belt.cost = new List<ItemAmount> { new ItemAmount(wood, 1) };
 
             // --- Camera (follows the player) ---
             var cam = Camera.main;
@@ -121,7 +125,7 @@ namespace Caveman
             { woodHut, stonePit, foragerHut, waterHole, sawmill, campfire,
               woodStore, stoneStore, foodStore, waterStore, warehouse, house, mammothShack,
               hunter, clayPit, charcoalBurner, clayStore, smokehouse, longhouse,
-              kiln, farm, mill, bakery, brickStore, roller };
+              kiln, farm, mill, bakery, brickStore, roller, belt };
 
             var follow = cam.GetComponent<CameraFollow>();
             if (follow == null) follow = cam.gameObject.AddComponent<CameraFollow>();
