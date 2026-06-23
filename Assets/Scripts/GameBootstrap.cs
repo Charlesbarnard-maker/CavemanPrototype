@@ -169,6 +169,12 @@ namespace Caveman
                 new Colony.AgeReq { pop = 12, cost = new List<ItemAmount> { new ItemAmount(planks, 25), new ItemAmount(clay, 20), new ItemAmount(stone, 30) } },
                 new Colony.AgeReq { pop = 18, cost = new List<ItemAmount> { new ItemAmount(bricks, 30), new ItemAmount(planks, 30), new ItemAmount(ore, 20) } },
             };
+            // Comfort goods (the demand sink): people want better food as the colony evolves.
+            colony.comforts = new List<Colony.Comfort>
+            {
+                new Colony.Comfort { item = cookedFood, unlockAge = 1 }, // Tribal: want cooked food
+                new Colony.Comfort { item = bread,      unlockAge = 2 }, // Bronze: want bread too
+            };
 
             // --- Town Hall (pre-placed, houses 3) ---
             var townHallDef = MakeHousing("Town Hall", 5, new Color(0.60f, 0.50f, 0.70f));

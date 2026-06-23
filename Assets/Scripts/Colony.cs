@@ -62,12 +62,22 @@ namespace Caveman
         public int growthFoodThreshold = 12;
         [Tooltip("Stored food consumed to raise each new citizen.")]
         public int growthFoodCost = 8;
+        public float comfortTick = 9f;  // every N seconds the colony consumes its comfort goods
 
-        private float _foodT, _waterT, _growthT, _starveT;
+        // Comfort goods the colony wants (beyond survival), unlocked by age. Meeting them
+        // raises Happiness, which boosts productivity and growth — the escalating demand sink.
+        [System.Serializable]
+        public class Comfort { public ItemDefinition item; public int unlockAge; }
+        public List<Comfort> comforts = new();
+
+        private float _foodT, _waterT, _growthT, _starveT, _comfortT;
         private float _fedBonus = 1f;
 
-        /// <summary>Global work-speed multiplier: lower when starving/thirsty, higher with varied food.</summary>
-        public float Productivity => (Starving || Thirsty) ? 0.6f : _fedBonus;
+        /// <summary>0..1 — fraction of currently-expected comfort goods being supplied.</summary>
+        public float Happiness { get; private set; } = 1f;
+
+        /// <summary>Global work-speed multiplier: survival × food variety × happiness.</summary>
+        public float Productivity => (Starving || Thirsty) ? 0.6f : _fedBonus * (0.85f + 0.3f * Happiness);
 
         public int Capacity
         {
@@ -185,6 +195,23 @@ namespace Caveman
                 }
             }
 
+            // --- Comfort goods (the demand sink): the colony consumes the comfort goods
+            //     unlocked for its age; how many it can supply sets Happiness. ---
+            _comfortT += dt;
+            if (_comfortT >= comfortTick)
+            {
+                _comfortT -= comfortTick;
+                int required = 0, met = 0;
+                foreach (var c in comforts)
+                {
+                    if (c.item == null || c.unlockAge > Age) continue;
+                    required++;
+                    int want = Mathf.Max(1, Population / 2); // comfort goods used at half the eating rate
+                    if (Economy.SpendUpTo(c.item, want, carried) > 0) met++;
+                }
+                Happiness = required == 0 ? 1f : (float)met / required;
+            }
+
             // --- Growth: needs housing space AND a real food surplus; each new
             //     citizen costs stored food, so growth reflects food-economy progress
             //     (no more instant house-fill). ---
@@ -193,7 +220,7 @@ namespace Caveman
                            && Economy.FoodPoints(carried) >= growthFoodThreshold;
             if (canGrow)
             {
-                _growthT += dt;
+                _growthT += dt * (0.5f + Happiness); // happier colonies grow faster
                 if (_growthT >= growthTick)
                 {
                     _growthT -= growthTick;
