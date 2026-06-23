@@ -60,8 +60,15 @@ namespace Caveman
                 new ItemAmount(wood, 10)); warehouse.configurable = true;
             var house = MakeHousing("House", 2, new Color(0.72f, 0.62f, 0.45f),
                 new ItemAmount(wood, 8), new ItemAmount(stone, 4), new ItemAmount(planks, 3));
-            var mammothShack = MakeLogistics("Mammoth Shack", 2, new Color(0.46f, 0.40f, 0.55f),
-                new ItemAmount(wood, 6), new ItemAmount(stone, 2));
+            // Long-distance logistics: depots + caravan routes (replaces the old haulers).
+            var depot = ScriptableObject.CreateInstance<BuildingDefinition>();
+            depot.displayName = "Depot"; depot.kind = BuildingKind.Depot; depot.unlockAge = 0;
+            depot.item = null; depot.capacity = 80; depot.color = new Color(0.50f, 0.45f, 0.55f);
+            depot.cost = new List<ItemAmount> { new ItemAmount(wood, 10), new ItemAmount(stone, 6) };
+            var caravan = ScriptableObject.CreateInstance<BuildingDefinition>();
+            caravan.displayName = "Caravan (Elephant)"; caravan.kind = BuildingKind.Route; caravan.unlockAge = 0;
+            caravan.capacity = 12; caravan.color = new Color(0.55f, 0.50f, 0.50f);
+            caravan.cost = new List<ItemAmount> { new ItemAmount(wood, 8) };
 
             // --- Age 1: Tribal ---
             var hunter = MakeCollector("Hunter's Hut", meat, 1, 2.5f, 2, 12, new Color(0.66f, 0.34f, 0.34f),
@@ -93,8 +100,6 @@ namespace Caveman
                 new ItemAmount(planks, 5), new ItemAmount(bricks, 4)); bakery.unlockAge = 2;
             var brickStore = MakeStorage("Brick Yard", bricks, 100, new Color(0.66f, 0.40f, 0.34f),
                 new ItemAmount(wood, 8)); brickStore.unlockAge = 2;
-            var roller = MakeLogistics("Wooden Roller", 1, new Color(0.60f, 0.45f, 0.30f),
-                new ItemAmount(planks, 4)); roller.unlockAge = 2; roller.mechanical = true;
             var woodBelt = ScriptableObject.CreateInstance<BuildingDefinition>();
             woodBelt.displayName = "Wooden Belt"; woodBelt.kind = BuildingKind.Belt; woodBelt.unlockAge = 0;
             woodBelt.interval = 1.1f; // slow — the early tier
@@ -112,9 +117,6 @@ namespace Caveman
                 new ItemAmount(wood, 6), new ItemAmount(stone, 4)); mine.unlockAge = 1;
             var oreStore = MakeStorage("Ore Stockpile", ore, 100, new Color(0.52f, 0.50f, 0.42f),
                 new ItemAmount(wood, 8)); oreStore.unlockAge = 1;
-            // Long-range hauler for distant mines (Iron age).
-            var oxCart = MakeLogistics("Ox Cart", 2, new Color(0.50f, 0.38f, 0.30f),
-                new ItemAmount(wood, 10), new ItemAmount(planks, 4)); oxCart.unlockAge = 3; oxCart.logisticsRange = 32f;
 
             // --- Camera (follows the player) ---
             var cam = Camera.main;
@@ -140,10 +142,10 @@ namespace Caveman
             builder.placeNodeRange = 6f;
             builder.buildables = new List<BuildingDefinition>
             { woodHut, stonePit, foragerHut, waterHole, sawmill, campfire,
-              woodStore, stoneStore, foodStore, waterStore, warehouse, house, mammothShack,
+              woodStore, stoneStore, foodStore, waterStore, warehouse, house,
               hunter, clayPit, charcoalBurner, clayStore, smokehouse, longhouse,
-              kiln, farm, mill, bakery, brickStore, roller, woodBelt, fastBelt,
-              mine, oreStore, oxCart };
+              kiln, farm, mill, bakery, brickStore, woodBelt, fastBelt,
+              mine, oreStore, depot, caravan };
 
             var follow = cam.GetComponent<CameraFollow>();
             if (follow == null) follow = cam.gameObject.AddComponent<CameraFollow>();

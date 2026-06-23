@@ -147,6 +147,8 @@ namespace Caveman
                 && (item == null || s.accepts == null || s.accepts == item)) return true;
             if (WorldGrid.Workshops.TryGetValue(ahead, out var w) && w != null
                 && (item == null || w.WantsInput(item))) return true;
+            if (WorldGrid.Depots.TryGetValue(ahead, out var dp) && dp != null
+                && (item == null || dp.item == null || dp.item == item)) return true;
             return false;
         }
 
@@ -175,6 +177,13 @@ namespace Caveman
                 if (w.InBuffer.Total() >= w.InBuffer.capacity) return;
                 w.InBuffer.Add(item, 1); count--; if (count <= 0) item = null; return;
             }
+
+            // ...or into a depot that handles this item (route endpoint).
+            if (WorldGrid.Depots.TryGetValue(ahead, out var dp) && dp != null && dp.item == item)
+            {
+                if (dp.def != null && dp.store.Total() >= dp.def.capacity) return;
+                dp.store.Add(item, 1); count--; if (count <= 0) item = null; return;
+            }
         }
 
         private static WorkshopBuilding WorkshopAt(Vector2Int c)
@@ -197,6 +206,12 @@ namespace Caveman
                     && (item == null || item == w.output) && w.Buffer.Count(w.output) > 0)
                 {
                     if (w.Buffer.RemoveUpTo(w.output, 1) > 0) { item = w.output; count++; return; }
+                }
+
+                if (WorldGrid.Depots.TryGetValue(c, out var dp) && dp != null && dp.item != null
+                    && (item == null || item == dp.item) && dp.store.Count(dp.item) > 0)
+                {
+                    if (dp.store.RemoveUpTo(dp.item, 1) > 0) { item = dp.item; count++; return; }
                 }
             }
         }

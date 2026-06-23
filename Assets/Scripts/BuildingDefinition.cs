@@ -24,8 +24,10 @@ namespace Caveman
         Storage,   // holds a large amount of one resource type
         Housing,   // raises the population cap
         Workshop,  // converts input resources into an output (a recipe)
-        Logistics, // houses transporters that carry goods between buildings
+        Logistics, // (legacy) houses transporters that carry goods between buildings
         Belt,      // a directional conveyor segment placed on the grid
+        Depot,     // a long-distance transfer station (route endpoint)
+        Route,     // a tool: link two depots with a caravan vehicle
     }
 
     /// <summary>Data for a placeable structure.</summary>

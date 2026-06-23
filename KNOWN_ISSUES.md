@@ -22,6 +22,13 @@ A running record so progress/problems don't get lost. Newest first. Move items t
   water consumption, bigger starting buffers (90 each), slower decline (more grace),
   and a big on-screen ⚠ warning when out of food/water.
 
+## Open — routes (MVP built — iterate)
+- Caravan routes are point-to-point (elephant shuttles A↔B along a straight line, no
+  laid track). Next: **track/path laying** (vehicle follows it; placement puzzle),
+  **vehicle tiers by age** (elephant → cart → **train**, faster/bigger), route **load
+  filters**, multi-stop routes, and a route-management panel. The old `TransportHub`/
+  `Transporter` classes are now unused (no buildables) — remove in a cleanup.
+
 ## Open — belts (strong now — iterate)
 - Belts: place/drag with **auto-direction** (path + corners), building→belt→storage
   **and** building→belt→**workshop input** (workshops consume belt-fed inputs before

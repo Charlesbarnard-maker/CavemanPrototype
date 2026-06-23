@@ -36,8 +36,9 @@ namespace Caveman
         {
             (BuildingKind.Collector, "Gathering"),
             (BuildingKind.Workshop, "Workshops"),
-            (BuildingKind.Logistics, "Logistics"),
             (BuildingKind.Belt, "Belts"),
+            (BuildingKind.Depot, "Depots"),
+            (BuildingKind.Route, "Routes"),
             (BuildingKind.Storage, "Storage"),
             (BuildingKind.Housing, "Housing"),
         };
@@ -245,6 +246,13 @@ namespace Caveman
                     GUILayout.Label($"<b>Laying Belt</b> — facing <color=#9cf>{builder.BeltDir}</color>  <size=14>(R to rotate)</size>", _s);
                     GUILayout.Label("<size=14>click or drag to lay · right-click to finish</size>", _small);
                 }
+                else if (def.kind == BuildingKind.Route)
+                {
+                    GUILayout.Label(builder.RoutePickingFirst
+                        ? "<b>Caravan route</b> — click the <color=#9cf>FROM</color> depot"
+                        : "<b>Caravan route</b> — click the <color=#9cf>TO</color> depot", _s);
+                    GUILayout.Label("<size=14>right-click to finish</size>", _small);
+                }
                 else
                 {
                     string ok = builder.PlacementValid ? "<color=#9f9>click to place</color>" : "<color=#f99>move to a valid spot</color>";
@@ -369,9 +377,11 @@ namespace Caveman
             var hb = sel.GetComponent<HousingBuilding>();
             var wb = sel.GetComponent<WorkshopBuilding>();
             var cs = sel.GetComponent<ConstructionSite>();
+            var dp = sel.GetComponent<Depot>();
             var staff = sel.GetComponent<IStaffable>();
             string name = staff != null ? staff.StaffLabel : sb != null ? sb.def.displayName
-                : hb != null ? hb.def.displayName : cs != null ? cs.def.displayName : "Building";
+                : hb != null ? hb.def.displayName : dp != null ? dp.def.displayName
+                : cs != null ? cs.def.displayName : "Building";
             string tag = cs != null ? "  <size=14><color=#bbb>(building)</color></size>" : "";
             GUILayout.Label($"<b>{name}</b>{tag}", _s);
 
@@ -422,6 +432,17 @@ namespace Caveman
                     }
                     else GUILayout.Label("<size=11><color=#888>empty it to change type</color></size>", _small);
                 }
+            }
+            else if (dp != null)
+            {
+                string acc = dp.item != null ? dp.item.displayName : "(not set)";
+                GUILayout.Label($"<size=15>Depot — {acc}: {dp.store.Total()}/{dp.def.capacity}</size>", _small);
+                if (dp.store.Total() == 0)
+                {
+                    if (GUILayout.Button($"<size=12>Handle: {acc} (change)</size>", _btn)) dp.CycleItem();
+                }
+                else GUILayout.Label("<size=11><color=#888>empty it to change type</color></size>", _small);
+                GUILayout.Label("<size=11><color=#bbb>Belt goods in; link with a Caravan route.</color></size>", _small);
             }
             else if (hb != null)
             {

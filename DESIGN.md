@@ -70,6 +70,15 @@ no Inspector wiring). Scripts in `Assets/Scripts/`:
   the player (`CameraFollow`); HUD via `OnGUI` (`InventoryHud`).
 
 ## Recently built
+- **Logistics reworked → belts (local) + caravan routes (long distance).** Removed the
+  abstract haulers. **Depots** are transfer stations (hold one resource, belt in/out);
+  a **Caravan route** links two depots with an **elephant** that physically shuttles
+  goods between them (travel time = distance, so depot placement matters). Build:
+  Depot ×2, then the **Caravan** tool → click FROM depot, then TO depot. Belt → Depot →
+  (route) → Depot → Belt brings distant resources home. Future: track-laying, and
+  vehicle tiers (cart → train) by age.
+- **HUD cleanup**: grouped, k-formatted, single-line resource bar (hover Food/Goods for
+  a breakdown) + a **minimap** (explored area, your buildings, the player).
 - **Explore → grow loop**: **Ore** is a rare resource found only in **distant veins**
   (far out in the fog). Build a **Mine** on a vein, haul the ore home, and it's
   **required to reach the Iron Age** — so you must explore, then plan a supply line

@@ -33,6 +33,7 @@ namespace Caveman
         private SpriteRenderer _ghostSr;
         private bool _dragging;
         private Vector2Int _dragLast;
+        private Depot _routeA; // first depot picked when linking a route
 
         void Awake() => _cam = Camera.main;
 
@@ -55,10 +56,10 @@ namespace Caveman
 
             if (PendingIndex >= 0)
             {
-                if (buildables[PendingIndex] != null && buildables[PendingIndex].kind == BuildingKind.Belt)
-                    UpdateBeltPlacement(mouse, kb);
-                else
-                    UpdatePlacement(mouse);
+                var pk = buildables[PendingIndex] != null ? buildables[PendingIndex].kind : BuildingKind.Collector;
+                if (pk == BuildingKind.Belt) UpdateBeltPlacement(mouse, kb);
+                else if (pk == BuildingKind.Route) UpdateRoutePlacement(mouse);
+                else UpdatePlacement(mouse);
                 return;
             }
 
@@ -205,12 +206,41 @@ namespace Caveman
             return BeltDir;
         }
 
+        // Route mode: click depot A, then depot B, to run a caravan between them.
+        private void UpdateRoutePlacement(Mouse mouse)
+        {
+            if (_ghost != null) _ghost.SetActive(false);
+            if (_cam == null || mouse == null) return;
+
+            if (mouse.rightButton.wasPressedThisFrame) { _routeA = null; CancelPlacement(); return; }
+            if (!mouse.leftButton.wasPressedThisFrame || InventoryHud.PointerOverUI) return;
+
+            Vector3 world = _cam.ScreenToWorldPoint(mouse.position.ReadValue());
+            var hit = Physics2D.OverlapPoint(world);
+            var depot = hit != null ? hit.GetComponent<Depot>() : null;
+            if (depot == null) return;
+
+            if (_routeA == null) { _routeA = depot; return; } // first endpoint
+            if (depot == _routeA) return;
+
+            var def = buildables[PendingIndex];
+            if (Economy.CanAfford(def.cost, Carried))
+            {
+                Economy.Spend(def.cost, Carried);
+                RouteVehicle.Spawn(_routeA, depot, Mathf.Max(1, def.capacity), 3.5f, def.color);
+            }
+            _routeA = null; // ready for the next route; stay in mode
+        }
+
+        public bool RoutePickingFirst => PendingDef != null && PendingDef.kind == BuildingKind.Route && _routeA == null;
+
         private void CancelPlacement()
         {
             PendingIndex = -1;
             PlacementValid = false;
             IsPlacing = false;
             _dragging = false;
+            _routeA = null;
             if (_ghost != null) _ghost.SetActive(false);
         }
 
@@ -238,8 +268,9 @@ namespace Caveman
             var hb = Selected.GetComponent<HousingBuilding>();
             var wb = Selected.GetComponent<WorkshopBuilding>();
             var th = Selected.GetComponent<TransportHub>();
+            var dpo = Selected.GetComponent<Depot>();
             BuildingDefinition rdef = pb != null ? pb.def : sb != null ? sb.def : hb != null ? hb.def
-                : wb != null ? wb.def : th != null ? th.def : null;
+                : wb != null ? wb.def : th != null ? th.def : dpo != null ? dpo.def : null;
             if (rdef == null) return;
 
             var staff = Selected.GetComponent<IStaffable>();
@@ -264,6 +295,7 @@ namespace Caveman
                               || hit.GetComponent<HousingBuilding>() != null
                               || hit.GetComponent<WorkshopBuilding>() != null
                               || hit.GetComponent<TransportHub>() != null
+                              || hit.GetComponent<Depot>() != null
                               || hit.GetComponent<Belt>() != null
                               || hit.GetComponent<ConstructionSite>() != null;
             return isBuilding ? hit.gameObject : null;
