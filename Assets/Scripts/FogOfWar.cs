@@ -17,6 +17,10 @@ namespace Caveman
         public float revealRadius = 7f;    // world units revealed around the player
         public float moveThreshold = 1.2f; // re-reveal after the player moves this far
 
+        public static FogOfWar Instance { get; private set; }
+        public Texture2D Tex => _tex;
+        public float WorldSize => worldSize;
+
         private Texture2D _tex;
         private Color32[] _px;
         private Vector3 _lastReveal = new Vector3(99999f, 99999f, 0f);
@@ -25,6 +29,7 @@ namespace Caveman
 
         void Awake()
         {
+            Instance = this;
             _tex = new Texture2D(res, res, TextureFormat.RGBA32, false)
             { filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Clamp };
             _px = new Color32[res * res];

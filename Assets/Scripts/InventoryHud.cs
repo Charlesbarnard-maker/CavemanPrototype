@@ -29,6 +29,8 @@ namespace Caveman
         private bool _buildShown, _selShown;
         private bool _showBuild;
         private Dictionary<ItemDefinition, int> _totals;
+        private Rect _topRect, _miniRect;
+        private readonly List<(string label, int value, string detail, Color color)> _chips = new();
 
         private static readonly (BuildingKind kind, string label)[] Cats =
         {
@@ -83,6 +85,7 @@ namespace Caveman
             DrawObjective();
             if (builder != null) DrawBuildMenu();
             DrawSelectedPanel();
+            DrawMinimap();
             DrawFooter();
             if (_showHelp) DrawHelp();
             if (_paused) GUI.Label(new Rect(0, 60, Screen.width, 60), "<b>PAUSED</b>  <size=18>(space)</size>", _big);
@@ -100,40 +103,95 @@ namespace Caveman
             if (Event.current.type == EventType.Repaint)
             {
                 var m = Event.current.mousePosition;
-                PointerOverUI = (_buildShown && _buildRect.Contains(m)) || (_selShown && _selRect.Contains(m));
+                PointerOverUI = (_buildShown && _buildRect.Contains(m)) || (_selShown && _selRect.Contains(m))
+                                || _topRect.Contains(m) || _miniRect.Contains(m);
             }
         }
 
-        // ---- Top resource bar (full width) ----
+        // ---- Top resource bar: grouped, k-formatted, single line, hover for detail ----
         private void DrawTopBar()
         {
             GUI.Box(new Rect(0, 0, Screen.width, 30), GUIContent.none);
-            GUILayout.BeginArea(new Rect(10, 5, Screen.width - 20, 22));
-            GUILayout.BeginHorizontal();
-
             var totals = _totals ?? Economy.Totals(gatherer.Inventory);
             int Get(ItemDefinition i) { if (i == null) return 0; totals.TryGetValue(i, out int v); return v; }
 
-            // Core resources always shown, then any others.
-            var core = new[] { woodItem, stoneItem, foodItem, waterItem };
-            foreach (var it in core) if (it != null) ResChip(it, Get(it));
+            _chips.Clear();
+            _chips.Add(("Wood", Get(woodItem), null, ColorOf(woodItem)));
+            _chips.Add(("Stone", Get(stoneItem), null, ColorOf(stoneItem)));
+            _chips.Add(("Water", Get(waterItem), null, ColorOf(waterItem)));
 
-            var extras = new List<ItemDefinition>();
-            foreach (var k in totals.Keys)
-                if (k != null && System.Array.IndexOf(core, k) < 0) extras.Add(k);
-            extras.Sort((a, b) => string.Compare(a.displayName, b.displayName, System.StringComparison.Ordinal));
-            foreach (var it in extras) ResChip(it, Get(it));
+            int foodSum = 0; var foodDetail = new List<string>();
+            int matSum = 0; var matDetail = new List<string>();
+            if (debugItems != null)
+                foreach (var it in debugItems)
+                {
+                    if (it == null) continue;
+                    int v = Get(it);
+                    if (it.foodValue > 0) { foodSum += v; if (v > 0) foodDetail.Add($"{it.displayName}: {K(v)}"); }
+                    else if (it != woodItem && it != stoneItem && it != waterItem)
+                    { matSum += v; if (v > 0) matDetail.Add($"{it.displayName}: {K(v)}"); }
+                }
+            _chips.Add(("Food", foodSum, foodDetail.Count > 0 ? string.Join("\n", foodDetail) : null, new Color(0.85f, 0.5f, 0.42f)));
+            _chips.Add(("Goods", matSum, matDetail.Count > 0 ? string.Join("\n", matDetail) : null, new Color(0.72f, 0.7f, 0.55f)));
 
-            GUILayout.FlexibleSpace();
-            GUILayout.EndHorizontal();
-            GUILayout.EndArea();
+            var mp = Event.current.mousePosition;
+            float x = 12f;
+            int hover = -1; Rect hoverRect = default;
+            for (int i = 0; i < _chips.Count; i++)
+            {
+                var c = _chips[i];
+                string hex = ColorUtility.ToHtmlStringRGB(c.color);
+                string text = $"<color=#{hex}>■</color> <b>{c.label}</b> {K(c.value)}";
+                float w = _small.CalcSize(new GUIContent(text)).x + 18f;
+                var r = new Rect(x, 5f, w, 22f);
+                GUI.Label(r, text, _small);
+                if (r.Contains(mp)) { hover = i; hoverRect = r; }
+                x += w;
+            }
+            _topRect = new Rect(0, 0, Screen.width, 30);
+
+            if (hover >= 0 && _chips[hover].detail != null)
+            {
+                int lines = _chips[hover].detail.Split('\n').Length;
+                var dr = new Rect(hoverRect.x, 31f, 190f, 10f + lines * 18f);
+                GUI.Box(dr, GUIContent.none);
+                GUI.Label(new Rect(dr.x + 8, dr.y + 5, dr.width - 16, dr.height - 10), $"<size=13>{_chips[hover].detail}</size>", _small);
+            }
         }
 
-        private void ResChip(ItemDefinition item, int count)
+        private static Color ColorOf(ItemDefinition i) => i != null ? i.color : Color.white;
+        private static string K(int n) => n < 1000 ? n.ToString() : (n / 1000f).ToString("0.#") + "k";
+
+        // ---- Minimap (bottom-right) ----
+        private void DrawMinimap()
         {
-            string hex = ColorUtility.ToHtmlStringRGB(item.color);
-            GUILayout.Label($"<color=#{hex}>■</color> <b>{item.displayName}</b> {count}", _small);
-            GUILayout.Space(16);
+            const float size = 168f;
+            var r = new Rect(Screen.width - size - 12f, Screen.height - size - 12f, size, size);
+            _miniRect = r;
+
+            GUI.color = new Color(0.22f, 0.31f, 0.19f);
+            GUI.DrawTexture(r, Texture2D.whiteTexture);
+            GUI.color = Color.white;
+
+            var fog = FogOfWar.Instance;
+            float W = fog != null ? fog.WorldSize : 240f;
+            if (fog != null && fog.Tex != null) GUI.DrawTexture(r, fog.Tex); // explored = transparent → ground shows
+            GUI.Box(r, GUIContent.none);
+
+            void Dot(Vector3 wp, Color col, float s)
+            {
+                float u = (wp.x + W / 2f) / W, v = (wp.y + W / 2f) / W;
+                if (u < 0f || u > 1f || v < 0f || v > 1f) return;
+                GUI.color = col;
+                GUI.DrawTexture(new Rect(r.x + u * size - s / 2f, r.yMax - v * size - s / 2f, s, s), Texture2D.whiteTexture);
+                GUI.color = Color.white;
+            }
+
+            foreach (var s in StorageBuilding.All) if (s != null) Dot(s.transform.position, new Color(0.6f, 0.6f, 0.72f), 3f);
+            foreach (var p in ProductionBuilding.All) if (p != null) Dot(p.transform.position, new Color(0.8f, 0.6f, 0.3f), 3f);
+            foreach (var wk in WorkshopBuilding.All) if (wk != null) Dot(wk.transform.position, new Color(0.7f, 0.5f, 0.3f), 3f);
+            foreach (var h in HousingBuilding.All) if (h != null) Dot(h.transform.position, new Color(0.62f, 0.5f, 0.72f), 4f);
+            if (gatherer != null) Dot(gatherer.transform.position, new Color(0.96f, 0.85f, 0.2f), 6f);
         }
 
         // ---- Status (population) ----
