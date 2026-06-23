@@ -76,6 +76,23 @@ namespace Caveman
             }
 
             if (kb.xKey.wasPressedThisFrame) DemolishSelected();
+            if (kb.cKey.wasPressedThisFrame && Selected != null) CopySelected();
+        }
+
+        /// <summary>Pick the selected building's type as the active placement (quick repeat).</summary>
+        private void CopySelected()
+        {
+            if (Selected == null) return;
+            var pb = Selected.GetComponent<ProductionBuilding>();
+            var sb = Selected.GetComponent<StorageBuilding>();
+            var hb = Selected.GetComponent<HousingBuilding>();
+            var wb = Selected.GetComponent<WorkshopBuilding>();
+            var dpo = Selected.GetComponent<Depot>();
+            BuildingDefinition def = pb != null ? pb.def : sb != null ? sb.def : hb != null ? hb.def
+                : wb != null ? wb.def : dpo != null ? dpo.def : null;
+            if (def == null) return;
+            int idx = buildables.IndexOf(def);
+            if (idx >= 0 && IsUnlocked(def)) BeginPlacement(idx);
         }
 
         public IStaffable SelectedStaffable =>
@@ -123,23 +140,43 @@ namespace Caveman
             bool affordable = Economy.CanAfford(def.cost, Carried);
             bool placeOk = def.kind != BuildingKind.Collector
                            || HasMatchingNodeNear(world, def.item, placeNodeRange);
-            PlacementValid = affordable && placeOk;
+            bool free = !CellOccupied(world);
+            PlacementValid = affordable && placeOk && free;
 
             _ghostSr.color = PlacementValid
                 ? new Color(def.color.r, def.color.g, def.color.b, 0.55f)
                 : new Color(1f, 0.3f, 0.3f, 0.45f);
 
-            if (mouse.leftButton.wasPressedThisFrame && PlacementValid)
+            // Hold-and-drag to place a whole row; stays in placement mode so you can
+            // keep stamping. Right-click / Esc finishes. One building per grid cell.
+            if (mouse.leftButton.isPressed && PlacementValid)
             {
-                if (Economy.FreeBuild) ConstructionSite.SpawnFinished(def, world); // sandbox: instant
-                else ConstructionSite.Spawn(def, world); // builders haul materials, then construct
-                BuildingsPlaced++;
-                CancelPlacement();
+                var cell = new Vector2Int(Mathf.RoundToInt(world.x), Mathf.RoundToInt(world.y));
+                if (!_dragging || cell != _dragLast)
+                {
+                    if (Economy.FreeBuild) ConstructionSite.SpawnFinished(def, world); // sandbox: instant
+                    else ConstructionSite.Spawn(def, world); // builders haul materials, then construct
+                    BuildingsPlaced++;
+                    _dragging = true;
+                    _dragLast = cell;
+                }
             }
-            else if (mouse.rightButton.wasPressedThisFrame)
+            if (!mouse.leftButton.isPressed) _dragging = false;
+            if (mouse.rightButton.wasPressedThisFrame) CancelPlacement();
+        }
+
+        private bool CellOccupied(Vector3 world)
+        {
+            var hits = Physics2D.OverlapPointAll(world);
+            foreach (var h in hits)
             {
-                CancelPlacement();
+                if (h == null) continue;
+                if (h.GetComponent<ProductionBuilding>() || h.GetComponent<StorageBuilding>()
+                    || h.GetComponent<HousingBuilding>() || h.GetComponent<WorkshopBuilding>()
+                    || h.GetComponent<TransportHub>() || h.GetComponent<Depot>()
+                    || h.GetComponent<ConstructionSite>()) return true;
             }
+            return false;
         }
 
         // Belt mode: lay directional conveyor segments. R rotates, left-click places

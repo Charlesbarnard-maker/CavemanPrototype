@@ -558,6 +558,7 @@ namespace Caveman
                 "• A Mammoth Shack's transporters carry goods from huts to storage.\n" +
                 "• Click a building to manage it (workers, demolish).\n" +
                 "• People need Food + Housing. Space = pause, Esc = cancel, X = demolish.\n" +
+                "• Hold-drag to place a row of buildings; C copies the selected building's type.\n" +
                 "• Status dots: <color=#6c6>green</color>=working, <color=#fd4>yellow</color>=output full, " +
                 "<color=#f66>red</color>=no input, <color=#999>grey</color>=no worker.\n" +
                 "\n<b>Sandbox:</b> F1 +resources · F2 +5 people · F3 advance age · " +
