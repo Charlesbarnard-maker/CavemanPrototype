@@ -43,6 +43,8 @@ namespace Caveman
                 new ItemAmount(wood, 8));
             var house = MakeHousing("House", 2, new Color(0.72f, 0.62f, 0.45f),
                 new ItemAmount(wood, 8), new ItemAmount(stone, 4), new ItemAmount(planks, 3));
+            var mammothShack = MakeLogistics("Mammoth Shack", 2, new Color(0.46f, 0.40f, 0.55f),
+                new ItemAmount(wood, 6), new ItemAmount(stone, 2));
 
             // --- Camera (follows the player) ---
             var cam = Camera.main;
@@ -64,7 +66,7 @@ namespace Caveman
             builder.gatherer = gatherer;
             builder.placeNodeRange = 6f;
             builder.buildables = new List<BuildingDefinition>
-            { woodHut, stonePit, foragerHut, sawmill, campfire, woodStore, stoneStore, foodStore, house };
+            { woodHut, stonePit, foragerHut, sawmill, campfire, woodStore, stoneStore, foodStore, house, mammothShack };
 
             var follow = cam.GetComponent<CameraFollow>();
             if (follow == null) follow = cam.gameObject.AddComponent<CameraFollow>();
@@ -161,6 +163,17 @@ namespace Caveman
             def.capacity = capacity;
             def.color = color;
             def.inputs = inputs;
+            def.cost = new List<ItemAmount>(cost);
+            return def;
+        }
+
+        private static BuildingDefinition MakeLogistics(string name, int maxWorkers, Color color, params ItemAmount[] cost)
+        {
+            var def = ScriptableObject.CreateInstance<BuildingDefinition>();
+            def.displayName = name;
+            def.kind = BuildingKind.Logistics;
+            def.maxWorkers = maxWorkers;
+            def.color = color;
             def.cost = new List<ItemAmount>(cost);
             return def;
         }

@@ -116,6 +116,7 @@ namespace Caveman
                 case BuildingKind.Storage: StorageBuilding.Spawn(def, transform.position); break;
                 case BuildingKind.Housing: HousingBuilding.Spawn(def, transform.position); break;
                 case BuildingKind.Workshop: WorkshopBuilding.Spawn(def, transform.position).TryAssign(); break;
+                case BuildingKind.Logistics: TransportHub.Spawn(def, transform.position).TryAssign(); break;
                 default: ProductionBuilding.Spawn(def, transform.position).TryAssign(); break;
             }
             Destroy(gameObject);

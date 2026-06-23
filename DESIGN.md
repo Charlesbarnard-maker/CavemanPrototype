@@ -40,9 +40,10 @@ mechanical → belts.
 - **Transport model:** abstract throughput. Buildings have storage buffers; links/
   haulers move X items/sec. Items are NOT individually simulated. Belts/haulers are
   visual; the sim is logical. (Chosen for tractability + scale.)
-- **Economy:** combined pool. Build costs spend from the player's carried inventory +
-  ALL building buffers/storage. Manual gathering fills carried; collectors fill their
-  own buffer then push to adjacent storage.
+- **Economy:** combined pool. Build costs (and workshop inputs) spend from the player's
+  carried inventory + ALL building buffers/storage. Manual gathering fills carried;
+  collectors fill their own buffer; **Transporters physically carry buffers → storage
+  (no instant transfer)**. A full buffer with no transport stalls the building.
 - **Art:** placeholder shapes (squares/circles) until systems are locked, then one art
   pass. Don't build art on top of changing mechanics.
 
@@ -69,13 +70,18 @@ no Inspector wiring). Scripts in `Assets/Scripts/`:
   the player (`CameraFollow`); HUD via `OnGUI` (`InventoryHud`).
 
 ## Recently built
-- **Workshop/Processor engine** (`WorkshopBuilding`): a generic recipe building —
-  consumes inputs from the pool, produces an output over time, needs assigned
-  workers (more = faster). All chains are just recipes. First two: **Sawmill**
-  (2 Wood → 1 Planks) and **Campfire** (2 Food → 1 Cooked Food). Planks are
-  required to build Houses; Cooked Food nourishes more (foodValue 3 vs raw 1).
-- **Shared staffing** via `IStaffable` (collectors + workshops draw from one
-  worker pool). **Multi-type food** via `ItemDefinition.foodValue`.
+- **Physical transport** (`TransportHub` + `Transporter`): the **Mammoth Shack** is
+  staffed with workers who become Transporters that carry goods from collector/
+  workshop buffers to the matching storage. Replaces the old instant teleport — this
+  is the basic manual logistics tier (later: wooden rollers → conveyors).
+- **Workshop/Processor engine** (`WorkshopBuilding`): generic recipe building (inputs
+  → output over time, needs workers). Chains are just recipes. **Sawmill** (2 Wood →
+  1 Planks) and **Campfire** (2 Food → 1 Cooked Food). Planks build Houses; Cooked
+  Food nourishes more (foodValue 3 vs raw 1).
+- **Builders = capped HQ job** (`Colony.MaxBuilders`): auto-filled while building,
+  manually adjustable from the Town Hall; shared squad services all sites.
+- **Shared staffing** via `IStaffable` (collectors, workshops, transport hubs draw
+  from one worker pool). **Multi-type food** via `ItemDefinition.foodValue`.
 
 ## Planned systems (designed, not yet built)
 
@@ -106,14 +112,29 @@ Chains deepen each age (rough plan, to refine):
 Each age also upgrades *logistics* (haulers → carts/animals → ramps/pulleys →
 conveyors → roads), which is the real progression axis.
 
+**Categorised build menu.** The flat number-key list won't scale as buildings grow.
+Need a proper menu grouped by category/industry (Gathering, Storage, Workshops,
+Logistics, Housing…), clickable + scrollable, with number-key shortcuts kept for the
+common ones. (Currently: keys 1–9 plus 0 for a 10th — temporary.)
+
+**Varied food + varied storage.** Multiple food sources need distinct gathering and
+storage: **berries** from bushes, **meat** from **animals** (a huntable node that
+moves / depletes differently), etc. Meat and berries store differently (e.g. a smoker/
+cold store vs a basket), spoil differently, and feed cooking recipes. Needs the build
+menu first (more buildings).
+
+**Conveyors / automated transport.** The next transport tier above Transporters:
+**wooden rollers** (slow, early-mechanical) → carts/animals → belts. Automates the
+buffer→storage and building→building movement that Transporters do by hand.
+
 ## Next steps
-1. **NPC Haulers** — workers that carry resources between buildings that aren't adjacent
-   (distance logistics without belts; the "human chain").
-2. First **production chain** (e.g. Wood → Planks via a workshop) so one building feeds
-   another — and **age-based routing** (where output goes changes as you evolve).
-3. First **age unlock** that changes *how* you build (e.g. gravity ramps → pulleys →
-   conveyors). Manual worker assignment polish (priorities), multiple workers tuning.
-4. Later: the **art pass** (turn placeholder shapes into real sprites).
+1. **Categorised build menu** (prerequisite for adding more buildings).
+2. **Varied food gathering** (animals→meat, bushes→berries) + matching storages,
+   feeding the cooking/worker-buff system.
+3. **First age unlock** that changes *how* you build/transport (wooden rollers, etc.).
+4. Cleanup: extract a shared base for collector/workshop (see `KNOWN_ISSUES.md`),
+   protect the HQ from demolition.
+5. Later: the **art pass**.
 
 ## Dev environment / repo
 - Unity `6000.5.0f1`, 2D (URP). Repo lives at `C:\Users\charl\Projects\CavemanPrototype`

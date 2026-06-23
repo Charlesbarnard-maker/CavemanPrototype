@@ -114,7 +114,8 @@ namespace Caveman
                     var def = builder.buildables[i];
                     if (def == null) continue;
                     string col = builder.CanAfford(def) ? "#9f9" : "#f99";
-                    GUILayout.Label($"[{i + 1}] {def.displayName}  <color={col}>{CostText(def)}</color>", _small);
+                    string key = i < 9 ? (i + 1).ToString() : "0";
+                    GUILayout.Label($"[{key}] {def.displayName}  <color={col}>{CostText(def)}</color>", _small);
                 }
             }
             GUILayout.EndArea();

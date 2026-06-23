@@ -47,6 +47,7 @@ namespace Caveman
                 int a = 0;
                 foreach (var p in ProductionBuilding.All) a += p.AssignedWorkers;
                 foreach (var w in WorkshopBuilding.All) a += w.AssignedWorkers;
+                foreach (var h in TransportHub.All) a += h.AssignedWorkers;
                 return a;
             }
         }
@@ -175,6 +176,11 @@ namespace Caveman
             foreach (var w in WorkshopBuilding.All)
             {
                 while (over > 0 && w.AssignedWorkers > 0) { w.Unassign(); over--; }
+                if (over <= 0) return;
+            }
+            foreach (var h in TransportHub.All)
+            {
+                while (over > 0 && h.AssignedWorkers > 0) { h.Unassign(); over--; }
                 if (over <= 0) break;
             }
         }

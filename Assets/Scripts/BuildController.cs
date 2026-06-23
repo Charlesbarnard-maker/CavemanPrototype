@@ -40,6 +40,7 @@ namespace Caveman
 
             for (int i = 0; i < buildables.Count && i < 9; i++)
                 if (kb[Key.Digit1 + i].wasPressedThisFrame) { BeginPlacement(i); break; }
+            if (buildables.Count >= 10 && kb.digit0Key.wasPressedThisFrame) BeginPlacement(9);
 
             if (kb.escapeKey.wasPressedThisFrame)
             {
@@ -156,7 +157,9 @@ namespace Caveman
             var sb = Selected.GetComponent<StorageBuilding>();
             var hb = Selected.GetComponent<HousingBuilding>();
             var wb = Selected.GetComponent<WorkshopBuilding>();
-            BuildingDefinition rdef = pb != null ? pb.def : sb != null ? sb.def : hb != null ? hb.def : wb != null ? wb.def : null;
+            var th = Selected.GetComponent<TransportHub>();
+            BuildingDefinition rdef = pb != null ? pb.def : sb != null ? sb.def : hb != null ? hb.def
+                : wb != null ? wb.def : th != null ? th.def : null;
             if (rdef == null) return;
 
             var staff = Selected.GetComponent<IStaffable>();
@@ -180,6 +183,7 @@ namespace Caveman
                               || hit.GetComponent<StorageBuilding>() != null
                               || hit.GetComponent<HousingBuilding>() != null
                               || hit.GetComponent<WorkshopBuilding>() != null
+                              || hit.GetComponent<TransportHub>() != null
                               || hit.GetComponent<ConstructionSite>() != null;
             return isBuilding ? hit.gameObject : null;
         }

@@ -4,6 +4,10 @@ A running record so progress/problems don't get lost. Newest first. Move items t
 **Fixed** when done. Maintained alongside the code — see DESIGN.md for the roadmap.
 
 ## Fixed
+- **2026-06-23 — Resources teleported to warehouses.** Buffer→storage was instant.
+  Now physical: build a **Mammoth Shack** (`TransportHub`) and assign workers who
+  become **Transporters** that carry goods from collector/workshop buffers to storage.
+  (Note: workshop *inputs* are still pulled from the global pool, not hauled — see Open.)
 - **2026-06-23 — Builders hogged all workers.** Each construction site claimed up
   to 3 free workers, starving resource collectors and making it impossible to keep
   gathering during a build. Reworked: builders are now a **capped HQ job**
@@ -14,10 +18,14 @@ A running record so progress/problems don't get lost. Newest first. Move items t
   unused template; `UnitySave.unity` is the working scene.
 
 ## Open — bugs / behaviour
-- **Inputs come from the global pool, not hauled.** Workshops and build costs draw
-  inputs from the combined pool regardless of distance. True spatial logistics
-  (haulers moving outputs between distant buildings, routes, roads) is the next big
-  layer and the intended core challenge.
+- **Workshop inputs & build costs still pull from the global pool, not hauled.**
+  Buffer→storage is now physical (Transporters), but a workshop's *inputs* and a
+  build site's *materials* are taken from the combined pool regardless of distance.
+  Next: route inputs through transport too (and conveyors).
+- **Build menu doesn't scale.** Flat number-key list; 10th building is on key `0` as a
+  stopgap. Needs a categorised, clickable menu (see DESIGN.md).
+- **No food variety yet.** Only one Food type. Planned: berries (bushes) + meat
+  (animals) with distinct gathering + storage.
 - **Reducing builders mid-haul wastes a little.** A removed builder drops its claim
   (the picked-up units were already spent); another re-fetches. Rare, low impact.
 - **HQ (Town Hall) can be demolished**, which would break builder management and

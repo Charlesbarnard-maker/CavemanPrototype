@@ -6,9 +6,8 @@ namespace Caveman
     /// <summary>
     /// A processor: consumes input resources from the pool and produces an output
     /// over time (a recipe). Needs assigned workers to run — more workers process
-    /// faster. Output goes to its buffer (and on to a matching storage if present),
-    /// and counts toward the shared pool. This is the engine for all production
-    /// chains; each chain is just a different recipe (Sawmill, Campfire, ...).
+    /// faster. Output accumulates in its buffer (counts toward the pool) and is
+    /// moved to storage by Transporters. The engine for all production chains.
     /// </summary>
     public class WorkshopBuilding : MonoBehaviour, IStaffable
     {
@@ -31,7 +30,6 @@ namespace Caveman
         private float _timer, _flash;
         private SpriteRenderer _sr;
         private Color _baseColor;
-        private LineRenderer _link;
 
         public static WorkshopBuilding Spawn(BuildingDefinition def, Vector3 pos)
         {
@@ -105,29 +103,8 @@ namespace Caveman
                 _timer = 0f;
             }
 
-            PushToStorage();
             bool working = AssignedWorkers > 0 && (produced || Buffer.Total() > 0);
             UpdateVisual(working);
-        }
-
-        private void PushToStorage()
-        {
-            int have = Buffer.Count(output);
-            if (have <= 0) { if (_link != null) _link.enabled = false; return; }
-
-            StorageBuilding store = null;
-            float bestSq = float.MaxValue;
-            foreach (var s in StorageBuilding.All)
-            {
-                if (s == null || s.accepts != output) continue;
-                float sq = ((Vector2)(s.transform.position - transform.position)).sqrMagnitude;
-                if (sq < bestSq) { bestSq = sq; store = s; }
-            }
-            if (store == null) { if (_link != null) _link.enabled = false; return; }
-
-            int accepted = store.Store.Add(output, have);
-            if (accepted > 0) Buffer.RemoveUpTo(output, accepted);
-            DrawLink(store.transform.position);
         }
 
         private void UpdateVisual(bool working)
@@ -140,25 +117,6 @@ namespace Caveman
                 shown = Color.Lerp(shown, Color.white, Mathf.Clamp01(_flash / 0.25f));
             }
             _sr.color = shown;
-        }
-
-        private void DrawLink(Vector3 to)
-        {
-            if (_link == null)
-            {
-                _link = gameObject.AddComponent<LineRenderer>();
-                var shader = Shader.Find("Sprites/Default");
-                if (shader != null) _link.material = new Material(shader);
-                _link.widthMultiplier = 0.08f;
-                _link.numCapVertices = 2;
-                _link.sortingOrder = 4;
-                _link.startColor = _link.endColor = new Color(1f, 1f, 1f, 0.35f);
-                _link.positionCount = 2;
-                _link.useWorldSpace = true;
-            }
-            _link.enabled = true;
-            _link.SetPosition(0, transform.position);
-            _link.SetPosition(1, to);
         }
     }
 }
