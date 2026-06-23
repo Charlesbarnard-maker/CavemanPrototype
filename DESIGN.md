@@ -70,6 +70,12 @@ no Inspector wiring). Scripts in `Assets/Scripts/`:
   the player (`CameraFollow`); HUD via `OnGUI` (`InventoryHud`).
 
 ## Recently built
+- **Explore → grow loop**: **Ore** is a rare resource found only in **distant veins**
+  (far out in the fog). Build a **Mine** on a vein, haul the ore home, and it's
+  **required to reach the Iron Age** — so you must explore, then plan a supply line
+  back. **Ox Cart** = a long-range hauler (Iron) for reaching distant mines.
+- **Items visibly ride belts** (a sliding dot per belt). Belt lookups are now O(1)
+  via `WorldGrid` (no per-tick building scans).
 - **Conveyor belts (spatial logistics!)** (`Belt`): place directional belt segments on
   a grid (R to rotate, click/drag to lay). A belt pulls from an adjacent collector/
   workshop buffer and carries items in its facing direction belt→belt→into a storage.

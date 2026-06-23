@@ -57,6 +57,7 @@ namespace Caveman
             h.def = def;
             h.maxWorkers = Mathf.Max(1, def.maxWorkers);
             h.mechanical = def.mechanical;
+            h.range = def.logisticsRange > 0f ? def.logisticsRange : 14f;
             if (h.mechanical)
             {
                 var t = Transporter.Spawn(h); // a conveyor runs itself, no worker needed

@@ -29,6 +29,7 @@ namespace Caveman
             var grain = MakeItem("grain", "Grain", new Color(0.86f, 0.76f, 0.36f));
             var flour = MakeItem("flour", "Flour", new Color(0.90f, 0.86f, 0.72f));
             var bread = MakeItem("bread", "Bread", new Color(0.80f, 0.58f, 0.30f)); bread.foodValue = 4;
+            var ore = MakeItem("ore", "Ore", new Color(0.62f, 0.58f, 0.42f)); // rare — found far from base
 
             // --- Buildings ---
             var woodHut = MakeCollector("Wood Hut", wood, 1, 2.0f, 2, 12, new Color(0.80f, 0.52f, 0.25f),
@@ -105,6 +106,16 @@ namespace Caveman
             fastBelt.color = new Color(0.72f, 0.63f, 0.40f);
             fastBelt.cost = new List<ItemAmount> { new ItemAmount(planks, 1) };
 
+            // Exploration payoff: Ore is mined from distant veins, hauled home, and is
+            // required to reach the Iron Age.
+            var mine = MakeCollector("Mine", ore, 1, 3.0f, 2, 12, new Color(0.50f, 0.48f, 0.40f),
+                new ItemAmount(wood, 6), new ItemAmount(stone, 4)); mine.unlockAge = 1;
+            var oreStore = MakeStorage("Ore Stockpile", ore, 100, new Color(0.52f, 0.50f, 0.42f),
+                new ItemAmount(wood, 8)); oreStore.unlockAge = 1;
+            // Long-range hauler for distant mines (Iron age).
+            var oxCart = MakeLogistics("Ox Cart", 2, new Color(0.50f, 0.38f, 0.30f),
+                new ItemAmount(wood, 10), new ItemAmount(planks, 4)); oxCart.unlockAge = 3; oxCart.logisticsRange = 32f;
+
             // --- Camera (follows the player) ---
             var cam = Camera.main;
             if (cam == null)
@@ -131,7 +142,8 @@ namespace Caveman
             { woodHut, stonePit, foragerHut, waterHole, sawmill, campfire,
               woodStore, stoneStore, foodStore, waterStore, warehouse, house, mammothShack,
               hunter, clayPit, charcoalBurner, clayStore, smokehouse, longhouse,
-              kiln, farm, mill, bakery, brickStore, roller, woodBelt, fastBelt };
+              kiln, farm, mill, bakery, brickStore, roller, woodBelt, fastBelt,
+              mine, oreStore, oxCart };
 
             var follow = cam.GetComponent<CameraFollow>();
             if (follow == null) follow = cam.gameObject.AddComponent<CameraFollow>();
@@ -153,7 +165,7 @@ namespace Caveman
             {
                 new Colony.AgeReq { pop = 8,  cost = new List<ItemAmount> { new ItemAmount(wood, 40), new ItemAmount(stone, 25) } },
                 new Colony.AgeReq { pop = 12, cost = new List<ItemAmount> { new ItemAmount(planks, 25), new ItemAmount(clay, 20), new ItemAmount(stone, 30) } },
-                new Colony.AgeReq { pop = 18, cost = new List<ItemAmount> { new ItemAmount(bricks, 30), new ItemAmount(planks, 30), new ItemAmount(bread, 10) } },
+                new Colony.AgeReq { pop = 18, cost = new List<ItemAmount> { new ItemAmount(bricks, 30), new ItemAmount(planks, 30), new ItemAmount(ore, 20) } },
             };
 
             // --- Town Hall (pre-placed, houses 3) ---
@@ -170,7 +182,7 @@ namespace Caveman
             hud.foodItem = food;
             hud.waterItem = water;
             hud.debugItems = new List<ItemDefinition>
-            { wood, stone, food, water, planks, cookedFood, meat, clay, charcoal, bricks, grain, flour, bread };
+            { wood, stone, food, water, planks, cookedFood, meat, clay, charcoal, bricks, grain, flour, bread, ore };
 
             // --- Resource patches: spread WIDE across the map so you must explore.
             //     A clear central area stays open as the player's base/processing yard. ---
@@ -189,6 +201,11 @@ namespace Caveman
                 new Vector2(26f, -18f), new Vector2(14f, 12f), new Vector2(0.8f, 1.2f), PlaceholderArt.Circle(), 30, baseClear);
             SpawnPatches("Clay", clay, new Color(0.68f, 0.46f, 0.36f), 9,
                 new Vector2(-26f, -18f), new Vector2(14f, 12f), new Vector2(1.0f, 1.4f), PlaceholderArt.Hexagon(), 40, baseClear);
+            // Ore veins — rare, far from base (must explore to find them), high yield.
+            SpawnPatches("Ore Vein", ore, new Color(0.62f, 0.58f, 0.42f), 4,
+                new Vector2(46f, 34f), new Vector2(12f, 12f), new Vector2(1.1f, 1.5f), PlaceholderArt.Hexagon(), 60, 26f);
+            SpawnPatches("Ore Vein", ore, new Color(0.62f, 0.58f, 0.42f), 4,
+                new Vector2(-46f, -34f), new Vector2(12f, 12f), new Vector2(1.1f, 1.5f), PlaceholderArt.Hexagon(), 60, 26f);
         }
 
         // Scatters `count` patches around `center`, jittered by ±spread, random size,

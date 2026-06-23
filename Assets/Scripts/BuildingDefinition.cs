@@ -64,6 +64,8 @@ namespace Caveman
         [Header("Logistics")]
         [Tooltip("Transport that runs WITHOUT a worker (a conveyor / wooden roller).")]
         public bool mechanical = false;
+        [Tooltip("How far a transport hub's carriers will travel to serve a source.")]
+        public float logisticsRange = 14f;
 
         [Header("Visuals / cost")]
         public Color color = Color.white;

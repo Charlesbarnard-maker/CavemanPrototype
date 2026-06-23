@@ -28,10 +28,15 @@ A running record so progress/problems don't get lost. Newest first. Move items t
   the pool). Buildings snap to the belt grid. Haulers range-limited.
 - Belts now: **don't run when disconnected** (dead-end = red, won't pull), **two speed
   tiers** (Wooden/Conveyor), and build-menu **tooltips** explain each building.
-- **Remaining:** **splitters/junctions/undergrounds**; visible **item dots** on belts;
-  explicit **output/input port sides** with markers; **collector tiers** (manual→machine,
-  slow→fast, to mirror the belt upgrade path); **item groups** so a storage can hold a
-  category (e.g. all "lumber"); re-gate belts to a later age after review.
+- **BIGGEST remaining (next focused batch): multi-cell building footprints + explicit
+  input/output port sides.** Buildings are 1 cell, so only 4 belt connections and no
+  size variety. Want: buildings sized by function (e.g. 2×2 workshop, big warehouse),
+  with dedicated output/input port cells (facing, rotatable) — belts must connect to
+  the right slot. This is the spatial-challenge depth the player is asking for; it's a
+  sizeable subsystem (footprint occupancy, ports, markers, belt port-aware I/O) best
+  done as its own carefully-iterated batch.
+- Other belt items: **splitters/junctions/undergrounds**; **collector tiers** (manual→
+  machine); **item groups** so a storage holds a category (all "lumber"); re-gate belts.
 
 ## Open — bugs / behaviour
 - **Workshop inputs & build costs still pull from the global pool, not hauled.**
