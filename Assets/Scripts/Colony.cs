@@ -14,21 +14,24 @@ namespace Caveman
         public static Colony Instance { get; private set; }
 
         public ItemDefinition foodItem;
+        public ItemDefinition waterItem;
         public Inventory carried; // player's carried inventory, for Economy spending
 
         public int Population { get; private set; }
         public bool Starving { get; private set; }
+        public bool Thirsty { get; private set; }
 
         [Header("Tuning")]
         public float foodTick = 7f;     // every N seconds each person eats 1 food (gentle early)
+        public float waterTick = 7f;    // every N seconds each person drinks 1 water
         public float growthTick = 15f;  // every N seconds +1 pop (needs surplus, see below)
-        public float starveTick = 12f;  // every N seconds -1 pop while starving
+        public float starveTick = 12f;  // every N seconds -1 pop while starving/thirsty
         [Tooltip("Stored food needed before population will grow at all.")]
         public int growthFoodThreshold = 12;
         [Tooltip("Stored food consumed to raise each new citizen.")]
         public int growthFoodCost = 8;
 
-        private float _foodT, _growthT, _starveT;
+        private float _foodT, _waterT, _growthT, _starveT;
 
         public int Capacity
         {
@@ -124,10 +127,26 @@ namespace Caveman
                 }
             }
 
+            // --- Water consumption ---
+            _waterT += dt;
+            if (_waterT >= waterTick)
+            {
+                _waterT -= waterTick;
+                if (Population > 0 && waterItem != null)
+                {
+                    int got = Economy.SpendUpTo(waterItem, Population, carried);
+                    Thirsty = got < Population;
+                }
+                else
+                {
+                    Thirsty = false;
+                }
+            }
+
             // --- Growth: needs housing space AND a real food surplus; each new
             //     citizen costs stored food, so growth reflects food-economy progress
             //     (no more instant house-fill). ---
-            bool canGrow = !Starving
+            bool canGrow = !Starving && !Thirsty
                            && Population < Capacity
                            && Economy.FoodPoints(carried) >= growthFoodThreshold;
             if (canGrow)
@@ -144,8 +163,8 @@ namespace Caveman
                 _growthT = 0f;
             }
 
-            // --- Decline (starvation) ---
-            if (Starving && Population > 0)
+            // --- Decline (starvation or thirst) ---
+            if ((Starving || Thirsty) && Population > 0)
             {
                 _starveT += dt;
                 if (_starveT >= starveTick)

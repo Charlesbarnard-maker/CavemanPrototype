@@ -21,6 +21,7 @@ namespace Caveman
             var planks = MakeItem("planks", "Planks", new Color(0.74f, 0.58f, 0.34f));
             var cookedFood = MakeItem("cooked", "Cooked Food", new Color(0.92f, 0.56f, 0.30f));
             cookedFood.foodValue = 3; // cooking turns 2 raw food into 1 cooked worth 3 — a real gain
+            var water = MakeItem("water", "Water", new Color(0.30f, 0.55f, 0.85f)); // survival + crafting
 
             // --- Buildings ---
             var woodHut = MakeCollector("Wood Hut", wood, 1, 2.0f, 2, 12, new Color(0.80f, 0.52f, 0.25f),
@@ -29,17 +30,22 @@ namespace Caveman
                 new ItemAmount(wood, 5), new ItemAmount(stone, 5));
             var foragerHut = MakeCollector("Forager Hut", food, 1, 2.0f, 2, 12, new Color(0.78f, 0.40f, 0.40f),
                 new ItemAmount(wood, 4));
+            var waterHole = MakeCollector("Water Hole", water, 1, 2.0f, 2, 12, new Color(0.40f, 0.62f, 0.85f),
+                new ItemAmount(wood, 4));
             var sawmill = MakeWorkshop("Sawmill", planks, 1, 2.5f, 2, 12, new Color(0.66f, 0.50f, 0.30f),
                 new List<ItemAmount> { new ItemAmount(wood, 2) },
                 new ItemAmount(wood, 6), new ItemAmount(stone, 4));
+            // Campfire: needs Wood as fuel and Water to cook, plus the raw Food.
             var campfire = MakeWorkshop("Campfire", cookedFood, 1, 3.0f, 2, 12, new Color(0.85f, 0.45f, 0.25f),
-                new List<ItemAmount> { new ItemAmount(food, 2) },
+                new List<ItemAmount> { new ItemAmount(food, 2), new ItemAmount(wood, 1), new ItemAmount(water, 1) },
                 new ItemAmount(wood, 4), new ItemAmount(stone, 2));
             var woodStore = MakeStorage("Wood Warehouse", wood, 100, new Color(0.62f, 0.40f, 0.20f),
                 new ItemAmount(wood, 8));
             var stoneStore = MakeStorage("Stone Storage", stone, 100, new Color(0.40f, 0.43f, 0.50f),
                 new ItemAmount(wood, 8));
             var foodStore = MakeStorage("Granary", food, 100, new Color(0.70f, 0.45f, 0.35f),
+                new ItemAmount(wood, 8));
+            var waterStore = MakeStorage("Water Barrel", water, 100, new Color(0.35f, 0.50f, 0.72f),
                 new ItemAmount(wood, 8));
             var house = MakeHousing("House", 2, new Color(0.72f, 0.62f, 0.45f),
                 new ItemAmount(wood, 8), new ItemAmount(stone, 4), new ItemAmount(planks, 3));
@@ -66,7 +72,8 @@ namespace Caveman
             builder.gatherer = gatherer;
             builder.placeNodeRange = 6f;
             builder.buildables = new List<BuildingDefinition>
-            { woodHut, stonePit, foragerHut, sawmill, campfire, woodStore, stoneStore, foodStore, house, mammothShack };
+            { woodHut, stonePit, foragerHut, waterHole, sawmill, campfire,
+              woodStore, stoneStore, foodStore, waterStore, house, mammothShack };
 
             var follow = cam.GetComponent<CameraFollow>();
             if (follow == null) follow = cam.gameObject.AddComponent<CameraFollow>();
@@ -75,9 +82,11 @@ namespace Caveman
             // --- Colony (population) ---
             var colony = new GameObject("Colony").AddComponent<Colony>();
             colony.foodItem = food;
+            colony.waterItem = water;
             colony.carried = gatherer.Inventory;
             colony.SetStartingPopulation(5);
-            gatherer.Inventory.Add(food, 50); // generous starting larder while you learn the ropes
+            gatherer.Inventory.Add(food, 50);   // starting larder while you learn the ropes
+            gatherer.Inventory.Add(water, 40);  // starting water
 
             // --- Town Hall (pre-placed, houses 3) ---
             var townHallDef = MakeHousing("Town Hall", 5, new Color(0.60f, 0.50f, 0.70f));
@@ -91,25 +100,31 @@ namespace Caveman
             hud.woodItem = wood;
             hud.stoneItem = stone;
             hud.foodItem = food;
+            hud.waterItem = water;
 
-            // --- Resource patches ---
-            var treeColor = new Color(0.27f, 0.55f, 0.22f);
-            SpawnNode("Tree", wood, treeColor, new Vector2(5f, 2.5f), 1.3f, PlaceholderArt.Triangle());
-            SpawnNode("Tree", wood, treeColor, new Vector2(7f, 1f), 1.2f, PlaceholderArt.Triangle());
-            SpawnNode("Tree", wood, treeColor, new Vector2(6f, -1.5f), 1.4f, PlaceholderArt.Triangle());
-            SpawnNode("Tree", wood, treeColor, new Vector2(8.5f, 2.2f), 1.1f, PlaceholderArt.Triangle());
+            // --- Resource patches: spread out across the map with random jitter ---
+            SpawnPatches("Tree", wood, new Color(0.27f, 0.55f, 0.22f), 7,
+                new Vector2(7f, 1f), new Vector2(4.5f, 5f), new Vector2(1.0f, 1.5f), PlaceholderArt.Triangle());
+            SpawnPatches("Rock", stone, new Color(0.55f, 0.55f, 0.6f), 7,
+                new Vector2(-7f, 1f), new Vector2(4.5f, 5f), new Vector2(1.0f, 1.5f), PlaceholderArt.Hexagon());
+            SpawnPatches("Bush", food, new Color(0.45f, 0.55f, 0.25f), 5,
+                new Vector2(0f, -6f), new Vector2(6f, 2f), new Vector2(0.7f, 1.0f), PlaceholderArt.Circle());
+            SpawnPatches("Pond", water, new Color(0.30f, 0.55f, 0.85f), 4,
+                new Vector2(0f, 6f), new Vector2(6f, 2f), new Vector2(1.1f, 1.6f), PlaceholderArt.Circle());
+        }
 
-            var rockColor = new Color(0.55f, 0.55f, 0.6f);
-            SpawnNode("Rock", stone, rockColor, new Vector2(-5f, 2.5f), 1.2f, PlaceholderArt.Hexagon());
-            SpawnNode("Rock", stone, rockColor, new Vector2(-7f, 1f), 1.1f, PlaceholderArt.Hexagon());
-            SpawnNode("Rock", stone, rockColor, new Vector2(-6f, -1.5f), 1.3f, PlaceholderArt.Hexagon());
-            SpawnNode("Rock", stone, rockColor, new Vector2(-8.5f, 2.2f), 1.0f, PlaceholderArt.Hexagon());
-
-            // Bushes (food) — bottom of the map
-            var bushColor = new Color(0.45f, 0.55f, 0.25f);
-            SpawnNode("Bush", food, bushColor, new Vector2(-1.5f, -5f), 0.8f, PlaceholderArt.Circle());
-            SpawnNode("Bush", food, bushColor, new Vector2(0.5f, -5.5f), 0.8f, PlaceholderArt.Circle());
-            SpawnNode("Bush", food, bushColor, new Vector2(2.5f, -4.5f), 0.8f, PlaceholderArt.Circle());
+        // Scatters `count` patches around `center`, jittered by ±spread, with a random size.
+        private static void SpawnPatches(string name, ItemDefinition item, Color color, int count,
+            Vector2 center, Vector2 spread, Vector2 sizeRange, Sprite sprite)
+        {
+            for (int i = 0; i < count; i++)
+            {
+                Vector2 pos = center + new Vector2(Random.Range(-spread.x, spread.x), Random.Range(-spread.y, spread.y));
+                float size = Random.Range(sizeRange.x, sizeRange.y);
+                float b = Random.Range(0.9f, 1.1f); // slight colour variation
+                var c = new Color(Mathf.Clamp01(color.r * b), Mathf.Clamp01(color.g * b), Mathf.Clamp01(color.b * b));
+                SpawnNode(name, item, c, pos, size, sprite);
+            }
         }
 
         private static ItemDefinition MakeItem(string id, string name, Color color)

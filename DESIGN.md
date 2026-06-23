@@ -70,6 +70,11 @@ no Inspector wiring). Scripts in `Assets/Scripts/`:
   the player (`CameraFollow`); HUD via `OnGUI` (`InventoryHud`).
 
 ## Recently built
+- **Water** (survival + crafting): ponds → **Water Hole** collector → **Water Barrel**.
+  The colony **drinks water** each tick (THIRSTY → population decline, like starving).
+  **Campfire** now needs **Wood (fuel) + Water** to cook, not just raw food.
+- **Top resource bar** (full-width) replaces the inline resource text; resource
+  patches are now **spread out + randomised** each game. Start with **5 people**.
 - **Physical transport** (`TransportHub` + `Transporter`): the **Mammoth Shack** is
   staffed with workers who become Transporters that carry goods from collector/
   workshop buffers to the matching storage. Replaces the old instant teleport — this
@@ -123,9 +128,20 @@ moves / depletes differently), etc. Meat and berries store differently (e.g. a s
 cold store vs a basket), spoil differently, and feed cooking recipes. Needs the build
 menu first (more buildings).
 
-**Conveyors / automated transport.** The next transport tier above Transporters:
-**wooden rollers** (slow, early-mechanical) → carts/animals → belts. Automates the
-buffer→storage and building→building movement that Transporters do by hand.
+**Conveyors / automated transport (the long-term goal).** The transport tiers above
+Transporters: **wooden rollers** (slow, early-mechanical) → carts/animals → belts,
+**gradually unlocked** across ages. The Mammoth Shack stays as the cheap early helper.
+Both transporters and conveyors need **priorities / filters** — *what* to collect,
+which source and which destination, and ordering when demand exceeds supply. This
+routing/priority layer is the core optimisation challenge.
+
+**Terrain & paths.** Ground tiles (grass/dirt/water edges) for visual variety, and
+**paths/roads** the player lays down — initially cosmetic, later functional (speed up
+transporters / required for carts), feeding into the logistics-optimisation loop.
+
+**Varied food sources.** Beyond bushes (berries): **animals → meat** (a huntable node
+that moves / depletes differently), with distinct gathering + storage (basket vs
+smoker/cold store) and different spoilage, feeding cooking recipes.
 
 ## Next steps
 1. **Categorised build menu** (prerequisite for adding more buildings).

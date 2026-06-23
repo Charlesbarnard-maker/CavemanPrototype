@@ -14,7 +14,7 @@ namespace Caveman
     {
         public PlayerGatherer gatherer;
         public BuildController builder;
-        public ItemDefinition woodItem, stoneItem, foodItem;
+        public ItemDefinition woodItem, stoneItem, foodItem, waterItem;
 
         /// <summary>True when the cursor is over an interactive HUD panel.</summary>
         public static bool PointerOverUI { get; private set; }
@@ -57,6 +57,7 @@ namespace Caveman
             _big ??= new GUIStyle(GUI.skin.label) { fontSize = 40, richText = true, alignment = TextAnchor.MiddleCenter };
             _btn ??= new GUIStyle(GUI.skin.button) { richText = true, alignment = TextAnchor.MiddleLeft, fontSize = 13 };
 
+            DrawTopBar();
             DrawStatus();
             DrawObjective();
             if (builder != null) DrawBuildMenu();
@@ -73,26 +74,52 @@ namespace Caveman
             }
         }
 
-        // ---- Top-left: status ----
-        private void DrawStatus()
+        // ---- Top resource bar (full width) ----
+        private void DrawTopBar()
         {
-            GUILayout.BeginArea(new Rect(12, 10, 520, 120));
-            var c = Colony.Instance;
-            if (c != null)
-            {
-                string starve = c.Starving ? "   <color=#f55>STARVING</color>" : "";
-                int working = c.Population - c.FreeWorkers; // assigned + builders + transporters
-                GUILayout.Label($"<b>Population</b> {c.Population}/{c.Capacity}   <b>Working</b> {working}   <b>Free</b> {c.FreeWorkers}{starve}", _s);
-            }
+            GUI.Box(new Rect(0, 0, Screen.width, 30), GUIContent.none);
+            GUILayout.BeginArea(new Rect(10, 5, Screen.width - 20, 22));
+            GUILayout.BeginHorizontal();
+
             var totals = Economy.Totals(gatherer.Inventory);
-            GUILayout.Label(ResLine(totals), _s);
+            int Get(ItemDefinition i) { if (i == null) return 0; totals.TryGetValue(i, out int v); return v; }
+
+            // Core resources always shown, then any others.
+            var core = new[] { woodItem, stoneItem, foodItem, waterItem };
+            foreach (var it in core) if (it != null) ResChip(it, Get(it));
+
+            var extras = new List<ItemDefinition>();
+            foreach (var k in totals.Keys)
+                if (k != null && System.Array.IndexOf(core, k) < 0) extras.Add(k);
+            extras.Sort((a, b) => string.Compare(a.displayName, b.displayName, System.StringComparison.Ordinal));
+            foreach (var it in extras) ResChip(it, Get(it));
+
+            GUILayout.FlexibleSpace();
+            GUILayout.EndHorizontal();
             GUILayout.EndArea();
         }
 
-        private string ResLine(Dictionary<ItemDefinition, int> totals)
+        private void ResChip(ItemDefinition item, int count)
         {
-            int Get(ItemDefinition i) { if (i == null) return 0; totals.TryGetValue(i, out int v); return v; }
-            return $"<b>Wood</b> {Get(woodItem)}   <b>Stone</b> {Get(stoneItem)}   <b>Food</b> {Get(foodItem)}";
+            string hex = ColorUtility.ToHtmlStringRGB(item.color);
+            GUILayout.Label($"<color=#{hex}>■</color> <b>{item.displayName}</b> {count}", _small);
+            GUILayout.Space(16);
+        }
+
+        // ---- Status (population) ----
+        private void DrawStatus()
+        {
+            GUILayout.BeginArea(new Rect(12, 36, 620, 28));
+            var c = Colony.Instance;
+            if (c != null)
+            {
+                string flags = "";
+                if (c.Starving) flags += "   <color=#f55>STARVING</color>";
+                if (c.Thirsty) flags += "   <color=#5cf>THIRSTY</color>";
+                int working = c.Population - c.FreeWorkers; // assigned + builders + transporters
+                GUILayout.Label($"<b>Population</b> {c.Population}/{c.Capacity}   <b>Working</b> {working}   <b>Free</b> {c.FreeWorkers}{flags}", _s);
+            }
+            GUILayout.EndArea();
         }
 
         // ---- Objective ----

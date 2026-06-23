@@ -26,8 +26,13 @@ A running record so progress/problems don't get lost. Newest first. Move items t
   clickable menu (Gathering / Workshops / Logistics / Storage / Housing). Number keys
   1–9 + 0 remain as shortcuts. Categories are derived from building kind for now;
   finer "industries" sub-grouping can come later.
-- **No food variety yet.** Only one Food type. Planned: berries (bushes) + meat
-  (animals) with distinct gathering + storage.
+- **No food variety yet.** Berries (bushes) exist as "Food"; planned: **meat** from
+  **animals** (moving/huntable node) with distinct gathering + storage + spoilage.
+- **Transporters have no priorities.** They grab the nearest available job; no way to
+  say "prioritise food" or set source→destination routes. Needed for real logistics
+  (and for conveyors later).
+- **No terrain / paths.** Flat background only; planned ground tiles + player-laid
+  paths/roads (cosmetic first, then speed/route function).
 - **Reducing builders mid-haul wastes a little.** A removed builder drops its claim
   (the picked-up units were already spent); another re-fetches. Rare, low impact.
 - **HQ (Town Hall) can be demolished**, which would break builder management and
