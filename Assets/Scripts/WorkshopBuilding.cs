@@ -27,9 +27,13 @@ namespace Caveman
         public string StaffLabel => def != null ? def.displayName : "Workshop";
 
         public static readonly List<WorkshopBuilding> All = new();
-        private Vector2Int _gridCell;
-        void OnEnable() { All.Add(this); _gridCell = Belt.CellOf(transform.position); WorldGrid.Workshops[_gridCell] = this; }
-        void OnDisable() { All.Remove(this); WorldGrid.Remove(WorldGrid.Workshops, _gridCell, this); }
+        private List<Vector2Int> _cells; // every grid cell this building occupies
+        void OnEnable() { All.Add(this); }
+        void OnDisable()
+        {
+            All.Remove(this);
+            if (_cells != null) foreach (var c in _cells) WorldGrid.Remove(WorldGrid.Workshops, c, this);
+        }
 
         private float _timer, _flash;
         private bool _starved;
@@ -47,7 +51,7 @@ namespace Caveman
         {
             var go = new GameObject(def.displayName);
             go.transform.position = new Vector3(pos.x, pos.y, 0f);
-            go.transform.localScale = Vector3.one * 1.0f;
+            go.transform.localScale = new Vector3(def.FootW, def.FootH, 1f);
 
             var sr = go.AddComponent<SpriteRenderer>();
             sr.sprite = PlaceholderArt.Square();
@@ -65,6 +69,8 @@ namespace Caveman
             w.inputs = def.inputs;
             w.Buffer = new Inventory { capacity = Mathf.Max(1, def.capacity) };
             w.InBuffer = new Inventory { capacity = 24 };
+            w._cells = Footprint.Cells(go.transform.position, def.FootW, def.FootH);
+            foreach (var c in w._cells) WorldGrid.Workshops[c] = w;
             return w;
         }
 
@@ -139,31 +145,45 @@ namespace Caveman
             }
         }
 
-        // The four grid cells touching this workshop.
+        // The grid cells immediately surrounding this building's footprint (cached).
         private static readonly Belt.Dir[] _dirs = { Belt.Dir.N, Belt.Dir.E, Belt.Dir.S, Belt.Dir.W };
+        private List<Vector2Int> _neighbours;
+        private List<Vector2Int> Neighbours()
+        {
+            if (_neighbours != null) return _neighbours;
+            var set = new HashSet<Vector2Int>();
+            if (_cells != null)
+                foreach (var cell in _cells)
+                    foreach (var d in _dirs)
+                    {
+                        var nc = cell + Belt.Step(d);
+                        if (!_cells.Contains(nc)) set.Add(nc); // skip our own interior cells
+                    }
+            _neighbours = new List<Vector2Int>(set);
+            return _neighbours;
+        }
 
-        /// <summary>Units of `item` reachable from directly adjacent storages / machines.</summary>
+        /// <summary>Units of `item` reachable from storages / machines adjacent to the footprint.</summary>
         private int AdjacentAvailable(ItemDefinition item)
         {
             int n = 0;
-            foreach (var d in _dirs)
+            var counted = new HashSet<Component>(); // a multi-cell neighbour must count only once
+            foreach (var nc in Neighbours())
             {
-                var nc = _gridCell + Belt.Step(d);
-                if (WorldGrid.Storages.TryGetValue(nc, out var s) && s != null && s.accepts == item) n += s.Store.Count(item);
-                if (WorldGrid.Collectors.TryGetValue(nc, out var p) && p != null && p.produces == item) n += p.Buffer.Count(item);
-                if (WorldGrid.Workshops.TryGetValue(nc, out var w) && w != null && w != this && w.output == item) n += w.Buffer.Count(item);
+                if (WorldGrid.Storages.TryGetValue(nc, out var s) && s != null && s.accepts == item && counted.Add(s)) n += s.Store.Count(item);
+                if (WorldGrid.Collectors.TryGetValue(nc, out var p) && p != null && p.produces == item && counted.Add(p)) n += p.Buffer.Count(item);
+                if (WorldGrid.Workshops.TryGetValue(nc, out var w) && w != null && w != this && w.output == item && counted.Add(w)) n += w.Buffer.Count(item);
             }
             return n;
         }
 
-        /// <summary>Pull `amount` of `item` from adjacent storages / machines.</summary>
+        /// <summary>Pull `amount` of `item` from storages / machines adjacent to the footprint.</summary>
         private void AdjacentConsume(ItemDefinition item, int amount)
         {
             int rem = amount;
-            foreach (var d in _dirs)
+            foreach (var nc in Neighbours())
             {
                 if (rem <= 0) return;
-                var nc = _gridCell + Belt.Step(d);
                 if (WorldGrid.Storages.TryGetValue(nc, out var s) && s != null && s.accepts == item) rem -= s.Store.RemoveUpTo(item, rem);
                 if (rem <= 0) return;
                 if (WorldGrid.Collectors.TryGetValue(nc, out var p) && p != null && p.produces == item) rem -= p.Buffer.RemoveUpTo(item, rem);

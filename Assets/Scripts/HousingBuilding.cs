@@ -22,7 +22,7 @@ namespace Caveman
         {
             var go = new GameObject(def.displayName);
             go.transform.position = new Vector3(pos.x, pos.y, 0f);
-            go.transform.localScale = Vector3.one * 1.1f;
+            go.transform.localScale = new Vector3(def.FootW * 1.1f, def.FootH * 1.1f, 1f);
 
             var sr = go.AddComponent<SpriteRenderer>();
             sr.sprite = PlaceholderArt.Square();

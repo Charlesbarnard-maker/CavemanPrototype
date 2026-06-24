@@ -28,9 +28,13 @@ namespace Caveman
         public string StaffLabel => def != null ? def.displayName : "Collector";
 
         public static readonly List<ProductionBuilding> All = new();
-        private Vector2Int _gridCell;
-        void OnEnable() { All.Add(this); _gridCell = Belt.CellOf(transform.position); WorldGrid.Collectors[_gridCell] = this; }
-        void OnDisable() { All.Remove(this); WorldGrid.Remove(WorldGrid.Collectors, _gridCell, this); }
+        private List<Vector2Int> _cells; // every grid cell this building occupies
+        void OnEnable() { All.Add(this); }
+        void OnDisable()
+        {
+            All.Remove(this);
+            if (_cells != null) foreach (var c in _cells) WorldGrid.Remove(WorldGrid.Collectors, c, this);
+        }
 
         // Rolling gather-rate estimate (units/min), recorded by this collector's workers.
         private int _producedWindow;
@@ -49,7 +53,7 @@ namespace Caveman
         {
             var go = new GameObject(def.displayName);
             go.transform.position = new Vector3(pos.x, pos.y, 0f);
-            go.transform.localScale = Vector3.one * 0.9f;
+            go.transform.localScale = new Vector3(def.FootW * 0.9f, def.FootH * 0.9f, 1f);
 
             var sr = go.AddComponent<SpriteRenderer>();
             sr.sprite = PlaceholderArt.Square();
@@ -65,6 +69,8 @@ namespace Caveman
             pb.interval = def.interval;
             pb.maxWorkers = Mathf.Max(1, def.maxWorkers);
             pb.Buffer = new Inventory { capacity = Mathf.Max(1, def.capacity) };
+            pb._cells = Footprint.Cells(go.transform.position, def.FootW, def.FootH);
+            foreach (var c in pb._cells) WorldGrid.Collectors[c] = pb;
             pb.Bind();
             return pb;
         }

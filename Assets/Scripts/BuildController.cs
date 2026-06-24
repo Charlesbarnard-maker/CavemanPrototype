@@ -170,19 +170,20 @@ namespace Caveman
             if (_cam == null || mouse == null || _ghost == null) return;
 
             var def = buildables[PendingIndex];
-            Vector3 world = _cam.ScreenToWorldPoint(mouse.position.ReadValue());
-            world.x = Mathf.Round(world.x); // snap buildings to the same grid as belts
-            world.y = Mathf.Round(world.y);
+            Vector3 raw = _cam.ScreenToWorldPoint(mouse.position.ReadValue());
+            // Snap to a valid CENTRE for this footprint (half-integer for even sizes).
+            Vector3 world = Footprint.SnapCenter(raw, def.FootW, def.FootH);
             world.z = 0f;
             _ghost.transform.position = world;
             _ghost.transform.rotation = Quaternion.identity;
             _ghostSr.sprite = PlaceholderArt.Square();
-            _ghost.transform.localScale = Vector3.one * (def.kind == BuildingKind.Collector ? 0.9f : 1.1f);
+            float gb = def.kind == BuildingKind.Collector ? 0.9f : 1.0f;
+            _ghost.transform.localScale = new Vector3(def.FootW * gb, def.FootH * gb, 1f);
 
             bool affordable = Economy.CanAfford(def.cost, Carried);
             bool placeOk = def.kind != BuildingKind.Collector
                            || HasMatchingNodeNear(world, def.item, placeNodeRange);
-            bool free = !CellOccupied(world);
+            bool free = !FootprintBlocked(world, def);
             PlacementValid = affordable && placeOk && free;
 
             // Clear green = OK, red = not OK (don't tint by the building's own colour,
@@ -195,7 +196,7 @@ namespace Caveman
             // keep stamping. Right-click / Esc finishes. One building per grid cell.
             if (mouse.leftButton.isPressed && PlacementValid)
             {
-                var cell = new Vector2Int(Mathf.RoundToInt(world.x), Mathf.RoundToInt(world.y));
+                var cell = Footprint.Anchor(world, def.FootW, def.FootH);
                 if (!_dragging || cell != _dragLast)
                 {
                     if (Economy.FreeBuild) ConstructionSite.SpawnFinished(def, world); // sandbox: instant
@@ -207,6 +208,14 @@ namespace Caveman
             }
             if (!mouse.leftButton.isPressed) _dragging = false;
             if (mouse.rightButton.wasPressedThisFrame) CancelPlacement();
+        }
+
+        // True if ANY cell this footprint would cover is already taken.
+        private bool FootprintBlocked(Vector3 center, BuildingDefinition def)
+        {
+            foreach (var c in Footprint.Cells(center, def.FootW, def.FootH))
+                if (CellOccupied(new Vector3(c.x, c.y, 0f))) return true;
+            return false;
         }
 
         private bool CellOccupied(Vector3 world)

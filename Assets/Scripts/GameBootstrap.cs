@@ -97,6 +97,7 @@ namespace Caveman
             // Generic warehouse: the player picks what it stores (e.g. Planks, Cooked Food).
             var warehouse = MakeStorage("Warehouse", null, 120, new Color(0.55f, 0.52f, 0.45f),
                 new ItemAmount(wood, 10)); warehouse.configurable = true;
+            warehouse.footprintW = 2; warehouse.footprintH = 2; // TEST: first multi-cell building
             var house = MakeHousing("House", 2, new Color(0.72f, 0.62f, 0.45f),
                 new ItemAmount(wood, 8), new ItemAmount(stone, 4), new ItemAmount(planks, 3));
             // Long-distance logistics: depots + caravan routes (replaces the old haulers).
@@ -171,6 +172,7 @@ namespace Caveman
             var smelter = MakeWorkshop("Smelter", metal, 1, 3.5f, 2, 12, new Color(0.55f, 0.50f, 0.50f),
                 new List<ItemAmount> { new ItemAmount(ore, 1), new ItemAmount(charcoal, 1) },
                 new ItemAmount(stone, 10), new ItemAmount(clay, 6)); smelter.unlockAge = 2;
+            smelter.footprintW = 2; smelter.footprintH = 2; // TEST: multi-cell workshop
             // Toolmaker: Metal + Planks -> Tools (an Iron-age comfort good).
             var toolmaker = MakeWorkshop("Toolmaker", tools, 1, 4.0f, 2, 12, new Color(0.50f, 0.55f, 0.60f),
                 new List<ItemAmount> { new ItemAmount(metal, 1), new ItemAmount(planks, 1) },

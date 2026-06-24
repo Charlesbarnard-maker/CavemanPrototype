@@ -284,7 +284,7 @@ namespace Caveman
                     : Color.Lerp(new Color(0.5f, 0.5f, 0.62f), new Color(0.9f, 0.8f, 0.3f), fill);
                 Dot(s.transform.position, sc, 3f);
             }
-            foreach (var dp in WorldGrid.Depots.Values) if (dp != null) Dot(dp.transform.position, new Color(0.5f, 0.8f, 0.9f), 4f);
+            foreach (var dp in Depot.All) if (dp != null) Dot(dp.transform.position, new Color(0.5f, 0.8f, 0.9f), 4f);
             // Collectors/workshops are coloured by live status, so starved (red) or
             // backed-up (yellow) buildings stand out across a sprawling base.
             foreach (var p in ProductionBuilding.All) if (p != null) Dot(p.transform.position, p.StatusColor, 4f);

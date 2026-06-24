@@ -37,7 +37,8 @@ namespace Caveman
         {
             var go = new GameObject("Site: " + def.displayName);
             go.transform.position = new Vector3(pos.x, pos.y, 0f);
-            go.transform.localScale = Vector3.one * (def.kind == BuildingKind.Collector ? 0.9f : 1.1f);
+            float sb = def.kind == BuildingKind.Collector ? 0.9f : 1.1f;
+            go.transform.localScale = new Vector3(def.FootW * sb, def.FootH * sb, 1f); // cover the footprint
 
             var sr = go.AddComponent<SpriteRenderer>();
             sr.sprite = PlaceholderArt.Square();

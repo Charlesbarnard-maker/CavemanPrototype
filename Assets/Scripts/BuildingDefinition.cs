@@ -53,6 +53,14 @@ namespace Caveman
         [Tooltip("How many people this houses (adds to population cap).")]
         public int houseCapacity = 0;
 
+        [Header("Footprint")]
+        [Tooltip("Building width in grid cells (1 = a single cell).")]
+        public int footprintW = 1;
+        [Tooltip("Building height in grid cells (1 = a single cell).")]
+        public int footprintH = 1;
+        public int FootW => Mathf.Max(1, footprintW);
+        public int FootH => Mathf.Max(1, footprintH);
+
         [Header("Capacity")]
         [Tooltip("Collector buffer size, or storage size.")]
         public int capacity = 10;

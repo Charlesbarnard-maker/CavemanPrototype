@@ -16,7 +16,7 @@ namespace Caveman
         public Inventory store;
 
         public static readonly List<Depot> All = new();
-        private Vector2Int _cell;
+        private List<Vector2Int> _cells; // every grid cell this building occupies
         private SpriteRenderer _sr;
         private Color _baseColor;
 
@@ -24,7 +24,7 @@ namespace Caveman
         {
             var go = new GameObject(def.displayName);
             go.transform.position = new Vector3(pos.x, pos.y, 0f);
-            go.transform.localScale = Vector3.one * 1.1f;
+            go.transform.localScale = new Vector3(def.FootW * 1.1f, def.FootH * 1.1f, 1f);
 
             var sr = go.AddComponent<SpriteRenderer>();
             sr.sprite = PlaceholderArt.Square();
@@ -39,11 +39,17 @@ namespace Caveman
             d.store = new Inventory { capacity = Mathf.Max(1, def.capacity) };
             d._sr = sr;
             d._baseColor = def.color;
+            d._cells = Footprint.Cells(go.transform.position, def.FootW, def.FootH);
+            foreach (var c in d._cells) WorldGrid.Depots[c] = d;
             return d;
         }
 
-        void OnEnable() { All.Add(this); _cell = Belt.CellOf(transform.position); WorldGrid.Depots[_cell] = this; }
-        void OnDisable() { All.Remove(this); WorldGrid.Remove(WorldGrid.Depots, _cell, this); }
+        void OnEnable() { All.Add(this); }
+        void OnDisable()
+        {
+            All.Remove(this);
+            if (_cells != null) foreach (var c in _cells) WorldGrid.Remove(WorldGrid.Depots, c, this);
+        }
 
         /// <summary>Choose which resource this depot handles (only while empty).</summary>
         public void CycleItem()

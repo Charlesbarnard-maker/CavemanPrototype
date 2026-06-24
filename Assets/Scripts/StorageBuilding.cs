@@ -29,9 +29,13 @@ namespace Caveman
         }
 
         public static readonly List<StorageBuilding> All = new();
-        private Vector2Int _gridCell;
-        void OnEnable() { All.Add(this); _gridCell = Belt.CellOf(transform.position); WorldGrid.Storages[_gridCell] = this; }
-        void OnDisable() { All.Remove(this); WorldGrid.Remove(WorldGrid.Storages, _gridCell, this); }
+        private List<Vector2Int> _cells; // every grid cell this building occupies
+        void OnEnable() { All.Add(this); }
+        void OnDisable()
+        {
+            All.Remove(this);
+            if (_cells != null) foreach (var c in _cells) WorldGrid.Remove(WorldGrid.Storages, c, this);
+        }
 
         private SpriteRenderer _sr;
         private Color _baseColor;
@@ -40,7 +44,7 @@ namespace Caveman
         {
             var go = new GameObject(def.displayName);
             go.transform.position = new Vector3(pos.x, pos.y, 0f);
-            go.transform.localScale = Vector3.one * 1.0f;
+            go.transform.localScale = new Vector3(def.FootW, def.FootH, 1f);
 
             var sr = go.AddComponent<SpriteRenderer>();
             sr.sprite = PlaceholderArt.Square();
@@ -54,6 +58,8 @@ namespace Caveman
             sb.accepts = def.item; // null for a configurable warehouse until the player sets it
             sb.configurable = def.configurable;
             sb.Store = new Inventory { capacity = Mathf.Max(1, def.capacity) };
+            sb._cells = Footprint.Cells(go.transform.position, def.FootW, def.FootH);
+            foreach (var c in sb._cells) WorldGrid.Storages[c] = sb;
             return sb;
         }
 
