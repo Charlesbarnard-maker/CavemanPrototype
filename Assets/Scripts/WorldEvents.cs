@@ -12,11 +12,12 @@ namespace Caveman
     {
         [System.NonSerialized] public Inventory carried; // player's carried inventory
         public ItemDefinition food, wood, stone;
-        public float minGap = 55f;
-        public float maxGap = 105f;
+        public float minGap = 140f;
+        public float maxGap = 280f;
 
         private float _t;
         private float _next;
+        private int _last = -1; // don't fire the same event twice in a row
 
         void Start() => _next = Random.Range(minGap, maxGap);
 
@@ -32,7 +33,10 @@ namespace Caveman
         private void Fire()
         {
             var col = Colony.Instance;
-            switch (Random.Range(0, 5))
+            int kind = Random.Range(0, 5);
+            if (kind == _last) kind = (kind + 1) % 5; // avoid back-to-back repeats
+            _last = kind;
+            switch (kind)
             {
                 case 0: // bountiful harvest
                     if (carried != null && food != null)

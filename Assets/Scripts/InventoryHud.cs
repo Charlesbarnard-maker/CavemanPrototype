@@ -829,7 +829,12 @@ namespace Caveman
         private static bool HasCollector(string itemId)
         {
             foreach (var p in ProductionBuilding.All)
-                if (p.produces != null && p.produces.id == itemId) return true;
+                if (p != null && p.produces != null && p.produces.id == itemId) return true;
+            // Count one that's been PLACED but is still building, so the finder arrow
+            // disappears the moment you commit a collector — not when it finishes.
+            foreach (var cs in ConstructionSite.All)
+                if (cs != null && cs.def != null && cs.def.kind == BuildingKind.Collector
+                    && cs.def.item != null && cs.def.item.id == itemId) return true;
             return false;
         }
 
