@@ -207,6 +207,7 @@ namespace Caveman
             hud.stoneItem = stone;
             hud.foodItem = food;
             hud.waterItem = water;
+            hud.monumentItem = monument;
             hud.debugItems = new List<ItemDefinition>
             { wood, stone, food, water, planks, cookedFood, meat, clay, charcoal, bricks, grain, flour, bread, ore, metal, tools };
 

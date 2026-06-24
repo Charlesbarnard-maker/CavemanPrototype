@@ -15,6 +15,7 @@ namespace Caveman
         public PlayerGatherer gatherer;
         public BuildController builder;
         public ItemDefinition woodItem, stoneItem, foodItem, waterItem;
+        public ItemDefinition monumentItem; // endgame win-goal tracker (10 blocks = win)
         public List<ItemDefinition> debugItems; // all resources, for the sandbox resource dump
         private float _speed = 1f;
 
@@ -224,7 +225,7 @@ namespace Caveman
         // ---- Status (population) ----
         private void DrawStatus()
         {
-            GUILayout.BeginArea(new Rect(12, 36, 620, 28));
+            GUILayout.BeginArea(new Rect(12, 36, Mathf.Max(620f, Screen.width - 320f), 28));
             var c = Colony.Instance;
             if (c != null)
             {
@@ -236,7 +237,19 @@ namespace Caveman
                 string prodCol = prod >= 100 ? "#9cf" : "#f99";
                 int happy = Mathf.RoundToInt(c.Happiness * 100f);
                 string happyCol = happy >= 80 ? "#9f9" : happy >= 50 ? "#ffd24d" : "#f99";
-                GUILayout.Label($"<b>Population</b> {c.Population}/{c.Capacity}   <b>Working</b> {working}   <b>Free</b> {c.FreeWorkers}   <color=#cda>{c.AgeName}</color>   <color={prodCol}>Output {prod}%</color>   <color={happyCol}>Happy {happy}%</color>   <color=#ffcf6b>Prosperity {c.Prosperity}</color>{flags}", _s);
+
+                // Monument progress (endgame): only shown once a Monument exists or blocks
+                // are held. Uses the per-frame cached totals — no extra pool scan.
+                string monu = "";
+                if (monumentItem != null)
+                {
+                    int mb = 0; if (_totals != null) _totals.TryGetValue(monumentItem, out mb);
+                    bool hasMon = false;
+                    foreach (var w in WorkshopBuilding.All) if (w != null && w.output == monumentItem) { hasMon = true; break; }
+                    if (hasMon || mb > 0) monu = $"   <color=#ffe08a>Monument {Mathf.Min(mb, 10)}/10</color>";
+                }
+
+                GUILayout.Label($"<b>Population</b> {c.Population}/{c.Capacity}   <b>Working</b> {working}   <b>Free</b> {c.FreeWorkers}   <color=#cda>{c.AgeName}</color>   <color={prodCol}>Output {prod}%</color>   <color={happyCol}>Happy {happy}%</color>   <color=#ffcf6b>Prosperity {c.Prosperity}</color>{monu}{flags}", _s);
             }
             GUILayout.EndArea();
         }
@@ -557,7 +570,7 @@ namespace Caveman
 
         private void DrawHelp()
         {
-            var r = new Rect(Screen.width / 2f - 240, Screen.height / 2f - 175, 480, 360);
+            var r = new Rect(Screen.width / 2f - 240, Screen.height / 2f - 200, 480, 410);
             GUI.Box(r, GUIContent.none);
             GUILayout.BeginArea(new Rect(r.x + 16, r.y + 12, r.width - 32, r.height - 24));
             GUILayout.Label("<b>How to play</b>", _s);
@@ -571,6 +584,9 @@ namespace Caveman
                 "• Click a building to manage it (workers, demolish).\n" +
                 "• People need Food + Housing. Space = pause, Esc = cancel, X = demolish.\n" +
                 "• Hold-drag to place a row of buildings; C copies the selected building's type.\n" +
+                "• <b>Prosperity</b> (status bar) climbs with population, happiness & automation.\n" +
+                "• <b>Goal:</b> reach the Industrial Age, build the <b>Monument</b>, and make " +
+                "10 Monument Blocks to <color=#ffd24d>WIN</color>.\n" +
                 "• Status dots: <color=#6c6>green</color>=working, <color=#fd4>yellow</color>=output full, " +
                 "<color=#f66>red</color>=no input, <color=#999>grey</color>=no worker.\n" +
                 "\n<b>Sandbox:</b> F1 +resources · F2 +5 people · F3 advance age · " +
