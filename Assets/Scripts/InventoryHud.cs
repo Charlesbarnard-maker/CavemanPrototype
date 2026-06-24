@@ -552,6 +552,9 @@ namespace Caveman
                     rem = GUILayout.Button("- worker", GUILayout.Height(28));
                     add = GUILayout.Button("+ worker", GUILayout.Height(28));
                     GUILayout.EndHorizontal();
+                    if (staff.AssignedWorkers < staff.MaxWorkers
+                        && GUILayout.Button("<size=12>Fill (assign free workers)</size>", _btn))
+                        for (int k = 0; k < 64 && staff.TryAssign(); k++) { }
                 }
                 if (th != null)
                 {
