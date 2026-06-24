@@ -694,7 +694,7 @@ namespace Caveman
             _finderRect = rect;
             PanelBg(rect);
             GUILayout.BeginArea(new Rect(rect.x + 10, rect.y + 6, rect.width - 20, rect.height - 12));
-            GUILayout.Label("<size=12><b>Find &amp; build collectors:</b></size>", _small);
+            GUILayout.Label("<size=12><b>Find + build collectors:</b></size>", _small);
             foreach (var l in lines) GUILayout.Label($"<size=14>{l}</size>", _small);
             GUILayout.EndArea();
         }
