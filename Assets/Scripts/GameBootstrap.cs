@@ -189,7 +189,7 @@ namespace Caveman
             cam.backgroundColor = new Color(0.16f, 0.19f, 0.16f);
 
             // --- Ground backdrop (behind everything; revealed as the fog clears) ---
-            MakeSprite("Ground", new Color(0.22f, 0.31f, 0.19f), Vector2.zero, 220f, -100, PlaceholderArt.Square());
+            MakeSprite("Ground", Color.white, Vector2.zero, 220f, -100, PlaceholderArt.Ground(new Color(0.22f, 0.31f, 0.19f)));
 
             // --- Player ---
             var player = MakeSprite("Player", new Color(0.92f, 0.82f, 0.25f), Vector2.zero, 0.7f, 10, PlaceholderArt.Circle());

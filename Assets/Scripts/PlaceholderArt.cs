@@ -12,6 +12,29 @@ namespace Caveman
         private static Sprite _circle;
         private static Sprite _triangle;
         private static Sprite _hexagon;
+        private static Sprite _ground;
+
+        /// <summary>A soft Perlin-noise ground sprite (organic tonal variation, baked colour)
+        /// so the world doesn't read as one flat slab. Deterministic — no Random.</summary>
+        public static Sprite Ground(Color baseCol)
+        {
+            if (_ground != null) return _ground;
+            const int s = 256;
+            var tex = new Texture2D(s, s) { filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Clamp };
+            var px = new Color[s * s];
+            for (int y = 0; y < s; y++)
+                for (int x = 0; x < s; x++)
+                {
+                    float n = Mathf.PerlinNoise(x / (float)s * 4f, y / (float)s * 4f);
+                    float n2 = Mathf.PerlinNoise(x / (float)s * 12f + 10f, y / (float)s * 12f + 5f);
+                    float v = 0.85f + 0.22f * n + 0.06f * n2; // ~0.85 .. 1.13
+                    px[y * s + x] = new Color(baseCol.r * v, baseCol.g * v, baseCol.b * v, 1f);
+                }
+            tex.SetPixels(px);
+            tex.Apply();
+            _ground = Sprite.Create(tex, new Rect(0, 0, s, s), new Vector2(0.5f, 0.5f), s);
+            return _ground;
+        }
 
         public static Sprite Square()
         {
