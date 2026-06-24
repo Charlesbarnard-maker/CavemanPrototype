@@ -32,6 +32,8 @@ namespace Caveman
         private bool _showMinimap = true;
         private Texture2D _panelTex; // dark panel background for readability
         private Dictionary<ItemDefinition, int> _totals;
+        private readonly Dictionary<string, int> _trendSnap = new(); // chip values ~3s ago (for ▲/▼)
+        private float _lastSnap = -999f;
         private Rect _topRect, _miniRect, _objRect;
         private readonly List<(string label, int value, string detail, Color color)> _chips = new();
         private GUIStyle _toast;
@@ -182,17 +184,24 @@ namespace Caveman
             var mp = Event.current.mousePosition;
             float x = 12f;
             int hover = -1; Rect hoverRect = default;
+            bool snap = Time.unscaledTime - _lastSnap >= 3f; // refresh the trend baseline every ~3s
             for (int i = 0; i < _chips.Count; i++)
             {
                 var c = _chips[i];
                 string hex = ColorUtility.ToHtmlStringRGB(c.color);
-                string text = $"<color=#{hex}>■</color> <b>{c.label}</b> {K(c.value)}";
+                // Trend vs the last snapshot: ▲ growing, ▼ shrinking (deficit warning).
+                string arrow = "";
+                if (_trendSnap.TryGetValue(c.label, out int prev))
+                    arrow = c.value > prev ? " <color=#7d7>▲</color>" : c.value < prev ? " <color=#e96>▼</color>" : "";
+                if (snap) _trendSnap[c.label] = c.value;
+                string text = $"<color=#{hex}>■</color> <b>{c.label}</b> {K(c.value)}{arrow}";
                 float w = _small.CalcSize(new GUIContent(text)).x + 18f;
                 var r = new Rect(x, 5f, w, 22f);
                 GUI.Label(r, text, _small);
                 if (r.Contains(mp)) { hover = i; hoverRect = r; }
                 x += w;
             }
+            if (snap) _lastSnap = Time.unscaledTime;
             _topRect = new Rect(0, 0, Screen.width, 30);
 
             if (hover >= 0 && _chips[hover].detail != null)
