@@ -87,6 +87,16 @@ no Inspector wiring). Scripts in `Assets/Scripts/`:
   the player (`CameraFollow`); HUD via `OnGUI` (`InventoryHud`).
 
 ## Recently built
+- **In-game info completeness.** Every building now has a full build-menu tooltip
+  (auto-generated for all kinds — Depot/Route were blank — plus hand-written strategic
+  notes for ~11 key buildings via `BuildingDefinition.description`). Every item has a
+  `description`. New **in-game Guide (key G)**: scrollable reference covering the goal,
+  local-logistics rule, people/comfort/happiness, prosperity/rank, ages, bottlenecks,
+  expansion — and a per-resource list (what it is, source, use). Discoverable from the
+  help overlay + welcome toast.
+- **Fixed:** Build Settings pointed at a deleted `SampleScene.unity`, so the project
+  opened a blank scene (blue screen). Now points at `Assets/UnitySave.unity` (the real
+  game scene, built at runtime by `GameBootstrap`). To run: open that scene, press Play.
 - **Visual / UX organisation pass.** Fixed the minimap drawing over panels (+ **N** to hide
   it); consistent **dark panel** backgrounds; manage panel shows a plain-language **status
   line** + **Pause/Resume**; **Perlin-noise ground** (not a flat slab); status dots **pulse**
