@@ -41,6 +41,8 @@ namespace Caveman
             // Exploration payoff: gems (rare, far) -> jewelry, a required Monument ingredient.
             var gems = MakeItem("gems", "Gems", new Color(0.55f, 0.85f, 0.80f));
             var jewelry = MakeItem("jewelry", "Jewelry", new Color(0.90f, 0.80f, 0.40f));
+            // Masonry: gives Stone its own processing chain (like Wood -> Planks).
+            var stoneBlock = MakeItem("stoneblock", "Stone Block", new Color(0.58f, 0.60f, 0.66f));
 
             // --- Buildings ---
             var woodHut = MakeCollector("Wood Hut", wood, 1, 2.0f, 2, 12, new Color(0.80f, 0.52f, 0.25f),
@@ -116,6 +118,12 @@ namespace Caveman
                 new ItemAmount(planks, 5), new ItemAmount(bricks, 4)); bakery.unlockAge = 2;
             var brickStore = MakeStorage("Brick Yard", bricks, 100, new Color(0.66f, 0.40f, 0.34f),
                 new ItemAmount(wood, 8)); brickStore.unlockAge = 2;
+            // Masonry: Stone -> Stone Blocks, used for sturdy housing.
+            var mason = MakeWorkshop("Mason", stoneBlock, 1, 3.0f, 2, 12, new Color(0.58f, 0.60f, 0.66f),
+                new List<ItemAmount> { new ItemAmount(stone, 2) },
+                new ItemAmount(wood, 6), new ItemAmount(stone, 4)); mason.unlockAge = 2;
+            var stoneHouse = MakeHousing("Stone House", 6, new Color(0.62f, 0.64f, 0.70f),
+                new ItemAmount(stoneBlock, 6), new ItemAmount(planks, 4)); stoneHouse.unlockAge = 2;
             var woodBelt = ScriptableObject.CreateInstance<BuildingDefinition>();
             woodBelt.displayName = "Wooden Belt"; woodBelt.kind = BuildingKind.Belt; woodBelt.unlockAge = 0;
             woodBelt.interval = 1.1f; // slow — the early tier
@@ -194,7 +202,7 @@ namespace Caveman
             { woodHut, stonePit, foragerHut, waterHole, sawmill, campfire,
               woodStore, stoneStore, foodStore, waterStore, warehouse, house,
               hunter, clayPit, charcoalBurner, clayStore, smokehouse, longhouse,
-              kiln, farm, mill, bakery, brickStore, woodBelt, fastBelt,
+              kiln, farm, mill, bakery, brickStore, mason, stoneHouse, woodBelt, fastBelt,
               mine, oreStore, smelter, toolmaker, monumentBldg,
               potter, cottonFarm, weaver, tailor, gemMine, jeweler,
               depot, caravan, oxCart, wagonTrain, cargoDrone };
@@ -247,7 +255,7 @@ namespace Caveman
             hud.waterItem = water;
             hud.monumentItem = monument;
             hud.debugItems = new List<ItemDefinition>
-            { wood, stone, food, water, planks, cookedFood, meat, clay, charcoal, bricks, grain, flour, bread, ore, metal, tools, monument, fiber, cloth, clothes, pot, gems, jewelry };
+            { wood, stone, food, water, planks, cookedFood, meat, clay, charcoal, bricks, grain, flour, bread, ore, metal, tools, monument, fiber, cloth, clothes, pot, gems, jewelry, stoneBlock };
 
             // --- Guided objectives ladder (the "what next / why advance" hook) ---
             var carriedInv = gatherer.Inventory;
@@ -272,6 +280,7 @@ namespace Caveman
                 new Quest { title = "Advance to the Bronze Age",         done = () => AgeNow() >= 2,         reward = () => carriedInv.Add(stone, 30), rewardText = "+30 Stone" },
                 new Quest { title = "Bake 15 Bread",                     done = () => Have(bread) >= 15,     reward = () => carriedInv.Add(planks, 20),rewardText = "+20 Planks" },
                 new Quest { title = "Make 10 Pottery (a Bronze comfort)", done = () => Have(pot) >= 10,       reward = () => carriedInv.Add(clay, 20), rewardText = "+20 Clay" },
+                new Quest { title = "Cut 15 Stone Blocks (Masonry)",      done = () => Have(stoneBlock) >= 15, reward = () => carriedInv.Add(stone, 25), rewardText = "+25 Stone" },
                 new Quest { title = "Explore far & mine 25 Ore",         done = () => Have(ore) >= 25,       reward = () => carriedInv.Add(stone, 40), rewardText = "+40 Stone" },
                 new Quest { title = "Smelt 20 Metal",                    done = () => Have(metal) >= 20,     reward = () => carriedInv.Add(stone, 40), rewardText = "+40 Stone" },
                 new Quest { title = "Advance to the Iron Age",           done = () => AgeNow() >= 3,         reward = () => carriedInv.Add(planks, 40),rewardText = "+40 Planks" },
@@ -313,6 +322,12 @@ namespace Caveman
                 new Vector2(46f, 34f), new Vector2(12f, 12f), new Vector2(1.1f, 1.5f), PlaceholderArt.Hexagon(), 60, 26f, 0);
             SpawnPatches("Ore Vein", ore, new Color(0.62f, 0.58f, 0.42f), 4,
                 new Vector2(-46f, -34f), new Vector2(12f, 12f), new Vector2(1.1f, 1.5f), PlaceholderArt.Hexagon(), 60, 26f, 0);
+
+            // --- Welcome / starter guidance (fades after a few seconds) ---
+            Toast.Show("<color=#ffd24d>Welcome, chief!</color>  Click trees & rocks to gather by hand.");
+            Toast.Show("<size=15>Goal: grow from caveman to a self-running civilisation — build the Monument to win.</size>");
+            Toast.Show("<size=14>Press <b>H</b> for help · <b>B</b> to build · follow the Objectives (top-right).</size>");
+
             // Gem deposits — rarest, farthest (a third exploration direction), finite.
             SpawnPatches("Gem Deposit", gems, new Color(0.50f, 0.82f, 0.76f), 3,
                 new Vector2(48f, -42f), new Vector2(10f, 10f), new Vector2(1.0f, 1.4f), PlaceholderArt.Hexagon(), 45, 32f, 0);
