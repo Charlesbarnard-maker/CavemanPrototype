@@ -388,9 +388,12 @@ namespace Caveman
                 }
                 else
                 {
-                    string ok = builder.PlacementValid ? "<color=#9f9>click to place</color>" : "<color=#f99>move to a valid spot</color>";
+                    bool isColl = def.kind == BuildingKind.Collector;
+                    string bad = isColl ? $"<color=#f99>move onto a glowing {Name(def.item)} patch</color>" : "<color=#f99>move to a clear spot</color>";
+                    string ok = builder.PlacementValid ? "<color=#9f9>green = click to place</color>" : bad;
                     GUILayout.Label($"<b>Placing {def.displayName}</b> — {ok}", _s);
-                    GUILayout.Label("<size=14>right-click / Esc to cancel</size>", _small);
+                    string hint = isColl ? $"<color=#cda>Must sit next to a {Name(def.item)} source — the {Name(def.item)} patches are glowing.</color>  " : "";
+                    GUILayout.Label($"<size=14>{hint}right-click / Esc to cancel</size>", _small);
                 }
                 GUILayout.EndArea();
                 return;

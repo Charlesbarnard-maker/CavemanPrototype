@@ -41,6 +41,11 @@ namespace Caveman
         void Update()
         {
             UpdateHighlight();
+            // While placing a collector, make its target resource patches glow so it's
+            // obvious where it must go. Cleared whenever we're not placing a collector.
+            var pd = PendingDef;
+            SetResourceHighlight(pd != null && pd.kind == BuildingKind.Collector ? pd.item : null);
+
             if (_cam == null) _cam = Camera.main;
             var kb = Keyboard.current;
             var mouse = Mouse.current;
@@ -95,6 +100,20 @@ namespace Caveman
             if (def == null) return;
             int idx = buildables.IndexOf(def);
             if (idx >= 0 && IsUnlocked(def)) BeginPlacement(idx);
+        }
+
+        // Glow all resource patches of a given type (the collector's target); pass null to clear.
+        private ItemDefinition _highlightItem;
+        private void SetResourceHighlight(ItemDefinition item)
+        {
+            if (item == _highlightItem) return;
+            if (_highlightItem != null)
+                foreach (var n in ResourceNode.All)
+                    if (n != null && n.yields == _highlightItem) n.SetHighlighted(false);
+            _highlightItem = item;
+            if (_highlightItem != null)
+                foreach (var n in ResourceNode.All)
+                    if (n != null && n.yields == _highlightItem) n.SetHighlighted(true);
         }
 
         // A soft glowing square behind the selected building so it's obvious what's selected.
@@ -166,9 +185,11 @@ namespace Caveman
             bool free = !CellOccupied(world);
             PlacementValid = affordable && placeOk && free;
 
+            // Clear green = OK, red = not OK (don't tint by the building's own colour,
+            // which can look like the red "invalid" state — that was the confusion).
             _ghostSr.color = PlacementValid
-                ? new Color(def.color.r, def.color.g, def.color.b, 0.55f)
-                : new Color(1f, 0.3f, 0.3f, 0.45f);
+                ? new Color(0.35f, 1f, 0.4f, 0.55f)
+                : new Color(1f, 0.3f, 0.3f, 0.5f);
 
             // Hold-and-drag to place a whole row; stays in placement mode so you can
             // keep stamping. Right-click / Esc finishes. One building per grid cell.
@@ -228,8 +249,8 @@ namespace Caveman
             bool free = Belt.At(cell) == null;
             PlacementValid = affordable && free;
             _ghostSr.color = PlacementValid
-                ? new Color(def.color.r, def.color.g, def.color.b, 0.6f)
-                : new Color(1f, 0.3f, 0.3f, 0.45f);
+                ? new Color(0.35f, 1f, 0.4f, 0.6f)
+                : new Color(1f, 0.3f, 0.3f, 0.5f);
 
             if (!mouse.leftButton.isPressed) _dragging = false;
 
