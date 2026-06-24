@@ -264,25 +264,68 @@ namespace Caveman
 
             if (!mouse.leftButton.isPressed) _dragging = false;
 
-            if (mouse.leftButton.isPressed && PlacementValid)
+            if (mouse.leftButton.isPressed)
             {
-                if (_dragging && Adjacent(cell, _dragLast))
+                if (!_dragging)
                 {
-                    var prev = Belt.At(_dragLast);
-                    if (prev != null) prev.SetDir(Belt.FromTo(_dragLast, cell)); // corner: previous flows into this
-                    dir = Belt.FromTo(_dragLast, cell);
+                    EnsureBelt(cell, dir, def); // first cell (auto-oriented)
+                    _dragging = true;
+                    _dragLast = cell;
+                    BeltDir = dir;
                 }
-                Economy.Spend(def.cost, Carried);
-                Belt.Spawn(cell, dir, def.interval);
-                BuildingsPlaced++;
-                _dragging = true;
-                _dragLast = cell;
-                BeltDir = dir;
+                else if (cell != _dragLast)
+                {
+                    // Fill an L-shaped path from the last cell to here, orienting each
+                    // belt toward the next — snapped corners + full 90° lines in one drag.
+                    DragBeltPath(_dragLast, cell, def);
+                    _dragLast = cell;
+                    var here = Belt.At(cell);
+                    if (here != null) BeltDir = here.dir;
+                }
             }
             else if (mouse.rightButton.wasPressedThisFrame)
             {
                 CancelPlacement();
             }
+        }
+
+        // Place a belt at `cell` pointing `d`, or re-orient the one already there.
+        private void EnsureBelt(Vector2Int cell, Belt.Dir d, BuildingDefinition def)
+        {
+            var existing = Belt.At(cell);
+            if (existing != null) { existing.SetDir(d); return; }
+            if (!Economy.CanAfford(def.cost, Carried)) return;
+            Economy.Spend(def.cost, Carried);
+            Belt.Spawn(cell, d, def.interval);
+            BuildingsPlaced++;
+        }
+
+        // Lay an L-shaped run from `from` to `to` (longer axis first), placing/orienting a
+        // belt in every cell so each flows into the next — corners snap automatically.
+        private void DragBeltPath(Vector2Int from, Vector2Int to, BuildingDefinition def)
+        {
+            int dx = to.x - from.x, dy = to.y - from.y;
+            int sx = dx > 0 ? 1 : dx < 0 ? -1 : 0;
+            int sy = dy > 0 ? 1 : dy < 0 ? -1 : 0;
+
+            var path = new List<Vector2Int> { from };
+            var c = from;
+            if (Mathf.Abs(dx) >= Mathf.Abs(dy))
+            {
+                for (int i = 0; i < Mathf.Abs(dx); i++) { c.x += sx; path.Add(c); }
+                for (int i = 0; i < Mathf.Abs(dy); i++) { c.y += sy; path.Add(c); }
+            }
+            else
+            {
+                for (int i = 0; i < Mathf.Abs(dy); i++) { c.y += sy; path.Add(c); }
+                for (int i = 0; i < Mathf.Abs(dx); i++) { c.x += sx; path.Add(c); }
+            }
+
+            for (int i = 0; i < path.Count - 1; i++)
+                EnsureBelt(path[i], Belt.FromTo(path[i], path[i + 1]), def);
+            // The final cell continues in the last segment's direction.
+            if (path.Count >= 2)
+                EnsureBelt(path[path.Count - 1], Belt.FromTo(path[path.Count - 2], path[path.Count - 1]), def);
         }
 
         private static bool Adjacent(Vector2Int a, Vector2Int b)

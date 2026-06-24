@@ -4,6 +4,15 @@ A running record so progress/problems don't get lost. Newest first. Move items t
 **Fixed** when done. Maintained alongside the code — see DESIGN.md for the roadmap.
 
 ## Fixed
+- **2026-06-24 — Belts lost goods into dead-ends + warped at corners + corners fiddly.**
+  (1) `HasForwardTarget` treated *any belt ahead* as connected, so belts pumped goods into
+  chains that ended in empty space, draining stock into limbo. Now `LeadsToSink` walks the
+  chain and a belt only pulls if it actually reaches a storage/workshop/depot. (2) The
+  sliding item-dot always entered "from behind", so at a corner it teleported across the
+  cell — now it enters from the edge it actually arrived at (`_inDir`) and tracks the bend.
+  (3) Belt drag now lays an L-shaped path (`DragBeltPath`/`EnsureBelt`): drag from A to B and
+  every cell is placed + auto-oriented toward the next, so corners snap and you can pull full
+  90° lines in one motion.
 - **2026-06-24 — HQ (Town Hall) could be demolished.** `BuildController.DemolishSelected`
   now refuses to demolish a `HousingBuilding` flagged `isHQ` (shows a toast instead), so
   builder management and the starting pop cap can't be lost.
