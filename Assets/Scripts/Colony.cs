@@ -88,6 +88,9 @@ namespace Caveman
         /// <summary>Highest prosperity reached this game (never drops, so it always climbs).</summary>
         public int PeakProsperity { get; private set; }
 
+        private static readonly int[] ProsperityMilestones = { 250, 500, 1000, 2000, 4000 };
+        private int _nextMilestone;
+
         // On-pillar weighting: automation (collectors/workshops/belts/routes) is worth
         // more than raw headcount, because the game is about systems that run themselves.
         private int ComputeProsperity()
@@ -243,6 +246,14 @@ namespace Caveman
                 _prosperityT -= 1f;
                 Prosperity = ComputeProsperity();
                 if (Prosperity > PeakProsperity) PeakProsperity = Prosperity;
+
+                // Celebrate crossing prosperity milestones — the "one more level" hook.
+                while (_nextMilestone < ProsperityMilestones.Length
+                       && PeakProsperity >= ProsperityMilestones[_nextMilestone])
+                {
+                    Toast.Show($"<color=#ffcf6b>📈 Prosperity {ProsperityMilestones[_nextMilestone]}!</color>  <size=14>your settlement flourishes</size>");
+                    _nextMilestone++;
+                }
             }
 
             // --- Growth: needs housing space AND a real food surplus; each new

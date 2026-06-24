@@ -131,7 +131,9 @@ namespace Caveman
                     }
                     else
                     {
-                        _timer = processTime; // inputs missing — wait
+                        // Inputs missing — back off so we don't re-scan the whole pool every
+                        // frame while starved (perf); recheck roughly twice a second.
+                        _timer = Mathf.Max(0f, processTime - 0.5f);
                         _starved = true;
                     }
                 }
