@@ -1,5 +1,11 @@
 # CavemanPrototype — Design & Direction
 
+> **📐 Canonical system synthesis: [GAME_DESIGN.md](GAME_DESIGN.md)** — the master design that
+> unifies all systems (audit, consolidation, age model, interaction map, implementation order).
+> Read it first; the per-system docs (this, AGES, WORLD, LIQUIDS, CONSTRUCTION, BUILD_SYSTEMS) are
+> the detail. Headline rule it establishes: *"stored, not summoned"* — resources are only usable
+> once logistics delivers them; nothing teleports.
+
 A 2D PC automation/factory game (Unity 6, URP) where you start as a caveman doing
 everything by hand and evolve across historical ages into self-running, factory-like
 systems. Inspirations: **Factorio** (production chains), **Satisfactory** (factory
