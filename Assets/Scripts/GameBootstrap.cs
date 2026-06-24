@@ -38,6 +38,9 @@ namespace Caveman
             var cloth = MakeItem("cloth", "Cloth", new Color(0.86f, 0.84f, 0.78f));
             var clothes = MakeItem("clothes", "Clothes", new Color(0.45f, 0.55f, 0.78f));
             var pot = MakeItem("pot", "Pottery", new Color(0.74f, 0.48f, 0.36f));
+            // Exploration payoff: gems (rare, far) -> jewelry, a required Monument ingredient.
+            var gems = MakeItem("gems", "Gems", new Color(0.55f, 0.85f, 0.80f));
+            var jewelry = MakeItem("jewelry", "Jewelry", new Color(0.90f, 0.80f, 0.40f));
 
             // --- Buildings ---
             var woodHut = MakeCollector("Wood Hut", wood, 1, 2.0f, 2, 12, new Color(0.80f, 0.52f, 0.25f),
@@ -141,7 +144,7 @@ namespace Caveman
             // Endgame: the Monument (Industrial age). A long resource sink you pour the
             // top of every production chain into — completing it (10 blocks) is the win.
             var monumentBldg = MakeWorkshop("Monument", monument, 1, 6.0f, 3, 12, new Color(0.88f, 0.84f, 0.62f),
-                new List<ItemAmount> { new ItemAmount(metal, 2), new ItemAmount(tools, 1), new ItemAmount(bricks, 2), new ItemAmount(planks, 2) },
+                new List<ItemAmount> { new ItemAmount(metal, 2), new ItemAmount(tools, 1), new ItemAmount(bricks, 2), new ItemAmount(planks, 2), new ItemAmount(jewelry, 1) },
                 new ItemAmount(bricks, 20), new ItemAmount(metal, 15), new ItemAmount(tools, 8)); monumentBldg.unlockAge = 4;
 
             // --- Textiles & pottery chains (comfort goods) ---
@@ -158,6 +161,12 @@ namespace Caveman
             var tailor = MakeWorkshop("Tailor", clothes, 1, 4.0f, 2, 12, new Color(0.50f, 0.58f, 0.80f),
                 new List<ItemAmount> { new ItemAmount(cloth, 2) },
                 new ItemAmount(planks, 6), new ItemAmount(bricks, 4)); tailor.unlockAge = 4;
+            // Gems (Iron, mined from distant deposits) -> Jewelry (Industrial) for the Monument.
+            var gemMine = MakeCollector("Gem Mine", gems, 1, 3.5f, 2, 10, new Color(0.45f, 0.70f, 0.66f),
+                new ItemAmount(wood, 8), new ItemAmount(stone, 6)); gemMine.unlockAge = 3;
+            var jeweler = MakeWorkshop("Jeweler", jewelry, 1, 4.5f, 2, 10, new Color(0.85f, 0.78f, 0.45f),
+                new List<ItemAmount> { new ItemAmount(gems, 2) },
+                new ItemAmount(planks, 8), new ItemAmount(metal, 4)); jeweler.unlockAge = 4;
 
             // --- Camera (follows the player) ---
             var cam = Camera.main;
@@ -187,7 +196,7 @@ namespace Caveman
               hunter, clayPit, charcoalBurner, clayStore, smokehouse, longhouse,
               kiln, farm, mill, bakery, brickStore, woodBelt, fastBelt,
               mine, oreStore, smelter, toolmaker, monumentBldg,
-              potter, cottonFarm, weaver, tailor,
+              potter, cottonFarm, weaver, tailor, gemMine, jeweler,
               depot, caravan, oxCart, wagonTrain, cargoDrone };
 
             var follow = cam.GetComponent<CameraFollow>();
@@ -238,7 +247,7 @@ namespace Caveman
             hud.waterItem = water;
             hud.monumentItem = monument;
             hud.debugItems = new List<ItemDefinition>
-            { wood, stone, food, water, planks, cookedFood, meat, clay, charcoal, bricks, grain, flour, bread, ore, metal, tools, monument, fiber, cloth, clothes, pot };
+            { wood, stone, food, water, planks, cookedFood, meat, clay, charcoal, bricks, grain, flour, bread, ore, metal, tools, monument, fiber, cloth, clothes, pot, gems, jewelry };
 
             // --- Guided objectives ladder (the "what next / why advance" hook) ---
             var carriedInv = gatherer.Inventory;
@@ -271,6 +280,8 @@ namespace Caveman
                 new Quest { title = "Keep your people happy (90%+)",     done = () => Colony.Instance != null && Colony.Instance.Happiness >= 0.9f, reward = () => carriedInv.Add(food, 30), rewardText = "+30 Food" },
                 new Quest { title = "Advance to the Industrial Age",     done = () => AgeNow() >= 4,         reward = () => carriedInv.Add(planks, 50),rewardText = "+50 Planks" },
                 new Quest { title = "Tailor 12 Clothes (Industrial comfort)", done = () => Have(clothes) >= 12, reward = () => carriedInv.Add(tools, 6), rewardText = "+6 Tools" },
+                new Quest { title = "Prospect the far reaches for 20 Gems", done = () => Have(gems) >= 20, reward = () => carriedInv.Add(metal, 10), rewardText = "+10 Metal" },
+                new Quest { title = "Craft 10 Jewelry (the Monument needs it)", done = () => Have(jewelry) >= 10, reward = () => carriedInv.Add(planks, 30), rewardText = "+30 Planks" },
                 new Quest { title = "Build a thriving settlement: 30 people", done = () => Pop() >= 30, reward = () => carriedInv.Add(metal, 15), rewardText = "+15 Metal" },
                 new Quest { title = "Build a prosperous colony: 600 Prosperity", done = () => Colony.Instance != null && Colony.Instance.PeakProsperity >= 600, reward = () => carriedInv.Add(tools, 10), rewardText = "+10 Tools" },
                 new Quest { title = "Begin your legacy: build the Monument",      done = () => HasWorkshopOf(monument), reward = () => carriedInv.Add(planks, 40), rewardText = "+40 Planks" },
@@ -302,6 +313,9 @@ namespace Caveman
                 new Vector2(46f, 34f), new Vector2(12f, 12f), new Vector2(1.1f, 1.5f), PlaceholderArt.Hexagon(), 60, 26f, 0);
             SpawnPatches("Ore Vein", ore, new Color(0.62f, 0.58f, 0.42f), 4,
                 new Vector2(-46f, -34f), new Vector2(12f, 12f), new Vector2(1.1f, 1.5f), PlaceholderArt.Hexagon(), 60, 26f, 0);
+            // Gem deposits — rarest, farthest (a third exploration direction), finite.
+            SpawnPatches("Gem Deposit", gems, new Color(0.50f, 0.82f, 0.76f), 3,
+                new Vector2(48f, -42f), new Vector2(10f, 10f), new Vector2(1.0f, 1.4f), PlaceholderArt.Hexagon(), 45, 32f, 0);
         }
 
         // Scatters `count` patches around `center`, jittered by ±spread, random size,
