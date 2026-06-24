@@ -11,6 +11,7 @@ namespace Caveman
         public System.Action reward;
         public string rewardText;
         public bool claimed;
+        public bool isWin; // completing this quest wins the game
     }
 
     /// <summary>
@@ -22,6 +23,9 @@ namespace Caveman
     {
         public static Objectives Instance { get; private set; }
         public List<Quest> quests = new();
+
+        /// <summary>Set once the win quest is completed — drives the victory banner.</summary>
+        public bool Won { get; private set; }
 
         private float _t;
         void Awake() => Instance = this;
@@ -40,6 +44,7 @@ namespace Caveman
                 {
                     q.claimed = true;
                     q.reward?.Invoke();
+                    if (q.isWin) Won = true;
                     Toast.Show($"<color=#9f9>✔ {q.title}</color>" + (string.IsNullOrEmpty(q.rewardText) ? "" : $"   <size=15>{q.rewardText}</size>"));
                     continue;
                 }

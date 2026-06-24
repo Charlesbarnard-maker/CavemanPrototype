@@ -113,6 +113,7 @@ namespace Caveman
             DrawObjectives();
             DrawToasts();
             DrawFooter();
+            if (Objectives.Instance != null && Objectives.Instance.Won) DrawWin();
             if (_showHelp) DrawHelp();
             if (_paused) GUI.Label(new Rect(0, 60, Screen.width, 60), "<b>PAUSED</b>  <size=18>(space)</size>", _big);
 
@@ -255,7 +256,6 @@ namespace Caveman
             if (!HasCollector("food")) return "Build a Forager Hut near the bushes (bottom) — food keeps people alive.";
             if (!HasCollector("wood")) return "Build a Wood Hut near the trees.";
             if (!HasStorage("wood")) return "Build a Wood Warehouse to stockpile wood.";
-            if (TransportHub.All.Count == 0) return "Build a Mammoth Shack — its transporters carry goods from huts to storage.";
             if (HousingCount() <= 1) return "Build a House (needs Planks from a Sawmill) so your population can grow.";
             return "Settlement running! Click a building to manage its workers; expand at will.";
         }
@@ -543,6 +543,18 @@ namespace Caveman
             GUILayout.EndArea();
         }
 
+        // ---- Victory banner (shown once the Monument is completed) ----
+        private void DrawWin()
+        {
+            var r = new Rect(Screen.width / 2f - 240, 150f, 480, 140);
+            GUI.Box(r, GUIContent.none);
+            int peak = Colony.Instance != null ? Colony.Instance.PeakProsperity : 0;
+            GUILayout.BeginArea(new Rect(r.x + 16, r.y + 14, r.width - 32, r.height - 28));
+            GUILayout.Label("<color=#ffd24d><b>🏆 YOU WIN!</b></color>", _big);
+            GUILayout.Label($"<size=16>You built a self-running civilization.\nPeak Prosperity: <b>{peak}</b>   ·   <color=#bbb>keep playing if you like</color></size>", _toast);
+            GUILayout.EndArea();
+        }
+
         private void DrawHelp()
         {
             var r = new Rect(Screen.width / 2f - 240, Screen.height / 2f - 175, 480, 360);
@@ -555,7 +567,7 @@ namespace Caveman
                 "• Click a building in the Build menu (left), then click the map.\n" +
                 "• Builders (from the HQ) haul materials there, then build it.\n" +
                 "• Collectors/workshops need WORKERS — each is one person.\n" +
-                "• A Mammoth Shack's transporters carry goods from huts to storage.\n" +
+                "• Lay Belts (Bronze) — or Depots + a Caravan route — to move goods to storage.\n" +
                 "• Click a building to manage it (workers, demolish).\n" +
                 "• People need Food + Housing. Space = pause, Esc = cancel, X = demolish.\n" +
                 "• Hold-drag to place a row of buildings; C copies the selected building's type.\n" +
