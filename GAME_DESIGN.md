@@ -244,7 +244,7 @@ See the Phase 4 diagram + rule list. The load-bearing edges: **Population→dema
 ## 5. Identified Problems → Fixes (traceable)
 | # | Problem (Phase 1) | Fix (Phase 2/3) | Status |
 |---|---|---|---|
-| A | Global teleport pool vs logistics pillar | "Stored, not summoned" — one resource rule | 📝 proposed (headline) |
+| A | Global teleport pool vs logistics pillar | "Stored, not summoned" — one resource rule | ✅ BUILT (`Economy.StoredOnly`, F9; liquids carried to barrels) |
 | B | 4 logistics tools, no shared model | One Source→Carrier→Sink pattern; in-region vs cross-region rule | 🔶 mostly exists, needs framing + the boundary rule |
 | C | Middle ages decorate, don't transform | One rule-change per age (table above) | 🔶 Bronze/Industrial done; Tribal/Iron need their shift |
 | D | Forest/Hills/Power/Routes shallow | Terrain friction; regional power; multi-stop routes | 📝 expansion targets |
@@ -263,10 +263,12 @@ because they add anything.
 ---
 
 ## Recommended implementation order (turning this doc into game)
-1. **Fix A — "stored, not summoned"** (scope `Economy.Available` to stored stock). The highest-
-   leverage change; everything else assumes it. Ship behind careful early-game balancing.
+1. ✅ **Fix A — "stored, not summoned"** DONE — `Economy.StoredOnly` (carried + storages only,
+   F9 to compare); solids back up / belt to storage, liquids are worker-carried to barrels.
+   Big world (terrain half 200, ~400 units) + far frontier resources shipped alongside, so the
+   change has somewhere to play out. *Watch:* early-game balance (see Phase 5 mitigations).
 2. **Geography friction (Fix C / Phase 3.2)** — forest/hills build+move modifiers. Cheap, turns
-   geography into a whole system.
+   geography into a whole system. ← NEXT
 3. **Tribal & Iron rule-shifts (Phase 3.1)** — make the mid ages transform (labour specialisation;
    region-gating via finite resources + cross-region vehicles).
 4. **Industrial power → regional + gates pumps/belts (Phase 3.3 / Fix E).**

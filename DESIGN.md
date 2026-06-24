@@ -19,9 +19,12 @@ inefficiency → repeat. Feeling: *"I'll just fix this one thing" → 3 new prob
 
 **Root cause being fixed:** the combined **global Economy pool** let workshops pull inputs
 from anywhere instantly, making belts/layout/distance cosmetic and preventing cascades.
-**Fix (in progress):** production consumption is going **local** — workshops consume only
-belt-delivered (InBuffer) or **adjacent** storage/collector/machine inputs
-(`Economy.LocalProduction`, default on, F7 to compare). Survival + build costs stay global.
+**Fix (DONE):** production consumption is **local** — workshops consume only belt-delivered
+(InBuffer) or **adjacent** storage/collector/machine inputs (`Economy.LocalProduction`, default
+on, F7 to compare). AND survival/comfort/build now obey **"stored, not summoned"**
+(`Economy.StoredOnly`, default on, F9 to compare): the usable pool is carried + storages only,
+NOT field buffers — so field output must be delivered (belt / pipe / worker-carried liquids) to
+count. Together these make logistics matter everywhere. See [GAME_DESIGN.md](GAME_DESIGN.md).
 
 **Pressure roadmap (priority):** ①local production ✅ → ②universal depletion (expansion via
 exhaustion, *replacing* the artificial "need gems" gate) → ③throughput ceilings that bite →
@@ -261,7 +264,8 @@ no Inspector wiring). Scripts in `Assets/Scripts/`:
   **don't pull goods into a dead end** (a disconnected belt turns red and won't run).
   Two tiers: slow **Wooden Belt** (early) and faster **Conveyor Belt** (Bronze) — the
   reason to upgrade.
-- **Sandbox/test hotkeys** (F1 resources, F2 pop, F3 age, F4 free build, F5 speed).
+- **Sandbox/test hotkeys** (F1 resources, F2 pop, F3 age, F4 free build, F5 speed, F7
+  local/global production, F8 reveal map, F9 stored-only economy).
 
 ## North-star (reference)
 Target depth ≈ **Workers & Resources: Soviet Republic** logistics, but stone-age → up:
@@ -402,7 +406,8 @@ smoker/cold store) and different spoilage, feeding cooking recipes.
 
 ## Dev process
 - **Sandbox/test hotkeys** (in-play): **F1** +500 of every resource · **F2** +5 people ·
-  **F3** advance age · **F4** toggle free/instant build · **F5** cycle game speed (1/2/4×).
+  **F3** advance age · **F4** toggle free/instant build · **F5** cycle game speed (1/2/4×) ·
+  **F7** toggle local/global production · **F8** reveal whole map · **F9** toggle stored-only economy.
   Lets you jump straight to testing without grinding. (Strip or gate before release.)
 - **`KNOWN_ISSUES.md`** is the running log of bugs + cleanup items — keep it current.
 - Every few feature batches, run a quick **optimisation/redundancy pass** and append

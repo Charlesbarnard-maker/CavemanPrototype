@@ -3,6 +3,20 @@
 A running record so progress/problems don't get lost. Newest first. Move items to
 **Fixed** when done. Maintained alongside the code — see DESIGN.md for the roadmap.
 
+## Latest state + top tuning watchpoints (2026-06-24) — read first
+- **"Stored, not summoned" is LIVE** (`Economy.StoredOnly`, F9 to toggle off). Usable pool =
+  carried + storages only. **Watch early-game balance:** solids must be belted/hand-carried to
+  storage; liquids are worker-carried to a Water Barrel (so a Water Hole needs a barrel beside
+  it). Starting 90 food/90 water are in `carried`. If it feels harsh, tune starting buffers /
+  pre-place a Water Barrel, or run on F9 while tuning.
+- **Big world shipped** (terrain half 200 ≈ 400 units; fog 420; camera maxZoom 140). Frontier
+  resource clusters (incl. finite ore/gems) far out. Tune size via `TerrainGrid.Generate` half +
+  fog `worldSize` (keep them matched). Watch: river density / early reachability on the bigger map.
+- **Liquids:** pipes + pump + pipe-fed consumers + pressure(range 16)/Booster Pumps; water can't
+  ride belts (`isLiquid`). Tune pump `flowPerTick`/`range`, booster/pipe costs.
+- **Next planned (GAME_DESIGN order):** geography friction (forest/hills build+move) → Tribal/Iron
+  age rule-shifts → regional power → multi-stop routes.
+
 ## World / water — hard rules (2026-06-24, NEEDS TESTING)
 - **Water is now a HARD barrier**: player can't walk on water (`PlayerController` per-axis
   `TerrainGrid.Walkable` check), and buildings/belts can't sit on it. **Bridges** (`Bridge`,

@@ -57,15 +57,19 @@ act, not a free spread. Ties directly into the logistics tiers already in the ga
   **opens up progressively with technology**. Early you're hemmed into the basin; later ages
   literally unlock more of the map. This is the world's version of the AGES.md progression.
 
-## 5. Structured scaling (not a big empty map) 📝
+## 5. Structured scaling (not a big empty map) 🔶
+- **Big world shipped:** terrain `half` is now **200 (~400 units across, ~2.8× area)**, fog
+  `worldSize/res` 420, camera maxZoom 140 / overview 130. The start stays compact (basin 15 +
+  near resources), and **frontier resource clusters** (incl. finite ore/gems) are scattered far
+  out (±100–180) as expansion targets. With "stored, not summoned" + finite distant ore, reaching
+  and supply-lining the frontier home is the late-game economy. ✅
 - **Early:** the plains **basin** ✅ — compact, everything reachable on foot.
-- **Mid:** the basin fills; surrounding biomes (forest/hills) hold what you now need, gated by
-  terrain friction + distance → you push outward and build your first outposts.
-- **Late:** a **multi-region logistics network** — several specialised production regions
-  (forest lumber, hill metals, plains assembly) tied together by long-haul transport; the
-  world itself is the puzzle. Tie region unlocks to ages (req 4) so scale is paced, not dumped.
-- Knobs: world `half` (currently 120), basin radius (15), water/forest/hills noise thresholds,
-  and how far resource biomes sit from spawn.
+- **Mid:** the basin fills; surrounding biomes hold what you now need, gated by distance (and 📝
+  terrain friction) → you push outward and build outposts.
+- **Late:** a **multi-region logistics network** 📝 — specialised regions (forest lumber, hill
+  metals, plains assembly) tied by long-haul transport. Tie region unlocks to ages so scale is paced.
+- Knobs: `TerrainGrid.Generate` **half (200)** + fog `worldSize` (must match), basin radius (15),
+  water/forest/hills noise thresholds, frontier cluster distance.
 
 ---
 
