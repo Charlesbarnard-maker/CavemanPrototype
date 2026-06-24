@@ -5,6 +5,23 @@ everything by hand and evolve across historical ages into self-running, factory-
 systems. Inspirations: **Factorio** (production chains), **Satisfactory** (factory
 scaling), **Spore** (evolution across stages).
 
+## Direction shift (2026-06-24): system-driven, not goal-driven
+The hook must come from **systems that create problems**, not authored objectives. Target
+loop: build something that works → it strains under scale → a bottleneck appears → it
+starves multiple downstream systems → you redesign/expand → the fix reveals a new
+inefficiency → repeat. Feeling: *"I'll just fix this one thing" → 3 new problems.*
+
+**Root cause being fixed:** the combined **global Economy pool** let workshops pull inputs
+from anywhere instantly, making belts/layout/distance cosmetic and preventing cascades.
+**Fix (in progress):** production consumption is going **local** — workshops consume only
+belt-delivered (InBuffer) or **adjacent** storage/collector/machine inputs
+(`Economy.LocalProduction`, default on, F7 to compare). Survival + build costs stay global.
+
+**Pressure roadmap (priority):** ①local production ✅ → ②universal depletion (expansion via
+exhaustion, *replacing* the artificial "need gems" gate) → ③throughput ceilings that bite →
+④food spoilage (steady throughput, not stockpiles) → ⑤more shared-intermediate chokepoints.
+All emergent, 2D-clear (adjacency + visible belts), reusing the red "starved" status dot.
+
 ## Core pillar
 > Players should evolve from **manual survival → to systems that play the game for them.**
 

@@ -392,7 +392,7 @@ namespace Caveman
                 case BuildingKind.Collector:
                     return $"Collector — produces {Name(def.item)}. Place near a {Name(def.item)} source; needs workers.";
                 case BuildingKind.Workshop:
-                    return $"Workshop — {CostList(def.inputs)} → {def.outputPerCycle} {Name(def.item)}. Needs workers; belts can feed its inputs.";
+                    return $"Workshop — {CostList(def.inputs)} → {def.outputPerCycle} {Name(def.item)}. Needs workers AND its inputs delivered: belt-fed, or in an ADJACENT storage/collector/machine. Red dot = starved.";
                 case BuildingKind.Storage:
                     return def.configurable
                         ? "Warehouse — stores ONE resource you choose (set it in the building's panel). Good for Planks, Cooked Food, etc."
@@ -581,7 +581,7 @@ namespace Caveman
 
         private void DrawHelp()
         {
-            var r = new Rect(Screen.width / 2f - 240, Screen.height / 2f - 200, 480, 410);
+            var r = new Rect(Screen.width / 2f - 240, Screen.height / 2f - 225, 500, 460);
             GUI.Box(r, GUIContent.none);
             GUILayout.BeginArea(new Rect(r.x + 16, r.y + 12, r.width - 32, r.height - 24));
             GUILayout.Label("<b>How to play</b>", _s);
@@ -591,6 +591,8 @@ namespace Caveman
                 "• Click a building in the Build menu (left), then click the map.\n" +
                 "• Builders (from the HQ) haul materials there, then build it.\n" +
                 "• Collectors/workshops need WORKERS — each is one person.\n" +
+                "• <b>Logistics matter:</b> a workshop only runs on inputs that ARRIVE — belt-fed or\n" +
+                "  in an ADJACENT storage/machine. Lay it out so each machine is fed. (F7 = old mode.)\n" +
                 "• Lay Belts (Bronze) — or Depots + a Caravan route — to move goods to storage.\n" +
                 "• Click a building to manage it (workers, demolish).\n" +
                 "• People need Food + Housing. Space = pause, Esc = cancel, X = demolish.\n" +
