@@ -79,6 +79,14 @@ namespace Caveman
                 new ItemAmount(wood, 4));
             var waterHole = MakeCollector("Water Hole", water, 1, 2.0f, 2, 12, new Color(0.40f, 0.62f, 0.85f),
                 new ItemAmount(wood, 4));
+            waterHole.fromWaterTerrain = true; // must sit next to real water terrain (river/lake)
+            // Bridge: plank tile placed on water; makes it passable for feet + belts. Core
+            // logistics infrastructure — strategic chokepoints across rivers.
+            var bridge = ScriptableObject.CreateInstance<BuildingDefinition>();
+            bridge.displayName = "Bridge"; bridge.kind = BuildingKind.Bridge;
+            bridge.color = new Color(0.62f, 0.47f, 0.28f);
+            bridge.cost = new List<ItemAmount> { new ItemAmount(wood, 3) };
+            bridge.description = "A plank tile laid on WATER. Lets you and your belts cross rivers/lakes. Drag to lay a span. Place bridges strategically — they're the only way across water until later transport.";
             var sawmill = MakeWorkshop("Sawmill", planks, 1, 2.5f, 2, 12, new Color(0.66f, 0.50f, 0.30f),
                 new List<ItemAmount> { new ItemAmount(wood, 2) },
                 new ItemAmount(wood, 6), new ItemAmount(stone, 4));
@@ -256,7 +264,7 @@ namespace Caveman
             builder.placeNodeRange = 6f;
             builder.buildables = new List<BuildingDefinition>
             { woodHut, stonePit, foragerHut, waterHole, sawmill, campfire,
-              woodStore, stoneStore, foodStore, waterStore, warehouse, house, buildYard,
+              woodStore, stoneStore, foodStore, waterStore, warehouse, house, buildYard, bridge,
               hunter, clayPit, charcoalBurner, clayStore, smokehouse, longhouse,
               kiln, farm, mill, bakery, brickStore, mason, stoneHouse, woodBelt, fastBelt,
               mine, oreStore, smelter, toolmaker, monumentBldg, generator,
@@ -369,9 +377,8 @@ namespace Caveman
                 new Vector2(-24f, 4f), new Vector2(18f, 18f), new Vector2(1.0f, 1.5f), PlaceholderArt.Hexagon(), 30, baseClear);
             SpawnPatches("Bush", food, new Color(0.45f, 0.55f, 0.25f), 9,
                 new Vector2(0f, -24f), new Vector2(20f, 10f), new Vector2(0.7f, 1.0f), PlaceholderArt.Circle(), 30, baseClear);
-            // Water bodies (lakes) scattered around the map.
-            SpawnPatches("Lake", water, new Color(0.30f, 0.55f, 0.85f), 4,
-                new Vector2(6f, 26f), new Vector2(22f, 8f), new Vector2(3.0f, 4.2f), PlaceholderArt.Circle(), 240, baseClear);
+            // Water is now real TERRAIN (rivers/lakes), not abstract nodes — see CarveWater
+            // below + the river generation. Build a Water Hole next to water to draw from it.
             // Animal herds (meat — Tribal age) and clay deposits (Bronze age), spread out.
             SpawnPatches("Herd", meat, new Color(0.66f, 0.34f, 0.34f), 8,
                 new Vector2(26f, -18f), new Vector2(14f, 12f), new Vector2(0.8f, 1.2f), PlaceholderArt.Circle(), 30, baseClear);
@@ -395,6 +402,9 @@ namespace Caveman
             SpawnPatches("Gem Deposit", gems, new Color(0.50f, 0.82f, 0.76f), 3,
                 new Vector2(48f, -42f), new Vector2(10f, 10f), new Vector2(1.0f, 1.4f), PlaceholderArt.Hexagon(), 45, 32f, 0);
 
+            // Guarantee a reachable water feature just outside the starting basin so you can
+            // build a Water Hole early (carved last so resource ClearAround can't erase it).
+            TerrainGrid.CarveWater(new Vector3(15f, 3f, 0f), 3.0f);
             // Bake the biome map into its visual now that resource cells have been cleared.
             TerrainGrid.SpawnRenderer();
         }

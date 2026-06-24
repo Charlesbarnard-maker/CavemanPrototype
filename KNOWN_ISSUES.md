@@ -3,6 +3,23 @@
 A running record so progress/problems don't get lost. Newest first. Move items to
 **Fixed** when done. Maintained alongside the code — see DESIGN.md for the roadmap.
 
+## World / water — hard rules (2026-06-24, NEEDS TESTING)
+- **Water is now a HARD barrier**: player can't walk on water (`PlayerController` per-axis
+  `TerrainGrid.Walkable` check), and buildings/belts can't sit on it. **Bridges** (`Bridge`,
+  build menu → Bridges) are placed ON water (drag to span) and make cells walkable + belt-
+  traversable. **Rivers** (noise bands) divide the map. **Water is terrain, not nodes** — the
+  old abstract "Lake" nodes are removed; the **Water Hole** now draws from adjacent water
+  TERRAIN (its `Bind` spawns an infinite invisible source at the nearest water cell). A
+  guaranteed starter pond is carved at ~(15,3) so early water is reachable.
+- **Test/watch:**
+  - Early-game reachability: can you always reach the starter pond + near wood/food without
+    needing a bridge first? If a river rings the basin and soft-locks early wood, widen the
+    basin or thin the river band (`rF` / `0.035` in `TerrainGrid.Generate`).
+  - Workers still walk onto water to "draw" from the water source node (only the PLAYER is
+    barred). Intentional (laborers at the shore), but note the inconsistency.
+  - Bridge cost (3 wood), no age gate is first-pass; consider cost/age-gate + requiring
+    bridges connect to land so they aren't spammed.
+
 ## Fixed
 - **2026-06-24 — Belts lost goods into dead-ends + warped at corners + corners fiddly.**
   (1) `HasForwardTarget` treated *any belt ahead* as connected, so belts pumped goods into

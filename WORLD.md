@@ -16,10 +16,13 @@ every system below hangs off — terrain is now queryable (`At`, `Buildable`) by
 belts, movement, and worldgen.
 
 ## 1. Meaningful terrain (effects, not decoration)
-- **Water (rivers/lakes)** ✅ **unbuildable** — buildings and belts can't cross it, so you
-  route around. 📝 **Bridges/foundations**: a buildable "Bridge"/"Foundation" tile (cost +
-  age-gated) that makes a water cell passable for belts/buildings → water becomes a *solvable*
-  obstacle, not a permanent wall. Crossing stays expensive, so routing still matters.
+- **Water (rivers + lakes)** ✅ is now a **hard barrier**: the player **cannot walk on it**
+  (per-axis movement block, slides along shores) and buildings/belts can't sit on it.
+  Winding **rivers** (noise-band) snake across the map and **divide it into regions**. Water
+  is real **terrain**, not abstract nodes.
+- **Bridges** ✅ — a plank tile placed ON water (drag to span a river) that makes the cell
+  passable for **feet + belts** (not normal buildings). Placed instantly (builders can't
+  reach water); strategic chokepoints; cheap now (3 wood) — 📝 tune cost/age-gate later.
 - **Forest** 📝 — resource-rich (wood/forage bias) but **slower to build** (construction-time
   multiplier on sites placed on forest) and **slower to move** through, until **cleared**
   (a clear-land action that yields some wood and converts the cell to plains). Trade-off:

@@ -47,7 +47,15 @@ namespace Caveman
             if (kb.aKey.isPressed || kb.leftArrowKey.isPressed) dir.x -= 1;
             if (kb.dKey.isPressed || kb.rightArrowKey.isPressed) dir.x += 1;
 
-            transform.position += (Vector3)(dir.normalized * (speed * Time.deltaTime));
+            // Water is a hard barrier — you can't walk onto it unless it's bridged. Resolve
+            // each axis separately so you slide along a shoreline instead of sticking.
+            Vector3 step = (Vector3)(dir.normalized * (speed * Time.deltaTime));
+            Vector3 p = transform.position;
+            Vector3 tryX = new Vector3(p.x + step.x, p.y, 0f);
+            if (TerrainGrid.Walkable(tryX)) p = tryX;
+            Vector3 tryY = new Vector3(p.x, p.y + step.y, 0f);
+            if (TerrainGrid.Walkable(tryY)) p = tryY;
+            transform.position = p;
         }
     }
 }

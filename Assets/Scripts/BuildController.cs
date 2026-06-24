@@ -71,6 +71,7 @@ namespace Caveman
                 var pk = buildables[PendingIndex] != null ? buildables[PendingIndex].kind : BuildingKind.Collector;
                 if (pk == BuildingKind.Belt) UpdateBeltPlacement(mouse, kb);
                 else if (pk == BuildingKind.Route) UpdateRoutePlacement(mouse);
+                else if (pk == BuildingKind.Bridge) UpdateBridgePlacement(mouse);
                 else UpdatePlacement(mouse);
                 return;
             }
@@ -199,7 +200,8 @@ namespace Caveman
 
             bool affordable = Economy.CanAfford(def.cost, Carried);
             bool placeOk = def.kind != BuildingKind.Collector
-                           || HasMatchingNodeNear(world, def.item, placeNodeRange);
+                           || HasMatchingNodeNear(world, def.item, placeNodeRange)
+                           || (def.fromWaterTerrain && TerrainGrid.HasWaterNear(world, placeNodeRange));
             bool free = !FootprintBlocked(world, def) && FootprintOnLand(world, def);
             PlacementValid = affordable && placeOk && free;
 
@@ -308,7 +310,7 @@ namespace Caveman
             _ghostSr.sprite = PlaceholderArt.Triangle();
 
             bool affordable = Economy.CanAfford(def.cost, Carried);
-            bool free = Belt.At(cell) == null && TerrainGrid.Buildable(cell); // belts can't cross water (yet)
+            bool free = Belt.At(cell) == null && TerrainGrid.BeltAllowed(cell); // water only if bridged
             PlacementValid = affordable && free;
             _ghostSr.color = PlacementValid
                 ? new Color(0.35f, 1f, 0.4f, 0.6f)
@@ -346,7 +348,7 @@ namespace Caveman
         {
             var existing = Belt.At(cell);
             if (existing != null) { existing.SetDir(d); return; }
-            if (!TerrainGrid.Buildable(cell)) return; // can't lay belt on water
+            if (!TerrainGrid.BeltAllowed(cell)) return; // water only if bridged
             if (!Economy.CanAfford(def.cost, Carried)) return;
             Economy.Spend(def.cost, Carried);
             Belt.Spawn(cell, d, def.interval);
@@ -379,6 +381,41 @@ namespace Caveman
             // The final cell continues in the last segment's direction.
             if (path.Count >= 2)
                 EnsureBelt(path[path.Count - 1], Belt.FromTo(path[path.Count - 2], path[path.Count - 1]), def);
+        }
+
+        // Bridge mode: lay plank tiles on WATER cells (hold-drag across a river). Bridges
+        // make water passable for feet + belts; placed instantly (builders can't reach water).
+        private void UpdateBridgePlacement(Mouse mouse)
+        {
+            if (_cam == null || mouse == null || _ghost == null) return;
+            if (_ghostArrow != null) _ghostArrow.SetActive(false);
+            if (_ghostNotch != null) _ghostNotch.SetActive(false);
+            var def = buildables[PendingIndex];
+
+            Vector3 world = _cam.ScreenToWorldPoint(mouse.position.ReadValue());
+            var cell = new Vector2Int(Mathf.RoundToInt(world.x), Mathf.RoundToInt(world.y));
+            _ghost.transform.position = new Vector3(cell.x, cell.y, 0f);
+            _ghost.transform.rotation = Quaternion.identity;
+            _ghostSr.sprite = PlaceholderArt.Square();
+            _ghost.transform.localScale = Vector3.one;
+
+            bool ok = TerrainGrid.IsWater(cell) && !TerrainGrid.IsBridged(cell) && Economy.CanAfford(def.cost, Carried);
+            PlacementValid = ok;
+            _ghostSr.color = ok ? new Color(0.35f, 1f, 0.4f, 0.55f) : new Color(1f, 0.3f, 0.3f, 0.5f);
+
+            if (!mouse.leftButton.isPressed) _dragging = false;
+            if (mouse.leftButton.isPressed && ok && !InventoryHud.PointerOverUI)
+            {
+                if (!_dragging || cell != _dragLast)
+                {
+                    Economy.Spend(def.cost, Carried);
+                    Bridge.Spawn(def, new Vector3(cell.x, cell.y, 0f));
+                    BuildingsPlaced++;
+                    _dragging = true;
+                    _dragLast = cell;
+                }
+            }
+            if (mouse.rightButton.wasPressedThisFrame) CancelPlacement();
         }
 
         private static bool Adjacent(Vector2Int a, Vector2Int b)
@@ -456,9 +493,10 @@ namespace Caveman
 
             // Cancelling a construction site: undelivered materials were never
             // spent, so there's nothing to refund — just remove it.
-            if (Selected.GetComponent<ConstructionSite>() != null || Selected.GetComponent<Belt>() != null)
+            if (Selected.GetComponent<ConstructionSite>() != null || Selected.GetComponent<Belt>() != null
+                || Selected.GetComponent<Bridge>() != null)
             {
-                Destroy(Selected); // belts & unbuilt sites: nothing to refund
+                Destroy(Selected); // belts, bridges & unbuilt sites: nothing to refund
                 Selected = null;
                 return;
             }
@@ -501,6 +539,7 @@ namespace Caveman
                               || hit.GetComponent<Depot>() != null
                               || hit.GetComponent<PowerPlant>() != null
                               || hit.GetComponent<ConstructionYard>() != null
+                              || hit.GetComponent<Bridge>() != null
                               || hit.GetComponent<Belt>() != null
                               || hit.GetComponent<ConstructionSite>() != null;
             return isBuilding ? hit.gameObject : null;

@@ -51,6 +51,7 @@ namespace Caveman
             (BuildingKind.Collector, "Gathering"),
             (BuildingKind.Workshop, "Workshops"),
             (BuildingKind.Belt, "Belts"),
+            (BuildingKind.Bridge, "Bridges"),
             (BuildingKind.Depot, "Depots"),
             (BuildingKind.Route, "Routes"),
             (BuildingKind.Power, "Power"),

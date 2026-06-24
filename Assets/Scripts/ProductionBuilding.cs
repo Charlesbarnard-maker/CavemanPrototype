@@ -96,6 +96,24 @@ namespace Caveman
                 float sq = ((Vector2)(n.transform.position - transform.position)).sqrMagnitude;
                 if (sq <= bestSq) { bestSq = sq; best = n; }
             }
+            // Water collectors draw from adjacent WATER TERRAIN, not a pre-placed node: create
+            // an infinite, invisible source at the nearest water cell (location-dependent
+            // extraction from a real map feature). Made once; parented so it's cleaned up.
+            if (best == null && def != null && def.fromWaterTerrain
+                && TerrainGrid.NearestWaterCell(transform.position, sourceRange, out var wc))
+            {
+                var go = new GameObject("WaterSource");
+                go.transform.SetParent(transform);
+                go.transform.position = new Vector3(wc.x, wc.y, 0f);
+                go.AddComponent<SpriteRenderer>();   // no sprite — the water terrain is the visual
+                go.AddComponent<BoxCollider2D>();
+                var n = go.AddComponent<ResourceNode>();
+                n.yields = produces;
+                n.capacity = 9999;
+                n.regenAmount = 9999;
+                n.regenInterval = 0.5f;
+                best = n;
+            }
             if (best != null) _source = best;
         }
 

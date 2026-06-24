@@ -30,6 +30,7 @@ namespace Caveman
         Route,     // a tool: link two depots with a caravan vehicle
         Power,     // a generator: burns fuel to supply electrical power (Industrial age)
         Build,     // a construction yard: raises the builder cap (scales construction)
+        Bridge,    // a plank tile placed on water to make it passable (feet + belts)
     }
 
     /// <summary>Data for a placeable structure.</summary>
@@ -72,6 +73,8 @@ namespace Caveman
         public int capacity = 10;
         [Tooltip("Storage: player chooses which resource it holds (a generic warehouse).")]
         public bool configurable = false;
+        [Tooltip("Collector: draws its resource from adjacent WATER terrain (not a node) — e.g. Water Hole.")]
+        public bool fromWaterTerrain = false;
 
         [Header("Progression")]
         [Tooltip("Age at which this becomes buildable (0 = Stone Age, available from the start).")]
