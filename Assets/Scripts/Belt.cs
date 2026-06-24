@@ -74,7 +74,9 @@ namespace Caveman
         }
 
         public bool CanAccept(ItemDefinition i) => count < capacity && (item == null || item == i);
-        public void Receive(ItemDefinition i, Dir fromEdge) { item = i; count++; _inDir = fromEdge; }
+        // Reset the move timer on receive so the item dwells a full interval here and the
+        // dot animates from the entry edge — no popping to a free-running clock's position.
+        public void Receive(ItemDefinition i, Dir fromEdge) { item = i; count++; _inDir = fromEdge; _timer = 0f; }
 
         public static Dir Opposite(Dir d) => (Dir)(((int)d + 2) % 4);
         public static Dir FromTo(Vector2Int a, Vector2Int b)
@@ -137,9 +139,11 @@ namespace Caveman
 
             // Slide from the edge the item arrived at, through the centre, to the exit
             // edge — so at a corner it tracks the bend instead of teleporting across.
+            // 0.5 offsets put the exit edge of one belt exactly on the entry edge of the
+            // next, so an item handed forward is visually continuous (no gap/jump).
             float progress = interval > 0f ? Mathf.Clamp01(_timer / interval) : 0f;
-            Vector3 inE = new Vector3(Step(_inDir).x, Step(_inDir).y, 0f) * 0.4f;
-            Vector3 outE = new Vector3(Step(dir).x, Step(dir).y, 0f) * 0.4f;
+            Vector3 inE = new Vector3(Step(_inDir).x, Step(_inDir).y, 0f) * 0.5f;
+            Vector3 outE = new Vector3(Step(dir).x, Step(dir).y, 0f) * 0.5f;
             _dot.transform.position = transform.position + Vector3.Lerp(inE, outE, progress);
             _dot.color = item.color;
         }
@@ -151,12 +155,15 @@ namespace Caveman
         private bool HasForwardTarget()
         {
             var ahead = _cell + Step(dir);
-            if (WorldGrid.Storages.TryGetValue(ahead, out var s) && s != null
+            // Input ports: a belt may only DELIVER into a building's INPUT side (opposite its
+            // output). Geometrically that means the belt must travel in the building's output
+            // direction (dir == OutputSide) to enter the input face.
+            if (WorldGrid.Storages.TryGetValue(ahead, out var s) && s != null && dir == s.OutputSide
                 && (item == null || s.accepts == null || s.accepts == item)) return true;
-            if (WorldGrid.Workshops.TryGetValue(ahead, out var w) && w != null
+            if (WorldGrid.Workshops.TryGetValue(ahead, out var w) && w != null && dir == w.OutputSide
                 && (item == null || w.WantsInput(item))) return true;
             if (WorldGrid.Depots.TryGetValue(ahead, out var dp) && dp != null
-                && (item == null || dp.item == null || dp.item == item)) return true;
+                && (item == null || dp.item == null || dp.item == item)) return true; // depots omnidirectional
             if (At(ahead) != null) return LeadsToSink(_cell, dir); // follow the chain
             return false;
         }
@@ -190,15 +197,15 @@ namespace Caveman
                 return;
             }
 
-            // No belt ahead — drop into a storage in that cell...
-            if (WorldGrid.Storages.TryGetValue(ahead, out var s) && s != null && s.accepts == item)
+            // No belt ahead — drop into a storage, but only on its INPUT side (dir == OutputSide).
+            if (WorldGrid.Storages.TryGetValue(ahead, out var s) && s != null && dir == s.OutputSide && s.accepts == item)
             {
                 if (s.def != null && s.Store.Total() >= s.def.capacity) return;
                 s.Store.Add(item, 1); count--; if (count <= 0) item = null; return;
             }
 
-            // ...or into a workshop's input buffer, if it uses this item.
-            if (WorkshopAt(ahead) is WorkshopBuilding w && w.WantsInput(item))
+            // ...or into a workshop's input buffer, on its INPUT side, if it uses this item.
+            if (WorkshopAt(ahead) is WorkshopBuilding w && dir == w.OutputSide && w.WantsInput(item))
             {
                 if (w.InBuffer.Total() >= w.InBuffer.capacity) return;
                 w.InBuffer.Add(item, 1); count--; if (count <= 0) item = null; return;
@@ -228,20 +235,20 @@ namespace Caveman
                     && p.OutputSide == Opposite((Dir)di)
                     && (item == null || item == p.produces) && p.Buffer.Count(p.produces) > 0)
                 {
-                    if (p.Buffer.RemoveUpTo(p.produces, 1) > 0) { item = p.produces; count++; _inDir = (Dir)di; return; }
+                    if (p.Buffer.RemoveUpTo(p.produces, 1) > 0) { item = p.produces; count++; _inDir = (Dir)di; _timer = 0f; return; }
                 }
 
                 if (WorldGrid.Workshops.TryGetValue(c, out var w) && w != null && w.output != null
                     && w.OutputSide == Opposite((Dir)di)
                     && (item == null || item == w.output) && w.Buffer.Count(w.output) > 0)
                 {
-                    if (w.Buffer.RemoveUpTo(w.output, 1) > 0) { item = w.output; count++; _inDir = (Dir)di; return; }
+                    if (w.Buffer.RemoveUpTo(w.output, 1) > 0) { item = w.output; count++; _inDir = (Dir)di; _timer = 0f; return; }
                 }
 
                 if (WorldGrid.Depots.TryGetValue(c, out var dp) && dp != null && dp.item != null
                     && (item == null || item == dp.item) && dp.store.Count(dp.item) > 0)
                 {
-                    if (dp.store.RemoveUpTo(dp.item, 1) > 0) { item = dp.item; count++; _inDir = (Dir)di; return; }
+                    if (dp.store.RemoveUpTo(dp.item, 1) > 0) { item = dp.item; count++; _inDir = (Dir)di; _timer = 0f; return; }
                 }
             }
         }

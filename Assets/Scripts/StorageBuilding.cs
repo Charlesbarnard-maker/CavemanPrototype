@@ -14,6 +14,9 @@ namespace Caveman
         public ItemDefinition accepts;
         public bool configurable;
         public Inventory Store { get; private set; }
+        // Orientation: belts deliver only on the INPUT side (opposite OutputSide). Storage
+        // has no belt-output, so OutputSide just sets which side is the input face.
+        public Belt.Dir OutputSide = Belt.Dir.E;
 
         /// <summary>Choose which resource this (configurable) warehouse holds — only while empty.</summary>
         public void CycleAccepts()
@@ -40,7 +43,7 @@ namespace Caveman
         private SpriteRenderer _sr;
         private Color _baseColor;
 
-        public static StorageBuilding Spawn(BuildingDefinition def, Vector3 pos)
+        public static StorageBuilding Spawn(BuildingDefinition def, Vector3 pos, Belt.Dir outputSide = Belt.Dir.E)
         {
             var go = new GameObject(def.displayName);
             go.transform.position = new Vector3(pos.x, pos.y, 0f);
@@ -58,8 +61,10 @@ namespace Caveman
             sb.accepts = def.item; // null for a configurable warehouse until the player sets it
             sb.configurable = def.configurable;
             sb.Store = new Inventory { capacity = Mathf.Max(1, def.capacity) };
+            sb.OutputSide = outputSide;
             sb._cells = Footprint.Cells(go.transform.position, def.FootW, def.FootH);
             foreach (var c in sb._cells) WorldGrid.Storages[c] = sb;
+            Ports.MakeInputNotch(go.transform, Belt.Opposite(outputSide)); // delivery (input) side
             return sb;
         }
 

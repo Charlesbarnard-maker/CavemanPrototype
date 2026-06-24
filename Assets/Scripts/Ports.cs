@@ -26,5 +26,20 @@ namespace Caveman
             sr.sortingOrder = 11;
             return sr;
         }
+
+        /// <summary>A small cyan square on the building's input edge (belts deliver here).</summary>
+        public static SpriteRenderer MakeInputNotch(Transform parent, Belt.Dir side)
+        {
+            var go = new GameObject("inport");
+            go.transform.SetParent(parent);
+            var s = Belt.Step(side);
+            go.transform.localPosition = new Vector3(s.x, s.y, 0f) * 0.5f;
+            go.transform.localScale = Vector3.one * 0.26f;
+            var sr = go.AddComponent<SpriteRenderer>();
+            sr.sprite = PlaceholderArt.Square();
+            sr.color = new Color(0.35f, 0.70f, 1f, 0.95f); // cyan = input
+            sr.sortingOrder = 11;
+            return sr;
+        }
     }
 }

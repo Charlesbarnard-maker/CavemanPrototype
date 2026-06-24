@@ -97,6 +97,19 @@ A running record so progress/problems don't get lost. Newest first. Move items t
   depots/storages + the workshop local-`AdjacentConsume` (currently still omnidirectional for
   inputs). Watch for: collectors whose belt was on a non-east side now not pulling (rotate
   with R); AutoBeltDir doesn't know about output sides yet.
+- **I/O PORTS — Step B done (2026-06-24).** Workshops + storages now also have an INPUT side
+  (opposite the output, both rotate together with R). Belts **deliver only on the input side**
+  (`dir == OutputSide`) — input notch (cyan) + output arrow (green) shown on the ghost AND
+  the placed building. Storages got an `OutputSide` (orientation only; belts don't pull from
+  storage yet). NOTE: worker hauling + workshop `AdjacentConsume` still move goods
+  omnidirectionally (only BELTS are port-gated) — this is intentional (keeps the game
+  playable) but means belts and people follow different rules; unify later if desired.
+  *Step C (not done):* per-input ports (Smelter: Ore port + Charcoal port on different
+  sides), depot port-gating, belt-pull FROM storages, AutoBeltDir port awareness.
+- **Belt item flow fixed (2026-06-24):** dots no longer jump at hand-offs — receiving a belt
+  resets its move timer (item dwells one interval) and the 0.5 edge offset makes one belt's
+  exit point coincide with the next's entry point (continuous slide, item visibly enters
+  buildings).
 - **(superseded) multi-cell footprints + I/O port sides.** Buildings are 1 cell, so only 4 belt connections and no
   size variety. Want: buildings sized by function (e.g. 2×2 workshop, big warehouse),
   with dedicated output/input port cells (facing, rotatable) — belts must connect to

@@ -36,8 +36,10 @@ namespace Caveman
         private Depot _routeA; // first depot picked when linking a route
         private GameObject _highlight; // glow ring around the selected building
         public Belt.Dir BuildDir { get; private set; } = Belt.Dir.E; // output side for the building being placed
-        private GameObject _ghostArrow; // shows the output side on the ghost
+        private GameObject _ghostArrow; // output-side marker on the ghost
         private SpriteRenderer _ghostArrowSr;
+        private GameObject _ghostNotch; // input-side marker on the ghost
+        private SpriteRenderer _ghostNotchSr;
 
         void Awake() => _cam = Camera.main;
 
@@ -177,9 +179,11 @@ namespace Caveman
             var def = buildables[PendingIndex];
             var kb = Keyboard.current;
 
-            // Producers/processors have a rotatable OUTPUT side — R cycles it; an arrow
-            // on the ghost shows where output will leave (belts pull only from there).
-            bool hasPorts = def.kind == BuildingKind.Collector || def.kind == BuildingKind.Workshop;
+            // Port buildings have a rotatable facing — R cycles it. Output (green arrow) is
+            // on BuildDir; input (cyan notch) is opposite. Belts pull output only from the
+            // arrow side and deliver inputs only on the notch side.
+            bool hasPorts = def.kind == BuildingKind.Collector || def.kind == BuildingKind.Workshop
+                            || def.kind == BuildingKind.Storage;
             if (hasPorts && kb != null && kb.rKey.wasPressedThisFrame) BuildDir = Belt.RotateCW(BuildDir);
 
             Vector3 raw = _cam.ScreenToWorldPoint(mouse.position.ReadValue());
@@ -191,7 +195,7 @@ namespace Caveman
             _ghostSr.sprite = PlaceholderArt.Square();
             float gb = def.kind == BuildingKind.Collector ? 0.9f : 1.0f;
             _ghost.transform.localScale = new Vector3(def.FootW * gb, def.FootH * gb, 1f);
-            UpdateGhostArrow(hasPorts, world, def);
+            UpdateGhostPorts(world, def);
 
             bool affordable = Economy.CanAfford(def.cost, Carried);
             bool placeOk = def.kind != BuildingKind.Collector
@@ -218,25 +222,34 @@ namespace Caveman
             if (mouse.rightButton.wasPressedThisFrame) CancelPlacement();
         }
 
-        // Position/rotate the green output-arrow on the ghost (hidden for buildings without
-        // an output port, e.g. storage/housing/depot/power/yard).
-        private void UpdateGhostArrow(bool show, Vector3 center, BuildingDefinition def)
+        // Show the ghost's I/O markers: green output arrow (collectors/workshops) on BuildDir,
+        // cyan input notch (workshops/storages) on the opposite side. Hidden otherwise.
+        private void UpdateGhostPorts(Vector3 center, BuildingDefinition def)
         {
-            if (_ghostArrow == null)
+            bool hasOut = def.kind == BuildingKind.Collector || def.kind == BuildingKind.Workshop;
+            bool hasIn = def.kind == BuildingKind.Workshop || def.kind == BuildingKind.Storage;
+            PlaceGhostMarker(ref _ghostArrow, ref _ghostArrowSr, hasOut, center, def, BuildDir, true);
+            PlaceGhostMarker(ref _ghostNotch, ref _ghostNotchSr, hasIn, center, def, Belt.Opposite(BuildDir), false);
+        }
+
+        private void PlaceGhostMarker(ref GameObject go, ref SpriteRenderer sr, bool show,
+            Vector3 center, BuildingDefinition def, Belt.Dir side, bool isOutput)
+        {
+            if (go == null)
             {
-                _ghostArrow = new GameObject("GhostArrow");
-                _ghostArrowSr = _ghostArrow.AddComponent<SpriteRenderer>();
-                _ghostArrowSr.sprite = PlaceholderArt.Triangle();
-                _ghostArrowSr.color = new Color(0.25f, 0.95f, 0.35f, 0.95f);
-                _ghostArrowSr.sortingOrder = 21;
+                go = new GameObject(isOutput ? "GhostArrow" : "GhostNotch");
+                sr = go.AddComponent<SpriteRenderer>();
+                sr.sprite = isOutput ? PlaceholderArt.Triangle() : PlaceholderArt.Square();
+                sr.color = isOutput ? new Color(0.25f, 0.95f, 0.35f, 0.95f) : new Color(0.35f, 0.70f, 1f, 0.95f);
+                sr.sortingOrder = 21;
             }
-            if (!show) { if (_ghostArrow.activeSelf) _ghostArrow.SetActive(false); return; }
-            if (!_ghostArrow.activeSelf) _ghostArrow.SetActive(true);
-            var s = Belt.Step(BuildDir);
+            if (!show) { if (go.activeSelf) go.SetActive(false); return; }
+            if (!go.activeSelf) go.SetActive(true);
+            var s = Belt.Step(side);
             float ext = (s.x != 0 ? def.FootW : def.FootH) * 0.5f + 0.25f;
-            _ghostArrow.transform.position = center + new Vector3(s.x, s.y, 0f) * ext;
-            _ghostArrow.transform.rotation = Quaternion.Euler(0f, 0f, Belt.Angle(BuildDir));
-            _ghostArrow.transform.localScale = Vector3.one * 0.5f;
+            go.transform.position = center + new Vector3(s.x, s.y, 0f) * ext;
+            go.transform.rotation = isOutput ? Quaternion.Euler(0f, 0f, Belt.Angle(side)) : Quaternion.identity;
+            go.transform.localScale = Vector3.one * (isOutput ? 0.5f : 0.4f);
         }
 
         // True if ANY cell this footprint would cover is already taken.
@@ -267,7 +280,8 @@ namespace Caveman
         private void UpdateBeltPlacement(Mouse mouse, Keyboard kb)
         {
             if (_cam == null || mouse == null || _ghost == null) return;
-            if (_ghostArrow != null) _ghostArrow.SetActive(false); // belts have no output port
+            if (_ghostArrow != null) _ghostArrow.SetActive(false); // belts have no I/O ports
+            if (_ghostNotch != null) _ghostNotch.SetActive(false);
             var def = buildables[PendingIndex];
 
             if (kb.rKey.wasPressedThisFrame) BeltDir = Belt.RotateCW(BeltDir);
@@ -375,6 +389,7 @@ namespace Caveman
         {
             if (_ghost != null) _ghost.SetActive(false);
             if (_ghostArrow != null) _ghostArrow.SetActive(false);
+            if (_ghostNotch != null) _ghostNotch.SetActive(false);
             if (_cam == null || mouse == null) return;
 
             if (mouse.rightButton.wasPressedThisFrame) { _routeA = null; CancelPlacement(); return; }
@@ -408,6 +423,7 @@ namespace Caveman
             _routeA = null;
             if (_ghost != null) _ghost.SetActive(false);
             if (_ghostArrow != null) _ghostArrow.SetActive(false);
+            if (_ghostNotch != null) _ghostNotch.SetActive(false);
         }
 
         public bool CanAfford(BuildingDefinition def) => def != null && Economy.CanAfford(def.cost, Carried);
