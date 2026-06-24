@@ -29,6 +29,8 @@ namespace Caveman
         private Rect _buildRect, _selRect;
         private bool _buildShown, _selShown;
         private bool _showBuild;
+        private bool _showMinimap = true;
+        private Texture2D _panelTex; // dark panel background for readability
         private Dictionary<ItemDefinition, int> _totals;
         private Rect _topRect, _miniRect, _objRect;
         private readonly List<(string label, int value, string detail, Color color)> _chips = new();
@@ -57,6 +59,7 @@ namespace Caveman
             }
             if (kb.hKey.wasPressedThisFrame) _showHelp = !_showHelp;
             if (kb.bKey.wasPressedThisFrame) _showBuild = !_showBuild;
+            if (kb.nKey.wasPressedThisFrame) _showMinimap = !_showMinimap;
 
             // --- Sandbox / debug hotkeys ---
             if (kb.f1Key.wasPressedThisFrame && debugItems != null)
@@ -105,13 +108,19 @@ namespace Caveman
             _big ??= new GUIStyle(GUI.skin.label) { fontSize = 40, richText = true, alignment = TextAnchor.MiddleCenter };
             _btn ??= new GUIStyle(GUI.skin.button) { richText = true, alignment = TextAnchor.MiddleLeft, fontSize = 13 };
             _toast ??= new GUIStyle(GUI.skin.label) { richText = true, fontSize = 22, alignment = TextAnchor.MiddleCenter };
+            if (_panelTex == null)
+            {
+                _panelTex = new Texture2D(1, 1);
+                _panelTex.SetPixel(0, 0, new Color(0.07f, 0.08f, 0.10f, 0.93f));
+                _panelTex.Apply();
+            }
 
             DrawTopBar();
             DrawStatus();
             DrawObjective();
             if (builder != null) DrawBuildMenu();
-            DrawSelectedPanel();
             DrawMinimap();
+            DrawSelectedPanel();
             DrawObjectives();
             DrawToasts();
             DrawFooter();
@@ -135,6 +144,13 @@ namespace Caveman
                 PointerOverUI = (_buildShown && _buildRect.Contains(m)) || (_selShown && _selRect.Contains(m))
                                 || _topRect.Contains(m) || _miniRect.Contains(m) || _objRect.Contains(m);
             }
+        }
+
+        // Consistent dark panel background + border, for an organized look.
+        private void PanelBg(Rect r)
+        {
+            if (_panelTex != null) GUI.DrawTexture(r, _panelTex);
+            GUI.Box(r, GUIContent.none);
         }
 
         // ---- Top resource bar: grouped, k-formatted, single line, hover for detail ----
@@ -194,6 +210,7 @@ namespace Caveman
         // ---- Minimap (bottom-right) ----
         private void DrawMinimap()
         {
+            if (!_showMinimap) { _miniRect = default; return; }
             const float size = 168f;
             var r = new Rect(Screen.width - size - 12f, Screen.height - size - 12f, size, size);
             _miniRect = r;
@@ -349,7 +366,7 @@ namespace Caveman
             float height = Mathf.Min(Screen.height - top - 16f, 470f);
             _buildRect = new Rect(12, top, 268, height);
             _buildShown = true;
-            GUI.Box(_buildRect, GUIContent.none);
+            PanelBg(_buildRect);
 
             GUILayout.BeginArea(new Rect(_buildRect.x + 8, _buildRect.y + 8, _buildRect.width - 16, _buildRect.height - 16));
 
@@ -439,11 +456,13 @@ namespace Caveman
             var sel = builder != null ? builder.Selected : null;
             if (sel == null) { _selShown = false; return; }
 
-            var rect = new Rect(Screen.width - 290, Screen.height - 200, 278, 188);
+            // Sit above the minimap when it's shown, so the two never overlap.
+            float panelY = _showMinimap ? Screen.height - 384 : Screen.height - 200;
+            var rect = new Rect(Screen.width - 290, panelY, 278, 188);
             _selRect = rect;
             _selShown = true;
 
-            GUI.Box(rect, GUIContent.none);
+            PanelBg(rect);
             GUILayout.BeginArea(new Rect(rect.x + 12, rect.y + 10, rect.width - 24, rect.height - 20));
 
             var sb = sel.GetComponent<StorageBuilding>();
@@ -572,7 +591,7 @@ namespace Caveman
 
             var rect = new Rect(Screen.width - 300, 62, 290, 112);
             _objRect = rect;
-            GUI.Box(rect, GUIContent.none);
+            PanelBg(rect);
             GUILayout.BeginArea(new Rect(rect.x + 10, rect.y + 8, rect.width - 20, rect.height - 14));
             GUILayout.Label("<b>Objectives</b>", _small);
             bool any = false;
@@ -595,7 +614,7 @@ namespace Caveman
         private void DrawFooter()
         {
             GUILayout.BeginArea(new Rect(Screen.width - 330, 10, 320, 50));
-            GUILayout.Label("<size=15>B build · Space pause · H help</size>", _small);
+            GUILayout.Label($"<size=15>B build · Space pause · H help · M overview · N map {(_showMinimap ? "on" : "off")}</size>", _small);
             string sandbox = Economy.FreeBuild ? "<color=#9f9>SANDBOX</color> · " : "";
             string mode = Economy.LocalProduction ? "<color=#fc8>Local logistics</color>" : "<color=#8cf>Global pool</color>";
             GUILayout.Label($"<size=12>{sandbox}Speed x{_speed:0} · {mode} (F7) · F1–F5 sandbox</size>", _small);
@@ -606,7 +625,7 @@ namespace Caveman
         private void DrawWin()
         {
             var r = new Rect(Screen.width / 2f - 240, 150f, 480, 140);
-            GUI.Box(r, GUIContent.none);
+            PanelBg(r);
             int peak = Colony.Instance != null ? Colony.Instance.PeakProsperity : 0;
             GUILayout.BeginArea(new Rect(r.x + 16, r.y + 14, r.width - 32, r.height - 28));
             GUILayout.Label("<color=#ffd24d><b>🏆 YOU WIN!</b></color>", _big);
@@ -617,7 +636,7 @@ namespace Caveman
         private void DrawHelp()
         {
             var r = new Rect(Screen.width / 2f - 240, Screen.height / 2f - 225, 500, 460);
-            GUI.Box(r, GUIContent.none);
+            PanelBg(r);
             GUILayout.BeginArea(new Rect(r.x + 16, r.y + 12, r.width - 32, r.height - 24));
             GUILayout.Label("<b>How to play</b>", _s);
             GUILayout.Label("<size=15>" +
