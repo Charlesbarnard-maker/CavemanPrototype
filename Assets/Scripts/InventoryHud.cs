@@ -250,6 +250,10 @@ namespace Caveman
             foreach (var wk in WorkshopBuilding.All) if (wk != null) Dot(wk.transform.position, wk.StatusColor, 4f);
             foreach (var h in HousingBuilding.All) if (h != null) Dot(h.transform.position, new Color(0.62f, 0.5f, 0.72f), 4f);
             if (gatherer != null) Dot(gatherer.transform.position, new Color(0.96f, 0.85f, 0.2f), 6f);
+
+            // Legend so the dot colours are self-explanatory.
+            GUI.Label(new Rect(r.x, r.y - 17f, r.width, 16f),
+                "<size=10><color=#6c6>●</color> ok  <color=#f66>●</color> starved  <color=#fd4>●</color> full</size>", _small);
         }
 
         // ---- Status (population) ----

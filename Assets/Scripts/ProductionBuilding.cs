@@ -167,7 +167,7 @@ namespace Caveman
         private void UpdateStatus()
         {
             if (_statusDot == null) _statusDot = Status.MakeDot(transform);
-            _statusDot.color = StatusColor;
+            Status.Apply(_statusDot, StatusColor);
         }
 
         private void UpdateVisual(bool working)
