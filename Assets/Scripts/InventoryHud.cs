@@ -234,6 +234,16 @@ namespace Caveman
             }
 
             // Storages tinted by fullness — a full storage (orange) is a backpressure cause.
+            // Discovered resource patches — so you can see where to expand as local ones
+            // deplete. Only shown where explored, to preserve the fog/exploration loop.
+            foreach (var rn in ResourceNode.All)
+            {
+                if (rn == null || rn.yields == null) continue;
+                if (fog != null && !fog.IsExplored(rn.transform.position)) continue;
+                var rc = rn.yields.color;
+                Dot(rn.transform.position, new Color(rc.r, rc.g, rc.b, 0.85f), 2f);
+            }
+
             foreach (var s in StorageBuilding.All)
             {
                 if (s == null) continue;

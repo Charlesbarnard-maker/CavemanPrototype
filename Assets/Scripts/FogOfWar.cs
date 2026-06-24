@@ -43,6 +43,17 @@ namespace Caveman
             transform.position = Vector3.zero;
         }
 
+        /// <summary>Has this world position been revealed? (cheap array lookup)</summary>
+        public bool IsExplored(Vector3 worldPos)
+        {
+            if (_px == null) return false;
+            float ppu = res / worldSize;
+            int x = Mathf.RoundToInt(worldPos.x * ppu + res * 0.5f);
+            int y = Mathf.RoundToInt(worldPos.y * ppu + res * 0.5f);
+            if (x < 0 || x >= res || y < 0 || y >= res) return false;
+            return _px[y * res + x].a == 0; // alpha 0 == revealed
+        }
+
         void Update()
         {
             if (target == null) return;
