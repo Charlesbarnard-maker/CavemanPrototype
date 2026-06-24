@@ -32,6 +32,13 @@ concrete task to deliver on it: **Power as a global constraint at the Industrial
 (the smallest change that proves an age can transform play). The current game is mechanically
 only Age 1–2; later ages exist as *content*, not yet *mechanic shifts*.
 
+## Construction is a system (see CONSTRUCTION.md)
+Building is "another production chain to optimise", not a delay: sites hold a material list,
+builders haul it from storage then build (supply rate gates speed), builders spread into
+**visible slots** around the site, and you scale construction by building **Construction
+Yards** (+builder cap) + having spare population — never a slider. Full design, bottleneck
+curve, age progression, and what's built vs planned are in **`CONSTRUCTION.md`**.
+
 ## Core pillar
 > Players should evolve from **manual survival → to systems that play the game for them.**
 
