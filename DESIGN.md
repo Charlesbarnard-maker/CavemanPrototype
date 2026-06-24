@@ -87,6 +87,17 @@ no Inspector wiring). Scripts in `Assets/Scripts/`:
   the player (`CameraFollow`); HUD via `OnGUI` (`InventoryHud`).
 
 ## Recently built
+- **Systemic toolkit: see, diagnose & manage bottlenecks** (supports the local-production
+  shift; all read-only/agency, no balance changes):
+  - **Minimap** colours collectors/workshops by live status (red starved / yellow backed-up)
+    and tints storages by fullness + shows depots — read the whole supply network at a glance.
+  - **Status bar** shows a bottleneck summary (`⚠ N starved · ⏸ M backed-up`) only when there's
+    a problem.
+  - **Click a stalled workshop** → "⚠ Waiting for: X" tells you the exact missing input.
+  - **Throughput readouts** (units/min) on workshops *and* collectors — measure whether a
+    tweak actually improved output (the optimisation loop).
+  - **Pause/Resume** any collector or workshop — halt one to free a scarce shared input for
+    another (player-driven prioritisation under pressure).
 - **Hook & optimisation wave.**
   - **Prosperity milestones** (250/500/1k/2k/4k) pop a celebratory toast — the "one more
     level" pull. **Settlement rank** (Camp → Hamlet → Village → Town → City → Metropolis)
