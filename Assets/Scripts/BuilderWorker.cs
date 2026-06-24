@@ -15,12 +15,14 @@ namespace Caveman
         public int carryCapacity = 2;
 
         private ConstructionSite _site;
+        private int _slot = -1; // my reserved position around the current site
         private ItemDefinition _targetItem; // what this fetch trip is going for
         private ItemDefinition _carryItem;
         private int _carryQty;
 
         private SpriteRenderer _sr;
         private readonly Color _baseColor = new Color(0.85f, 0.86f, 0.95f);
+        private const float BaseScale = 0.34f;
 
         public static BuilderWorker Spawn()
         {
@@ -43,23 +45,26 @@ namespace Caveman
             // Acquire / re-acquire a site when not committed to one.
             if (_site == null || _site.IsComplete)
             {
+                ReleaseSlot();
                 DropClaim();
                 _site = NearestActiveSite();
                 _targetItem = null;
+                if (_site != null) _slot = _site.ClaimSlot();
             }
 
+            ResetPulse();
             if (_site == null) { MoveTo(NearestHousing(transform.position)); UpdateColor(); return; } // idle at HQ
 
             if (_site.MaterialsDone)
             {
-                if (MoveTo(_site.transform.position)) _site.AddBuildProgress(Time.deltaTime);
+                if (MoveTo(_site.SlotPosition(_slot))) { _site.AddBuildProgress(Time.deltaTime); Pulse(); }
                 UpdateColor();
                 return;
             }
 
             if (_carryQty > 0) // carrying — deliver
             {
-                if (MoveTo(_site.transform.position))
+                if (MoveTo(_site.SlotPosition(_slot)))
                 {
                     _site.Deliver(_carryItem, _carryQty);
                     _carryItem = null;
@@ -71,7 +76,7 @@ namespace Caveman
                 if (_targetItem == null)
                 {
                     var m = _site.NextFetchable();
-                    if (m == null) { MoveTo(_site.transform.position); UpdateColor(); return; } // wait to build
+                    if (m == null) { MoveTo(_site.SlotPosition(_slot)); UpdateColor(); return; } // wait to build
                     _targetItem = m.item;
                 }
 
@@ -105,7 +110,24 @@ namespace Caveman
             _carryQty = 0;
         }
 
-        void OnDestroy() => DropClaim();
+        private void ReleaseSlot()
+        {
+            if (_site != null) _site.ReleaseSlot(_slot);
+            _slot = -1;
+        }
+
+        // A gentle scale pulse while actively building — visible "work" feedback.
+        private void Pulse()
+        {
+            if (_sr == null) return;
+            transform.localScale = Vector3.one * (BaseScale * (1f + 0.18f * Mathf.Abs(Mathf.Sin(Time.time * 9f))));
+        }
+        private void ResetPulse()
+        {
+            if (transform.localScale.x != BaseScale) transform.localScale = Vector3.one * BaseScale;
+        }
+
+        void OnDestroy() { ReleaseSlot(); DropClaim(); }
 
         private ConstructionSite NearestActiveSite()
         {

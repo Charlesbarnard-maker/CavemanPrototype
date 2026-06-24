@@ -100,6 +100,11 @@ namespace Caveman
             warehouse.footprintW = 2; warehouse.footprintH = 2; // TEST: first multi-cell building
             var house = MakeHousing("House", 2, new Color(0.72f, 0.62f, 0.45f),
                 new ItemAmount(wood, 8), new ItemAmount(stone, 4), new ItemAmount(planks, 3));
+            // Construction scaling: each yard adds builder capacity (you still need spare
+            // population + materials flowing). Build more to construct whole areas faster.
+            var buildYard = MakeBuildYard("Construction Yard", 3, 1, new Color(0.86f, 0.72f, 0.34f),
+                new ItemAmount(wood, 12), new ItemAmount(stone, 8));
+            buildYard.description = "Raises your builder cap by 3. Build more yards (and keep spare people) to construct faster — scaling construction is infrastructure, not a slider. Builders still haul materials from storage, so supply rate caps build speed.";
             // Long-distance logistics: depots + caravan routes (replaces the old haulers).
             var depot = ScriptableObject.CreateInstance<BuildingDefinition>();
             depot.displayName = "Depot"; depot.kind = BuildingKind.Depot; depot.unlockAge = 0;
@@ -248,7 +253,7 @@ namespace Caveman
             builder.placeNodeRange = 6f;
             builder.buildables = new List<BuildingDefinition>
             { woodHut, stonePit, foragerHut, waterHole, sawmill, campfire,
-              woodStore, stoneStore, foodStore, waterStore, warehouse, house,
+              woodStore, stoneStore, foodStore, waterStore, warehouse, house, buildYard,
               hunter, clayPit, charcoalBurner, clayStore, smokehouse, longhouse,
               kiln, farm, mill, bakery, brickStore, mason, stoneHouse, woodBelt, fastBelt,
               mine, oreStore, smelter, toolmaker, monumentBldg, generator,
@@ -471,6 +476,19 @@ namespace Caveman
             def.interval = interval;
             def.unlockAge = unlockAge;
             def.inputs = fuel != null ? new List<ItemAmount> { new ItemAmount(fuel, fuelPerCycle) } : new List<ItemAmount>();
+            def.color = color;
+            def.cost = new List<ItemAmount>(cost);
+            return def;
+        }
+
+        // A construction yard: raises the builder cap by `slots` (scales construction).
+        private static BuildingDefinition MakeBuildYard(string name, int slots, int unlockAge, Color color, params ItemAmount[] cost)
+        {
+            var def = ScriptableObject.CreateInstance<BuildingDefinition>();
+            def.displayName = name;
+            def.kind = BuildingKind.Build;
+            def.builderSlots = slots;
+            def.unlockAge = unlockAge;
             def.color = color;
             def.cost = new List<ItemAmount>(cost);
             return def;

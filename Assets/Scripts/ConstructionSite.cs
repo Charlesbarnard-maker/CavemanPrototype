@@ -26,6 +26,30 @@ namespace Caveman
         void OnEnable() => All.Add(this);
         void OnDisable() => All.Remove(this);
 
+        // --- Builder slots: fixed positions around the structure so multiple builders
+        //     spread out (visible work) instead of stacking on one spot. Overflow
+        //     builders (slot -1) still add progress but aren't given a unique position. ---
+        public const int SlotCount = 8;
+        private readonly bool[] _slotUsed = new bool[SlotCount];
+
+        public int ClaimSlot()
+        {
+            for (int i = 0; i < SlotCount; i++)
+                if (!_slotUsed[i]) { _slotUsed[i] = true; return i; }
+            return -1; // all slots taken — this builder contributes but isn't placed
+        }
+
+        public void ReleaseSlot(int i) { if (i >= 0 && i < SlotCount) _slotUsed[i] = false; }
+
+        /// <summary>World position a builder should stand at for slot `i` (ring around the site).</summary>
+        public Vector3 SlotPosition(int i)
+        {
+            if (i < 0) return transform.position; // overflow: abstracted at the centre
+            float r = (def != null ? Mathf.Max(def.FootW, def.FootH) : 1) * 0.5f + 0.55f;
+            float ang = (i / (float)SlotCount) * Mathf.PI * 2f;
+            return transform.position + new Vector3(Mathf.Cos(ang) * r, Mathf.Sin(ang) * r, 0f);
+        }
+
         public bool MaterialsDone => materials.Count == 0;
         public bool IsComplete => MaterialsDone && buildProgress >= buildTime;
         public float BuildFraction => Mathf.Clamp01(buildProgress / Mathf.Max(0.01f, buildTime));
@@ -127,6 +151,7 @@ namespace Caveman
                 case BuildingKind.Logistics: TransportHub.Spawn(def, pos).TryAssign(); break;
                 case BuildingKind.Depot: Depot.Spawn(def, pos); break;
                 case BuildingKind.Power: PowerPlant.Spawn(def, pos); break;
+                case BuildingKind.Build: ConstructionYard.Spawn(def, pos); break;
                 default: ProductionBuilding.Spawn(def, pos).TryAssign(); break;
             }
         }

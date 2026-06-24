@@ -136,9 +136,11 @@ namespace Caveman
         }
 
         // --- Builders: a capped HQ job, auto-filled when there's construction,
-        //     but manually adjustable so they don't hog your gatherers. ---
+        //     but manually adjustable so they don't hog your gatherers. The cap SCALES
+        //     with Construction Yards you build (infrastructure), not a fixed number. ---
         [Header("Builders")]
-        public int MaxBuilders = 2;
+        public int baseBuilders = 2;
+        public int MaxBuilders => baseBuilders + ConstructionYard.TotalSlots;
         public int Builders { get; private set; }
         private bool _builderManual;
         private readonly List<BuilderWorker> _builderSquad = new();

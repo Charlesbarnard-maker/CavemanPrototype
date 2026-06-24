@@ -52,6 +52,7 @@ namespace Caveman
             (BuildingKind.Depot, "Depots"),
             (BuildingKind.Route, "Routes"),
             (BuildingKind.Power, "Power"),
+            (BuildingKind.Build, "Construction"),
             (BuildingKind.Storage, "Storage"),
             (BuildingKind.Housing, "Housing"),
         };

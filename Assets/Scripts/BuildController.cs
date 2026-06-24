@@ -96,8 +96,9 @@ namespace Caveman
             var wb = Selected.GetComponent<WorkshopBuilding>();
             var dpo = Selected.GetComponent<Depot>();
             var pp = Selected.GetComponent<PowerPlant>();
+            var cy = Selected.GetComponent<ConstructionYard>();
             BuildingDefinition def = pb != null ? pb.def : sb != null ? sb.def : hb != null ? hb.def
-                : wb != null ? wb.def : dpo != null ? dpo.def : pp != null ? pp.def : null;
+                : wb != null ? wb.def : dpo != null ? dpo.def : pp != null ? pp.def : cy != null ? cy.def : null;
             if (def == null) return;
             int idx = buildables.IndexOf(def);
             if (idx >= 0 && IsUnlocked(def)) BeginPlacement(idx);
@@ -228,7 +229,8 @@ namespace Caveman
                 if (h.GetComponent<ProductionBuilding>() || h.GetComponent<StorageBuilding>()
                     || h.GetComponent<HousingBuilding>() || h.GetComponent<WorkshopBuilding>()
                     || h.GetComponent<TransportHub>() || h.GetComponent<Depot>()
-                    || h.GetComponent<PowerPlant>() || h.GetComponent<ConstructionSite>()) return true;
+                    || h.GetComponent<PowerPlant>() || h.GetComponent<ConstructionYard>()
+                    || h.GetComponent<ConstructionSite>()) return true;
             }
             return false;
         }
@@ -413,8 +415,10 @@ namespace Caveman
             var th = Selected.GetComponent<TransportHub>();
             var dpo = Selected.GetComponent<Depot>();
             var pp = Selected.GetComponent<PowerPlant>();
+            var cy = Selected.GetComponent<ConstructionYard>();
             BuildingDefinition rdef = pb != null ? pb.def : sb != null ? sb.def : hb != null ? hb.def
-                : wb != null ? wb.def : th != null ? th.def : dpo != null ? dpo.def : pp != null ? pp.def : null;
+                : wb != null ? wb.def : th != null ? th.def : dpo != null ? dpo.def : pp != null ? pp.def
+                : cy != null ? cy.def : null;
             if (rdef == null) return;
 
             var staff = Selected.GetComponent<IStaffable>();
@@ -441,6 +445,7 @@ namespace Caveman
                               || hit.GetComponent<TransportHub>() != null
                               || hit.GetComponent<Depot>() != null
                               || hit.GetComponent<PowerPlant>() != null
+                              || hit.GetComponent<ConstructionYard>() != null
                               || hit.GetComponent<Belt>() != null
                               || hit.GetComponent<ConstructionSite>() != null;
             return isBuilding ? hit.gameObject : null;

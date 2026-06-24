@@ -29,6 +29,7 @@ namespace Caveman
         Depot,     // a long-distance transfer station (route endpoint)
         Route,     // a tool: link two depots with a caravan vehicle
         Power,     // a generator: burns fuel to supply electrical power (Industrial age)
+        Build,     // a construction yard: raises the builder cap (scales construction)
     }
 
     /// <summary>Data for a placeable structure.</summary>
@@ -53,6 +54,10 @@ namespace Caveman
         [Header("Housing")]
         [Tooltip("How many people this houses (adds to population cap).")]
         public int houseCapacity = 0;
+
+        [Header("Construction")]
+        [Tooltip("Construction Yard: extra builders this adds to the cap (needs spare population to fill).")]
+        public int builderSlots = 0;
 
         [Header("Footprint")]
         [Tooltip("Building width in grid cells (1 = a single cell).")]
