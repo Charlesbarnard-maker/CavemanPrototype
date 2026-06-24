@@ -769,7 +769,7 @@ namespace Caveman
                 "\n<b>Sandbox:</b> F1 +resources · F2 +5 people · F3 advance age · " +
                 "F4 free build · F5 game speed.\n" +
                 "</size>", _small);
-            GUILayout.Label("<size=15>Press H to close.</size>", _small);
+            GUILayout.Label("<size=15>Press <b>H</b> to close  ·  Press <b>G</b> for the full Guide (mechanics + every resource)  ·  <b>N</b> hides the map.</size>", _small);
             GUILayout.EndArea();
         }
 

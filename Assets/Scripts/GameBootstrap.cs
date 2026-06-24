@@ -373,7 +373,7 @@ namespace Caveman
             // --- Welcome / starter guidance (fades after a few seconds) ---
             Toast.Show("<color=#ffd24d>Welcome, chief!</color>  Click trees & rocks to gather by hand.");
             Toast.Show("<size=15>Goal: grow from caveman to a self-running civilisation — build the Monument to win.</size>");
-            Toast.Show("<size=14>Press <b>H</b> for help · <b>B</b> to build · follow the Objectives (top-right).</size>");
+            Toast.Show("<size=14>Press <b>H</b> for help · <b>G</b> for the Guide · <b>B</b> to build · follow the Objectives (top-right).</size>");
 
             // Gem deposits — rarest, farthest (a third exploration direction), finite.
             SpawnPatches("Gem Deposit", gems, new Color(0.50f, 0.82f, 0.76f), 3,
