@@ -209,7 +209,7 @@ namespace Caveman
             hud.waterItem = water;
             hud.monumentItem = monument;
             hud.debugItems = new List<ItemDefinition>
-            { wood, stone, food, water, planks, cookedFood, meat, clay, charcoal, bricks, grain, flour, bread, ore, metal, tools };
+            { wood, stone, food, water, planks, cookedFood, meat, clay, charcoal, bricks, grain, flour, bread, ore, metal, tools, monument };
 
             // --- Guided objectives ladder (the "what next / why advance" hook) ---
             var carriedInv = gatherer.Inventory;
