@@ -87,6 +87,13 @@ no Inspector wiring). Scripts in `Assets/Scripts/`:
   the player (`CameraFollow`); HUD via `OnGUI` (`InventoryHud`).
 
 ## Recently built
+- **Visual / UX organisation pass.** Fixed the minimap drawing over panels (+ **N** to hide
+  it); consistent **dark panel** backgrounds; manage panel shows a plain-language **status
+  line** + **Pause/Resume**; **Perlin-noise ground** (not a flat slab); status dots **pulse**
+  when starved/backed-up; **minimap legend** + **discovered resource patches** shown on the
+  minimap (fog-gated, so exploration still matters); **selection highlight** ring around the
+  clicked building. (Building footprints + I/O port sides still NOT done — see KNOWN_ISSUES;
+  it's the one subsystem held for a supervised compile/test loop.)
 - **Systemic toolkit: see, diagnose & manage bottlenecks** (supports the local-production
   shift; all read-only/agency, no balance changes):
   - **Minimap** colours collectors/workshops by live status (red starved / yellow backed-up)
