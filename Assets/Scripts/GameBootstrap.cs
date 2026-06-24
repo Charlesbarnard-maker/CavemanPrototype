@@ -33,6 +33,11 @@ namespace Caveman
             var metal = MakeItem("metal", "Metal", new Color(0.66f, 0.68f, 0.74f));
             var tools = MakeItem("tools", "Tools", new Color(0.55f, 0.60f, 0.68f));
             var monument = MakeItem("monument", "Monument Block", new Color(0.90f, 0.86f, 0.62f)); // endgame
+            // Textiles + pottery — parallel comfort-good chains that deepen the demand sink.
+            var fiber = MakeItem("fiber", "Plant Fiber", new Color(0.62f, 0.74f, 0.45f));
+            var cloth = MakeItem("cloth", "Cloth", new Color(0.86f, 0.84f, 0.78f));
+            var clothes = MakeItem("clothes", "Clothes", new Color(0.45f, 0.55f, 0.78f));
+            var pot = MakeItem("pot", "Pottery", new Color(0.74f, 0.48f, 0.36f));
 
             // --- Buildings ---
             var woodHut = MakeCollector("Wood Hut", wood, 1, 2.0f, 2, 12, new Color(0.80f, 0.52f, 0.25f),
@@ -134,6 +139,21 @@ namespace Caveman
                 new List<ItemAmount> { new ItemAmount(metal, 2), new ItemAmount(tools, 1), new ItemAmount(bricks, 2), new ItemAmount(planks, 2) },
                 new ItemAmount(bricks, 20), new ItemAmount(metal, 15), new ItemAmount(tools, 8)); monumentBldg.unlockAge = 4;
 
+            // --- Textiles & pottery chains (comfort goods) ---
+            // Pottery (Bronze): Clay -> Pottery. Reuses the clay you already mine.
+            var potter = MakeWorkshop("Potter", pot, 1, 3.0f, 2, 12, new Color(0.72f, 0.50f, 0.40f),
+                new List<ItemAmount> { new ItemAmount(clay, 2) },
+                new ItemAmount(wood, 6), new ItemAmount(stone, 4)); potter.unlockAge = 2;
+            // Textiles: Cotton -> Fiber -> Cloth -> Clothes (an Industrial luxury).
+            var cottonFarm = MakeCollector("Cotton Farm", fiber, 1, 2.5f, 2, 12, new Color(0.70f, 0.78f, 0.55f),
+                new ItemAmount(wood, 6)); cottonFarm.unlockAge = 2;
+            var weaver = MakeWorkshop("Weaver", cloth, 1, 3.5f, 2, 12, new Color(0.80f, 0.78f, 0.70f),
+                new List<ItemAmount> { new ItemAmount(fiber, 2) },
+                new ItemAmount(wood, 8), new ItemAmount(planks, 4)); weaver.unlockAge = 3;
+            var tailor = MakeWorkshop("Tailor", clothes, 1, 4.0f, 2, 12, new Color(0.50f, 0.58f, 0.80f),
+                new List<ItemAmount> { new ItemAmount(cloth, 2) },
+                new ItemAmount(planks, 6), new ItemAmount(bricks, 4)); tailor.unlockAge = 4;
+
             // --- Camera (follows the player) ---
             var cam = Camera.main;
             if (cam == null)
@@ -161,7 +181,8 @@ namespace Caveman
               woodStore, stoneStore, foodStore, waterStore, warehouse, house,
               hunter, clayPit, charcoalBurner, clayStore, smokehouse, longhouse,
               kiln, farm, mill, bakery, brickStore, woodBelt, fastBelt,
-              mine, oreStore, smelter, toolmaker, monumentBldg, depot, caravan };
+              mine, oreStore, smelter, toolmaker, monumentBldg,
+              potter, cottonFarm, weaver, tailor, depot, caravan };
 
             var follow = cam.GetComponent<CameraFollow>();
             if (follow == null) follow = cam.gameObject.AddComponent<CameraFollow>();
@@ -191,7 +212,9 @@ namespace Caveman
             {
                 new Colony.Comfort { item = cookedFood, unlockAge = 1 }, // Tribal: want cooked food
                 new Colony.Comfort { item = bread,      unlockAge = 2 }, // Bronze: want bread too
+                new Colony.Comfort { item = pot,        unlockAge = 2 }, // Bronze: want pottery
                 new Colony.Comfort { item = tools,      unlockAge = 3 }, // Iron: want tools
+                new Colony.Comfort { item = clothes,    unlockAge = 4 }, // Industrial: want clothes
             };
 
             // --- Town Hall (pre-placed, houses 3) ---
@@ -209,7 +232,7 @@ namespace Caveman
             hud.waterItem = water;
             hud.monumentItem = monument;
             hud.debugItems = new List<ItemDefinition>
-            { wood, stone, food, water, planks, cookedFood, meat, clay, charcoal, bricks, grain, flour, bread, ore, metal, tools, monument };
+            { wood, stone, food, water, planks, cookedFood, meat, clay, charcoal, bricks, grain, flour, bread, ore, metal, tools, monument, fiber, cloth, clothes, pot };
 
             // --- Guided objectives ladder (the "what next / why advance" hook) ---
             var carriedInv = gatherer.Inventory;
@@ -233,12 +256,15 @@ namespace Caveman
                 new Quest { title = "Grow to 12 people",                 done = () => Pop() >= 12,           reward = () => carriedInv.Add(planks, 15),rewardText = "+15 Planks" },
                 new Quest { title = "Advance to the Bronze Age",         done = () => AgeNow() >= 2,         reward = () => carriedInv.Add(stone, 30), rewardText = "+30 Stone" },
                 new Quest { title = "Bake 15 Bread",                     done = () => Have(bread) >= 15,     reward = () => carriedInv.Add(planks, 20),rewardText = "+20 Planks" },
+                new Quest { title = "Make 10 Pottery (a Bronze comfort)", done = () => Have(pot) >= 10,       reward = () => carriedInv.Add(clay, 20), rewardText = "+20 Clay" },
                 new Quest { title = "Explore far & mine 25 Ore",         done = () => Have(ore) >= 25,       reward = () => carriedInv.Add(stone, 40), rewardText = "+40 Stone" },
                 new Quest { title = "Smelt 20 Metal",                    done = () => Have(metal) >= 20,     reward = () => carriedInv.Add(stone, 40), rewardText = "+40 Stone" },
                 new Quest { title = "Advance to the Iron Age",           done = () => AgeNow() >= 3,         reward = () => carriedInv.Add(planks, 40),rewardText = "+40 Planks" },
                 new Quest { title = "Craft 10 Tools",                    done = () => Have(tools) >= 10,     reward = () => carriedInv.Add(planks, 30),rewardText = "+30 Planks" },
+                new Quest { title = "Weave 15 Cloth (Cotton → Fiber → Cloth)", done = () => Have(cloth) >= 15, reward = () => carriedInv.Add(planks, 15),rewardText = "+15 Planks" },
                 new Quest { title = "Keep your people happy (90%+)",     done = () => Colony.Instance != null && Colony.Instance.Happiness >= 0.9f, reward = () => carriedInv.Add(food, 30), rewardText = "+30 Food" },
                 new Quest { title = "Advance to the Industrial Age",     done = () => AgeNow() >= 4,         reward = () => carriedInv.Add(planks, 50),rewardText = "+50 Planks" },
+                new Quest { title = "Tailor 12 Clothes (Industrial comfort)", done = () => Have(clothes) >= 12, reward = () => carriedInv.Add(tools, 6), rewardText = "+6 Tools" },
                 new Quest { title = "Build a thriving settlement: 30 people", done = () => Pop() >= 30, reward = () => carriedInv.Add(metal, 15), rewardText = "+15 Metal" },
                 new Quest { title = "Build a prosperous colony: 600 Prosperity", done = () => Colony.Instance != null && Colony.Instance.PeakProsperity >= 600, reward = () => carriedInv.Add(tools, 10), rewardText = "+10 Tools" },
                 new Quest { title = "Begin your legacy: build the Monument",      done = () => HasWorkshopOf(monument), reward = () => carriedInv.Add(planks, 40), rewardText = "+40 Planks" },
@@ -262,6 +288,9 @@ namespace Caveman
                 new Vector2(26f, -18f), new Vector2(14f, 12f), new Vector2(0.8f, 1.2f), PlaceholderArt.Circle(), 30, baseClear);
             SpawnPatches("Clay", clay, new Color(0.68f, 0.46f, 0.36f), 9,
                 new Vector2(-26f, -18f), new Vector2(14f, 12f), new Vector2(1.0f, 1.4f), PlaceholderArt.Hexagon(), 40, baseClear);
+            // Cotton fields (fiber for the textile chain) — mid-distance, north-west.
+            SpawnPatches("Cotton", fiber, new Color(0.80f, 0.84f, 0.66f), 8,
+                new Vector2(-8f, 26f), new Vector2(16f, 8f), new Vector2(0.7f, 1.1f), PlaceholderArt.Circle(), 36, baseClear);
             // Ore veins — rare, far from base (must explore to find them), high yield.
             SpawnPatches("Ore Vein", ore, new Color(0.62f, 0.58f, 0.42f), 4,
                 new Vector2(46f, 34f), new Vector2(12f, 12f), new Vector2(1.1f, 1.5f), PlaceholderArt.Hexagon(), 60, 26f, 0);
