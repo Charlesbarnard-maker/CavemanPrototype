@@ -52,6 +52,8 @@ namespace Caveman
             (BuildingKind.Workshop, "Workshops"),
             (BuildingKind.Belt, "Belts"),
             (BuildingKind.Bridge, "Bridges"),
+            (BuildingKind.Pump, "Liquids"),
+            (BuildingKind.Pipe, "Pipes"),
             (BuildingKind.Depot, "Depots"),
             (BuildingKind.Route, "Routes"),
             (BuildingKind.Power, "Power"),
@@ -430,7 +432,10 @@ namespace Caveman
             if (pp != null) return "<size=13><b>Power Plant</b></size>";
             var cy = hit.GetComponent<ConstructionYard>();
             if (cy != null) return "<size=13><b>Construction Yard</b></size>";
+            var wp = hit.GetComponent<WaterPump>();
+            if (wp != null) return "<size=13><b>Water Pump</b>  <color=#bbb>water → pipes</color></size>";
             if (hit.GetComponent<Bridge>() != null) return "<size=13><b>Bridge</b></size>";
+            if (hit.GetComponent<Pipe>() != null) return "<size=13><b>Pipe</b>  <color=#bbb>liquid network</color></size>";
             return null;
         }
 

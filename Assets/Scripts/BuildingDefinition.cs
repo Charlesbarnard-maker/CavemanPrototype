@@ -31,6 +31,8 @@ namespace Caveman
         Power,     // a generator: burns fuel to supply electrical power (Industrial age)
         Build,     // a construction yard: raises the builder cap (scales construction)
         Bridge,    // a plank tile placed on water to make it passable (feet + belts)
+        Pipe,      // a liquid-network segment (continuous flow, not items)
+        Pump,      // draws water from adjacent water terrain into the pipe network
     }
 
     /// <summary>Data for a placeable structure.</summary>

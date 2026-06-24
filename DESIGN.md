@@ -32,6 +32,14 @@ concrete task to deliver on it: **Power as a global constraint at the Industrial
 (the smallest change that proves an age can transform play). The current game is mechanically
 only Age 1–2; later ages exist as *content*, not yet *mechanic shifts*.
 
+## Liquids are a distinct, age-evolving system (see LIQUIDS.md)
+Liquids exist in every age but evolve in form (never a brand-new system): Stone = hand-carried
+(Water Hole), **Bronze = pipes + a mechanical Pump** (built — continuous flow over a connected
+network into storage, distinct from item-belts), Industrial = pressurised networks, Late =
+abstract fluids. Distinct problems from solids: network starvation, topology, (later) pressure.
+The same continuity rule applies to all logistics (solids/transport/construction). Full
+age-progression design in **`LIQUIDS.md`**.
+
 ## The world is a system (see WORLD.md)
 Geography constrains expansion, not decorates it. A biome grid (`TerrainGrid`: Plains/Forest/
 Hills/Water) with a clear starting basin; **water is unbuildable** so rivers/lakes force belt

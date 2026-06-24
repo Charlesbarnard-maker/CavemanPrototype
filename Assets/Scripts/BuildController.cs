@@ -72,6 +72,7 @@ namespace Caveman
                 if (pk == BuildingKind.Belt) UpdateBeltPlacement(mouse, kb);
                 else if (pk == BuildingKind.Route) UpdateRoutePlacement(mouse);
                 else if (pk == BuildingKind.Bridge) UpdateBridgePlacement(mouse);
+                else if (pk == BuildingKind.Pipe) UpdatePipePlacement(mouse);
                 else UpdatePlacement(mouse);
                 return;
             }
@@ -103,8 +104,10 @@ namespace Caveman
             var dpo = Selected.GetComponent<Depot>();
             var pp = Selected.GetComponent<PowerPlant>();
             var cy = Selected.GetComponent<ConstructionYard>();
+            var wp = Selected.GetComponent<WaterPump>();
             BuildingDefinition def = pb != null ? pb.def : sb != null ? sb.def : hb != null ? hb.def
-                : wb != null ? wb.def : dpo != null ? dpo.def : pp != null ? pp.def : cy != null ? cy.def : null;
+                : wb != null ? wb.def : dpo != null ? dpo.def : pp != null ? pp.def : cy != null ? cy.def
+                : wp != null ? wp.def : null;
             if (def == null) return;
             int idx = buildables.IndexOf(def);
             if (idx >= 0 && IsUnlocked(def)) BeginPlacement(idx);
@@ -199,9 +202,13 @@ namespace Caveman
             UpdateGhostPorts(world, def);
 
             bool affordable = Economy.CanAfford(def.cost, Carried);
-            bool placeOk = def.kind != BuildingKind.Collector
-                           || HasMatchingNodeNear(world, def.item, placeNodeRange)
-                           || (def.fromWaterTerrain && TerrainGrid.HasWaterNear(world, placeNodeRange));
+            bool placeOk;
+            if (def.kind == BuildingKind.Collector)
+                placeOk = HasMatchingNodeNear(world, def.item, placeNodeRange)
+                          || (def.fromWaterTerrain && TerrainGrid.HasWaterNear(world, placeNodeRange));
+            else if (def.kind == BuildingKind.Pump)
+                placeOk = TerrainGrid.HasWaterNear(world, placeNodeRange); // pump must reach water
+            else placeOk = true;
             bool free = !FootprintBlocked(world, def) && FootprintOnLand(world, def);
             PlacementValid = affordable && placeOk && free;
 
@@ -280,7 +287,7 @@ namespace Caveman
                     || h.GetComponent<HousingBuilding>() || h.GetComponent<WorkshopBuilding>()
                     || h.GetComponent<TransportHub>() || h.GetComponent<Depot>()
                     || h.GetComponent<PowerPlant>() || h.GetComponent<ConstructionYard>()
-                    || h.GetComponent<ConstructionSite>()) return true;
+                    || h.GetComponent<WaterPump>() || h.GetComponent<ConstructionSite>()) return true;
             }
             return false;
         }
@@ -418,6 +425,41 @@ namespace Caveman
             if (mouse.rightButton.wasPressedThisFrame) CancelPlacement();
         }
 
+        // Pipe mode: drag to lay liquid-network segments on land (or bridged water). No
+        // direction; placed instantly. A Water Pump pushes water through them into storage.
+        private void UpdatePipePlacement(Mouse mouse)
+        {
+            if (_cam == null || mouse == null || _ghost == null) return;
+            if (_ghostArrow != null) _ghostArrow.SetActive(false);
+            if (_ghostNotch != null) _ghostNotch.SetActive(false);
+            var def = buildables[PendingIndex];
+
+            Vector3 world = _cam.ScreenToWorldPoint(mouse.position.ReadValue());
+            var cell = new Vector2Int(Mathf.RoundToInt(world.x), Mathf.RoundToInt(world.y));
+            _ghost.transform.position = new Vector3(cell.x, cell.y, 0f);
+            _ghost.transform.rotation = Quaternion.identity;
+            _ghostSr.sprite = PlaceholderArt.Square();
+            _ghost.transform.localScale = Vector3.one * 0.6f;
+
+            bool ok = PipeNet.At(cell) == null && TerrainGrid.BeltAllowed(cell) && Economy.CanAfford(def.cost, Carried);
+            PlacementValid = ok;
+            _ghostSr.color = ok ? new Color(0.35f, 1f, 0.4f, 0.55f) : new Color(1f, 0.3f, 0.3f, 0.5f);
+
+            if (!mouse.leftButton.isPressed) _dragging = false;
+            if (mouse.leftButton.isPressed && ok && !InventoryHud.PointerOverUI)
+            {
+                if (!_dragging || cell != _dragLast)
+                {
+                    Economy.Spend(def.cost, Carried);
+                    Pipe.Spawn(def, new Vector3(cell.x, cell.y, 0f));
+                    BuildingsPlaced++;
+                    _dragging = true;
+                    _dragLast = cell;
+                }
+            }
+            if (mouse.rightButton.wasPressedThisFrame) CancelPlacement();
+        }
+
         private static bool Adjacent(Vector2Int a, Vector2Int b)
         {
             return Mathf.Abs(a.x - b.x) + Mathf.Abs(a.y - b.y) == 1;
@@ -494,9 +536,9 @@ namespace Caveman
             // Cancelling a construction site: undelivered materials were never
             // spent, so there's nothing to refund — just remove it.
             if (Selected.GetComponent<ConstructionSite>() != null || Selected.GetComponent<Belt>() != null
-                || Selected.GetComponent<Bridge>() != null)
+                || Selected.GetComponent<Bridge>() != null || Selected.GetComponent<Pipe>() != null)
             {
-                Destroy(Selected); // belts, bridges & unbuilt sites: nothing to refund
+                Destroy(Selected); // belts, bridges, pipes & unbuilt sites: nothing to refund
                 Selected = null;
                 return;
             }
@@ -509,9 +551,10 @@ namespace Caveman
             var dpo = Selected.GetComponent<Depot>();
             var pp = Selected.GetComponent<PowerPlant>();
             var cy = Selected.GetComponent<ConstructionYard>();
+            var wp = Selected.GetComponent<WaterPump>();
             BuildingDefinition rdef = pb != null ? pb.def : sb != null ? sb.def : hb != null ? hb.def
                 : wb != null ? wb.def : th != null ? th.def : dpo != null ? dpo.def : pp != null ? pp.def
-                : cy != null ? cy.def : null;
+                : cy != null ? cy.def : wp != null ? wp.def : null;
             if (rdef == null) return;
 
             var staff = Selected.GetComponent<IStaffable>();
@@ -539,7 +582,9 @@ namespace Caveman
                               || hit.GetComponent<Depot>() != null
                               || hit.GetComponent<PowerPlant>() != null
                               || hit.GetComponent<ConstructionYard>() != null
+                              || hit.GetComponent<WaterPump>() != null
                               || hit.GetComponent<Bridge>() != null
+                              || hit.GetComponent<Pipe>() != null
                               || hit.GetComponent<Belt>() != null
                               || hit.GetComponent<ConstructionSite>() != null;
             return isBuilding ? hit.gameObject : null;

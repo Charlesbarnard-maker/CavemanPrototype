@@ -87,6 +87,19 @@ namespace Caveman
             bridge.color = new Color(0.62f, 0.47f, 0.28f);
             bridge.cost = new List<ItemAmount> { new ItemAmount(wood, 3) };
             bridge.description = "A plank tile laid on WATER. Lets you and your belts cross rivers/lakes. Drag to lay a span. Place bridges strategically — they're the only way across water until later transport.";
+            // Liquid logistics (Bronze): pipes + a mechanical pump move water from a river/lake
+            // into your storage continuously — the EVOLUTION of the hand-carried Water Hole, not
+            // a new system. Continuous flow over a connected network (topology matters).
+            var pipe = ScriptableObject.CreateInstance<BuildingDefinition>();
+            pipe.displayName = "Pipe"; pipe.kind = BuildingKind.Pipe; pipe.unlockAge = 2;
+            pipe.color = new Color(0.40f, 0.62f, 0.85f);
+            pipe.cost = new List<ItemAmount> { new ItemAmount(stone, 1) };
+            pipe.description = "A liquid-network segment — continuous flow, NOT items. Drag to run pipes from a Water Pump to your Water Barrels. The pump only fills storage its pipes actually reach, so layout/topology matters.";
+            var pump = ScriptableObject.CreateInstance<BuildingDefinition>();
+            pump.displayName = "Water Pump"; pump.kind = BuildingKind.Pump; pump.item = water; pump.unlockAge = 2;
+            pump.color = new Color(0.30f, 0.55f, 0.78f);
+            pump.cost = new List<ItemAmount> { new ItemAmount(planks, 4), new ItemAmount(stone, 4) };
+            pump.description = "Place next to water (river/lake) and connect pipes: it pushes water through the network into reachable Water Barrels — no workers carrying it. The Bronze-age evolution of the Water Hole.";
             var sawmill = MakeWorkshop("Sawmill", planks, 1, 2.5f, 2, 12, new Color(0.66f, 0.50f, 0.30f),
                 new List<ItemAmount> { new ItemAmount(wood, 2) },
                 new ItemAmount(wood, 6), new ItemAmount(stone, 4));
@@ -264,7 +277,7 @@ namespace Caveman
             builder.placeNodeRange = 6f;
             builder.buildables = new List<BuildingDefinition>
             { woodHut, stonePit, foragerHut, waterHole, sawmill, campfire,
-              woodStore, stoneStore, foodStore, waterStore, warehouse, house, buildYard, bridge,
+              woodStore, stoneStore, foodStore, waterStore, warehouse, house, buildYard, bridge, pipe, pump,
               hunter, clayPit, charcoalBurner, clayStore, smokehouse, longhouse,
               kiln, farm, mill, bakery, brickStore, mason, stoneHouse, woodBelt, fastBelt,
               mine, oreStore, smelter, toolmaker, monumentBldg, generator,

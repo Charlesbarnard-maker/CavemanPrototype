@@ -154,6 +154,7 @@ namespace Caveman
                 case BuildingKind.Depot: Depot.Spawn(def, pos); break;
                 case BuildingKind.Power: PowerPlant.Spawn(def, pos); break;
                 case BuildingKind.Build: ConstructionYard.Spawn(def, pos); break;
+                case BuildingKind.Pump: WaterPump.Spawn(def, pos); break;
                 default: ProductionBuilding.Spawn(def, pos, outDir).TryAssign(); break;
             }
         }
