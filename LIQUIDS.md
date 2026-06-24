@@ -60,9 +60,13 @@ abstract). The player solves the same fundamentals with better tools over time.
 
 ## Build order
 1. ✅ Pipes + mechanical pump (Bronze) — the core distinct model.
-2. **Pipe-fed consumers** 📝 — let workshops that use water (Campfire/Farm/Bakery) draw from an
-   adjacent pipe network directly (not just fill barrels), so liquids feed production chains.
-3. **Pressure/range + booster pumps** 📝 — the Industrial problem; far sinks starve without boosters.
+2. ✅ **Pipe-fed consumers** — the pump now fills adjacent water-using workshops
+   (Campfire/Farm/Bakery) DIRECTLY into their input buffer, as well as barrels. Barrels are
+   now optional **buffers** (evolution, not replacement): pipe a pump straight to a Campfire
+   and it runs without any barrel; add a barrel to buffer surges. Pipe feeding ignores the
+   workshop's belt input-port side for now (pipes are a separate network).
+3. **Pressure/range + booster pumps** 📝 — the Industrial headline; far sinks starve without
+   boosters / network segmentation / hubs ("works locally, breaks at scale"). NEXT.
 4. **More fluids** 📝 — steam/oil for power & cooling (industrial water usage), then abstract
    fluids in the future ages.
 

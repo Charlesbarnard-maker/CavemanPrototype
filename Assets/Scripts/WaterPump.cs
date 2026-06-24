@@ -6,9 +6,10 @@ namespace Caveman
     /// <summary>
     /// A mechanical water pump: must sit next to WATER TERRAIN (river/lake/coast) and connect
     /// to a pipe network. Each tick it floods its connected pipes and fills any water storage
-    /// they reach — continuous flow from the map's water features into your base, without
-    /// workers carrying it. This is the Bronze-age evolution of water logistics (Stone age
-    /// still hand-carries via the Water Hole). Out of water/disconnected → no flow (starvation).
+    /// (barrels, as buffers) AND any water-using workshop (Campfire/Farm/Bakery, fed directly
+    /// into its input buffer) the pipes reach — continuous flow from the map's water features
+    /// into your base, without workers carrying it. The Bronze-age evolution of water logistics
+    /// (Stone age still hand-carries via the Water Hole). Out of water/disconnected → no flow.
     /// </summary>
     public class WaterPump : MonoBehaviour
     {
@@ -87,6 +88,7 @@ namespace Caveman
                 foreach (var d in _dirs)
                 {
                     var nb = c + Belt.Step(d);
+                    // Sink 1: water storage (barrel) adjacent to the pipe — a buffer.
                     if (WorldGrid.Storages.TryGetValue(nb, out var st) && st != null && st.accepts == water
                         && st.def != null && budget > 0)
                     {
@@ -95,6 +97,20 @@ namespace Caveman
                         {
                             int add = Mathf.Min(budget, room);
                             st.Store.Add(water, add);
+                            budget -= add;
+                            delivered = true;
+                        }
+                    }
+                    // Sink 2: a water-using workshop adjacent to the pipe — fed DIRECTLY into
+                    // its input buffer (no barrel needed for local consumption). The workshop
+                    // already eats InBuffer water first, so it just runs.
+                    if (budget > 0 && WorldGrid.Workshops.TryGetValue(nb, out var wk) && wk != null && wk.WantsInput(water))
+                    {
+                        int room = wk.InBuffer.capacity - wk.InBuffer.Total();
+                        if (room > 0)
+                        {
+                            int add = Mathf.Min(budget, room);
+                            wk.InBuffer.Add(water, add);
                             budget -= add;
                             delivered = true;
                         }

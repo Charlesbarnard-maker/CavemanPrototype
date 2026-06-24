@@ -99,7 +99,7 @@ namespace Caveman
             pump.displayName = "Water Pump"; pump.kind = BuildingKind.Pump; pump.item = water; pump.unlockAge = 2;
             pump.color = new Color(0.30f, 0.55f, 0.78f);
             pump.cost = new List<ItemAmount> { new ItemAmount(planks, 4), new ItemAmount(stone, 4) };
-            pump.description = "Place next to water (river/lake) and connect pipes: it pushes water through the network into reachable Water Barrels — no workers carrying it. The Bronze-age evolution of the Water Hole.";
+            pump.description = "Place next to water (river/lake) and connect pipes: it pushes water through the network into reachable Water Barrels AND directly into adjacent water-using buildings (Campfire/Farm/Bakery) — no workers carrying it. The Bronze-age evolution of the Water Hole.";
             var sawmill = MakeWorkshop("Sawmill", planks, 1, 2.5f, 2, 12, new Color(0.66f, 0.50f, 0.30f),
                 new List<ItemAmount> { new ItemAmount(wood, 2) },
                 new ItemAmount(wood, 6), new ItemAmount(stone, 4));
