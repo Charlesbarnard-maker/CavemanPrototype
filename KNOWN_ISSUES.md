@@ -25,6 +25,21 @@ A running record so progress/problems don't get lost. Newest first. Move items t
   water consumption, bigger starting buffers (90 each), slower decline (more grace),
   and a big on-screen ⚠ warning when out of food/water.
 
+## Open — SYSTEMIC SHIFT: local production (2026-06-24, NEEDS TESTING FIRST)
+- **`Economy.LocalProduction` (default ON, F7 toggles).** Workshops now consume inputs only
+  from InBuffer (belt) or an **adjacent** storage/collector/workshop — not the global pool.
+  This is the core "logistics actually matters / bottlenecks cascade" change. **Test this
+  before layering more pressure on top.** Things to verify:
+  - Early game is still doable: can you feed a Sawmill by placing it next to a wood source/
+    storage or belting wood in? Is the difficulty spike fair or brutal?
+  - Do bottlenecks now *cascade* (one starved upstream machine starves everything after it)?
+  - Compare with **F7** (old global-pool mode) to feel the difference.
+  - Collectors now **auto-rebind** to a fresh nearby patch when one depletes; only go idle
+    when the whole local cluster is dry → the cue to expand. Verify it doesn't thrash.
+- **DELIBERATELY NOT YET STACKED** (would obscure whether the above works): deeper universal
+  depletion tuning, throughput ceilings, food spoilage, more shared-intermediate chokepoints.
+  These are the next pressure layers — add one at a time AFTER local production is validated.
+
 ## Open — routes (MVP built — iterate)
 - Caravan routes are point-to-point (elephant shuttles A↔B along a straight line, no
   laid track). Next: **track/path laying** (vehicle follows it; placement puzzle),
