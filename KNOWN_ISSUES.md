@@ -186,6 +186,22 @@ A running record so progress/problems don't get lost. Newest first. Move items t
   which is a lot for a new player. Plan: progressive unlock (via ages) so early game
   shows only a few options, plus a cleaner first-run / tidier build panel.
 
+## UX / visuals pass (2026-06-24)
+- *(Done)* Minimap no longer overlaps panels (reordered + repositioned), **N** hides it,
+  and all panels share a dark background for an organised look. Selected panel shows a
+  plain-language status line. Ground uses soft Perlin noise instead of a flat slab.
+- **Building footprints + input/output port sides: STILL NOT DONE** (asked for repeatedly).
+  It's the one big subsystem held back because doing it blind is too risky: it touches
+  placement (`BuildController.CellOccupied`/ghost), multi-cell occupancy (`WorldGrid` would
+  need to register every footprint cell), belt I/O (`Belt.PullFromNeighbour`/`PushForward`
+  must respect designated sides), and building orientation/rotation. A bug here breaks
+  *placement itself* → can't build anything → ruins a whole test session. Recommend doing
+  it as a dedicated batch with a compile/playtest loop. Scope when tackled:
+  1. `footprintW/H` + `outputDir`/input sides on `BuildingDefinition`.
+  2. Register all covered cells in `WorldGrid`; placement checks all cells; bigger ghost.
+  3. Belts only connect at the matching port cell/side; rotate building with R.
+  4. Visual port markers (in = small notch, out = arrow).
+
 ## Open — content / polish (deliberately deferred)
 - Placeholder art (code-drawn shapes, debug `OnGUI` HUD). One real art pass once
   the systems are locked.
