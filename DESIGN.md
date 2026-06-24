@@ -32,6 +32,14 @@ concrete task to deliver on it: **Power as a global constraint at the Industrial
 (the smallest change that proves an age can transform play). The current game is mechanically
 only Age 1–2; later ages exist as *content*, not yet *mechanic shifts*.
 
+## Build systems: placement, menu, I/O slots, planning (see BUILD_SYSTEMS.md)
+Placement is split by building type (belts drag-place; structured buildings are one-per-click
+to stop accidental spam); the build menu is collapsible categories + a Recent row (scales as
+buildings grow). Two big designed-not-built systems live there: **I/O ports** (buildings as
+directional network nodes — the same as the queued footprint-ports pass, the next major
+build) and a **Planning vs Execution layer** (lay ghosts free → commit → builders execute).
+Full formal design in **`BUILD_SYSTEMS.md`**.
+
 ## Construction is a system (see CONSTRUCTION.md)
 Building is "another production chain to optimise", not a delay: sites hold a material list,
 builders haul it from storage then build (supply rate gates speed), builders spread into
