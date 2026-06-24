@@ -56,6 +56,12 @@ A running record so progress/problems don't get lost. Newest first. Move items t
   machine); **item groups** so a storage holds a category (all "lumber"); re-gate belts.
 
 ## Open — bugs / behaviour
+- **Collectors don't re-bind when their source depletes (matters now ore is finite).**
+  `ProductionBuilding.Bind()` picks the nearest matching node *once* (at spawn). With
+  finite ore veins (Hook #3), a Mine whose vein depletes goes permanently 🔴 Starved even
+  if another vein is in range — the player must demolish + rebuild. Options: re-`Bind()`
+  when `_source` is null/exhausted, or surface "source depleted — relocate" in the panel.
+  (Decide if auto-rebind is desired or if relocation is the intended logistics pressure.)
 - **Workshop inputs & build costs still pull from the global pool, not hauled.**
   Buffer→storage is now physical (Transporters), but a workshop's *inputs* and a
   build site's *materials* are taken from the combined pool regardless of distance.
@@ -82,6 +88,33 @@ A running record so progress/problems don't get lost. Newest first. Move items t
   checks are O(1). Item-on-belt shown as one pooled sliding dot per belt (cheap).
 
 ## Open — optimisation / redundancy
+
+### Audit 2026-06-24 (blind review — logged, not yet fixed)
+- **`OutputBuilding` base class is the clear win (confirms "biggest" below).** Concretely,
+  `ProductionBuilding` and `WorkshopBuilding` share: an **identical `UpdateVisual`**
+  (flash + dim), identical `Awake` (cache `_sr`/`_baseColor`), the `_flash/_sr/_baseColor/
+  _statusDot` field set, near-identical `UpdateStatus` (only the "starved" test differs),
+  near-identical `TryAssign`/`Unassign`, and the same `OnEnable/OnDisable` WorldGrid
+  registration shape. A shared `abstract OutputBuilding : MonoBehaviour, IStaffable`
+  could hold all of it; subclasses override only the per-tick produce logic + the
+  starved test. ~80 lines removed. (Supervised refactor — touches the two hottest files.)
+- **"Nearest-in-list" pattern is copy-pasted ~6×.** `Worker.NearestStorage`,
+  `BuilderWorker.NearestActiveSite`/`DepotFor`/`NearestHousing`, `ProductionBuilding.Bind`,
+  `BuildController.HasMatchingNodeNear` all re-implement the same min-`sqrMagnitude` scan.
+  A generic `Util.Nearest<T>(IEnumerable<T>, Vector3, predicate)` would dedupe all of them.
+- **`Worker` vs `BuilderWorker`** share `MoveTo` (Worker scales by `Prod`, Builder doesn't),
+  `UpdateColor` (identical carry-tint), and the nearest-housing logic — a small shared
+  `CarrierBase` would help once the Nearest helper exists.
+- **Workshop hot path: `CanMake` scans the whole pool every frame while starved.**
+  When inputs are missing, `Update` sets `_timer = processTime`, so each starved workshop
+  calls `Economy.Available` (which iterates all storages+collectors+workshops) **per input,
+  per frame**. With many workshops + buildings this is the main per-frame cost. Fix idea:
+  a once-per-frame cached pool snapshot shared by all consumers (extends the existing
+  `Economy.Totals` caching), or back off the retry cadence when starved.
+- **Stale doc comments:** `ProductionBuilding`/`WorkshopBuilding` class summaries still say
+  buffers are "emptied by Transporters (TransportHub)" — that model was replaced by belts/
+  workers. Harmless, but update when the TransportHub classes are removed.
+
 - **Collector/Workshop duplication [biggest].** `ProductionBuilding` and
   `WorkshopBuilding` duplicate `PushToStorage` / `DrawLink` / `UpdateVisual` / flash
   handling. Extract a shared base class (e.g. `OutputBuilding`). Deferred to a
