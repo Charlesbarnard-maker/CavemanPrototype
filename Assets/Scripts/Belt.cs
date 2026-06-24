@@ -98,23 +98,23 @@ namespace Caveman
         public static bool IsSourceCell(Vector2Int c) =>
             WorldGrid.Collectors.ContainsKey(c) || WorldGrid.Workshops.ContainsKey(c);
 
+        private bool _connected;
+
         void Update()
         {
-            bool connected = HasForwardTarget();
-
+            // Connectivity (a chain-walk up to 256 cells) is only needed when we actually move
+            // an item — recompute it on the interval tick and cache, not every frame.
             _timer += Time.deltaTime;
             if (_timer >= interval)
             {
                 _timer -= interval;
+                _connected = HasForwardTarget();
                 PushForward();
-                if (connected) PullFromNeighbour(); // don't pull goods onto a belt that leads nowhere
+                if (_connected) PullFromNeighbour(); // don't pull goods onto a belt that leads nowhere
             }
 
             if (_sr != null)
-            {
-                if (!connected) _sr.color = new Color(0.55f, 0.25f, 0.25f); // dead end — not connected
-                else _sr.color = _baseColor;
-            }
+                _sr.color = _connected ? _baseColor : new Color(0.55f, 0.25f, 0.25f); // red = dead end
 
             UpdateDot();
         }

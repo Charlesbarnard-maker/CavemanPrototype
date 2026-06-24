@@ -164,6 +164,13 @@ A running record so progress/problems don't get lost. Newest first. Move items t
   drop the starting pop cap. Should be protected from demolition.
 
 ## Optimisation done
+- *(2026-06-24 pass)* **Belt connectivity throttled** — `HasForwardTarget`/`LeadsToSink`
+  (a chain walk up to 256 cells) now runs only on the move-interval tick and is cached
+  (`_connected`), not every frame → big win with many belts. **Workshop `AdjacentAvailable`**
+  no longer allocates a `HashSet` per call (reuses a static). **Worker self-haul removed**
+  (gameplay + perf: one fewer per-frame storage scan). Verified no `FindObjectsByType`/LINQ
+  allocations in hot paths. Remaining (logged below, needs supervised refactor): `OutputBuilding`
+  base class + `Util.Nearest<T>` to dedupe the ~6 nearest-scans.
 - *(2026-06-23)* Belts no longer scan every building each tick — buildings register
   their cell in `WorldGrid` (cell→building dicts) so belt pickup/delivery/connection
   checks are O(1). Item-on-belt shown as one pooled sliding dot per belt (cheap).

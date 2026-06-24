@@ -30,7 +30,7 @@ namespace Caveman
         private bool _buildShown, _selShown;
         private bool _showBuild;
         private readonly List<int> _recent = new(); // recently-placed buildable indices
-        private readonly HashSet<string> _collapsed = new(); // collapsed build-menu categories
+        private string _activeCat = "Gathering"; // build-menu accordion: only this category is open
         private bool _showMinimap = true;
         private bool _showGuide;
         private Vector2 _guideScroll;
@@ -149,6 +149,7 @@ namespace Caveman
             DrawSelectedPanel();
             DrawObjectives();
             DrawResourceFinder();
+            DrawHoverInfo();
             DrawToasts();
             DrawFooter();
             if (Objectives.Instance != null && Objectives.Instance.Won) DrawWin();
@@ -384,6 +385,55 @@ namespace Caveman
         }
 
         // ---- Build menu (left, categorised + scrollable + clickable) ----
+        // Hover tooltip: name whatever's under the cursor (resource + amount, or building +
+        // contents), so the placeholder shapes are readable. Skipped while placing/over a panel.
+        private void DrawHoverInfo()
+        {
+            if (builder != null && builder.PendingIndex >= 0) return;
+            if (PointerOverUI) return;
+            var cam = Camera.main;
+            var mouse = Mouse.current;
+            if (cam == null || mouse == null) return;
+            Vector2 sp = mouse.position.ReadValue();
+            Vector3 w = cam.ScreenToWorldPoint(sp);
+            var hit = Physics2D.OverlapPoint(w);
+            if (hit == null) return;
+            string info = HoverText(hit);
+            if (string.IsNullOrEmpty(info)) return;
+
+            var rect = new Rect(sp.x + 16f, Screen.height - sp.y + 8f, 234f, 30f);
+            if (rect.xMax > Screen.width) rect.x = Screen.width - rect.width - 4f;
+            PanelBg(rect);
+            GUI.Label(new Rect(rect.x + 8f, rect.y + 5f, rect.width - 16f, rect.height - 10f), info, _small);
+        }
+
+        private static string NameOf(BuildingDefinition d) => d != null ? d.displayName : "Building";
+        private static string HoverText(Collider2D hit)
+        {
+            var rn = hit.GetComponent<ResourceNode>();
+            if (rn != null && rn.yields != null)
+            {
+                string hex = ColorUtility.ToHtmlStringRGB(rn.yields.color);
+                return $"<size=14><color=#{hex}>■</color> <b>{rn.yields.displayName}</b>  <color=#bbb>x{rn.Amount}</color></size>";
+            }
+            var pb = hit.GetComponent<ProductionBuilding>();
+            if (pb != null) return $"<size=13><b>{NameOf(pb.def)}</b>  <color=#bbb>{(pb.produces != null ? pb.produces.displayName : "")}</color></size>";
+            var wb = hit.GetComponent<WorkshopBuilding>();
+            if (wb != null) return $"<size=13><b>{NameOf(wb.def)}</b>  <color=#bbb>{(wb.output != null ? wb.output.displayName : "")}</color></size>";
+            var sb = hit.GetComponent<StorageBuilding>();
+            if (sb != null) return $"<size=13><b>{NameOf(sb.def)}</b>  <color=#bbb>{(sb.accepts != null ? sb.accepts.displayName : "empty")}</color></size>";
+            var dp = hit.GetComponent<Depot>();
+            if (dp != null) return $"<size=13><b>{NameOf(dp.def)}</b>  <color=#bbb>{(dp.item != null ? dp.item.displayName : "empty")}</color></size>";
+            var hb = hit.GetComponent<HousingBuilding>();
+            if (hb != null) return $"<size=13><b>{NameOf(hb.def)}</b></size>";
+            var pp = hit.GetComponent<PowerPlant>();
+            if (pp != null) return "<size=13><b>Power Plant</b></size>";
+            var cy = hit.GetComponent<ConstructionYard>();
+            if (cy != null) return "<size=13><b>Construction Yard</b></size>";
+            if (hit.GetComponent<Bridge>() != null) return "<size=13><b>Bridge</b></size>";
+            return null;
+        }
+
         private void RecordRecent(int i)
         {
             _recent.Remove(i);
@@ -487,8 +537,9 @@ namespace Caveman
                     if (i >= 0 && i < builder.buildables.Count && builder.IsUnlocked(builder.buildables[i])) Entry(i);
             }
 
-            // Collapsible categories — click a header to fold it away so the menu stays
-            // navigable as buildings grow. Empty/all-future categories are skipped.
+            // Accordion categories — every header is always visible (compact), but only the
+            // one you click is OPEN, so you see one category's items at a time instead of
+            // scrolling the whole list. Empty/all-future categories are skipped.
             foreach (var cat in Cats)
             {
                 bool hasAny = false;
@@ -499,12 +550,10 @@ namespace Caveman
                 }
                 if (!hasAny) continue;
 
-                bool collapsed = _collapsed.Contains(cat.label);
-                if (GUILayout.Button($"<size=12><b><color=#d8c8a0>{(collapsed ? "▶" : "▼")} {cat.label}</color></b></size>", _btn))
-                {
-                    if (collapsed) _collapsed.Remove(cat.label); else _collapsed.Add(cat.label);
-                }
-                if (collapsed) continue;
+                bool active = _activeCat == cat.label;
+                if (GUILayout.Button($"<size=12><b><color=#d8c8a0>{(active ? "▼" : "▶")} {cat.label}</color></b></size>", _btn))
+                    _activeCat = active ? "" : cat.label; // open this one (closes the rest); click again to close
+                if (!active) continue;
 
                 for (int i = 0; i < builder.buildables.Count; i++)
                 {

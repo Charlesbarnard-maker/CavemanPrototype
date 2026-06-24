@@ -174,15 +174,16 @@ namespace Caveman
         }
 
         /// <summary>Units of `item` reachable from storages / machines adjacent to the footprint.</summary>
+        private static readonly HashSet<Component> _counted = new(); // reused (no per-call alloc)
         private int AdjacentAvailable(ItemDefinition item)
         {
             int n = 0;
-            var counted = new HashSet<Component>(); // a multi-cell neighbour must count only once
+            _counted.Clear(); // a multi-cell neighbour must count only once
             foreach (var nc in Neighbours())
             {
-                if (WorldGrid.Storages.TryGetValue(nc, out var s) && s != null && s.accepts == item && counted.Add(s)) n += s.Store.Count(item);
-                if (WorldGrid.Collectors.TryGetValue(nc, out var p) && p != null && p.produces == item && counted.Add(p)) n += p.Buffer.Count(item);
-                if (WorldGrid.Workshops.TryGetValue(nc, out var w) && w != null && w != this && w.output == item && counted.Add(w)) n += w.Buffer.Count(item);
+                if (WorldGrid.Storages.TryGetValue(nc, out var s) && s != null && s.accepts == item && _counted.Add(s)) n += s.Store.Count(item);
+                if (WorldGrid.Collectors.TryGetValue(nc, out var p) && p != null && p.produces == item && _counted.Add(p)) n += p.Buffer.Count(item);
+                if (WorldGrid.Workshops.TryGetValue(nc, out var w) && w != null && w != this && w.output == item && _counted.Add(w)) n += w.Buffer.Count(item);
             }
             return n;
         }
