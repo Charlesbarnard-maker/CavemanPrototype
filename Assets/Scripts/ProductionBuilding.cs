@@ -18,6 +18,7 @@ namespace Caveman
         public float interval = 2f;
         public int maxWorkers = 2;
         public float sourceRange = 6f;   // worker can commute this far
+        public Belt.Dir OutputSide = Belt.Dir.E; // belts pull output only from this side
 
         public Inventory Buffer { get; private set; }
         public bool Paused { get; private set; }            // player can halt it (priorities)
@@ -49,7 +50,7 @@ namespace Caveman
         private Color _baseColor;
         private SpriteRenderer _statusDot;
 
-        public static ProductionBuilding Spawn(BuildingDefinition def, Vector3 pos)
+        public static ProductionBuilding Spawn(BuildingDefinition def, Vector3 pos, Belt.Dir outputSide = Belt.Dir.E)
         {
             var go = new GameObject(def.displayName);
             go.transform.position = new Vector3(pos.x, pos.y, 0f);
@@ -69,8 +70,10 @@ namespace Caveman
             pb.interval = def.interval;
             pb.maxWorkers = Mathf.Max(1, def.maxWorkers);
             pb.Buffer = new Inventory { capacity = Mathf.Max(1, def.capacity) };
+            pb.OutputSide = outputSide;
             pb._cells = Footprint.Cells(go.transform.position, def.FootW, def.FootH);
             foreach (var c in pb._cells) WorldGrid.Collectors[c] = pb;
+            Ports.MakeOutputArrow(go.transform, outputSide);
             pb.Bind();
             return pb;
         }

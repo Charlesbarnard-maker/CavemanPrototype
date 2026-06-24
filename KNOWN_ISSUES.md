@@ -88,8 +88,16 @@ A running record so progress/problems don't get lost. Newest first. Move items t
   the pool). Buildings snap to the belt grid. Haulers range-limited.
 - Belts now: **don't run when disconnected** (dead-end = red, won't pull), **two speed
   tiers** (Wooden/Conveyor), and build-menu **tooltips** explain each building.
-- **BIGGEST remaining (next focused batch): multi-cell building footprints + explicit
-  input/output port sides.** Buildings are 1 cell, so only 4 belt connections and no
+- **I/O PORTS — Step A done (2026-06-24), NEEDS TESTING.** Collectors + workshops now have a
+  rotatable **output side** (`OutputSide`, R during placement, green arrow on the edge +
+  ghost). Belts only **pull** a building's output from that side (`Belt.PullFromNeighbour`
+  gated by `OutputSide == Opposite(scanDir)`). All buildings default output = East, so belts
+  must sit on the arrow side. *Step B (not done):* input-side ports (deliver only on chosen
+  sides), per-input ports (Smelter: Ore port + Charcoal port on different sides), and gating
+  depots/storages + the workshop local-`AdjacentConsume` (currently still omnidirectional for
+  inputs). Watch for: collectors whose belt was on a non-east side now not pulling (rotate
+  with R); AutoBeltDir doesn't know about output sides yet.
+- **(superseded) multi-cell footprints + I/O port sides.** Buildings are 1 cell, so only 4 belt connections and no
   size variety. Want: buildings sized by function (e.g. 2×2 workshop, big warehouse),
   with dedicated output/input port cells (facing, rotatable) — belts must connect to
   the right slot. This is the spatial-challenge depth the player is asking for; it's a

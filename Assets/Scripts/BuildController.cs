@@ -35,6 +35,9 @@ namespace Caveman
         private Vector2Int _dragLast;
         private Depot _routeA; // first depot picked when linking a route
         private GameObject _highlight; // glow ring around the selected building
+        public Belt.Dir BuildDir { get; private set; } = Belt.Dir.E; // output side for the building being placed
+        private GameObject _ghostArrow; // shows the output side on the ghost
+        private SpriteRenderer _ghostArrowSr;
 
         void Awake() => _cam = Camera.main;
 
@@ -172,6 +175,13 @@ namespace Caveman
             if (_cam == null || mouse == null || _ghost == null) return;
 
             var def = buildables[PendingIndex];
+            var kb = Keyboard.current;
+
+            // Producers/processors have a rotatable OUTPUT side — R cycles it; an arrow
+            // on the ghost shows where output will leave (belts pull only from there).
+            bool hasPorts = def.kind == BuildingKind.Collector || def.kind == BuildingKind.Workshop;
+            if (hasPorts && kb != null && kb.rKey.wasPressedThisFrame) BuildDir = Belt.RotateCW(BuildDir);
+
             Vector3 raw = _cam.ScreenToWorldPoint(mouse.position.ReadValue());
             // Snap to a valid CENTRE for this footprint (half-integer for even sizes).
             Vector3 world = Footprint.SnapCenter(raw, def.FootW, def.FootH);
@@ -181,6 +191,7 @@ namespace Caveman
             _ghostSr.sprite = PlaceholderArt.Square();
             float gb = def.kind == BuildingKind.Collector ? 0.9f : 1.0f;
             _ghost.transform.localScale = new Vector3(def.FootW * gb, def.FootH * gb, 1f);
+            UpdateGhostArrow(hasPorts, world, def);
 
             bool affordable = Economy.CanAfford(def.cost, Carried);
             bool placeOk = def.kind != BuildingKind.Collector
@@ -200,11 +211,32 @@ namespace Caveman
             // PointerOverUI guard stops a build-menu click from also dropping a building.
             if (mouse.leftButton.wasPressedThisFrame && PlacementValid && !InventoryHud.PointerOverUI)
             {
-                if (Economy.FreeBuild) ConstructionSite.SpawnFinished(def, world); // sandbox: instant
-                else ConstructionSite.Spawn(def, world); // builders haul materials, then construct
+                if (Economy.FreeBuild) ConstructionSite.SpawnFinished(def, world, BuildDir); // sandbox: instant
+                else ConstructionSite.Spawn(def, world, BuildDir); // builders haul materials, then construct
                 BuildingsPlaced++;
             }
             if (mouse.rightButton.wasPressedThisFrame) CancelPlacement();
+        }
+
+        // Position/rotate the green output-arrow on the ghost (hidden for buildings without
+        // an output port, e.g. storage/housing/depot/power/yard).
+        private void UpdateGhostArrow(bool show, Vector3 center, BuildingDefinition def)
+        {
+            if (_ghostArrow == null)
+            {
+                _ghostArrow = new GameObject("GhostArrow");
+                _ghostArrowSr = _ghostArrow.AddComponent<SpriteRenderer>();
+                _ghostArrowSr.sprite = PlaceholderArt.Triangle();
+                _ghostArrowSr.color = new Color(0.25f, 0.95f, 0.35f, 0.95f);
+                _ghostArrowSr.sortingOrder = 21;
+            }
+            if (!show) { if (_ghostArrow.activeSelf) _ghostArrow.SetActive(false); return; }
+            if (!_ghostArrow.activeSelf) _ghostArrow.SetActive(true);
+            var s = Belt.Step(BuildDir);
+            float ext = (s.x != 0 ? def.FootW : def.FootH) * 0.5f + 0.25f;
+            _ghostArrow.transform.position = center + new Vector3(s.x, s.y, 0f) * ext;
+            _ghostArrow.transform.rotation = Quaternion.Euler(0f, 0f, Belt.Angle(BuildDir));
+            _ghostArrow.transform.localScale = Vector3.one * 0.5f;
         }
 
         // True if ANY cell this footprint would cover is already taken.
@@ -235,6 +267,7 @@ namespace Caveman
         private void UpdateBeltPlacement(Mouse mouse, Keyboard kb)
         {
             if (_cam == null || mouse == null || _ghost == null) return;
+            if (_ghostArrow != null) _ghostArrow.SetActive(false); // belts have no output port
             var def = buildables[PendingIndex];
 
             if (kb.rKey.wasPressedThisFrame) BeltDir = Belt.RotateCW(BeltDir);
@@ -341,6 +374,7 @@ namespace Caveman
         private void UpdateRoutePlacement(Mouse mouse)
         {
             if (_ghost != null) _ghost.SetActive(false);
+            if (_ghostArrow != null) _ghostArrow.SetActive(false);
             if (_cam == null || mouse == null) return;
 
             if (mouse.rightButton.wasPressedThisFrame) { _routeA = null; CancelPlacement(); return; }
@@ -373,6 +407,7 @@ namespace Caveman
             _dragging = false;
             _routeA = null;
             if (_ghost != null) _ghost.SetActive(false);
+            if (_ghostArrow != null) _ghostArrow.SetActive(false);
         }
 
         public bool CanAfford(BuildingDefinition def) => def != null && Economy.CanAfford(def.cost, Carried);

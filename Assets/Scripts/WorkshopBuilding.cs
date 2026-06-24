@@ -17,6 +17,7 @@ namespace Caveman
         public float processTime = 2.5f;
         public int maxWorkers = 2;
         public List<ItemAmount> inputs = new();
+        public Belt.Dir OutputSide = Belt.Dir.E; // belts pull output only from this side
 
         public Inventory Buffer { get; private set; }      // finished output
         public Inventory InBuffer { get; private set; }     // inputs delivered by belts
@@ -52,7 +53,7 @@ namespace Caveman
         private Color _baseColor;
         private SpriteRenderer _statusDot;
 
-        public static WorkshopBuilding Spawn(BuildingDefinition def, Vector3 pos)
+        public static WorkshopBuilding Spawn(BuildingDefinition def, Vector3 pos, Belt.Dir outputSide = Belt.Dir.E)
         {
             var go = new GameObject(def.displayName);
             go.transform.position = new Vector3(pos.x, pos.y, 0f);
@@ -74,8 +75,10 @@ namespace Caveman
             w.inputs = def.inputs;
             w.Buffer = new Inventory { capacity = Mathf.Max(1, def.capacity) };
             w.InBuffer = new Inventory { capacity = 24 };
+            w.OutputSide = outputSide;
             w._cells = Footprint.Cells(go.transform.position, def.FootW, def.FootH);
             foreach (var c in w._cells) WorldGrid.Workshops[c] = w;
+            Ports.MakeOutputArrow(go.transform, outputSide);
             return w;
         }
 

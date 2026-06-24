@@ -416,7 +416,9 @@ namespace Caveman
                     string ok = builder.PlacementValid ? "<color=#9f9>green = click to place</color>" : bad;
                     GUILayout.Label($"<b>Placing {def.displayName}</b> — {ok}", _s);
                     string hint = isColl ? $"<color=#cda>Must sit next to a {Name(def.item)} source — the {Name(def.item)} patches are glowing.</color>  " : "";
-                    GUILayout.Label($"<size=14>{hint}right-click / Esc to cancel</size>", _small);
+                    bool hasPorts = def.kind == BuildingKind.Collector || def.kind == BuildingKind.Workshop;
+                    string rot = hasPorts ? $"<color=#6f6>R rotates output ▸ {builder.BuildDir}</color> (belts pull from there) · " : "";
+                    GUILayout.Label($"<size=14>{hint}{rot}right-click / Esc to cancel</size>", _small);
                 }
                 GUILayout.EndArea();
                 return;

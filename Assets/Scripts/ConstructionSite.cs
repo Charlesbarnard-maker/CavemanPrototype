@@ -13,6 +13,7 @@ namespace Caveman
     {
         public BuildingDefinition def;
         public float buildTime = 4f;
+        public Belt.Dir outDir = Belt.Dir.E; // output side chosen at placement (collectors/workshops)
 
         /// <summary>A material line: how many still needed, and how many are reserved in-transit.</summary>
         public class Mat { public ItemDefinition item; public int needed; public int claimed; }
@@ -57,7 +58,7 @@ namespace Caveman
         private SpriteRenderer _sr;
         private Color _baseColor;
 
-        public static ConstructionSite Spawn(BuildingDefinition def, Vector3 pos)
+        public static ConstructionSite Spawn(BuildingDefinition def, Vector3 pos, Belt.Dir outDir = Belt.Dir.E)
         {
             var go = new GameObject("Site: " + def.displayName);
             go.transform.position = new Vector3(pos.x, pos.y, 0f);
@@ -73,6 +74,7 @@ namespace Caveman
 
             var site = go.AddComponent<ConstructionSite>();
             site.def = def;
+            site.outDir = outDir;
             site._sr = sr;
             site._baseColor = def.color;
             foreach (var c in def.cost)
@@ -136,23 +138,23 @@ namespace Caveman
 
         private void Complete()
         {
-            SpawnFinished(def, transform.position);
+            SpawnFinished(def, transform.position, outDir);
             Destroy(gameObject);
         }
 
         /// <summary>Spawn the finished building of the given kind at a position (no construction).</summary>
-        public static void SpawnFinished(BuildingDefinition def, Vector3 pos)
+        public static void SpawnFinished(BuildingDefinition def, Vector3 pos, Belt.Dir outDir = Belt.Dir.E)
         {
             switch (def.kind)
             {
                 case BuildingKind.Storage: StorageBuilding.Spawn(def, pos); break;
                 case BuildingKind.Housing: HousingBuilding.Spawn(def, pos); break;
-                case BuildingKind.Workshop: WorkshopBuilding.Spawn(def, pos).TryAssign(); break;
+                case BuildingKind.Workshop: WorkshopBuilding.Spawn(def, pos, outDir).TryAssign(); break;
                 case BuildingKind.Logistics: TransportHub.Spawn(def, pos).TryAssign(); break;
                 case BuildingKind.Depot: Depot.Spawn(def, pos); break;
                 case BuildingKind.Power: PowerPlant.Spawn(def, pos); break;
                 case BuildingKind.Build: ConstructionYard.Spawn(def, pos); break;
-                default: ProductionBuilding.Spawn(def, pos).TryAssign(); break;
+                default: ProductionBuilding.Spawn(def, pos, outDir).TryAssign(); break;
             }
         }
 

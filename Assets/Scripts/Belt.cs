@@ -222,13 +222,17 @@ namespace Caveman
             {
                 var c = _cell + Step((Dir)di);
 
+                // Output ports: a belt only pulls a building's output from its OUTPUT side
+                // (the building's output must face this belt — Opposite of our scan dir).
                 if (WorldGrid.Collectors.TryGetValue(c, out var p) && p != null && p.produces != null
+                    && p.OutputSide == Opposite((Dir)di)
                     && (item == null || item == p.produces) && p.Buffer.Count(p.produces) > 0)
                 {
                     if (p.Buffer.RemoveUpTo(p.produces, 1) > 0) { item = p.produces; count++; _inDir = (Dir)di; return; }
                 }
 
                 if (WorldGrid.Workshops.TryGetValue(c, out var w) && w != null && w.output != null
+                    && w.OutputSide == Opposite((Dir)di)
                     && (item == null || item == w.output) && w.Buffer.Count(w.output) > 0)
                 {
                     if (w.Buffer.RemoveUpTo(w.output, 1) > 0) { item = w.output; count++; _inDir = (Dir)di; return; }
