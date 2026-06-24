@@ -297,6 +297,13 @@ namespace Caveman
                 new Quest { title = "🏆 Complete the Monument — 10 Blocks. YOU WIN!", done = () => Have(monument) >= 10, isWin = true },
             };
 
+            // --- Random world events (variety / surprise hook) ---
+            var events = new GameObject("WorldEvents").AddComponent<WorldEvents>();
+            events.carried = gatherer.Inventory;
+            events.food = food;
+            events.wood = wood;
+            events.stone = stone;
+
             // --- Resource patches: spread WIDE across the map so you must explore.
             //     A clear central area stays open as the player's base/processing yard. ---
             const float baseClear = 11f;
