@@ -41,16 +41,19 @@ namespace Caveman
                     int wx = gx - half, wy = gy - half;
                     if (wx * wx + wy * wy <= basin2) { _map[gy * _size + gx] = Terrain.Plains; continue; }
 
+                    // Ocean rim: a coastline of water near the map edge → a clean world boundary.
+                    bool ocean = (wx * wx + wy * wy) > (half - 8) * (half - 8);
+
                     float e = Mathf.PerlinNoise(wx * eF + ox, wy * eF + oy);     // elevation
                     float m = Mathf.PerlinNoise(wx * mF + ox2, wy * mF + oy2);   // moisture
-                    // Winding rivers: thin bands where a low-freq noise crosses 0.5 — these snake
-                    // across the map and DIVIDE it into regions you must bridge between.
-                    bool river = Mathf.Abs(Mathf.PerlinNoise(wx * rF + rox, wy * rF + roy) - 0.5f) < 0.035f;
+                    // Winding rivers: THIN bands where a low-freq noise crosses 0.5 — these snake
+                    // across the map and DIVIDE it into regions you bridge between (routes, not walls).
+                    bool river = Mathf.Abs(Mathf.PerlinNoise(wx * rF + rox, wy * rF + roy) - 0.5f) < 0.020f;
 
                     Terrain t;
-                    if (river || e < 0.34f) t = Terrain.Water;   // rivers + low ground (lakes)
-                    else if (e > 0.70f) t = Terrain.Hills;       // high ground → hills
-                    else if (m > 0.62f) t = Terrain.Forest;      // wet mid ground → forest
+                    if (ocean || river || e < 0.20f) t = Terrain.Water; // coastline + thin rivers + rare lakes
+                    else if (e > 0.70f) t = Terrain.Hills;              // high ground → hills
+                    else if (m > 0.60f) t = Terrain.Forest;            // wet mid ground → forest
                     else t = Terrain.Plains;
                     _map[gy * _size + gx] = t;
                 }
@@ -141,6 +144,25 @@ namespace Caveman
                     if (gx < 0 || gy < 0 || gx >= _size || gy >= _size) continue;
                     if (_map[gy * _size + gx] == Terrain.Water) _map[gy * _size + gx] = Terrain.Plains;
                 }
+        }
+
+        /// <summary>Find a random cell of `biome` at least `minClear` from origin (for biome-placed
+        /// resources). Returns false if none found within `attempts` tries.</summary>
+        public static bool TryRandomCellOfBiome(Terrain biome, float minClear, int attempts, out Vector3 pos)
+        {
+            pos = default;
+            if (_map == null) return false;
+            float min2 = minClear * minClear;
+            for (int i = 0; i < attempts; i++)
+            {
+                int wx = UnityEngine.Random.Range(-Half, Half + 1);
+                int wy = UnityEngine.Random.Range(-Half, Half + 1);
+                if (wx * wx + wy * wy < min2) continue;
+                if (At(wx, wy) != biome) continue;
+                pos = new Vector3(wx, wy, 0f);
+                return true;
+            }
+            return false;
         }
 
         public static Color ColorOf(Terrain t) => t switch

@@ -275,7 +275,7 @@ namespace Caveman
             MakeSprite("Ground", Color.white, Vector2.zero, 420f, -100, PlaceholderArt.Ground(new Color(0.22f, 0.31f, 0.19f)));
             // World as a system: biome map with a clear starting basin. Water blocks building,
             // so geography forces routing/expansion decisions. Rendered after resource spawns.
-            TerrainGrid.Generate(200, Random.value * 1000f, 15f); // big world (~400 across); compact start basin
+            TerrainGrid.Generate(200, Random.value * 1000f, 22f); // big world (~400 across); open start basin
 
             // --- Player ---
             var player = MakeSprite("Player", new Color(0.92f, 0.82f, 0.25f), Vector2.zero, 0.7f, 10, PlaceholderArt.Circle());
@@ -425,34 +425,45 @@ namespace Caveman
             SpawnPatches("Gem Deposit", gems, new Color(0.50f, 0.82f, 0.76f), 3,
                 new Vector2(48f, -42f), new Vector2(10f, 10f), new Vector2(1.0f, 1.4f), PlaceholderArt.Hexagon(), 45, 32f, 0);
 
-            // --- FRONTIER (the big world): rich clusters spread far out in every direction, so
-            //     exploration uncovers a lot and expansion has real targets. Finite ore/gems out
-            //     here are the late-game economy (you must reach + supply-line them home). ---
-            SpawnPatches("Tree", wood, new Color(0.27f, 0.55f, 0.22f), 16,
-                new Vector2(120f, 70f), new Vector2(40f, 40f), new Vector2(1.0f, 1.6f), PlaceholderArt.Triangle(), 30, 60f);
-            SpawnPatches("Tree", wood, new Color(0.27f, 0.55f, 0.22f), 16,
-                new Vector2(-110f, 90f), new Vector2(40f, 40f), new Vector2(1.0f, 1.6f), PlaceholderArt.Triangle(), 30, 60f);
-            SpawnPatches("Rock", stone, new Color(0.55f, 0.55f, 0.6f), 16,
-                new Vector2(-120f, -80f), new Vector2(40f, 40f), new Vector2(1.0f, 1.6f), PlaceholderArt.Hexagon(), 30, 60f);
-            SpawnPatches("Clay", clay, new Color(0.68f, 0.46f, 0.36f), 10,
-                new Vector2(100f, -100f), new Vector2(30f, 30f), new Vector2(1.0f, 1.5f), PlaceholderArt.Hexagon(), 40, 60f);
-            SpawnPatches("Cotton", fiber, new Color(0.80f, 0.84f, 0.66f), 10,
-                new Vector2(40f, 130f), new Vector2(30f, 24f), new Vector2(0.7f, 1.1f), PlaceholderArt.Circle(), 36, 60f);
-            SpawnPatches("Herd", meat, new Color(0.66f, 0.34f, 0.34f), 10,
-                new Vector2(-60f, -130f), new Vector2(30f, 24f), new Vector2(0.8f, 1.2f), PlaceholderArt.Circle(), 30, 60f);
-            // Rich finite ore + gems far out — the frontier economy.
-            SpawnPatches("Ore Vein", ore, new Color(0.62f, 0.58f, 0.42f), 6,
-                new Vector2(150f, -40f), new Vector2(28f, 40f), new Vector2(1.1f, 1.6f), PlaceholderArt.Hexagon(), 80, 60f, 0);
-            SpawnPatches("Ore Vein", ore, new Color(0.62f, 0.58f, 0.42f), 6,
-                new Vector2(-150f, 30f), new Vector2(28f, 40f), new Vector2(1.1f, 1.6f), PlaceholderArt.Hexagon(), 80, 60f, 0);
-            SpawnPatches("Gem Deposit", gems, new Color(0.50f, 0.82f, 0.76f), 5,
-                new Vector2(30f, -160f), new Vector2(26f, 26f), new Vector2(1.0f, 1.5f), PlaceholderArt.Hexagon(), 60, 60f, 0);
+            // --- BIOME FRONTIER: resources live in their biome, so each region means something
+            //     and expansion is a planning problem (find the region → route it home). FORESTS
+            //     = lumber + fibre; HILLS = stone, ore, gems; PLAINS = herds + clay. Finite
+            //     ore/gems out here are the late-game economy. ---
+            ScatterInBiome("Tree", wood, new Color(0.27f, 0.55f, 0.22f), PlaceholderArt.Triangle(),
+                Terrain.Forest, 70, 50f, 30, 1, new Vector2(1.0f, 1.6f));
+            ScatterInBiome("Cotton", fiber, new Color(0.80f, 0.84f, 0.66f), PlaceholderArt.Circle(),
+                Terrain.Forest, 14, 50f, 36, 1, new Vector2(0.7f, 1.1f));
+            ScatterInBiome("Rock", stone, new Color(0.55f, 0.55f, 0.6f), PlaceholderArt.Hexagon(),
+                Terrain.Hills, 55, 50f, 30, 1, new Vector2(1.0f, 1.6f));
+            ScatterInBiome("Ore Vein", ore, new Color(0.62f, 0.58f, 0.42f), PlaceholderArt.Hexagon(),
+                Terrain.Hills, 28, 55f, 80, 0, new Vector2(1.1f, 1.6f)); // finite
+            ScatterInBiome("Gem Deposit", gems, new Color(0.50f, 0.82f, 0.76f), PlaceholderArt.Hexagon(),
+                Terrain.Hills, 9, 90f, 60, 0, new Vector2(1.0f, 1.5f)); // finite, far
+            ScatterInBiome("Herd", meat, new Color(0.66f, 0.34f, 0.34f), PlaceholderArt.Circle(),
+                Terrain.Plains, 14, 60f, 30, 1, new Vector2(0.8f, 1.2f));
+            ScatterInBiome("Clay", clay, new Color(0.68f, 0.46f, 0.36f), PlaceholderArt.Hexagon(),
+                Terrain.Plains, 12, 60f, 40, 1, new Vector2(1.0f, 1.5f));
 
             // Guarantee a reachable water feature just outside the starting basin so you can
             // build a Water Hole early (carved last so resource ClearAround can't erase it).
             TerrainGrid.CarveWater(new Vector3(15f, 3f, 0f), 3.0f);
             // Bake the biome map into its visual now that resource cells have been cleared.
             TerrainGrid.SpawnRenderer();
+        }
+
+        // Scatters `count` resource patches onto cells of a given BIOME (forest/hills/plains),
+        // so each region has its own resources — expansion becomes a planning problem.
+        private static void ScatterInBiome(string name, ItemDefinition item, Color color, Sprite sprite,
+            Terrain biome, int count, float minClear, int capacity, int regen, Vector2 sizeRange)
+        {
+            for (int i = 0; i < count; i++)
+            {
+                if (!TerrainGrid.TryRandomCellOfBiome(biome, minClear, 50, out var p)) continue;
+                float size = Random.Range(sizeRange.x, sizeRange.y);
+                float b = Random.Range(0.9f, 1.1f);
+                var c = new Color(Mathf.Clamp01(color.r * b), Mathf.Clamp01(color.g * b), Mathf.Clamp01(color.b * b));
+                SpawnNode(name, item, c, p, size, sprite, capacity, regen);
+            }
         }
 
         // Scatters `count` patches around `center`, jittered by ±spread, random size,

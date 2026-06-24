@@ -66,6 +66,16 @@ namespace Caveman
                 else Selected = null;
             }
 
+            // Rapid delete (QoL): X or Delete removes the building UNDER THE CURSOR, in any
+            // mode (no need to click-select first) — fast correction of placement mistakes.
+            if ((kb.xKey.wasPressedThisFrame || kb.deleteKey.wasPressedThisFrame)
+                && mouse != null && !InventoryHud.PointerOverUI)
+            {
+                var under = BuildingGOUnderCursor(mouse);
+                if (under != null) { Selected = under; DemolishSelected(); }
+                else if (PendingIndex < 0) DemolishSelected(); // nothing hovered: fall back to selection
+            }
+
             if (PendingIndex >= 0)
             {
                 var pk = buildables[PendingIndex] != null ? buildables[PendingIndex].kind : BuildingKind.Collector;
@@ -89,7 +99,6 @@ namespace Caveman
                 if (kb.leftBracketKey.wasPressedThisFrame) staff.Unassign();
             }
 
-            if (kb.xKey.wasPressedThisFrame) DemolishSelected();
             if (kb.cKey.wasPressedThisFrame && Selected != null) CopySelected();
         }
 

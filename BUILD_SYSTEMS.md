@@ -35,10 +35,12 @@ ghost that follows the cursor.
 ## 2. Build-menu structure — hierarchical & scalable
 Goal: find any building in **1–2 interactions**, even late game.
 
-**Built ✅:** category headers (Gathering / Workshops / Belts / Routes / Power / Construction
-/ Storage / Housing), **collapsible** (click a header to fold), a **Recent** row of your
-last-placed buildings, age-gated (locked shown greyed with unlock age + hover description),
-number-key shortcuts for the top entries, hover tooltips.
+**Built ✅:** **accordion** categories (Gathering / Workshops / Belts / Bridges / Liquids / Pipes
+/ Routes / Power / Construction / Storage / Housing) — only the clicked one is open, so you see
+one category at a time; **★ Pinned** favourites row + **Recent** row on top; **obsolete (≥2 ages
+old) tech is dimmed** but still usable; far-future buildings hidden until near their age; locked
+items greyed with unlock age; number-key shortcuts; hover tooltips. Covers progression-aware
+filtering (A), structured categories (B), and contextual visibility + recent/pinned (C).
 
 **Category structure (target):**
 ```

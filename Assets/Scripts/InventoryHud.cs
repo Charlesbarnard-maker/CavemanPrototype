@@ -30,6 +30,7 @@ namespace Caveman
         private bool _buildShown, _selShown;
         private bool _showBuild;
         private readonly List<int> _recent = new(); // recently-placed buildable indices
+        private readonly HashSet<int> _pinned = new(); // pinned (favourite) buildable indices
         private string _activeCat = "Gathering"; // build-menu accordion: only this category is open
         private bool _showMinimap = true;
         private bool _showGuide;
@@ -520,22 +521,41 @@ namespace Caveman
             int curAge = col != null ? col.Age : 0;
             _buildScroll = GUILayout.BeginScrollView(_buildScroll);
 
-            // Draws one build entry (locked → label, unlocked → button). Local fn so the
-            // recent row and category lists render identically.
+            // Draws one build entry: a pin star + the build button. Locked → greyed label.
+            // Obsolete (unlocked ≥2 ages ago) is dimmed but still usable. Local fn so the
+            // pinned/recent/category lists all render identically.
             void Entry(int i)
             {
                 var def = builder.buildables[i];
                 if (def == null) return;
+                GUILayout.BeginHorizontal();
+                bool pinned = _pinned.Contains(i);
+                if (GUILayout.Button(pinned ? "<color=#ffd24d>★</color>" : "<color=#777>☆</color>", _btn, GUILayout.Width(22)))
+                { if (pinned) _pinned.Remove(i); else _pinned.Add(i); }
+
                 if (!builder.IsUnlocked(def))
                 {
                     string ageName = def.unlockAge < Colony.AgeNames.Length ? Colony.AgeNames[def.unlockAge] : "later";
                     GUILayout.Label(new GUIContent($"<size=11><color=#888>🔒 {def.displayName} — {ageName}</color></size>", Describe(def)), _small);
-                    return;
                 }
-                string costCol = builder.CanAfford(def) ? "#9f9" : "#f99";
-                string key = i < 9 ? (i + 1).ToString() : i == 9 ? "0" : "·";
-                var label = new GUIContent($"<size=12>[{key}] {def.displayName}  <color={costCol}>{CostText(def)}</color></size>", Describe(def));
-                if (GUILayout.Button(label, _btn)) { builder.BeginPlacement(i); RecordRecent(i); }
+                else
+                {
+                    bool obsolete = curAge - def.unlockAge >= 2; // de-emphasise old-age tech
+                    string costCol = builder.CanAfford(def) ? "#9f9" : "#f99";
+                    string key = i < 9 ? (i + 1).ToString() : i == 9 ? "0" : "·";
+                    string nm = obsolete ? $"<color=#9a9a9a>{def.displayName}</color>" : def.displayName;
+                    var label = new GUIContent($"<size=12>[{key}] {nm}  <color={costCol}>{CostText(def)}</color></size>", Describe(def));
+                    if (GUILayout.Button(label, _btn)) { builder.BeginPlacement(i); RecordRecent(i); }
+                }
+                GUILayout.EndHorizontal();
+            }
+
+            // Pinned favourites — always one click away regardless of category/age.
+            if (_pinned.Count > 0)
+            {
+                GUILayout.Label("<b><color=#ffd24d>★ Pinned</color></b>", _small);
+                foreach (int i in _pinned)
+                    if (i >= 0 && i < builder.buildables.Count && builder.IsUnlocked(builder.buildables[i])) Entry(i);
             }
 
             // Recently-placed shortcut row — fast re-access of what you're actively using.
@@ -920,7 +940,9 @@ namespace Caveman
                 "  in an ADJACENT storage/machine. Lay it out so each machine is fed. (F7 = old mode.)\n" +
                 "• Lay Belts (Bronze) — or Depots + a Caravan route — to move goods to storage.\n" +
                 "• Click a building to manage it (workers, demolish).\n" +
-                "• People need Food + Housing. Space = pause, Esc = cancel, X = demolish.\n" +
+                "• People need Food + Housing. Space = pause, Esc = cancel.\n" +
+                "• <b>X</b> or <b>Delete</b> removes the building under the cursor (fast un-do). " +
+                "Build menu: ★ pins a building; old-age tech is dimmed.\n" +
                 "• Hold-drag to place a row of buildings; C copies the selected building's type.\n" +
                 "• <b>Prosperity</b> (status bar) climbs with population, happiness & automation.\n" +
                 "• <b>Goal:</b> reach the Industrial Age, build the <b>Monument</b>, and make " +

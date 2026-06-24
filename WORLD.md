@@ -16,6 +16,10 @@ every system below hangs off — terrain is now queryable (`At`, `Buildable`) by
 belts, movement, and worldgen.
 
 ## 1. Meaningful terrain (effects, not decoration)
+- **Water rebalanced (2026-06-24):** was ~34% of the map (movement frustration); now lakes are
+  rare (`e < 0.20`), rivers are **thin winding routes** (band 0.020), plus an **ocean rim** at the
+  map edge (coastline + clean boundary). Start basin widened to 22. Water = routing chokepoints
+  (bridge them), not dead zones.
 - **Water (rivers + lakes)** ✅ is now a **hard barrier**: the player **cannot walk on it**
   (per-axis movement block, slides along shores) and buildings/belts can't sit on it.
   Winding **rivers** (noise-band) snake across the map and **divide it into regions**. Water
@@ -34,7 +38,12 @@ belts, movement, and worldgen.
 - Implementation hook: `TerrainGrid` already exposes per-cell type; add `BuildSpeedMul`,
   `MoveCostMul`, and `BuildableBy(kind)` lookups + the clear/level/bridge actions.
 
-## 2. Biome-based regional differences 📝
+## 2. Biome-based regional differences 🔶 (built)
+**Resources now spawn BY biome** (`TerrainGrid.TryRandomCellOfBiome` + `ScatterInBiome`): the
+frontier has **forests = lumber + fibre, hills = stone/ore/gems, plains = herds/clay**. The
+start basin keeps its hand-placed survival cluster (wood/food/water). So you must identify a
+region and route its resource home — expansion is a planning problem. 📝 still to add: the
+*build/move friction* per biome (forest slow, hills mining-only) — see §1. Original note:
 Bias **resource spawns by biome** (forests carry wood/berries/cotton, hills carry
 ore/stone/gems, water edges carry fish/clay, plains are open). Generate terrain first, then
 place each resource only on its biome. Result: **different regions demand different
