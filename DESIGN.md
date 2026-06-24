@@ -22,6 +22,16 @@ exhaustion, *replacing* the artificial "need gems" gate) → ③throughput ceili
 ④food spoilage (steady throughput, not stockpiles) → ⑤more shared-intermediate chokepoints.
 All emergent, 2D-clear (adjacency + visible belts), reusing the red "starved" status dot.
 
+## Ages = mechanical transformation (see AGES.md)
+The headline differentiator: **each age changes the RULES, not just the contents** — the
+dominant constraint and the unit of the puzzle transform (manual/adjacency → workforce/flow →
+throughput+**power** → demand-pull **networks** → **goals/agents** → **information/bandwidth**
+→ **entropy/stability**), while the core loop stays constant. Full ladder, transition shocks,
+two original post-modern ages, and the pragmatic build order are in **`AGES.md`**. First
+concrete task to deliver on it: **Power as a global constraint at the Industrial boundary**
+(the smallest change that proves an age can transform play). The current game is mechanically
+only Age 1–2; later ages exist as *content*, not yet *mechanic shifts*.
+
 ## Core pillar
 > Players should evolve from **manual survival → to systems that play the game for them.**
 
