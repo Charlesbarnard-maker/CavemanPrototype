@@ -258,7 +258,7 @@ namespace Caveman
                     if (hasMon || mb > 0) monu = $"   <color=#ffe08a>Monument {Mathf.Min(mb, 10)}/10</color>";
                 }
 
-                GUILayout.Label($"<b>Population</b> {c.Population}/{c.Capacity}   <b>Working</b> {working}   <b>Free</b> {c.FreeWorkers}   <color=#cda>{c.AgeName}</color>   <color={prodCol}>Output {prod}%</color>   <color={happyCol}>Happy {happy}%</color>{needComfort}   <color=#ffcf6b>Prosperity {c.Prosperity}</color>{monu}{flags}", _s);
+                GUILayout.Label($"<b>Population</b> {c.Population}/{c.Capacity}   <b>Working</b> {working}   <b>Free</b> {c.FreeWorkers}   <color=#cda>{c.AgeName}</color>   <color=#dca>{c.Rank}</color>   <color={prodCol}>Output {prod}%</color>   <color={happyCol}>Happy {happy}%</color>{needComfort}   <color=#ffcf6b>Prosperity {c.Prosperity}</color>{monu}{flags}", _s);
             }
             GUILayout.EndArea();
         }

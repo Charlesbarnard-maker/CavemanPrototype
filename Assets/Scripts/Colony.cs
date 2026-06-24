@@ -90,6 +90,15 @@ namespace Caveman
 
         private static readonly int[] ProsperityMilestones = { 250, 500, 1000, 2000, 4000 };
         private int _nextMilestone;
+        private string _lastRank;
+
+        /// <summary>Settlement rank, derived from peak prosperity (only ever climbs).</summary>
+        public string Rank =>
+            PeakProsperity < 100 ? "Camp" :
+            PeakProsperity < 300 ? "Hamlet" :
+            PeakProsperity < 700 ? "Village" :
+            PeakProsperity < 1500 ? "Town" :
+            PeakProsperity < 3000 ? "City" : "Metropolis";
 
         // On-pillar weighting: automation (collectors/workshops/belts/routes) is worth
         // more than raw headcount, because the game is about systems that run themselves.
@@ -253,6 +262,13 @@ namespace Caveman
                 {
                     Toast.Show($"<color=#ffcf6b>📈 Prosperity {ProsperityMilestones[_nextMilestone]}!</color>  <size=14>your settlement flourishes</size>");
                     _nextMilestone++;
+                }
+
+                // Announce settlement rank promotions (identity / progression hook).
+                if (Rank != _lastRank)
+                {
+                    if (_lastRank != null) Toast.Show($"<color=#ffd24d>🏘 Your settlement is now a {Rank}!</color>");
+                    _lastRank = Rank;
                 }
             }
 
