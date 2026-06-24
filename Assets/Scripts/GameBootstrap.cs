@@ -177,6 +177,12 @@ namespace Caveman
             var toolmaker = MakeWorkshop("Toolmaker", tools, 1, 4.0f, 2, 12, new Color(0.50f, 0.55f, 0.60f),
                 new List<ItemAmount> { new ItemAmount(metal, 1), new ItemAmount(planks, 1) },
                 new ItemAmount(planks, 8), new ItemAmount(bricks, 6)); toolmaker.unlockAge = 3;
+            // Power: the Industrial age's new constraint. The Coal Generator burns Charcoal
+            // to supply electrical power; from the Industrial age machines need it (or they
+            // brown out and slow down). Unlocks in Iron so you can prepare before it bites.
+            var generator = MakePower("Coal Generator", 60, charcoal, 1, 3f, 3, new Color(0.30f, 0.30f, 0.34f),
+                new ItemAmount(bricks, 12), new ItemAmount(metal, 6));
+            generator.description = "Burns Charcoal to supply electrical Power. From the Industrial age, machines need power — too little and the whole grid browns out, slowing every machine. Keep charcoal flowing to it.";
             // Endgame: the Monument (Industrial age). A long resource sink you pour the
             // top of every production chain into — completing it (10 blocks) is the win.
             var monumentBldg = MakeWorkshop("Monument", monument, 1, 6.0f, 3, 12, new Color(0.88f, 0.84f, 0.62f),
@@ -245,7 +251,7 @@ namespace Caveman
               woodStore, stoneStore, foodStore, waterStore, warehouse, house,
               hunter, clayPit, charcoalBurner, clayStore, smokehouse, longhouse,
               kiln, farm, mill, bakery, brickStore, mason, stoneHouse, woodBelt, fastBelt,
-              mine, oreStore, smelter, toolmaker, monumentBldg,
+              mine, oreStore, smelter, toolmaker, monumentBldg, generator,
               potter, cottonFarm, weaver, tailor, gemMine, jeweler,
               depot, caravan, oxCart, wagonTrain, cargoDrone };
 
@@ -449,6 +455,23 @@ namespace Caveman
             def.capacity = capacity;
             def.color = color;
             def.inputs = inputs;
+            def.powerDraw = 10; // machines draw power once the Industrial age arrives
+            def.cost = new List<ItemAmount>(cost);
+            return def;
+        }
+
+        // A power plant: burns `fuel` to supply `output` electrical power (Industrial age).
+        private static BuildingDefinition MakePower(string name, int output, ItemDefinition fuel, int fuelPerCycle,
+            float interval, int unlockAge, Color color, params ItemAmount[] cost)
+        {
+            var def = ScriptableObject.CreateInstance<BuildingDefinition>();
+            def.displayName = name;
+            def.kind = BuildingKind.Power;
+            def.powerOutput = output;
+            def.interval = interval;
+            def.unlockAge = unlockAge;
+            def.inputs = fuel != null ? new List<ItemAmount> { new ItemAmount(fuel, fuelPerCycle) } : new List<ItemAmount>();
+            def.color = color;
             def.cost = new List<ItemAmount>(cost);
             return def;
         }

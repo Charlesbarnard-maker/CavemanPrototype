@@ -26,6 +26,11 @@ namespace Caveman
         public int MaxWorkers => maxWorkers;
         public string StaffLabel => def != null ? def.displayName : "Workshop";
 
+        // Power (Industrial age): a running machine draws power; the grid's supply/demand
+        // ratio scales its speed (brownouts) via Power.Factor.
+        public int PowerDraw => def != null ? def.powerDraw : 0;
+        public bool DrawsPower => Power.Active && PowerDraw > 0 && AssignedWorkers > 0 && !Paused;
+
         public static readonly List<WorkshopBuilding> All = new();
         private List<Vector2Int> _cells; // every grid cell this building occupies
         void OnEnable() { All.Add(this); }
@@ -194,13 +199,15 @@ namespace Caveman
 
         void Update()
         {
+            Power.EnsureFresh();
             var carried = Colony.Instance != null ? Colony.Instance.carried : null;
             bool produced = false;
 
             if (!Paused && AssignedWorkers > 0 && output != null && Buffer.Total() < Buffer.capacity)
             {
                 float prod = Colony.Instance != null ? Colony.Instance.Productivity : 1f;
-                _timer += Time.deltaTime * AssignedWorkers * prod; // more workers / well-fed = faster
+                float pw = Power.Active && PowerDraw > 0 ? Power.Factor : 1f; // brownouts slow machines
+                _timer += Time.deltaTime * AssignedWorkers * prod * pw; // more workers / well-fed / powered = faster
                 if (_timer >= processTime)
                 {
                     if (CanMake(carried))

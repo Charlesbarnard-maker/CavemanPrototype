@@ -51,6 +51,7 @@ namespace Caveman
             (BuildingKind.Belt, "Belts"),
             (BuildingKind.Depot, "Depots"),
             (BuildingKind.Route, "Routes"),
+            (BuildingKind.Power, "Power"),
             (BuildingKind.Storage, "Storage"),
             (BuildingKind.Housing, "Housing"),
         };
@@ -344,7 +345,17 @@ namespace Caveman
                     if (hasMon || mb > 0) monu = $"   <color=#ffe08a>Monument {Mathf.Min(mb, 10)}/10</color>";
                 }
 
-                GUILayout.Label($"<b>Population</b> {c.Population}/{c.Capacity}   <b>Working</b> {working}   <b>Free</b> {c.FreeWorkers}{bottleneck}   <color=#cda>{c.AgeName}</color>   <color=#dca>{c.Rank}</color>   <color={prodCol}>Output {prod}%</color>   <color={happyCol}>Happy {happy}%</color>{needComfort}   <color=#ffcf6b>Prosperity {c.Prosperity}</color>{monu}{flags}", _s);
+                // Power (Industrial age): supply / demand, red while browning out.
+                string power = "";
+                Power.EnsureFresh();
+                if (Power.Active || Power.Generation > 0 || Power.Demand > 0)
+                {
+                    bool brown = Power.Demand > Power.Generation + 0.01f;
+                    string pc = brown ? "#f99" : "#9f9";
+                    power = $"   <color={pc}>⚡ {Mathf.RoundToInt(Power.Generation)}/{Mathf.RoundToInt(Power.Demand)}{(brown ? " BROWNOUT" : "")}</color>";
+                }
+
+                GUILayout.Label($"<b>Population</b> {c.Population}/{c.Capacity}   <b>Working</b> {working}   <b>Free</b> {c.FreeWorkers}{bottleneck}   <color=#cda>{c.AgeName}</color>   <color=#dca>{c.Rank}</color>   <color={prodCol}>Output {prod}%</color>   <color={happyCol}>Happy {happy}%</color>{needComfort}   <color=#ffcf6b>Prosperity {c.Prosperity}</color>{power}{monu}{flags}", _s);
             }
             GUILayout.EndArea();
         }

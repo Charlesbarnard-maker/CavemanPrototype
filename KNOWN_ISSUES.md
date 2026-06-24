@@ -40,6 +40,25 @@ A running record so progress/problems don't get lost. Newest first. Move items t
   depletion tuning, throughput ceilings, food spoilage, more shared-intermediate chokepoints.
   These are the next pressure layers — add one at a time AFTER local production is validated.
 
+## Open — POWER (Industrial age, first age-as-mechanic-shift — NEEDS TESTING)
+- **`Power` (global) + `PowerPlant` + `BuildingKind.Power`.** From the Industrial age
+  (age index 4) workshops DRAW power (`def.powerDraw`, default 10 via MakeWorkshop) and
+  the **Coal Generator** burns charcoal to SUPPLY it (`powerOutput` 60, unlock Iron so you
+  can prep). Supply < demand → global brownout scales machine speed down to a 0.35 floor
+  (`Power.Factor`, applied in WorkshopBuilding.Update). Status bar shows `⚡ gen/dem` (red
+  + BROWNOUT when short). This is the proof-of-thesis for AGES.md ("an age changes the rules").
+- **Balance is first-pass & built blind — verify on a playtest:**
+  - Advancing to Industrial makes ALL running workshops demand power at once → if you have
+    no generators it instantly drops everything to 35%. Intended "shock", but maybe too harsh
+    — tune `BrownoutFloor`, `powerDraw` (10), generator `powerOutput` (60), or stagger which
+    machines need power.
+  - Generator pulls fuel from the GLOBAL pool (not local/belt-fed) for now — simpler, but
+    inconsistent with LocalProduction. Next: belt-feed fuel + local draw.
+  - Generator is 1×1, no workers. Consider footprint (2×2) + a worker once footprints land.
+- **Next power layers (after it's validated):** regional grids (wires/range) instead of one
+  global pool; power as a prerequisite (machine off, not just slow, below a threshold); a
+  brownout status dot on starved machines.
+
 ## Open — routes (MVP built — iterate)
 - Caravan routes are point-to-point (elephant shuttles A↔B along a straight line, no
   laid track). Next: **track/path laying** (vehicle follows it; placement puzzle),

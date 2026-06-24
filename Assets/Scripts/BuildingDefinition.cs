@@ -28,6 +28,7 @@ namespace Caveman
         Belt,      // a directional conveyor segment placed on the grid
         Depot,     // a long-distance transfer station (route endpoint)
         Route,     // a tool: link two depots with a caravan vehicle
+        Power,     // a generator: burns fuel to supply electrical power (Industrial age)
     }
 
     /// <summary>Data for a placeable structure.</summary>
@@ -70,6 +71,12 @@ namespace Caveman
         [Header("Progression")]
         [Tooltip("Age at which this becomes buildable (0 = Stone Age, available from the start).")]
         public int unlockAge = 0;
+
+        [Header("Power (Industrial age)")]
+        [Tooltip("Workshop: electrical power drawn while running (0 = none).")]
+        public int powerDraw = 0;
+        [Tooltip("Power plant: electrical power supplied while fuelled.")]
+        public int powerOutput = 0;
 
         [Header("Logistics")]
         [Tooltip("Transport that runs WITHOUT a worker (a conveyor / wooden roller).")]

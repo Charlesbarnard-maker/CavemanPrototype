@@ -95,8 +95,9 @@ namespace Caveman
             var hb = Selected.GetComponent<HousingBuilding>();
             var wb = Selected.GetComponent<WorkshopBuilding>();
             var dpo = Selected.GetComponent<Depot>();
+            var pp = Selected.GetComponent<PowerPlant>();
             BuildingDefinition def = pb != null ? pb.def : sb != null ? sb.def : hb != null ? hb.def
-                : wb != null ? wb.def : dpo != null ? dpo.def : null;
+                : wb != null ? wb.def : dpo != null ? dpo.def : pp != null ? pp.def : null;
             if (def == null) return;
             int idx = buildables.IndexOf(def);
             if (idx >= 0 && IsUnlocked(def)) BeginPlacement(idx);
@@ -227,7 +228,7 @@ namespace Caveman
                 if (h.GetComponent<ProductionBuilding>() || h.GetComponent<StorageBuilding>()
                     || h.GetComponent<HousingBuilding>() || h.GetComponent<WorkshopBuilding>()
                     || h.GetComponent<TransportHub>() || h.GetComponent<Depot>()
-                    || h.GetComponent<ConstructionSite>()) return true;
+                    || h.GetComponent<PowerPlant>() || h.GetComponent<ConstructionSite>()) return true;
             }
             return false;
         }
@@ -368,8 +369,9 @@ namespace Caveman
             var wb = Selected.GetComponent<WorkshopBuilding>();
             var th = Selected.GetComponent<TransportHub>();
             var dpo = Selected.GetComponent<Depot>();
+            var pp = Selected.GetComponent<PowerPlant>();
             BuildingDefinition rdef = pb != null ? pb.def : sb != null ? sb.def : hb != null ? hb.def
-                : wb != null ? wb.def : th != null ? th.def : dpo != null ? dpo.def : null;
+                : wb != null ? wb.def : th != null ? th.def : dpo != null ? dpo.def : pp != null ? pp.def : null;
             if (rdef == null) return;
 
             var staff = Selected.GetComponent<IStaffable>();
@@ -395,6 +397,7 @@ namespace Caveman
                               || hit.GetComponent<WorkshopBuilding>() != null
                               || hit.GetComponent<TransportHub>() != null
                               || hit.GetComponent<Depot>() != null
+                              || hit.GetComponent<PowerPlant>() != null
                               || hit.GetComponent<Belt>() != null
                               || hit.GetComponent<ConstructionSite>() != null;
             return isBuilding ? hit.gameObject : null;
