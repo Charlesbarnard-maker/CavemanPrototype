@@ -70,6 +70,15 @@ no Inspector wiring). Scripts in `Assets/Scripts/`:
   the player (`CameraFollow`); HUD via `OnGUI` (`InventoryHud`).
 
 ## Recently built
+- **Textile + pottery economy (deeper demand sink).** Two new comfort-good chains:
+  **Pottery** (Clay → Pottery, Bronze) and **Textiles** (Cotton patches → Fiber via a
+  **Cotton Farm** → **Weaver** makes Cloth → **Tailor** makes Clothes, an Industrial
+  luxury). Pottery (Bronze) and Clothes (Industrial) are now **comfort goods** the colony
+  consumes, so the happiness sink scales to **5 goods** by the late game (cooked food,
+  bread, pottery, tools, clothes) — more parallel production to plan as you grow. New
+  Cotton resource patches, F1-sandbox coverage, and four objectives wire it in.
+  *(First-pass balance — the heavier comfort load likely needs `comfortTick`/want-rate
+  retuning; see KNOWN_ISSUES.)*
 - **Prosperity score + Monument win goal (the endless pull).** Added a climbing
   **Prosperity** score = population × happiness + tech age + an **automation weight**
   (collectors/workshops/belts/routes), so *systems* — not raw headcount — drive it,

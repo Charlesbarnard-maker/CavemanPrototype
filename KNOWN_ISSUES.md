@@ -136,6 +136,12 @@ A running record so progress/problems don't get lost. Newest first. Move items t
   Tune after a playtest: the 600-Prosperity objective threshold (vs the Prosperity
   formula in `Colony.ComputeProsperity`), the Monument's build cost + recipe + the
   10-block win target, and whether the Industrial-age gate paces into it well.
+- **Balance: comfort demand grew from 3 → 5 goods** (added Pottery@Bronze,
+  Clothes@Industrial). `Colony` Happiness = fraction of *all* unlocked comforts supplied,
+  each wanted at ~Population/2 per `comfortTick` (9s). At Industrial the colony now wants
+  cooked food + bread + pottery + tools + clothes simultaneously — likely too punishing at
+  first. Tune `comfortTick`, the per-comfort want rate (`Colony` comfort loop), or stagger
+  the unlock ages. Watch that early "Happy %" doesn't crater the moment Bronze adds pottery.
 
 ## Open — design
 - **Too automated / not enough choice** — *partly addressed*: ages now force choices
