@@ -44,6 +44,32 @@ namespace Caveman
             // Masonry: gives Stone its own processing chain (like Wood -> Planks).
             var stoneBlock = MakeItem("stoneblock", "Stone Block", new Color(0.58f, 0.60f, 0.66f));
 
+            // --- Item descriptions (shown in the in-game Guide, key G) ---
+            wood.description = "The starter resource — chop it from trees. Used by nearly every building, and refined into Planks and Charcoal.";
+            stone.description = "Basic building material — mine it from rocks. Used in most early buildings; cut into Stone Blocks by a Mason.";
+            food.description = "Berries gathered from bushes (Forager Hut). Keeps people alive; cook it for far more nourishment.";
+            water.description = "Drawn from lakes (Water Hole). People drink it every day; also needed for cooking, farming and baking.";
+            planks.description = "A Sawmill turns Wood into Planks — a stronger material for houses and advanced machines.";
+            cookedFood.description = "A Campfire cooks Food (+Wood +Water). More nourishing than raw, and your people's first comfort good (Tribal).";
+            meat.description = "Hunted from animal herds (Hunter's Hut). A nourishing food; keep it in a Smokehouse.";
+            clay.description = "Dug from clay deposits (Clay Pit). Fired into Bricks, and shaped into Pottery.";
+            charcoal.description = "A Charcoal Burner turns Wood into Charcoal. It fuels BOTH the Kiln and the Smelter — a key shared bottleneck.";
+            bricks.description = "A Kiln fires Clay + Charcoal into Bricks — a sturdy material for advanced buildings.";
+            grain.description = "A Farm grows Grain from Water. Milled into Flour.";
+            flour.description = "A Mill grinds Grain into Flour. Baked into Bread.";
+            bread.description = "A Bakery bakes Flour + Water into Bread — high nourishment, and a Bronze comfort good.";
+            ore.description = "Mined from FINITE veins far from base. Smelted into Metal. Its scarcity drives exploration.";
+            metal.description = "A Smelter melts Ore + Charcoal into Metal — the backbone of Tools and the Monument.";
+            tools.description = "A Toolmaker crafts Metal + Planks into Tools. An Iron-age comfort good that also gates the Industrial Age.";
+            monument.description = "Built at the Monument from Metal + Tools + Bricks + Planks. Collect 10 Blocks to WIN the game.";
+            fiber.description = "Plant Fiber harvested from Cotton fields (Cotton Farm). Woven into Cloth.";
+            cloth.description = "A Weaver turns Fiber into Cloth. Tailored into Clothes.";
+            clothes.description = "A Tailor sews Cloth into Clothes — an Industrial luxury comfort good.";
+            pot.description = "A Potter shapes Clay into Pottery — a Bronze comfort good your people want.";
+            gems.description = "The rarest resource, in FINITE deposits far out in the map. Cut into Jewelry; reaching them rewards exploration.";
+            jewelry.description = "A Jeweler crafts Gems into Jewelry — a high-value luxury good.";
+            stoneBlock.description = "A Mason cuts Stone into Stone Blocks — used to build the sturdy Stone House.";
+
             // --- Buildings ---
             var woodHut = MakeCollector("Wood Hut", wood, 1, 2.0f, 2, 12, new Color(0.80f, 0.52f, 0.25f),
                 new ItemAmount(wood, 5), new ItemAmount(stone, 3));

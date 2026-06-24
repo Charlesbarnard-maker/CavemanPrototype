@@ -18,5 +18,8 @@ namespace Caveman
         public int maxStack = 999;
         [Tooltip("Nourishment per unit when eaten (0 = not food). Cooked food is worth more.")]
         public int foodValue = 0;
+        [TextArea]
+        [Tooltip("Short blurb for the in-game Guide: what it is, where it comes from, what it's for.")]
+        public string description = "";
     }
 }

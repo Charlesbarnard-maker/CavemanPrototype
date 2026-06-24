@@ -30,6 +30,9 @@ namespace Caveman
         private bool _buildShown, _selShown;
         private bool _showBuild;
         private bool _showMinimap = true;
+        private bool _showGuide;
+        private Vector2 _guideScroll;
+        private Rect _guideRect;
         private bool _localTipShown; // one-time hint when a workshop first starves
         private Texture2D _panelTex; // dark panel background for readability
         private Dictionary<ItemDefinition, int> _totals;
@@ -63,6 +66,7 @@ namespace Caveman
             if (kb.hKey.wasPressedThisFrame) _showHelp = !_showHelp;
             if (kb.bKey.wasPressedThisFrame) _showBuild = !_showBuild;
             if (kb.nKey.wasPressedThisFrame) _showMinimap = !_showMinimap;
+            if (kb.gKey.wasPressedThisFrame) _showGuide = !_showGuide;
 
             // --- Sandbox / debug hotkeys ---
             if (kb.f1Key.wasPressedThisFrame && debugItems != null)
@@ -142,6 +146,7 @@ namespace Caveman
             DrawFooter();
             if (Objectives.Instance != null && Objectives.Instance.Won) DrawWin();
             if (_showHelp) DrawHelp();
+            if (_showGuide) DrawGuide();
             if (_paused) GUI.Label(new Rect(0, 60, Screen.width, 60), "<b>PAUSED</b>  <size=18>(space)</size>", _big);
 
             var col = Colony.Instance;
@@ -158,7 +163,8 @@ namespace Caveman
             {
                 var m = Event.current.mousePosition;
                 PointerOverUI = (_buildShown && _buildRect.Contains(m)) || (_selShown && _selRect.Contains(m))
-                                || _topRect.Contains(m) || _miniRect.Contains(m) || _objRect.Contains(m);
+                                || _topRect.Contains(m) || _miniRect.Contains(m) || _objRect.Contains(m)
+                                || (_showGuide && _guideRect.Contains(m));
             }
         }
 
@@ -674,7 +680,7 @@ namespace Caveman
         private void DrawFooter()
         {
             GUILayout.BeginArea(new Rect(Screen.width - 330, 10, 320, 50));
-            GUILayout.Label($"<size=15>B build · Space pause · H help · M overview · N map {(_showMinimap ? "on" : "off")}</size>", _small);
+            GUILayout.Label($"<size=15>B build · G guide · Space pause · H help · M overview · N map {(_showMinimap ? "on" : "off")}</size>", _small);
             string sandbox = Economy.FreeBuild ? "<color=#9f9>SANDBOX</color> · " : "";
             string mode = Economy.LocalProduction ? "<color=#fc8>Local logistics</color>" : "<color=#8cf>Global pool</color>";
             GUILayout.Label($"<size=12>{sandbox}Speed x{_speed:0} · {mode} (F7) · F1–F5 sandbox</size>", _small);
@@ -690,6 +696,50 @@ namespace Caveman
             GUILayout.BeginArea(new Rect(r.x + 16, r.y + 14, r.width - 32, r.height - 28));
             GUILayout.Label("<color=#ffd24d><b>🏆 YOU WIN!</b></color>", _big);
             GUILayout.Label($"<size=16>You built a self-running civilization.\nPeak Prosperity: <b>{peak}</b>   ·   <color=#bbb>keep playing if you like</color></size>", _toast);
+            GUILayout.EndArea();
+        }
+
+        // ---- In-game Guide (G): mechanics + a resource reference ----
+        private void DrawGuide()
+        {
+            float w = 640f, h = Mathf.Min(Screen.height - 70f, 580f);
+            var r = new Rect(Screen.width / 2f - w / 2f, Screen.height / 2f - h / 2f, w, h);
+            _guideRect = r;
+            PanelBg(r);
+            GUILayout.BeginArea(new Rect(r.x + 16, r.y + 12, r.width - 32, r.height - 24));
+            GUILayout.Label("<size=22><b>Guide</b></size>   <size=13><color=#bbb>(G to close)</color></size>", _s);
+            _guideScroll = GUILayout.BeginScrollView(_guideScroll);
+
+            void Section(string head, string body) =>
+                GUILayout.Label($"<size=15><b>{head}</b>\n<color=#cfcfcf>{body}</color></size>\n", _small);
+
+            Section("<color=#ffd24d>The Goal</color>",
+                "Grow from a lone caveman to a self-running civilisation. Reach the Industrial Age and build the Monument (10 Blocks) to WIN.");
+            Section("<color=#fc8>Logistics matter (the core)</color>",
+                "A workshop only runs on inputs that ARRIVE — belt-fed, or sitting in an ADJACENT storage / collector / machine. It will NOT pull from across the map. Lay out your base so every machine is fed; a shortage cascades to everything downstream. (F7 toggles the old global-pool mode to compare.)");
+            Section("<color=#9cf>People</color>",
+                "Population grows while fed and housed. They eat Food and drink Water — running out causes decline. Beyond survival they want comfort goods (cooked food, bread, pottery, tools, clothes). How much you supply sets Happiness, which boosts productivity and growth. Growth raises demand — the escalating pull to keep scaling.");
+            Section("<color=#ffcf6b>Prosperity & Rank</color>",
+                "A climbing score from population, happiness and automation (collectors, workshops, belts, routes). Your settlement ranks up: Camp → Hamlet → Village → Town → City → Metropolis.");
+            Section("<color=#cda>Ages</color>",
+                "Stone → Tribal → Bronze → Iron → Industrial. Advancing costs resources + population and unlocks new buildings.");
+            Section("<color=#6c6>Bottlenecks</color>",
+                "Status dots: green working, yellow output-full (haul it out), red starved (no input), grey no worker. Problems pulse and show on the minimap. Click a building to see what it's waiting for, its rate, and to Pause it (free a scarce shared input for another).");
+            Section("<color=#9f9>Expansion</color>",
+                "Patches deplete as you harvest; collectors auto-chase fresh ones nearby, and go idle when a cluster runs dry — your cue to push outward. Ore and Gems are finite and far, so exploration + long routes (cart → train → drone) matter.");
+
+            GUILayout.Label("<size=18><b>Resources</b></size>\n", _s);
+            if (debugItems != null)
+                foreach (var it in debugItems)
+                {
+                    if (it == null) continue;
+                    string hex = ColorUtility.ToHtmlStringRGB(it.color);
+                    string d = string.IsNullOrEmpty(it.description) ? "" : $"  <size=12><color=#bbb>{it.description}</color></size>";
+                    GUILayout.Label($"<size=14><color=#{hex}>■</color> <b>{it.displayName}</b></size>{d}", _small);
+                    GUILayout.Space(3);
+                }
+
+            GUILayout.EndScrollView();
             GUILayout.EndArea();
         }
 
