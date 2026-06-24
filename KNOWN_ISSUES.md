@@ -4,6 +4,9 @@ A running record so progress/problems don't get lost. Newest first. Move items t
 **Fixed** when done. Maintained alongside the code — see DESIGN.md for the roadmap.
 
 ## Fixed
+- **2026-06-24 — HQ (Town Hall) could be demolished.** `BuildController.DemolishSelected`
+  now refuses to demolish a `HousingBuilding` flagged `isHQ` (shows a toast instead), so
+  builder management and the starting pop cap can't be lost.
 - **2026-06-23 — Resources teleported to warehouses.** Buffer→storage was instant.
   Now physical: build a **Mammoth Shack** (`TransportHub`) and assign workers who
   become **Transporters** that carry goods from collector/workshop buffers to storage.
@@ -27,7 +30,14 @@ A running record so progress/problems don't get lost. Newest first. Move items t
   laid track). Next: **track/path laying** (vehicle follows it; placement puzzle),
   **vehicle tiers by age** (elephant → cart → **train**, faster/bigger), route **load
   filters**, multi-stop routes, and a route-management panel. The old `TransportHub`/
-  `Transporter` classes are now unused (no buildables) — remove in a cleanup.
+  `Transporter` classes have no buildables, but are NOT trivially deletable — they're
+  still referenced in **5 files** (`Colony` AssignedTotal/EnforceAssignment,
+  `BuildController` CellOccupied/Demolish/BuildingGOUnderCursor, `ConstructionSite`
+  `case BuildingKind.Logistics`, `InventoryHud` lines ~258/379/424, plus `MakeLogistics`
+  in `GameBootstrap`). Removing them is a multi-file pass best done **supervised** (with
+  a compile after), not blind. Related stale-UX: `InventoryHud.CurrentObjective` still
+  tells the player to "Build a Mammoth Shack" (line ~258) — a building that no longer
+  exists; fix when the classes are removed.
 
 ## Open — belts (strong now — iterate)
 - Belts: place/drag with **auto-direction** (path + corners), building→belt→storage
@@ -84,11 +94,15 @@ A running record so progress/problems don't get lost. Newest first. Move items t
   building registries each frame — fine for now, revisit if building counts get large.
 
 ## Open — the hook (keep deepening)
-- Objectives ladder + age toasts added (gives direction + reward). To make the pull
-  *endless*, add: a **population demand sink** (people want more/better goods as they
-  grow), a visible **prosperity/output score** that climbs, and a **long-term win goal**
-  (a Monument you pour resources into / reach the Future age). Also: per-objective
-  rewards could unlock *new buildings* (tech) rather than just resources.
+- *(Done 2026-06-24)* ~~population demand sink~~ (comfort goods + happiness),
+  ~~prosperity/output score that climbs~~ (Prosperity, automation-weighted, with a peak),
+  and ~~a long-term win goal~~ (the Monument — 10 blocks = win). Still open: per-objective
+  rewards that unlock *new buildings* (tech) rather than just resources, and a
+  post-Industrial **Future age** to extend the ladder.
+- **Balance: the new endgame numbers are first-pass and UNTESTED** (built blind).
+  Tune after a playtest: the 600-Prosperity objective threshold (vs the Prosperity
+  formula in `Colony.ComputeProsperity`), the Monument's build cost + recipe + the
+  10-block win target, and whether the Industrial-age gate paces into it well.
 
 ## Open — design
 - **Too automated / not enough choice** — *partly addressed*: ages now force choices

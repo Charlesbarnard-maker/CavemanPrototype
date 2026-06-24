@@ -70,6 +70,14 @@ no Inspector wiring). Scripts in `Assets/Scripts/`:
   the player (`CameraFollow`); HUD via `OnGUI` (`InventoryHud`).
 
 ## Recently built
+- **Prosperity score + Monument win goal (the endless pull).** Added a climbing
+  **Prosperity** score = population × happiness + tech age + an **automation weight**
+  (collectors/workshops/belts/routes), so *systems* — not raw headcount — drive it,
+  on-pillar. Shown in the status bar; a never-dropping **peak** is tracked too. Added
+  the **Monument** (Industrial age): a building you pour metal/tools/bricks/planks into;
+  producing **10 Monument Blocks** completes it and **wins the game**. New objectives
+  tie it together (reach 600 Prosperity → build the Monument → complete it). Also: the
+  **Town Hall (HQ) is now protected from demolition**.
 - **The hook — depth pass (5 systems).** Built the "just one more thing" loop the game
   was missing:
   1. **Population demand sink + happiness.** Citizens consume **comfort goods** beyond
@@ -98,8 +106,9 @@ no Inspector wiring). Scripts in `Assets/Scripts/`:
   top-right. Completing one pays a small **reward**, pops a celebratory **toast**, and
   reveals the next — constant direction + dopamine. Reaching a new **age pops a toast
   listing what it unlocked** (advancement feels like a power-up).
-  *Next hook layers:* a prosperity **score** and a long-term **win goal** (a Monument /
-  the Future age) so the pull is endless.
+  *Done since:* the prosperity **score** and a long-term **win goal** (the Monument) now
+  exist (see the top of this section). *Still open:* per-objective rewards that unlock new
+  *buildings* (tech), and a post-Industrial **Future age** to extend the ladder further.
 - **Logistics reworked → belts (local) + caravan routes (long distance).** Removed the
   abstract haulers. **Depots** are transfer stations (hold one resource, belt in/out);
   a **Caravan route** links two depots with an **elephant** that physically shuttles
