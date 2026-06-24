@@ -15,7 +15,7 @@ namespace Caveman
         public float chopTime = 1.5f;
         public int carryAmount = 3;
 
-        private enum State { ToNode, Chopping, ToHome }
+        private enum State { ToNode, Chopping, ToHome, ToStorage }
         private State _state = State.ToNode;
         private float _chopTimer;
         private float _nudgeTimer;
@@ -89,18 +89,49 @@ namespace Caveman
                         {
                             int accepted = home.Buffer.Add(_carryItem, _carrying);
                             if (accepted > 0) { _carrying -= accepted; home.Pulse(); }
-                            // Buffer full → WAIT here holding the load. The collector backs up
-                            // visibly (its job is to signal "build transport to drain me"); the
-                            // worker no longer self-hauls to storage.
-                            if (_carrying > 0) break;
+                            if (_carrying > 0)
+                            {
+                                // Liquids have no belt — a person carries the container to a barrel
+                                // (the Stone-age liquid carrier). Solids just back up here (build a
+                                // belt to drain me) — the intended visible bottleneck.
+                                if (_carryItem.isLiquid) { _state = State.ToStorage; break; }
+                                break;
+                            }
                         }
                         _carryItem = null;
                         _state = State.ToNode;
                     }
                     break;
+
+                case State.ToStorage:
+                    if (_carrying <= 0 || _carryItem == null) { _state = State.ToNode; break; }
+                    var store = NearestStorage(_carryItem);
+                    if (store == null) { _state = State.ToHome; break; } // no barrel yet — hold at home (backs up)
+                    if (MoveTo(store.transform.position))
+                    {
+                        int a = store.Store.Add(_carryItem, _carrying);
+                        if (a > 0) _carrying -= a;
+                        if (_carrying <= 0) { _carryItem = null; _state = State.ToNode; }
+                        else _state = State.ToHome; // that barrel filled — re-evaluate
+                    }
+                    break;
             }
 
             UpdateColor();
+        }
+
+        private StorageBuilding NearestStorage(ItemDefinition item)
+        {
+            StorageBuilding best = null;
+            float bestSq = float.MaxValue;
+            foreach (var s in StorageBuilding.All)
+            {
+                if (s == null || s.accepts != item) continue;
+                if (s.def != null && s.Store.Total() >= s.def.capacity) continue;
+                float sq = ((Vector2)(s.transform.position - transform.position)).sqrMagnitude;
+                if (sq < bestSq) { bestSq = sq; best = s; }
+            }
+            return best;
         }
 
         private static float Prod => Colony.Instance != null ? Colony.Instance.Productivity : 1f;

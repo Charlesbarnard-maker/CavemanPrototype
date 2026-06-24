@@ -81,7 +81,7 @@ namespace Caveman
             var waterHole = MakeCollector("Water Hole", water, 1, 2.0f, 2, 12, new Color(0.40f, 0.62f, 0.85f),
                 new ItemAmount(wood, 4));
             waterHole.fromWaterTerrain = true; // must sit next to real water terrain (river/lake)
-            waterHole.description = "Stone-age water: workers draw from adjacent water terrain into its buffer. Water is a LIQUID — it can't ride belts, so feed nearby buildings by placing them next to it (or upgrade to Pipes + a Water Pump in the Bronze age to move it further).";
+            waterHole.description = "Stone-age water: a worker draws from adjacent water terrain and CARRIES it to the nearest Water Barrel (build one beside it so your colony has stored water to drink). Adjacent buildings can also use it directly. Water is a LIQUID — it can't ride belts; pipe it (Bronze) to move it further.";
             // Bridge: plank tile placed on water; makes it passable for feet + belts. Core
             // logistics infrastructure — strategic chokepoints across rivers.
             var bridge = ScriptableObject.CreateInstance<BuildingDefinition>();
@@ -348,6 +348,7 @@ namespace Caveman
             int Have(ItemDefinition i) => Economy.Available(i, carriedInv);
             bool HasCollectorOf(ItemDefinition i) { foreach (var p in ProductionBuilding.All) if (p != null && p.produces == i) return true; return false; }
             bool HasWorkshopOf(ItemDefinition i) { foreach (var w in WorkshopBuilding.All) if (w != null && w.output == i) return true; return false; }
+            bool HasStorageOf(ItemDefinition i) { foreach (var s in StorageBuilding.All) if (s != null && s.accepts == i) return true; return false; }
             int Pop() => Colony.Instance != null ? Colony.Instance.Population : 0;
             int AgeNow() => Colony.Instance != null ? Colony.Instance.Age : 0;
             var objectives = new GameObject("Objectives").AddComponent<Objectives>();
@@ -355,7 +356,7 @@ namespace Caveman
             {
                 new Quest { title = "Gather 12 Wood by hand",            done = () => Have(wood) >= 12,      reward = () => carriedInv.Add(stone, 8),  rewardText = "+8 Stone" },
                 new Quest { title = "Build a Forager Hut for food",      done = () => HasCollectorOf(food),  reward = () => carriedInv.Add(food, 20),  rewardText = "+20 Food" },
-                new Quest { title = "Build a Water Hole",                done = () => HasCollectorOf(water), reward = () => carriedInv.Add(water, 20), rewardText = "+20 Water" },
+                new Quest { title = "Build a Water Hole + a Water Barrel beside it", done = () => HasCollectorOf(water) && HasStorageOf(water), reward = () => carriedInv.Add(water, 20), rewardText = "+20 Water" },
                 new Quest { title = "Grow your settlement to 8 people",  done = () => Pop() >= 8,            reward = () => carriedInv.Add(wood, 25),  rewardText = "+25 Wood" },
                 new Quest { title = "Advance to the Tribal Age",         done = () => AgeNow() >= 1,         reward = () => carriedInv.Add(stone, 25), rewardText = "+25 Stone" },
                 new Quest { title = "Build a Sawmill & make 25 Planks",  done = () => Have(planks) >= 25,    reward = () => carriedInv.Add(planks, 10),rewardText = "+10 Planks" },

@@ -84,6 +84,7 @@ namespace Caveman
             if (kb.f4Key.wasPressedThisFrame) Economy.FreeBuild = !Economy.FreeBuild;
             if (kb.f7Key.wasPressedThisFrame) Economy.LocalProduction = !Economy.LocalProduction;
             if (kb.f8Key.wasPressedThisFrame && FogOfWar.Instance != null) FogOfWar.Instance.RevealAll();
+            if (kb.f9Key.wasPressedThisFrame) Economy.StoredOnly = !Economy.StoredOnly;
             if (kb.f5Key.wasPressedThisFrame)
             {
                 _speed = _speed >= 4f ? 1f : _speed * 2f;
@@ -927,7 +928,8 @@ namespace Caveman
                 "• Status dots: <color=#6c6>green</color>=working, <color=#fd4>yellow</color>=output full, " +
                 "<color=#f66>red</color>=no input, <color=#999>grey</color>=no worker.\n" +
                 "\n<b>Sandbox:</b> F1 +resources · F2 +5 people · F3 advance age · " +
-                "F4 free build · F5 game speed · F7 local/global production · F8 reveal map.\n" +
+                "F4 free build · F5 game speed · F7 local/global production · F8 reveal map · " +
+                "F9 stored-only economy.\n" +
                 "</size>", _small);
             GUILayout.Label("<size=15>Press <b>H</b> to close  ·  Press <b>G</b> for the full Guide (mechanics + every resource)  ·  <b>N</b> hides the map.</size>", _small);
             GUILayout.EndArea();

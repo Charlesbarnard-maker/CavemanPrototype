@@ -22,11 +22,21 @@ namespace Caveman
         /// </summary>
         public static bool LocalProduction = true;
 
+        /// <summary>
+        /// "Stored, not summoned": the usable settlement pool is the player's CARRIED stock +
+        /// STORAGES only — NOT raw field collector/workshop output buffers. Field production must
+        /// be DELIVERED (belt / pipe / worker-carried liquids) into storage before survival,
+        /// comfort, and build costs can use it. This makes logistics matter for every system, not
+        /// just workshops. Toggle with F9 to compare the old "everything counts everywhere" pool.
+        /// </summary>
+        public static bool StoredOnly = true;
+
         public static int Available(ItemDefinition item, Inventory carried)
         {
             if (item == null) return 0;
             int total = carried != null ? carried.Count(item) : 0;
             foreach (var s in StorageBuilding.All) total += s.Store.Count(item);
+            if (StoredOnly) return total;
             foreach (var p in ProductionBuilding.All) total += p.Buffer.Count(item);
             foreach (var w in WorkshopBuilding.All) total += w.Buffer.Count(item);
             return total;
@@ -58,6 +68,7 @@ namespace Caveman
                 remaining -= s.Store.RemoveUpTo(item, remaining);
                 if (remaining <= 0) return amount;
             }
+            if (StoredOnly) return amount - remaining; // only carried + storages are usable
             foreach (var p in ProductionBuilding.All)
             {
                 remaining -= p.Buffer.RemoveUpTo(item, remaining);
@@ -88,8 +99,11 @@ namespace Caveman
 
             AddAll(carried);
             foreach (var s in StorageBuilding.All) AddAll(s.Store);
-            foreach (var p in ProductionBuilding.All) AddAll(p.Buffer);
-            foreach (var w in WorkshopBuilding.All) AddAll(w.Buffer);
+            if (!StoredOnly)
+            {
+                foreach (var p in ProductionBuilding.All) AddAll(p.Buffer);
+                foreach (var w in WorkshopBuilding.All) AddAll(w.Buffer);
+            }
             return totals;
         }
 
@@ -109,6 +123,7 @@ namespace Caveman
         {
             int pts = FoodPointsIn(carried);
             foreach (var s in StorageBuilding.All) pts += FoodPointsIn(s.Store);
+            if (StoredOnly) return pts;
             foreach (var p in ProductionBuilding.All) pts += FoodPointsIn(p.Buffer);
             foreach (var w in WorkshopBuilding.All) pts += FoodPointsIn(w.Buffer);
             return pts;
