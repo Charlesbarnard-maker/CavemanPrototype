@@ -13,6 +13,15 @@ namespace Caveman
         /// <summary>Sandbox: building/age costs are free and instant.</summary>
         public static bool FreeBuild;
 
+        /// <summary>
+        /// When true, a workshop may only consume inputs that are PHYSICALLY present —
+        /// belt-delivered (its InBuffer) or in an adjacent storage/collector/workshop —
+        /// NOT the global pool. This is what makes logistics matter and bottlenecks
+        /// cascade. Survival (food/water/comfort) and build costs still use the pool.
+        /// Toggle with F7 to compare the old "everything teleports" behaviour.
+        /// </summary>
+        public static bool LocalProduction = true;
+
         public static int Available(ItemDefinition item, Inventory carried)
         {
             if (item == null) return 0;

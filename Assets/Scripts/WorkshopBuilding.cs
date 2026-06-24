@@ -86,14 +86,18 @@ namespace Caveman
             return false;
         }
 
-        // Inputs come from the local InBuffer (belt-fed) first, then the global pool.
+        // Inputs: belt-fed InBuffer first, then —
+        //   LocalProduction ON  → only ADJACENT storage/collector/workshop (logistics matters).
+        //   LocalProduction OFF → the global pool (old "everything teleports" behaviour).
         private bool CanMake(Inventory carried)
         {
             if (Economy.FreeBuild) return true;
             foreach (var c in inputs)
             {
                 if (c.item == null) continue;
-                if (InBuffer.Count(c.item) + Economy.Available(c.item, carried) < c.amount) return false;
+                int have = InBuffer.Count(c.item)
+                    + (Economy.LocalProduction ? AdjacentAvailable(c.item) : Economy.Available(c.item, carried));
+                if (have < c.amount) return false;
             }
             return true;
         }
@@ -105,7 +109,42 @@ namespace Caveman
             {
                 if (c.item == null) continue;
                 int need = c.amount - InBuffer.RemoveUpTo(c.item, c.amount);
-                if (need > 0) Economy.SpendUpTo(c.item, need, carried);
+                if (need <= 0) continue;
+                if (Economy.LocalProduction) AdjacentConsume(c.item, need);
+                else Economy.SpendUpTo(c.item, need, carried);
+            }
+        }
+
+        // The four grid cells touching this workshop.
+        private static readonly Belt.Dir[] _dirs = { Belt.Dir.N, Belt.Dir.E, Belt.Dir.S, Belt.Dir.W };
+
+        /// <summary>Units of `item` reachable from directly adjacent storages / machines.</summary>
+        private int AdjacentAvailable(ItemDefinition item)
+        {
+            int n = 0;
+            foreach (var d in _dirs)
+            {
+                var nc = _gridCell + Belt.Step(d);
+                if (WorldGrid.Storages.TryGetValue(nc, out var s) && s != null && s.accepts == item) n += s.Store.Count(item);
+                if (WorldGrid.Collectors.TryGetValue(nc, out var p) && p != null && p.produces == item) n += p.Buffer.Count(item);
+                if (WorldGrid.Workshops.TryGetValue(nc, out var w) && w != null && w != this && w.output == item) n += w.Buffer.Count(item);
+            }
+            return n;
+        }
+
+        /// <summary>Pull `amount` of `item` from adjacent storages / machines.</summary>
+        private void AdjacentConsume(ItemDefinition item, int amount)
+        {
+            int rem = amount;
+            foreach (var d in _dirs)
+            {
+                if (rem <= 0) return;
+                var nc = _gridCell + Belt.Step(d);
+                if (WorldGrid.Storages.TryGetValue(nc, out var s) && s != null && s.accepts == item) rem -= s.Store.RemoveUpTo(item, rem);
+                if (rem <= 0) return;
+                if (WorldGrid.Collectors.TryGetValue(nc, out var p) && p != null && p.produces == item) rem -= p.Buffer.RemoveUpTo(item, rem);
+                if (rem <= 0) return;
+                if (WorldGrid.Workshops.TryGetValue(nc, out var w) && w != null && w != this && w.output == item) rem -= w.Buffer.RemoveUpTo(item, rem);
             }
         }
 

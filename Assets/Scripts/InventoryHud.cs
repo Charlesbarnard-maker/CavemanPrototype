@@ -64,6 +64,7 @@ namespace Caveman
             if (kb.f2Key.wasPressedThisFrame && Colony.Instance != null) Colony.Instance.DebugAddPopulation(5);
             if (kb.f3Key.wasPressedThisFrame && Colony.Instance != null) Colony.Instance.DebugAdvanceAge();
             if (kb.f4Key.wasPressedThisFrame) Economy.FreeBuild = !Economy.FreeBuild;
+            if (kb.f7Key.wasPressedThisFrame) Economy.LocalProduction = !Economy.LocalProduction;
             if (kb.f5Key.wasPressedThisFrame)
             {
                 _speed = _speed >= 4f ? 1f : _speed * 2f;
@@ -561,7 +562,8 @@ namespace Caveman
             GUILayout.BeginArea(new Rect(Screen.width - 330, 10, 320, 50));
             GUILayout.Label("<size=15>B build · Space pause · H help</size>", _small);
             string sandbox = Economy.FreeBuild ? "<color=#9f9>SANDBOX</color> · " : "";
-            GUILayout.Label($"<size=12>{sandbox}Speed x{_speed:0} · F1–F5 sandbox</size>", _small);
+            string mode = Economy.LocalProduction ? "<color=#fc8>Local logistics</color>" : "<color=#8cf>Global pool</color>";
+            GUILayout.Label($"<size=12>{sandbox}Speed x{_speed:0} · {mode} (F7) · F1–F5 sandbox</size>", _small);
             GUILayout.EndArea();
         }
 
