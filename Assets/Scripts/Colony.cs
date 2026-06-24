@@ -76,6 +76,9 @@ namespace Caveman
         /// <summary>0..1 — fraction of currently-expected comfort goods being supplied.</summary>
         public float Happiness { get; private set; } = 1f;
 
+        /// <summary>Comfort goods currently unlocked but NOT being supplied (for HUD guidance).</summary>
+        public readonly List<ItemDefinition> UnmetComforts = new();
+
         /// <summary>Global work-speed multiplier: survival × food variety × happiness.</summary>
         public float Productivity => (Starving || Thirsty) ? 0.6f : _fedBonus * (0.85f + 0.3f * Happiness);
 
@@ -221,12 +224,14 @@ namespace Caveman
             {
                 _comfortT -= comfortTick;
                 int required = 0, met = 0;
+                UnmetComforts.Clear();
                 foreach (var c in comforts)
                 {
                     if (c.item == null || c.unlockAge > Age) continue;
                     required++;
                     int want = Mathf.Max(1, Population / 2); // comfort goods used at half the eating rate
                     if (Economy.SpendUpTo(c.item, want, carried) > 0) met++;
+                    else UnmetComforts.Add(c.item);
                 }
                 Happiness = required == 0 ? 1f : (float)met / required;
             }

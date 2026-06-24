@@ -238,6 +238,15 @@ namespace Caveman
                 int happy = Mathf.RoundToInt(c.Happiness * 100f);
                 string happyCol = happy >= 80 ? "#9f9" : happy >= 50 ? "#ffd24d" : "#f99";
 
+                // Show which comfort goods are short, so low happiness is actionable.
+                string needComfort = "";
+                if (c.UnmetComforts != null && c.UnmetComforts.Count > 0)
+                {
+                    var names = new List<string>();
+                    foreach (var it in c.UnmetComforts) if (it != null) names.Add(it.displayName);
+                    if (names.Count > 0) needComfort = $"   <size=12><color=#f99>need: {string.Join(", ", names)}</color></size>";
+                }
+
                 // Monument progress (endgame): only shown once a Monument exists or blocks
                 // are held. Uses the per-frame cached totals — no extra pool scan.
                 string monu = "";
@@ -249,7 +258,7 @@ namespace Caveman
                     if (hasMon || mb > 0) monu = $"   <color=#ffe08a>Monument {Mathf.Min(mb, 10)}/10</color>";
                 }
 
-                GUILayout.Label($"<b>Population</b> {c.Population}/{c.Capacity}   <b>Working</b> {working}   <b>Free</b> {c.FreeWorkers}   <color=#cda>{c.AgeName}</color>   <color={prodCol}>Output {prod}%</color>   <color={happyCol}>Happy {happy}%</color>   <color=#ffcf6b>Prosperity {c.Prosperity}</color>{monu}{flags}", _s);
+                GUILayout.Label($"<b>Population</b> {c.Population}/{c.Capacity}   <b>Working</b> {working}   <b>Free</b> {c.FreeWorkers}   <color=#cda>{c.AgeName}</color>   <color={prodCol}>Output {prod}%</color>   <color={happyCol}>Happy {happy}%</color>{needComfort}   <color=#ffcf6b>Prosperity {c.Prosperity}</color>{monu}{flags}", _s);
             }
             GUILayout.EndArea();
         }
