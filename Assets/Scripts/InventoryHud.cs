@@ -216,7 +216,17 @@ namespace Caveman
                 GUI.color = Color.white;
             }
 
-            foreach (var s in StorageBuilding.All) if (s != null) Dot(s.transform.position, new Color(0.6f, 0.6f, 0.72f), 3f);
+            // Storages tinted by fullness — a full storage (orange) is a backpressure cause.
+            foreach (var s in StorageBuilding.All)
+            {
+                if (s == null) continue;
+                float fill = (s.def != null && s.def.capacity > 0) ? (float)s.Store.Total() / s.def.capacity : 0f;
+                Color sc = fill >= 0.99f
+                    ? new Color(0.95f, 0.55f, 0.2f)
+                    : Color.Lerp(new Color(0.5f, 0.5f, 0.62f), new Color(0.9f, 0.8f, 0.3f), fill);
+                Dot(s.transform.position, sc, 3f);
+            }
+            foreach (var dp in WorldGrid.Depots.Values) if (dp != null) Dot(dp.transform.position, new Color(0.5f, 0.8f, 0.9f), 4f);
             // Collectors/workshops are coloured by live status, so starved (red) or
             // backed-up (yellow) buildings stand out across a sprawling base.
             foreach (var p in ProductionBuilding.All) if (p != null) Dot(p.transform.position, p.StatusColor, 4f);
