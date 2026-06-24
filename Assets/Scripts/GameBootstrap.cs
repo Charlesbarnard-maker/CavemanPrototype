@@ -32,6 +32,7 @@ namespace Caveman
             var ore = MakeItem("ore", "Ore", new Color(0.62f, 0.58f, 0.42f)); // rare — found far from base
             var metal = MakeItem("metal", "Metal", new Color(0.66f, 0.68f, 0.74f));
             var tools = MakeItem("tools", "Tools", new Color(0.55f, 0.60f, 0.68f));
+            var monument = MakeItem("monument", "Monument Block", new Color(0.90f, 0.86f, 0.62f)); // endgame
 
             // --- Buildings ---
             var woodHut = MakeCollector("Wood Hut", wood, 1, 2.0f, 2, 12, new Color(0.80f, 0.52f, 0.25f),
@@ -127,6 +128,11 @@ namespace Caveman
             var toolmaker = MakeWorkshop("Toolmaker", tools, 1, 4.0f, 2, 12, new Color(0.50f, 0.55f, 0.60f),
                 new List<ItemAmount> { new ItemAmount(metal, 1), new ItemAmount(planks, 1) },
                 new ItemAmount(planks, 8), new ItemAmount(bricks, 6)); toolmaker.unlockAge = 3;
+            // Endgame: the Monument (Industrial age). A long resource sink you pour the
+            // top of every production chain into — completing it (10 blocks) is the win.
+            var monumentBldg = MakeWorkshop("Monument", monument, 1, 6.0f, 3, 12, new Color(0.88f, 0.84f, 0.62f),
+                new List<ItemAmount> { new ItemAmount(metal, 2), new ItemAmount(tools, 1), new ItemAmount(bricks, 2), new ItemAmount(planks, 2) },
+                new ItemAmount(bricks, 20), new ItemAmount(metal, 15), new ItemAmount(tools, 8)); monumentBldg.unlockAge = 4;
 
             // --- Camera (follows the player) ---
             var cam = Camera.main;
@@ -155,7 +161,7 @@ namespace Caveman
               woodStore, stoneStore, foodStore, waterStore, warehouse, house,
               hunter, clayPit, charcoalBurner, clayStore, smokehouse, longhouse,
               kiln, farm, mill, bakery, brickStore, woodBelt, fastBelt,
-              mine, oreStore, smelter, toolmaker, depot, caravan };
+              mine, oreStore, smelter, toolmaker, monumentBldg, depot, caravan };
 
             var follow = cam.GetComponent<CameraFollow>();
             if (follow == null) follow = cam.gameObject.AddComponent<CameraFollow>();
@@ -208,6 +214,7 @@ namespace Caveman
             var carriedInv = gatherer.Inventory;
             int Have(ItemDefinition i) => Economy.Available(i, carriedInv);
             bool HasCollectorOf(ItemDefinition i) { foreach (var p in ProductionBuilding.All) if (p != null && p.produces == i) return true; return false; }
+            bool HasWorkshopOf(ItemDefinition i) { foreach (var w in WorkshopBuilding.All) if (w != null && w.output == i) return true; return false; }
             int Pop() => Colony.Instance != null ? Colony.Instance.Population : 0;
             int AgeNow() => Colony.Instance != null ? Colony.Instance.Age : 0;
             var objectives = new GameObject("Objectives").AddComponent<Objectives>();
@@ -231,7 +238,10 @@ namespace Caveman
                 new Quest { title = "Craft 10 Tools",                    done = () => Have(tools) >= 10,     reward = () => carriedInv.Add(planks, 30),rewardText = "+30 Planks" },
                 new Quest { title = "Keep your people happy (90%+)",     done = () => Colony.Instance != null && Colony.Instance.Happiness >= 0.9f, reward = () => carriedInv.Add(food, 30), rewardText = "+30 Food" },
                 new Quest { title = "Advance to the Industrial Age",     done = () => AgeNow() >= 4,         reward = () => carriedInv.Add(planks, 50),rewardText = "+50 Planks" },
-                new Quest { title = "Build a thriving settlement: 30 people", done = () => Pop() >= 30 },
+                new Quest { title = "Build a thriving settlement: 30 people", done = () => Pop() >= 30, reward = () => carriedInv.Add(metal, 15), rewardText = "+15 Metal" },
+                new Quest { title = "Build a prosperous colony: 600 Prosperity", done = () => Colony.Instance != null && Colony.Instance.PeakProsperity >= 600, reward = () => carriedInv.Add(tools, 10), rewardText = "+10 Tools" },
+                new Quest { title = "Begin your legacy: build the Monument",      done = () => HasWorkshopOf(monument), reward = () => carriedInv.Add(planks, 40), rewardText = "+40 Planks" },
+                new Quest { title = "🏆 Complete the Monument — 10 Blocks. YOU WIN!", done = () => Have(monument) >= 10 },
             };
 
             // --- Resource patches: spread WIDE across the map so you must explore.
