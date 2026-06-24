@@ -65,8 +65,12 @@ abstract). The player solves the same fundamentals with better tools over time.
    now optional **buffers** (evolution, not replacement): pipe a pump straight to a Campfire
    and it runs without any barrel; add a barrel to buffer surges. Pipe feeding ignores the
    workshop's belt input-port side for now (pipes are a separate network).
-3. **Pressure/range + booster pumps** 📝 — the Industrial headline; far sinks starve without
-   boosters / network segmentation / hubs ("works locally, breaks at scale"). NEXT.
+3. ✅ **Pressure/range + booster pumps** — a pump's pressure now fades over distance: it floods
+   its network tracking pipe-steps and only feeds sinks within `range` (16). Far consumers
+   STARVE on big networks ("works locally, breaks at scale") until you place a **Booster Pump**
+   on the run — it resets pressure to full, extending reach another full range; chain several
+   for long hauls. Solid liquids never ride belts (`isLiquid`). NOTE: pressure is a simple
+   distance model (not true fluid pressure/back-pressure) — fine for the gameplay; deepen later.
 4. **More fluids** 📝 — steam/oil for power & cooling (industrial water usage), then abstract
    fluids in the future ages.
 

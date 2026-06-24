@@ -43,6 +43,15 @@ namespace Caveman
             transform.position = Vector3.zero;
         }
 
+        /// <summary>Reveal the entire map at once (sandbox/testing).</summary>
+        public void RevealAll()
+        {
+            if (_px == null) return;
+            for (int i = 0; i < _px.Length; i++) _px[i] = Clear;
+            _tex.SetPixels32(_px);
+            _tex.Apply();
+        }
+
         /// <summary>Has this world position been revealed? (cheap array lookup)</summary>
         public bool IsExplored(Vector3 worldPos)
         {

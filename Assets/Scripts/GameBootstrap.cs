@@ -22,6 +22,7 @@ namespace Caveman
             var cookedFood = MakeItem("cooked", "Cooked Food", new Color(0.92f, 0.56f, 0.30f));
             cookedFood.foodValue = 3; // cooking turns 2 raw food into 1 cooked worth 3 — a real gain
             var water = MakeItem("water", "Water", new Color(0.30f, 0.55f, 0.85f)); // survival + crafting
+            water.isLiquid = true; // liquid: moves via pipes/carrying, never on belts
             var meat = MakeItem("meat", "Meat", new Color(0.72f, 0.30f, 0.30f)); meat.foodValue = 2;
             var clay = MakeItem("clay", "Clay", new Color(0.70f, 0.45f, 0.35f));
             var charcoal = MakeItem("charcoal", "Charcoal", new Color(0.24f, 0.24f, 0.27f));
@@ -80,6 +81,7 @@ namespace Caveman
             var waterHole = MakeCollector("Water Hole", water, 1, 2.0f, 2, 12, new Color(0.40f, 0.62f, 0.85f),
                 new ItemAmount(wood, 4));
             waterHole.fromWaterTerrain = true; // must sit next to real water terrain (river/lake)
+            waterHole.description = "Stone-age water: workers draw from adjacent water terrain into its buffer. Water is a LIQUID — it can't ride belts, so feed nearby buildings by placing them next to it (or upgrade to Pipes + a Water Pump in the Bronze age to move it further).";
             // Bridge: plank tile placed on water; makes it passable for feet + belts. Core
             // logistics infrastructure — strategic chokepoints across rivers.
             var bridge = ScriptableObject.CreateInstance<BuildingDefinition>();
@@ -99,7 +101,14 @@ namespace Caveman
             pump.displayName = "Water Pump"; pump.kind = BuildingKind.Pump; pump.item = water; pump.unlockAge = 2;
             pump.color = new Color(0.30f, 0.55f, 0.78f);
             pump.cost = new List<ItemAmount> { new ItemAmount(planks, 4), new ItemAmount(stone, 4) };
-            pump.description = "Place next to water (river/lake) and connect pipes: it pushes water through the network into reachable Water Barrels AND directly into adjacent water-using buildings (Campfire/Farm/Bakery) — no workers carrying it. The Bronze-age evolution of the Water Hole.";
+            pump.description = "Place next to water (river/lake) and connect pipes: it pushes water through the network into reachable Water Barrels AND directly into adjacent water-using buildings (Campfire/Farm/Bakery) — no workers carrying it. Pressure fades over distance — far consumers starve unless you add a Booster Pump. The Bronze-age evolution of the Water Hole.";
+            // Booster Pump: re-pressurises a pipe network so it reaches further (the solution to
+            // the distance/pressure problem). No water source needed — place it on a long run.
+            var booster = ScriptableObject.CreateInstance<BuildingDefinition>();
+            booster.displayName = "Booster Pump"; booster.kind = BuildingKind.Pump; booster.booster = true; booster.unlockAge = 2;
+            booster.color = new Color(0.45f, 0.62f, 0.72f);
+            booster.cost = new List<ItemAmount> { new ItemAmount(planks, 3), new ItemAmount(stone, 3) };
+            booster.description = "Re-pressurises a pipe network next to it, extending how far water reaches. No water source needed — place it partway along a long pipe run so distant consumers stop starving. Chain several for very long networks.";
             var sawmill = MakeWorkshop("Sawmill", planks, 1, 2.5f, 2, 12, new Color(0.66f, 0.50f, 0.30f),
                 new List<ItemAmount> { new ItemAmount(wood, 2) },
                 new ItemAmount(wood, 6), new ItemAmount(stone, 4));
@@ -277,7 +286,7 @@ namespace Caveman
             builder.placeNodeRange = 6f;
             builder.buildables = new List<BuildingDefinition>
             { woodHut, stonePit, foragerHut, waterHole, sawmill, campfire,
-              woodStore, stoneStore, foodStore, waterStore, warehouse, house, buildYard, bridge, pipe, pump,
+              woodStore, stoneStore, foodStore, waterStore, warehouse, house, buildYard, bridge, pipe, pump, booster,
               hunter, clayPit, charcoalBurner, clayStore, smokehouse, longhouse,
               kiln, farm, mill, bakery, brickStore, mason, stoneHouse, woodBelt, fastBelt,
               mine, oreStore, smelter, toolmaker, monumentBldg, generator,

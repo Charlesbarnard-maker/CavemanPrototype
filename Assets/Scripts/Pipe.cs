@@ -7,6 +7,9 @@ namespace Caveman
     public static class PipeNet
     {
         public static readonly Dictionary<Vector2Int, Pipe> Pipes = new();
+        // Cells next to a Booster Pump: when a pump's pressure flood reaches one (in range),
+        // pressure resets to full there, extending the network another full range onward.
+        public static readonly HashSet<Vector2Int> BoostCells = new();
         public static int Count => Pipes.Count;
         public static Pipe At(Vector2Int c) => Pipes.TryGetValue(c, out var p) ? p : null;
     }

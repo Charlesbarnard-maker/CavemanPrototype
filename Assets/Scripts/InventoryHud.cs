@@ -83,6 +83,7 @@ namespace Caveman
             if (kb.f3Key.wasPressedThisFrame && Colony.Instance != null) Colony.Instance.DebugAdvanceAge();
             if (kb.f4Key.wasPressedThisFrame) Economy.FreeBuild = !Economy.FreeBuild;
             if (kb.f7Key.wasPressedThisFrame) Economy.LocalProduction = !Economy.LocalProduction;
+            if (kb.f8Key.wasPressedThisFrame && FogOfWar.Instance != null) FogOfWar.Instance.RevealAll();
             if (kb.f5Key.wasPressedThisFrame)
             {
                 _speed = _speed >= 4f ? 1f : _speed * 2f;
@@ -433,7 +434,9 @@ namespace Caveman
             var cy = hit.GetComponent<ConstructionYard>();
             if (cy != null) return "<size=13><b>Construction Yard</b></size>";
             var wp = hit.GetComponent<WaterPump>();
-            if (wp != null) return "<size=13><b>Water Pump</b>  <color=#bbb>water → pipes</color></size>";
+            if (wp != null) return wp.isBooster
+                ? "<size=13><b>Booster Pump</b>  <color=#bbb>re-pressurises pipes</color></size>"
+                : "<size=13><b>Water Pump</b>  <color=#bbb>water → pipes</color></size>";
             if (hit.GetComponent<Bridge>() != null) return "<size=13><b>Bridge</b></size>";
             if (hit.GetComponent<Pipe>() != null) return "<size=13><b>Pipe</b>  <color=#bbb>liquid network</color></size>";
             return null;
@@ -924,7 +927,7 @@ namespace Caveman
                 "• Status dots: <color=#6c6>green</color>=working, <color=#fd4>yellow</color>=output full, " +
                 "<color=#f66>red</color>=no input, <color=#999>grey</color>=no worker.\n" +
                 "\n<b>Sandbox:</b> F1 +resources · F2 +5 people · F3 advance age · " +
-                "F4 free build · F5 game speed.\n" +
+                "F4 free build · F5 game speed · F7 local/global production · F8 reveal map.\n" +
                 "</size>", _small);
             GUILayout.Label("<size=15>Press <b>H</b> to close  ·  Press <b>G</b> for the full Guide (mechanics + every resource)  ·  <b>N</b> hides the map.</size>", _small);
             GUILayout.EndArea();

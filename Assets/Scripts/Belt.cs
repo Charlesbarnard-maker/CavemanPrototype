@@ -231,21 +231,22 @@ namespace Caveman
 
                 // Output ports: a belt only pulls a building's output from its OUTPUT side
                 // (the building's output must face this belt — Opposite of our scan dir).
-                if (WorldGrid.Collectors.TryGetValue(c, out var p) && p != null && p.produces != null
+                // Liquids never ride belts — they move via pipes / carrying.
+                if (WorldGrid.Collectors.TryGetValue(c, out var p) && p != null && p.produces != null && !p.produces.isLiquid
                     && p.OutputSide == Opposite((Dir)di)
                     && (item == null || item == p.produces) && p.Buffer.Count(p.produces) > 0)
                 {
                     if (p.Buffer.RemoveUpTo(p.produces, 1) > 0) { item = p.produces; count++; _inDir = (Dir)di; _timer = 0f; return; }
                 }
 
-                if (WorldGrid.Workshops.TryGetValue(c, out var w) && w != null && w.output != null
+                if (WorldGrid.Workshops.TryGetValue(c, out var w) && w != null && w.output != null && !w.output.isLiquid
                     && w.OutputSide == Opposite((Dir)di)
                     && (item == null || item == w.output) && w.Buffer.Count(w.output) > 0)
                 {
                     if (w.Buffer.RemoveUpTo(w.output, 1) > 0) { item = w.output; count++; _inDir = (Dir)di; _timer = 0f; return; }
                 }
 
-                if (WorldGrid.Depots.TryGetValue(c, out var dp) && dp != null && dp.item != null
+                if (WorldGrid.Depots.TryGetValue(c, out var dp) && dp != null && dp.item != null && !dp.item.isLiquid
                     && (item == null || item == dp.item) && dp.store.Count(dp.item) > 0)
                 {
                     if (dp.store.RemoveUpTo(dp.item, 1) > 0) { item = dp.item; count++; _inDir = (Dir)di; _timer = 0f; return; }

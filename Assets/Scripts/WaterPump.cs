@@ -17,10 +17,18 @@ namespace Caveman
         public ItemDefinition water;
         public float interval = 0.5f;
         public int flowPerTick = 4;
+        public int range = 16;       // how many pipe-steps pressure carries before it dies
+        public bool isBooster;       // a relay (no water source) that re-pressurises the network
 
         public static readonly List<WaterPump> All = new();
+        private readonly List<Vector2Int> _myBoost = new(); // boost cells I registered
         void OnEnable() => All.Add(this);
-        void OnDisable() => All.Remove(this);
+        void OnDisable()
+        {
+            All.Remove(this);
+            foreach (var c in _myBoost) PipeNet.BoostCells.Remove(c);
+            _myBoost.Clear();
+        }
 
         private float _t;
         private bool _flowing;
@@ -28,7 +36,7 @@ namespace Caveman
         private Color _base;
 
         private static readonly Queue<Vector2Int> _q = new();
-        private static readonly HashSet<Vector2Int> _seen = new();
+        private static readonly Dictionary<Vector2Int, int> _dist = new(); // pipe cell → pressure distance
         private static readonly Belt.Dir[] _dirs = { Belt.Dir.N, Belt.Dir.E, Belt.Dir.S, Belt.Dir.W };
 
         public static WaterPump Spawn(BuildingDefinition def, Vector3 pos)
@@ -47,13 +55,29 @@ namespace Caveman
             var p = go.AddComponent<WaterPump>();
             p.def = def;
             p.water = def.item;
+            p.isBooster = def.booster;
             p._sr = sr;
             p._base = def.color;
+            // A booster registers its neighbouring cells as pressure-reset points.
+            if (p.isBooster)
+            {
+                var me = new Vector2Int(cellX(pos), cellY(pos));
+                foreach (var d in _dirs)
+                {
+                    var c = me + Belt.Step(d);
+                    PipeNet.BoostCells.Add(c);
+                    p._myBoost.Add(c);
+                }
+            }
             return p;
         }
 
+        private static int cellX(Vector3 p) => Mathf.RoundToInt(p.x);
+        private static int cellY(Vector3 p) => Mathf.RoundToInt(p.y);
+
         void Update()
         {
+            if (isBooster) return; // passive relay — only marks BoostCells
             _t += Time.deltaTime;
             if (_t < interval) return;
             _t = 0f;
@@ -61,8 +85,10 @@ namespace Caveman
             if (_sr != null) _sr.color = _flowing ? _base : Color.Lerp(_base, Color.black, 0.5f);
         }
 
-        // Source water only if adjacent to water terrain; then BFS the connected pipe network
-        // and top up every water-accepting storage the pipes touch (split a per-tick budget).
+        // Source water only if adjacent to water terrain; then flood the connected pipe network
+        // tracking PRESSURE = pipe-steps from the pump. Pressure dies past `range` (distant
+        // sinks starve) UNLESS a Booster cell resets it to full — the layout/scaling problem.
+        // Sinks within pressure get water from a shared per-tick budget (nearest first).
         private bool Pump()
         {
             if (water == null) return false;
@@ -72,52 +98,52 @@ namespace Caveman
             foreach (var d in _dirs) if (TerrainGrid.IsWater(me + Belt.Step(d))) { atWater = true; break; }
             if (!atWater) return false;
 
-            _q.Clear(); _seen.Clear();
+            _q.Clear(); _dist.Clear();
             foreach (var d in _dirs)
             {
                 var s = me + Belt.Step(d);
-                if (PipeNet.At(s) != null && _seen.Add(s)) _q.Enqueue(s);
+                if (PipeNet.At(s) != null && !_dist.ContainsKey(s)) { _dist[s] = 1; _q.Enqueue(s); }
             }
 
             int budget = flowPerTick;
             bool delivered = false;
             int guard = 0;
-            while (_q.Count > 0 && guard++ < 1024)
+            while (_q.Count > 0 && guard++ < 4096)
             {
                 var c = _q.Dequeue();
+                int dc = _dist[c];
+                if (dc > range) continue; // out of pressure — no delivery, no further reach here
+
+                if (budget > 0)
+                {
+                    foreach (var d in _dirs)
+                    {
+                        var nb = c + Belt.Step(d);
+                        if (budget <= 0) break;
+                        // Sink 1: water storage (barrel) — a buffer.
+                        if (WorldGrid.Storages.TryGetValue(nb, out var st) && st != null && st.accepts == water && st.def != null)
+                        {
+                            int room = st.def.capacity - st.Store.Total();
+                            if (room > 0) { int add = Mathf.Min(budget, room); st.Store.Add(water, add); budget -= add; delivered = true; }
+                        }
+                        // Sink 2: a water-using workshop — fed directly into its input buffer.
+                        if (budget > 0 && WorldGrid.Workshops.TryGetValue(nb, out var wk) && wk != null && wk.WantsInput(water))
+                        {
+                            int room = wk.InBuffer.capacity - wk.InBuffer.Total();
+                            if (room > 0) { int add = Mathf.Min(budget, room); wk.InBuffer.Add(water, add); budget -= add; delivered = true; }
+                        }
+                    }
+                }
+
+                // Propagate pressure: a Booster cell resets distance to full (extends range).
+                int baseD = PipeNet.BoostCells.Contains(c) ? 0 : dc;
                 foreach (var d in _dirs)
                 {
                     var nb = c + Belt.Step(d);
-                    // Sink 1: water storage (barrel) adjacent to the pipe — a buffer.
-                    if (WorldGrid.Storages.TryGetValue(nb, out var st) && st != null && st.accepts == water
-                        && st.def != null && budget > 0)
-                    {
-                        int room = st.def.capacity - st.Store.Total();
-                        if (room > 0)
-                        {
-                            int add = Mathf.Min(budget, room);
-                            st.Store.Add(water, add);
-                            budget -= add;
-                            delivered = true;
-                        }
-                    }
-                    // Sink 2: a water-using workshop adjacent to the pipe — fed DIRECTLY into
-                    // its input buffer (no barrel needed for local consumption). The workshop
-                    // already eats InBuffer water first, so it just runs.
-                    if (budget > 0 && WorldGrid.Workshops.TryGetValue(nb, out var wk) && wk != null && wk.WantsInput(water))
-                    {
-                        int room = wk.InBuffer.capacity - wk.InBuffer.Total();
-                        if (room > 0)
-                        {
-                            int add = Mathf.Min(budget, room);
-                            wk.InBuffer.Add(water, add);
-                            budget -= add;
-                            delivered = true;
-                        }
-                    }
-                    if (PipeNet.At(nb) != null && _seen.Add(nb)) _q.Enqueue(nb);
+                    if (PipeNet.At(nb) == null) continue;
+                    int nd = baseD + 1;
+                    if (!_dist.TryGetValue(nb, out var old) || nd < old) { _dist[nb] = nd; _q.Enqueue(nb); }
                 }
-                if (budget <= 0) break;
             }
             return delivered;
         }

@@ -207,7 +207,7 @@ namespace Caveman
                 placeOk = HasMatchingNodeNear(world, def.item, placeNodeRange)
                           || (def.fromWaterTerrain && TerrainGrid.HasWaterNear(world, placeNodeRange));
             else if (def.kind == BuildingKind.Pump)
-                placeOk = TerrainGrid.HasWaterNear(world, placeNodeRange); // pump must reach water
+                placeOk = def.booster || TerrainGrid.HasWaterNear(world, placeNodeRange); // pump needs water; booster doesn't
             else placeOk = true;
             bool free = !FootprintBlocked(world, def) && FootprintOnLand(world, def);
             PlacementValid = affordable && placeOk && free;

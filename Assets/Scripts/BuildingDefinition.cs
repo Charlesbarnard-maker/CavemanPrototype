@@ -77,6 +77,8 @@ namespace Caveman
         public bool configurable = false;
         [Tooltip("Collector: draws its resource from adjacent WATER terrain (not a node) — e.g. Water Hole.")]
         public bool fromWaterTerrain = false;
+        [Tooltip("Pump: a BOOSTER (no water source) — re-pressurises a pipe network to extend its range.")]
+        public bool booster = false;
 
         [Header("Progression")]
         [Tooltip("Age at which this becomes buildable (0 = Stone Age, available from the start).")]
