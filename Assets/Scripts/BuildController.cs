@@ -34,11 +34,13 @@ namespace Caveman
         private bool _dragging;
         private Vector2Int _dragLast;
         private Depot _routeA; // first depot picked when linking a route
+        private GameObject _highlight; // glow ring around the selected building
 
         void Awake() => _cam = Camera.main;
 
         void Update()
         {
+            UpdateHighlight();
             if (_cam == null) _cam = Camera.main;
             var kb = Keyboard.current;
             var mouse = Mouse.current;
@@ -93,6 +95,27 @@ namespace Caveman
             if (def == null) return;
             int idx = buildables.IndexOf(def);
             if (idx >= 0 && IsUnlocked(def)) BeginPlacement(idx);
+        }
+
+        // A soft glowing square behind the selected building so it's obvious what's selected.
+        private void UpdateHighlight()
+        {
+            if (_highlight == null)
+            {
+                _highlight = new GameObject("SelectionHighlight");
+                var sr = _highlight.AddComponent<SpriteRenderer>();
+                sr.sprite = PlaceholderArt.Square();
+                sr.color = new Color(1f, 0.95f, 0.4f, 0.5f);
+                sr.sortingOrder = 4; // just under buildings (5) so it reads as a border
+            }
+            if (Selected != null)
+            {
+                if (!_highlight.activeSelf) _highlight.SetActive(true);
+                var p = Selected.transform.position;
+                _highlight.transform.position = new Vector3(p.x, p.y, 0f);
+                _highlight.transform.localScale = Vector3.one * (1.25f + 0.08f * Mathf.Sin(Time.unscaledTime * 5f));
+            }
+            else if (_highlight.activeSelf) _highlight.SetActive(false);
         }
 
         public IStaffable SelectedStaffable =>
