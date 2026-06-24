@@ -29,6 +29,8 @@ namespace Caveman
         private Rect _buildRect, _selRect;
         private bool _buildShown, _selShown;
         private bool _showBuild;
+        private readonly List<int> _recent = new(); // recently-placed buildable indices
+        private readonly HashSet<string> _collapsed = new(); // collapsed build-menu categories
         private bool _showMinimap = true;
         private bool _showGuide;
         private Vector2 _guideScroll;
@@ -381,6 +383,13 @@ namespace Caveman
         }
 
         // ---- Build menu (left, categorised + scrollable + clickable) ----
+        private void RecordRecent(int i)
+        {
+            _recent.Remove(i);
+            _recent.Insert(0, i);
+            while (_recent.Count > 4) _recent.RemoveAt(_recent.Count - 1);
+        }
+
         private void DrawBuildMenu()
         {
             if (builder.PendingIndex >= 0)
@@ -444,33 +453,62 @@ namespace Caveman
                 }
             }
             GUILayout.Space(4);
-            GUILayout.Label("<b>Build</b>  <size=11>(click, then click the map)</size>", _small);
-            _buildScroll = GUILayout.BeginScrollView(_buildScroll);
+            GUILayout.Label("<b>Build</b>  <size=11>(click, then click the map · headers collapse)</size>", _small);
 
             int curAge = col != null ? col.Age : 0;
+            _buildScroll = GUILayout.BeginScrollView(_buildScroll);
+
+            // Draws one build entry (locked → label, unlocked → button). Local fn so the
+            // recent row and category lists render identically.
+            void Entry(int i)
+            {
+                var def = builder.buildables[i];
+                if (def == null) return;
+                if (!builder.IsUnlocked(def))
+                {
+                    string ageName = def.unlockAge < Colony.AgeNames.Length ? Colony.AgeNames[def.unlockAge] : "later";
+                    GUILayout.Label(new GUIContent($"<size=11><color=#888>🔒 {def.displayName} — {ageName}</color></size>", Describe(def)), _small);
+                    return;
+                }
+                string costCol = builder.CanAfford(def) ? "#9f9" : "#f99";
+                string key = i < 9 ? (i + 1).ToString() : i == 9 ? "0" : "·";
+                var label = new GUIContent($"<size=12>[{key}] {def.displayName}  <color={costCol}>{CostText(def)}</color></size>", Describe(def));
+                if (GUILayout.Button(label, _btn)) { builder.BeginPlacement(i); RecordRecent(i); }
+            }
+
+            // Recently-placed shortcut row — fast re-access of what you're actively using.
+            if (_recent.Count > 0)
+            {
+                GUILayout.Label("<b><color=#d8c8a0>Recent</color></b>", _small);
+                foreach (int i in _recent)
+                    if (i >= 0 && i < builder.buildables.Count && builder.IsUnlocked(builder.buildables[i])) Entry(i);
+            }
+
+            // Collapsible categories — click a header to fold it away so the menu stays
+            // navigable as buildings grow. Empty/all-future categories are skipped.
             foreach (var cat in Cats)
             {
-                bool header = false;
+                bool hasAny = false;
+                for (int i = 0; i < builder.buildables.Count; i++)
+                {
+                    var d = builder.buildables[i];
+                    if (d != null && d.kind == cat.kind && d.unlockAge <= curAge + 1) { hasAny = true; break; }
+                }
+                if (!hasAny) continue;
+
+                bool collapsed = _collapsed.Contains(cat.label);
+                if (GUILayout.Button($"<size=12><b><color=#d8c8a0>{(collapsed ? "▶" : "▼")} {cat.label}</color></b></size>", _btn))
+                {
+                    if (collapsed) _collapsed.Remove(cat.label); else _collapsed.Add(cat.label);
+                }
+                if (collapsed) continue;
+
                 for (int i = 0; i < builder.buildables.Count; i++)
                 {
                     var def = builder.buildables[i];
                     if (def == null || def.kind != cat.kind) continue;
                     if (def.unlockAge > curAge + 1) continue; // hide far-future buildings
-                    if (!header) { GUILayout.Label($"<b><color=#d8c8a0>{cat.label}</color></b>", _small); header = true; }
-
-                    if (!builder.IsUnlocked(def))
-                    {
-                        string ageName = def.unlockAge < Colony.AgeNames.Length ? Colony.AgeNames[def.unlockAge] : "later";
-                        // Show the description on hover too, so you can plan toward it.
-                        GUILayout.Label(new GUIContent($"<size=11><color=#888>🔒 {def.displayName} — {ageName}</color></size>", Describe(def)), _small);
-                        continue;
-                    }
-
-                    string costCol = builder.CanAfford(def) ? "#9f9" : "#f99";
-                    string key = i < 9 ? (i + 1).ToString() : i == 9 ? "0" : "·";
-                    var label = new GUIContent($"<size=12>[{key}] {def.displayName}  <color={costCol}>{CostText(def)}</color></size>", Describe(def));
-                    if (GUILayout.Button(label, _btn))
-                        builder.BeginPlacement(i);
+                    Entry(i);
                 }
             }
 

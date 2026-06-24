@@ -194,21 +194,16 @@ namespace Caveman
                 ? new Color(0.35f, 1f, 0.4f, 0.55f)
                 : new Color(1f, 0.3f, 0.3f, 0.5f);
 
-            // Hold-and-drag to place a whole row; stays in placement mode so you can
-            // keep stamping. Right-click / Esc finishes. One building per grid cell.
-            if (mouse.leftButton.isPressed && PlacementValid)
+            // Intentional placement: ONE building per deliberate click (no hold-drag spam —
+            // that's reserved for belts/mass infrastructure). Stays in placement mode so you
+            // can place several with discrete clicks; right-click / Esc finishes. The
+            // PointerOverUI guard stops a build-menu click from also dropping a building.
+            if (mouse.leftButton.wasPressedThisFrame && PlacementValid && !InventoryHud.PointerOverUI)
             {
-                var cell = Footprint.Anchor(world, def.FootW, def.FootH);
-                if (!_dragging || cell != _dragLast)
-                {
-                    if (Economy.FreeBuild) ConstructionSite.SpawnFinished(def, world); // sandbox: instant
-                    else ConstructionSite.Spawn(def, world); // builders haul materials, then construct
-                    BuildingsPlaced++;
-                    _dragging = true;
-                    _dragLast = cell;
-                }
+                if (Economy.FreeBuild) ConstructionSite.SpawnFinished(def, world); // sandbox: instant
+                else ConstructionSite.Spawn(def, world); // builders haul materials, then construct
+                BuildingsPlaced++;
             }
-            if (!mouse.leftButton.isPressed) _dragging = false;
             if (mouse.rightButton.wasPressedThisFrame) CancelPlacement();
         }
 
