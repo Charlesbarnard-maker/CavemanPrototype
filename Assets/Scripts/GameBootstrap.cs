@@ -152,7 +152,7 @@ namespace Caveman
             // Endgame: the Monument (Industrial age). A long resource sink you pour the
             // top of every production chain into — completing it (10 blocks) is the win.
             var monumentBldg = MakeWorkshop("Monument", monument, 1, 6.0f, 3, 12, new Color(0.88f, 0.84f, 0.62f),
-                new List<ItemAmount> { new ItemAmount(metal, 2), new ItemAmount(tools, 1), new ItemAmount(bricks, 2), new ItemAmount(planks, 2), new ItemAmount(jewelry, 1) },
+                new List<ItemAmount> { new ItemAmount(metal, 2), new ItemAmount(tools, 1), new ItemAmount(bricks, 2), new ItemAmount(planks, 2) },
                 new ItemAmount(bricks, 20), new ItemAmount(metal, 15), new ItemAmount(tools, 8)); monumentBldg.unlockAge = 4;
 
             // --- Textiles & pottery chains (comfort goods) ---
@@ -290,7 +290,7 @@ namespace Caveman
                 new Quest { title = "Advance to the Industrial Age",     done = () => AgeNow() >= 4,         reward = () => carriedInv.Add(planks, 50),rewardText = "+50 Planks" },
                 new Quest { title = "Tailor 12 Clothes (Industrial comfort)", done = () => Have(clothes) >= 12, reward = () => carriedInv.Add(tools, 6), rewardText = "+6 Tools" },
                 new Quest { title = "Prospect the far reaches for 20 Gems", done = () => Have(gems) >= 20, reward = () => carriedInv.Add(metal, 10), rewardText = "+10 Metal" },
-                new Quest { title = "Craft 10 Jewelry (the Monument needs it)", done = () => Have(jewelry) >= 10, reward = () => carriedInv.Add(planks, 30), rewardText = "+30 Planks" },
+                new Quest { title = "Craft 10 Jewelry (luxury wealth)", done = () => Have(jewelry) >= 10, reward = () => carriedInv.Add(planks, 30), rewardText = "+30 Planks" },
                 new Quest { title = "Build a thriving settlement: 30 people", done = () => Pop() >= 30, reward = () => carriedInv.Add(metal, 15), rewardText = "+15 Metal" },
                 new Quest { title = "Build a prosperous colony: 600 Prosperity", done = () => Colony.Instance != null && Colony.Instance.PeakProsperity >= 600, reward = () => carriedInv.Add(tools, 10), rewardText = "+10 Tools" },
                 new Quest { title = "Begin your legacy: build the Monument",      done = () => HasWorkshopOf(monument), reward = () => carriedInv.Add(planks, 40), rewardText = "+40 Planks" },

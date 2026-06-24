@@ -73,11 +73,26 @@ namespace Caveman
             float bestSq = sourceRange * sourceRange;
             foreach (var n in ResourceNode.All)
             {
-                if (n == null || n.yields != produces) continue;
+                // Prefer the nearest node in range that still HAS resource, so we re-bind
+                // to a live patch when the old one is exhausted.
+                if (n == null || n.yields != produces || !n.HasResource) continue;
                 float sq = ((Vector2)(n.transform.position - transform.position)).sqrMagnitude;
                 if (sq <= bestSq) { bestSq = sq; best = n; }
             }
-            _source = best;
+            if (best != null) _source = best;
+        }
+
+        // Re-bind to a fresh nearby patch when the current source is gone (finite vein
+        // exhausted/destroyed) — so local depletion pushes you outward instead of just
+        // killing the collector. Throttled so we don't scan every frame when none remain.
+        private float _rebindT;
+        private void MaybeRebind()
+        {
+            if (_source != null && _source.HasResource) return;
+            _rebindT += Time.deltaTime;
+            if (_rebindT < 1f) return;
+            _rebindT = 0f;
+            if (_source == null || !_source.HasResource) Bind();
         }
 
         public bool TryAssign()
@@ -112,6 +127,8 @@ namespace Caveman
 
         void Update()
         {
+            MaybeRebind(); // chase fresh patches as nearby ones deplete
+
             bool working = AssignedWorkers > 0 && _source != null && _source.HasResource
                            && Buffer.Total() < Buffer.capacity;
             UpdateVisual(working);
