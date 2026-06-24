@@ -456,32 +456,38 @@ namespace Caveman
             // Tooltip describing the hovered build entry.
             if (!string.IsNullOrEmpty(GUI.tooltip))
             {
-                var tr = new Rect(_buildRect.xMax + 6, _buildRect.y, 250, 120);
-                GUI.Box(tr, GUIContent.none);
-                GUI.Label(new Rect(tr.x + 8, tr.y + 6, tr.width - 16, tr.height - 12), $"<size=13>{GUI.tooltip}</size>", _small);
+                var tr = new Rect(_buildRect.xMax + 6, _buildRect.y, 280, 172);
+                PanelBg(tr);
+                GUI.Label(new Rect(tr.x + 9, tr.y + 7, tr.width - 18, tr.height - 14), $"<size=13>{GUI.tooltip}</size>", _small);
             }
         }
 
         private static string Describe(BuildingDefinition def)
         {
+            if (def == null) return "";
+            // A hand-written description always wins; otherwise build a full one from data.
+            if (!string.IsNullOrEmpty(def.description)) return def.description;
+
+            string age = (def.unlockAge > 0 && def.unlockAge < Colony.AgeNames.Length)
+                ? $"\n<i>Unlocks: {Colony.AgeNames[def.unlockAge]}.</i>" : "";
             switch (def.kind)
             {
                 case BuildingKind.Collector:
-                    return $"Collector — produces {Name(def.item)}. Place near a {Name(def.item)} source; needs workers.";
+                    return $"Gathers {Name(def.item)} from a nearby {Name(def.item)} patch. Needs workers (1 per harvester, up to {def.maxWorkers}). Place it next to the resource.{age}";
                 case BuildingKind.Workshop:
-                    return $"Workshop — {CostList(def.inputs)} → {def.outputPerCycle} {Name(def.item)}. Needs workers AND its inputs delivered: belt-fed, or in an ADJACENT storage/collector/machine. Red dot = starved.";
+                    return $"Recipe: {CostList(def.inputs)} → {def.outputPerCycle} {Name(def.item)}. Needs workers, and its inputs must be DELIVERED here (belt, or an adjacent storage/machine). Red dot = starved.{age}";
                 case BuildingKind.Storage:
                     return def.configurable
-                        ? "Warehouse — stores ONE resource you choose (set it in the building's panel). Good for Planks, Cooked Food, etc."
-                        : $"Stores {Name(def.item)} only.";
+                        ? $"Warehouse — stores ONE resource you pick (set it in its panel); good for Planks, Cooked Food, etc. Holds {def.capacity}.{age}"
+                        : $"Stores {Name(def.item)} (up to {def.capacity}). Workers haul output here; if it fills up, production backs up.{age}";
                 case BuildingKind.Housing:
-                    return $"Housing — raises population cap by {def.houseCapacity}.";
-                case BuildingKind.Logistics:
-                    return def.mechanical
-                        ? "Conveyor hub — auto-hauls nearby goods to storage, no worker."
-                        : "Hauler hut — assign workers to carry nearby goods to storage (short range).";
+                    return $"Houses {def.houseCapacity} people — raises the population cap so the colony can grow.{age}";
                 case BuildingKind.Belt:
-                    return $"Belt — carries items in its direction ({(def.interval <= 0.6f ? "fast" : "slow")}). Drag to route; feeds storage or workshop inputs.";
+                    return $"Conveyor — carries items one cell in the way it faces ({(def.interval <= 0.6f ? "fast tier" : "slow tier")}). Click/drag to lay a line, R to rotate. Feeds storage or workshop inputs.{age}";
+                case BuildingKind.Depot:
+                    return $"Long-distance transfer station. Belt goods in/out and link two depots with a route vehicle. Holds {def.capacity}.{age}";
+                case BuildingKind.Route:
+                    return $"Sends a vehicle between two depots, hauling goods over distance (travel time scales with distance). Capacity {def.capacity}. Pick the FROM depot, then the TO depot.{age}";
                 default:
                     return def.displayName;
             }

@@ -74,5 +74,10 @@ namespace Caveman
         [Header("Visuals / cost")]
         public Color color = Color.white;
         public List<ItemAmount> cost = new();
+
+        [Header("Help")]
+        [TextArea]
+        [Tooltip("Build-menu tooltip. If blank, a description is auto-generated from the data.")]
+        public string description = "";
     }
 }

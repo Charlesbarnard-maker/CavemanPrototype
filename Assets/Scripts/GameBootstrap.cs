@@ -176,6 +176,20 @@ namespace Caveman
                 new List<ItemAmount> { new ItemAmount(gems, 2) },
                 new ItemAmount(planks, 8), new ItemAmount(metal, 4)); jeweler.unlockAge = 4;
 
+            // --- Hand-written descriptions for buildings that need strategic context
+            //     (everything else auto-generates a full tooltip from its data). ---
+            campfire.description = "Food + Wood + Water → Cooked Food (worth more nourishment). Your people's first comfort good. Needs workers + inputs delivered.";
+            charcoalBurner.description = "Wood → Charcoal. Charcoal feeds BOTH the Kiln and the Smelter — scaling one can starve the other. A key shared-bottleneck.";
+            kiln.description = "Clay + Charcoal → Bricks. Charcoal is shared with the Smelter, so watch that bottleneck. Bricks build advanced structures.";
+            smelter.description = "Ore + Charcoal → Metal. Ore comes from distant Mines; Charcoal is shared with the Kiln. The backbone of the late game.";
+            toolmaker.description = "Metal + Planks → Tools. Tools are an Iron-age comfort good your people demand — and gate the Industrial Age.";
+            mine.description = "Build ON a distant Ore Vein. Ore is FINITE — veins deplete and vanish, so you must keep exploring outward and hauling it home.";
+            gemMine.description = "Build ON a far Gem Deposit (the rarest, finite resource). Gems → Jewelry. Reaching them rewards exploration + good transport.";
+            jeweler.description = "Gems → Jewelry, a high-value luxury good. Pairs with long-haul routes to bring distant gems home.";
+            monumentBldg.description = "ENDGAME: pour Metal + Tools + Bricks + Planks in to produce Monument Blocks. Make 10 to WIN. A massive, sustained resource sink.";
+            mason.description = "Stone → Stone Blocks (Stone's own processing chain). Stone Blocks build the sturdy Stone House.";
+            warehouse.description = "Configurable storage: pick ONE resource it holds (open its panel). Essential for routing belt goods and feeding workshops by adjacency.";
+
             // --- Camera (follows the player) ---
             var cam = Camera.main;
             if (cam == null)
