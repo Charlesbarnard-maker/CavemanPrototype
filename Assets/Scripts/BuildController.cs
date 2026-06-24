@@ -200,7 +200,7 @@ namespace Caveman
             bool affordable = Economy.CanAfford(def.cost, Carried);
             bool placeOk = def.kind != BuildingKind.Collector
                            || HasMatchingNodeNear(world, def.item, placeNodeRange);
-            bool free = !FootprintBlocked(world, def);
+            bool free = !FootprintBlocked(world, def) && FootprintOnLand(world, def);
             PlacementValid = affordable && placeOk && free;
 
             // Clear green = OK, red = not OK (don't tint by the building's own colour,
@@ -260,6 +260,14 @@ namespace Caveman
             return false;
         }
 
+        // True only if EVERY footprint cell is on buildable terrain (not water).
+        private bool FootprintOnLand(Vector3 center, BuildingDefinition def)
+        {
+            foreach (var c in Footprint.Cells(center, def.FootW, def.FootH))
+                if (!TerrainGrid.Buildable(c)) return false;
+            return true;
+        }
+
         private bool CellOccupied(Vector3 world)
         {
             var hits = Physics2D.OverlapPointAll(world);
@@ -300,7 +308,7 @@ namespace Caveman
             _ghostSr.sprite = PlaceholderArt.Triangle();
 
             bool affordable = Economy.CanAfford(def.cost, Carried);
-            bool free = Belt.At(cell) == null;
+            bool free = Belt.At(cell) == null && TerrainGrid.Buildable(cell); // belts can't cross water (yet)
             PlacementValid = affordable && free;
             _ghostSr.color = PlacementValid
                 ? new Color(0.35f, 1f, 0.4f, 0.6f)
@@ -338,6 +346,7 @@ namespace Caveman
         {
             var existing = Belt.At(cell);
             if (existing != null) { existing.SetDir(d); return; }
+            if (!TerrainGrid.Buildable(cell)) return; // can't lay belt on water
             if (!Economy.CanAfford(def.cost, Carried)) return;
             Economy.Spend(def.cost, Carried);
             Belt.Spawn(cell, d, def.interval);

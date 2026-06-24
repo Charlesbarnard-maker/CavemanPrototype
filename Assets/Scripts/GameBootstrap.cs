@@ -243,6 +243,9 @@ namespace Caveman
 
             // --- Ground backdrop (behind everything; revealed as the fog clears) ---
             MakeSprite("Ground", Color.white, Vector2.zero, 220f, -100, PlaceholderArt.Ground(new Color(0.22f, 0.31f, 0.19f)));
+            // World as a system: biome map with a clear starting basin. Water blocks building,
+            // so geography forces routing/expansion decisions. Rendered after resource spawns.
+            TerrainGrid.Generate(120, Random.value * 1000f, 15f);
 
             // --- Player ---
             var player = MakeSprite("Player", new Color(0.92f, 0.82f, 0.25f), Vector2.zero, 0.7f, 10, PlaceholderArt.Circle());
@@ -391,6 +394,9 @@ namespace Caveman
             // Gem deposits — rarest, farthest (a third exploration direction), finite.
             SpawnPatches("Gem Deposit", gems, new Color(0.50f, 0.82f, 0.76f), 3,
                 new Vector2(48f, -42f), new Vector2(10f, 10f), new Vector2(1.0f, 1.4f), PlaceholderArt.Hexagon(), 45, 32f, 0);
+
+            // Bake the biome map into its visual now that resource cells have been cleared.
+            TerrainGrid.SpawnRenderer();
         }
 
         // Scatters `count` patches around `center`, jittered by ±spread, random size,
@@ -538,6 +544,7 @@ namespace Caveman
             node.capacity = capacity;
             node.regenAmount = regen; // 0 = finite (depletes and vanishes)
             node.regenInterval = 1.5f;
+            TerrainGrid.ClearAround(pos, 2.5f); // keep the patch + adjacent build cells off water
         }
 
         private static GameObject MakeSprite(string name, Color color, Vector2 pos, float size, int sortingOrder, Sprite sprite)
