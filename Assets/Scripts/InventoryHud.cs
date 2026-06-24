@@ -492,7 +492,7 @@ namespace Caveman
                 // What this collector/workshop currently holds in its buffer.
                 var pbb = sel.GetComponent<ProductionBuilding>();
                 if (pbb != null && pbb.produces != null)
-                    GUILayout.Label($"<size=12>Holds: {pbb.produces.displayName} {pbb.Buffer.Count(pbb.produces)}/{pbb.Buffer.capacity}</size>", _small);
+                    GUILayout.Label($"<size=12>Holds: {pbb.produces.displayName} {pbb.Buffer.Count(pbb.produces)}/{pbb.Buffer.capacity}   ·   Rate: {pbb.RatePerMin:0.#}/min</size>", _small);
                 else if (wb != null && wb.output != null)
                     GUILayout.Label($"<size=12>Holds: {wb.output.displayName} {wb.Buffer.Count(wb.output)}/{wb.Buffer.capacity}</size>", _small);
             }

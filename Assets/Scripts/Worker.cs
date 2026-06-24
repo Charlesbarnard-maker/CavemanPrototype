@@ -75,6 +75,7 @@ namespace Caveman
                     {
                         _carrying = node.Extract(carryAmount);
                         _carryItem = node.yields;
+                        if (_carrying > 0 && home != null) home.RecordProduced(_carrying); // throughput metric
                         node.Nudge();
                         _state = State.ToHome;
                     }

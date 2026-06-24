@@ -30,6 +30,12 @@ namespace Caveman
         void OnEnable() { All.Add(this); _gridCell = Belt.CellOf(transform.position); WorldGrid.Collectors[_gridCell] = this; }
         void OnDisable() { All.Remove(this); WorldGrid.Remove(WorldGrid.Collectors, _gridCell, this); }
 
+        // Rolling gather-rate estimate (units/min), recorded by this collector's workers.
+        private int _producedWindow;
+        private float _rateTimer;
+        public float RatePerMin { get; private set; }
+        public void RecordProduced(int n) { if (n > 0) _producedWindow += n; }
+
         private readonly List<Worker> _workers = new();
         private ResourceNode _source;
         private float _flash;
@@ -128,6 +134,14 @@ namespace Caveman
         void Update()
         {
             MaybeRebind(); // chase fresh patches as nearby ones deplete
+
+            _rateTimer += Time.deltaTime;
+            if (_rateTimer >= 4f)
+            {
+                RatePerMin = _producedWindow * (60f / _rateTimer);
+                _producedWindow = 0;
+                _rateTimer = 0f;
+            }
 
             bool working = AssignedWorkers > 0 && _source != null && _source.HasResource
                            && Buffer.Total() < Buffer.capacity;
