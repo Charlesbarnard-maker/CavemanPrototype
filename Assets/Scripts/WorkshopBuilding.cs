@@ -79,6 +79,22 @@ namespace Caveman
             if (AssignedWorkers > 0) AssignedWorkers--;
         }
 
+        /// <summary>Which recipe inputs are currently short (for the "waiting for X" panel hint).</summary>
+        public string MissingText()
+        {
+            if (Economy.FreeBuild) return "";
+            var carried = Colony.Instance != null ? Colony.Instance.carried : null;
+            var missing = new System.Collections.Generic.List<string>();
+            foreach (var c in inputs)
+            {
+                if (c.item == null) continue;
+                int have = InBuffer.Count(c.item)
+                    + (Economy.LocalProduction ? AdjacentAvailable(c.item) : Economy.Available(c.item, carried));
+                if (have < c.amount) missing.Add(c.item.displayName);
+            }
+            return missing.Count > 0 ? string.Join(", ", missing) : "";
+        }
+
         /// <summary>Is this item one of the recipe inputs (so a belt may deliver it here)?</summary>
         public bool WantsInput(ItemDefinition i)
         {
