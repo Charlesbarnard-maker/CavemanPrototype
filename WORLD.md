@@ -1,0 +1,85 @@
+# CavemanPrototype — The World as a System
+
+The world must **constrain, shape, and challenge** factory expansion — geography as a system,
+not a backdrop. It should create problems that force expansion, force logistics, and force
+layout redesign.
+
+Status: ✅ built · 🔶 partial · 📝 designed, not yet built.
+
+---
+
+## Foundation — the biome grid ✅ (Step 1)
+`TerrainGrid`: a per-cell biome map (**Plains / Forest / Hills / Water**) generated from
+layered Perlin noise (elevation + moisture), rendered as a point-filtered biome texture.
+A clear plains **basin** around spawn keeps the early game compact. This is the substrate
+every system below hangs off — terrain is now queryable (`At`, `Buildable`) by placement,
+belts, movement, and worldgen.
+
+## 1. Meaningful terrain (effects, not decoration)
+- **Water (rivers/lakes)** ✅ **unbuildable** — buildings and belts can't cross it, so you
+  route around. 📝 **Bridges/foundations**: a buildable "Bridge"/"Foundation" tile (cost +
+  age-gated) that makes a water cell passable for belts/buildings → water becomes a *solvable*
+  obstacle, not a permanent wall. Crossing stays expensive, so routing still matters.
+- **Forest** 📝 — resource-rich (wood/forage bias) but **slower to build** (construction-time
+  multiplier on sites placed on forest) and **slower to move** through, until **cleared**
+  (a clear-land action that yields some wood and converts the cell to plains). Trade-off:
+  rich but high-friction.
+- **Hills** 📝 — the **mining** biome (ore/stone/gems bias) but **hard to build on** (only
+  mines/limited structures, or a costly "terrace/level" action to flatten). Forces mines out
+  to the hills and a supply line back.
+- **Plains** ✅ default — the **optimal** factory ground (cheap, fast, unconstrained).
+- Implementation hook: `TerrainGrid` already exposes per-cell type; add `BuildSpeedMul`,
+  `MoveCostMul`, and `BuildableBy(kind)` lookups + the clear/level/bridge actions.
+
+## 2. Biome-based regional differences 📝
+Bias **resource spawns by biome** (forests carry wood/berries/cotton, hills carry
+ore/stone/gems, water edges carry fish/clay, plains are open). Generate terrain first, then
+place each resource only on its biome. Result: **different regions demand different
+strategies** — a wood economy lives in forest, a metal economy out in the hills, and you must
+connect them. (Currently resources are placed by fixed direction; this step makes placement
+biome-driven, replacing the hand-placed clusters.)
+
+## 3. Expansion = a logistics problem 🔶
+Water already forces routing ✅. With biome resource bias (above), the **richest deposits sit
+in distant, awkward biomes**, so you need: belts around water, **remote outposts** (a
+collector + small storage cluster out at the resource), and **supply lines** (caravan routes
+/ future trains) back to the core. Distance + terrain friction make expansion a deliberate
+act, not a free spread. Ties directly into the logistics tiers already in the game
+(belts → depots/caravans → vehicles).
+
+## 4. Terrain-based build restrictions 🔶→📝
+- ✅ Water blocks building/belts now.
+- 📝 **Modify-to-build**: clear forest, level hills, bridge water — each an action with a
+  cost and an **age gate** (e.g. bridges at Bronze, hill-levelling at Iron), so the world
+  **opens up progressively with technology**. Early you're hemmed into the basin; later ages
+  literally unlock more of the map. This is the world's version of the AGES.md progression.
+
+## 5. Structured scaling (not a big empty map) 📝
+- **Early:** the plains **basin** ✅ — compact, everything reachable on foot.
+- **Mid:** the basin fills; surrounding biomes (forest/hills) hold what you now need, gated by
+  terrain friction + distance → you push outward and build your first outposts.
+- **Late:** a **multi-region logistics network** — several specialised production regions
+  (forest lumber, hill metals, plains assembly) tied together by long-haul transport; the
+  world itself is the puzzle. Tie region unlocks to ages (req 4) so scale is paced, not dumped.
+- Knobs: world `half` (currently 120), basin radius (15), water/forest/hills noise thresholds,
+  and how far resource biomes sit from spawn.
+
+---
+
+## Anti-goals (from the brief)
+- ❌ Purely decorative terrain · ❌ large empty maps with no impact · ❌ visual-only expansion.
+- ✅ Geography that constrains logistics/construction/efficiency and forces redesign.
+
+## Build order
+1. ✅ Biome grid + water-blocks-building + basin (done).
+2. **Biome resource bias** (req 2) — highest impact next: makes regions mean different things.
+3. **Bridges + clear/level actions, age-gated** (req 1/4) — water/forest/hills become
+   solvable, and the map opens with tech.
+4. **Forest/hills build-speed & movement effects** (req 1) — friction that rewards plains.
+5. **Region/scaling pass** (req 5) — paced multi-region unlocks.
+
+## Balance / knobs (Step 1, first-pass)
+- `TerrainGrid.Generate(half, seed, basinRadius)`: water threshold `e < 0.34`, hills `e > 0.70`,
+  forest `m > 0.62`. Tune so water is a *winding obstacle*, not a maze, and the basin feels
+  open. Resource `ClearAround` radius = 2.5. Watch: too much water near spawn = frustrating;
+  too little = no constraint.

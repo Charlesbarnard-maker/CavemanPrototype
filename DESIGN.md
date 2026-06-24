@@ -32,6 +32,14 @@ concrete task to deliver on it: **Power as a global constraint at the Industrial
 (the smallest change that proves an age can transform play). The current game is mechanically
 only Age 1–2; later ages exist as *content*, not yet *mechanic shifts*.
 
+## The world is a system (see WORLD.md)
+Geography constrains expansion, not decorates it. A biome grid (`TerrainGrid`: Plains/Forest/
+Hills/Water) with a clear starting basin; **water is unbuildable** so rivers/lakes force belt
+routing + expansion decisions. Designed-not-built next: per-biome resource bias (regions mean
+different strategies), bridges + clear/level actions (age-gated, so the map opens with tech),
+forest/hills build-speed & movement friction, and paced multi-region scaling. Full design in
+**`WORLD.md`**.
+
 ## Build systems: placement, menu, I/O slots, planning (see BUILD_SYSTEMS.md)
 Placement is split by building type (belts drag-place; structured buildings are one-per-click
 to stop accidental spam); the build menu is collapsible categories + a Recent row (scales as
