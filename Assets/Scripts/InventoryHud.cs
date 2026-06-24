@@ -30,6 +30,7 @@ namespace Caveman
         private bool _buildShown, _selShown;
         private bool _showBuild;
         private bool _showMinimap = true;
+        private bool _localTipShown; // one-time hint when a workshop first starves
         private Texture2D _panelTex; // dark panel background for readability
         private Dictionary<ItemDefinition, int> _totals;
         private readonly Dictionary<string, int> _trendSnap = new(); // chip values ~3s ago (for ▲/▼)
@@ -82,6 +83,19 @@ namespace Caveman
             // Toasts fade out.
             for (int i = 0; i < Toast.Items.Count; i++) Toast.Items[i].t -= Time.unscaledDeltaTime;
             Toast.Items.RemoveAll(t => t.t <= 0f);
+
+            // One-time onboarding hint the first time a workshop starves under local
+            // production — so a new player learns inputs must be delivered, not pooled.
+            if (!_localTipShown && Economy.LocalProduction)
+            {
+                foreach (var w in WorkshopBuilding.All)
+                    if (w != null && w.StatusColor == Status.Starved)
+                    {
+                        _localTipShown = true;
+                        Toast.Show("<color=#ffd24d>💡 Tip:</color> a workshop only runs on inputs that ARRIVE — put it next to its input storage/source, or belt the inputs in.");
+                        break;
+                    }
+            }
 
             // Celebrate reaching a new age.
             int age = Colony.Instance != null ? Colony.Instance.Age : 0;
