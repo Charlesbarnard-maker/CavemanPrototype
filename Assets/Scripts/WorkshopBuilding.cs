@@ -31,6 +31,12 @@ namespace Caveman
 
         private float _timer, _flash;
         private bool _starved;
+
+        // Rolling throughput estimate (units/min) — lets the player measure whether a
+        // tweak actually improved output (the optimisation "almost working" loop).
+        private int _producedWindow;
+        private float _rateTimer;
+        public float RatePerMin { get; private set; }
         private SpriteRenderer _sr;
         private Color _baseColor;
         private SpriteRenderer _statusDot;
@@ -180,6 +186,7 @@ namespace Caveman
                         _timer -= processTime;
                         ConsumeInputs(carried);
                         Buffer.Add(output, outputPerCycle);
+                        _producedWindow += outputPerCycle;
                         _flash = 0.25f;
                         produced = true;
                         _starved = false;
@@ -196,6 +203,15 @@ namespace Caveman
             else
             {
                 _timer = 0f;
+            }
+
+            // Roll up throughput over a ~4s window.
+            _rateTimer += Time.deltaTime;
+            if (_rateTimer >= 4f)
+            {
+                RatePerMin = _producedWindow * (60f / _rateTimer);
+                _producedWindow = 0;
+                _rateTimer = 0f;
             }
 
             bool working = AssignedWorkers > 0 && (produced || Buffer.Total() > 0);
