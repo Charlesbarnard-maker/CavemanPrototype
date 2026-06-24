@@ -68,6 +68,8 @@ namespace Caveman
         public bool mechanical = false;
         [Tooltip("How far a transport hub's carriers will travel to serve a source.")]
         public float logisticsRange = 14f;
+        [Tooltip("Route vehicles only: travel speed (cart < caravan < train < drone).")]
+        public float vehicleSpeed = 3.5f;
 
         [Header("Visuals / cost")]
         public Color color = Color.white;

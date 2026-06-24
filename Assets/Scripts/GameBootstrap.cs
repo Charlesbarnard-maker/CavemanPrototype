@@ -73,10 +73,15 @@ namespace Caveman
             depot.displayName = "Depot"; depot.kind = BuildingKind.Depot; depot.unlockAge = 0;
             depot.item = null; depot.capacity = 80; depot.color = new Color(0.50f, 0.45f, 0.55f);
             depot.cost = new List<ItemAmount> { new ItemAmount(wood, 10), new ItemAmount(stone, 6) };
-            var caravan = ScriptableObject.CreateInstance<BuildingDefinition>();
-            caravan.displayName = "Caravan (Elephant)"; caravan.kind = BuildingKind.Route; caravan.unlockAge = 0;
-            caravan.capacity = 12; caravan.color = new Color(0.55f, 0.50f, 0.50f);
-            caravan.cost = new List<ItemAmount> { new ItemAmount(wood, 8) };
+            // Route vehicle tiers — each links two depots; bigger/faster as ages advance.
+            var caravan = MakeRoute("Caravan (Elephant)", 12, 3.5f, 0, new Color(0.55f, 0.50f, 0.50f),
+                new ItemAmount(wood, 8));
+            var oxCart = MakeRoute("Ox Cart", 18, 4.5f, 1, new Color(0.60f, 0.45f, 0.30f),
+                new ItemAmount(wood, 10), new ItemAmount(planks, 4));
+            var wagonTrain = MakeRoute("Wagon Train", 36, 6.5f, 3, new Color(0.45f, 0.45f, 0.52f),
+                new ItemAmount(planks, 10), new ItemAmount(metal, 8));
+            var cargoDrone = MakeRoute("Cargo Drone", 24, 12f, 4, new Color(0.50f, 0.70f, 0.85f),
+                new ItemAmount(metal, 10), new ItemAmount(tools, 4));
 
             // --- Age 1: Tribal ---
             var hunter = MakeCollector("Hunter's Hut", meat, 1, 2.5f, 2, 12, new Color(0.66f, 0.34f, 0.34f),
@@ -182,7 +187,8 @@ namespace Caveman
               hunter, clayPit, charcoalBurner, clayStore, smokehouse, longhouse,
               kiln, farm, mill, bakery, brickStore, woodBelt, fastBelt,
               mine, oreStore, smelter, toolmaker, monumentBldg,
-              potter, cottonFarm, weaver, tailor, depot, caravan };
+              potter, cottonFarm, weaver, tailor,
+              depot, caravan, oxCart, wagonTrain, cargoDrone };
 
             var follow = cam.GetComponent<CameraFollow>();
             if (follow == null) follow = cam.gameObject.AddComponent<CameraFollow>();
@@ -375,6 +381,19 @@ namespace Caveman
             def.displayName = name;
             def.kind = BuildingKind.Logistics;
             def.maxWorkers = maxWorkers;
+            def.color = color;
+            def.cost = new List<ItemAmount>(cost);
+            return def;
+        }
+
+        private static BuildingDefinition MakeRoute(string name, int capacity, float speed, int unlockAge, Color color, params ItemAmount[] cost)
+        {
+            var def = ScriptableObject.CreateInstance<BuildingDefinition>();
+            def.displayName = name;
+            def.kind = BuildingKind.Route;
+            def.capacity = capacity;
+            def.vehicleSpeed = speed;
+            def.unlockAge = unlockAge;
             def.color = color;
             def.cost = new List<ItemAmount>(cost);
             return def;

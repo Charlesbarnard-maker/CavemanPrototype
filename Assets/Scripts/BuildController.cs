@@ -264,7 +264,7 @@ namespace Caveman
             if (Economy.CanAfford(def.cost, Carried))
             {
                 Economy.Spend(def.cost, Carried);
-                RouteVehicle.Spawn(_routeA, depot, Mathf.Max(1, def.capacity), 3.5f, def.color);
+                RouteVehicle.Spawn(_routeA, depot, Mathf.Max(1, def.capacity), Mathf.Max(0.5f, def.vehicleSpeed), def.color);
             }
             _routeA = null; // ready for the next route; stay in mode
         }
