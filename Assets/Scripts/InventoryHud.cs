@@ -33,6 +33,7 @@ namespace Caveman
         private bool _showGuide;
         private Vector2 _guideScroll;
         private Rect _guideRect;
+        private Rect _finderRect;
         private bool _localTipShown; // one-time hint when a workshop first starves
         private Texture2D _panelTex; // dark panel background for readability
         private Dictionary<ItemDefinition, int> _totals;
@@ -142,6 +143,7 @@ namespace Caveman
             DrawMinimap();
             DrawSelectedPanel();
             DrawObjectives();
+            DrawResourceFinder();
             DrawToasts();
             DrawFooter();
             if (Objectives.Instance != null && Objectives.Instance.Won) DrawWin();
@@ -164,7 +166,7 @@ namespace Caveman
                 var m = Event.current.mousePosition;
                 PointerOverUI = (_buildShown && _buildRect.Contains(m)) || (_selShown && _selRect.Contains(m))
                                 || _topRect.Contains(m) || _miniRect.Contains(m) || _objRect.Contains(m)
-                                || (_showGuide && _guideRect.Contains(m));
+                                || _finderRect.Contains(m) || (_showGuide && _guideRect.Contains(m));
             }
         }
 
@@ -651,6 +653,50 @@ namespace Caveman
             if (rem) { if (hq) Colony.Instance?.RemoveBuilder(); else builder.UnassignSelected(); }
             if (demo) builder.DemolishSelected();
             if (close) builder.Deselect();
+        }
+
+        // ---- Resource finder: arrows to the nearest Wood/Stone/Food/Water you haven't
+        //      tapped yet. Each line disappears once you build that collector. ----
+        private static readonly string[] _arrows8 = { "→", "↗", "↑", "↖", "←", "↙", "↓", "↘" };
+        private static string ArrowFor(Vector2 dir)
+        {
+            float ang = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
+            int idx = Mathf.RoundToInt(((ang + 360f) % 360f) / 45f) % 8;
+            return _arrows8[idx];
+        }
+
+        private void DrawResourceFinder()
+        {
+            if (gatherer == null) { _finderRect = default; return; }
+            Vector2 p = gatherer.transform.position;
+            var keys = new (ItemDefinition item, string label)[]
+            { (woodItem, "Wood"), (stoneItem, "Stone"), (foodItem, "Food"), (waterItem, "Water") };
+
+            var lines = new List<string>();
+            foreach (var k in keys)
+            {
+                if (k.item == null || HasCollector(k.item.id)) continue; // already tapped → drop it
+                ResourceNode best = null; float bestSq = float.MaxValue;
+                foreach (var n in ResourceNode.All)
+                {
+                    if (n == null || n.yields != k.item) continue;
+                    float sq = ((Vector2)n.transform.position - p).sqrMagnitude;
+                    if (sq < bestSq) { bestSq = sq; best = n; }
+                }
+                if (best == null) continue;
+                Vector2 dir = (Vector2)best.transform.position - p;
+                string hex = ColorUtility.ToHtmlStringRGB(k.item.color);
+                lines.Add($"<color=#{hex}>■</color> <b>{k.label}</b>  <size=18>{ArrowFor(dir)}</size> <size=12>{Mathf.RoundToInt(dir.magnitude)}m</size>");
+            }
+            if (lines.Count == 0) { _finderRect = default; return; }
+
+            var rect = new Rect(Screen.width - 222, 182, 210, 28 + lines.Count * 22);
+            _finderRect = rect;
+            PanelBg(rect);
+            GUILayout.BeginArea(new Rect(rect.x + 10, rect.y + 6, rect.width - 20, rect.height - 12));
+            GUILayout.Label("<size=12><b>Find &amp; build collectors:</b></size>", _small);
+            foreach (var l in lines) GUILayout.Label($"<size=14>{l}</size>", _small);
+            GUILayout.EndArea();
         }
 
         // ---- Objectives panel (top-right) ----
