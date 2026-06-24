@@ -444,7 +444,8 @@ namespace Caveman
                     if (!builder.IsUnlocked(def))
                     {
                         string ageName = def.unlockAge < Colony.AgeNames.Length ? Colony.AgeNames[def.unlockAge] : "later";
-                        GUILayout.Label($"<size=11><color=#888>🔒 {def.displayName} — {ageName}</color></size>", _small);
+                        // Show the description on hover too, so you can plan toward it.
+                        GUILayout.Label(new GUIContent($"<size=11><color=#888>🔒 {def.displayName} — {ageName}</color></size>", Describe(def)), _small);
                         continue;
                     }
 
