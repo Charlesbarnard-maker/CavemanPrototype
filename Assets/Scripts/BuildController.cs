@@ -291,6 +291,15 @@ namespace Caveman
         {
             if (Selected == null) return;
 
+            // The Town Hall (HQ) manages builders and sets the starting pop cap —
+            // demolishing it would break both, so it's protected.
+            var hqCheck = Selected.GetComponent<HousingBuilding>();
+            if (hqCheck != null && hqCheck.isHQ)
+            {
+                Toast.Show("<color=#f99>The Town Hall can't be demolished.</color>");
+                return;
+            }
+
             // Cancelling a construction site: undelivered materials were never
             // spent, so there's nothing to refund — just remove it.
             if (Selected.GetComponent<ConstructionSite>() != null || Selected.GetComponent<Belt>() != null)
