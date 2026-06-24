@@ -47,6 +47,7 @@ namespace Caveman
         void Update()
         {
             if (home == null) { Destroy(gameObject); return; }
+            if (home.Paused) { MoveTo(home.transform.position); UpdateColor(); return; } // collector halted
 
             ResourceNode node = home.Source;
 

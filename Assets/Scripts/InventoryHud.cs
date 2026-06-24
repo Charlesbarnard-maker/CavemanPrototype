@@ -489,6 +489,15 @@ namespace Caveman
                     if (GUILayout.Button($"<size=12>Haul priority: {pn}</size>", _btn)) th.CyclePriority();
                 }
 
+                // Pause toggle — halt this building to free shared inputs for others (priorities).
+                var pbPause = sel.GetComponent<ProductionBuilding>();
+                if (wb != null || pbPause != null)
+                {
+                    bool isPaused = wb != null ? wb.Paused : pbPause.Paused;
+                    if (GUILayout.Button(isPaused ? "<size=12><color=#9f9>▶ Resume</color></size>" : "<size=12>⏸ Pause</size>", _btn))
+                    { if (wb != null) wb.TogglePause(); if (pbPause != null) pbPause.TogglePause(); }
+                }
+
                 // What this collector/workshop currently holds in its buffer.
                 var pbb = sel.GetComponent<ProductionBuilding>();
                 if (pbb != null && pbb.produces != null)

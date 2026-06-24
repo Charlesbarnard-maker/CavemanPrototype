@@ -20,6 +20,8 @@ namespace Caveman
 
         public Inventory Buffer { get; private set; }      // finished output
         public Inventory InBuffer { get; private set; }     // inputs delivered by belts
+        public bool Paused { get; private set; }            // player can halt it to free shared inputs
+        public void TogglePause() => Paused = !Paused;
         public int AssignedWorkers { get; private set; }
         public int MaxWorkers => maxWorkers;
         public string StaffLabel => def != null ? def.displayName : "Workshop";
@@ -175,7 +177,7 @@ namespace Caveman
             var carried = Colony.Instance != null ? Colony.Instance.carried : null;
             bool produced = false;
 
-            if (AssignedWorkers > 0 && output != null && Buffer.Total() < Buffer.capacity)
+            if (!Paused && AssignedWorkers > 0 && output != null && Buffer.Total() < Buffer.capacity)
             {
                 float prod = Colony.Instance != null ? Colony.Instance.Productivity : 1f;
                 _timer += Time.deltaTime * AssignedWorkers * prod; // more workers / well-fed = faster
@@ -224,7 +226,7 @@ namespace Caveman
         {
             get
             {
-                if (AssignedWorkers == 0) return Status.Idle;
+                if (Paused || AssignedWorkers == 0) return Status.Idle;
                 if (Buffer.Total() >= Buffer.capacity) return Status.BackedUp;
                 if (_starved) return Status.Starved;
                 return Status.Working;

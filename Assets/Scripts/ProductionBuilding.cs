@@ -20,6 +20,8 @@ namespace Caveman
         public float sourceRange = 6f;   // worker can commute this far
 
         public Inventory Buffer { get; private set; }
+        public bool Paused { get; private set; }            // player can halt it (priorities)
+        public void TogglePause() => Paused = !Paused;
         public ResourceNode Source => _source;
         public int AssignedWorkers { get; private set; }
         public int MaxWorkers => maxWorkers;
@@ -143,7 +145,7 @@ namespace Caveman
                 _rateTimer = 0f;
             }
 
-            bool working = AssignedWorkers > 0 && _source != null && _source.HasResource
+            bool working = !Paused && AssignedWorkers > 0 && _source != null && _source.HasResource
                            && Buffer.Total() < Buffer.capacity;
             UpdateVisual(working);
             UpdateStatus();
@@ -155,7 +157,7 @@ namespace Caveman
         {
             get
             {
-                if (AssignedWorkers == 0) return Status.Idle;
+                if (Paused || AssignedWorkers == 0) return Status.Idle;
                 if (Buffer.Total() >= Buffer.capacity) return Status.BackedUp;
                 if (_source == null || !_source.HasResource) return Status.Starved;
                 return Status.Working;
