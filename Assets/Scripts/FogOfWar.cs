@@ -12,9 +12,9 @@ namespace Caveman
     public class FogOfWar : MonoBehaviour
     {
         public Transform target;
-        public float worldSize = 240f;     // covers roughly -120..120 (lots to explore)
-        public int res = 320;              // fog texture resolution
-        public float revealRadius = 7f;    // world units revealed around the player
+        public float worldSize = 420f;     // covers roughly -210..210 (a big world to explore)
+        public int res = 420;              // fog texture resolution (~1 px per cell)
+        public float revealRadius = 9f;    // world units revealed around the player
         public float moveThreshold = 1.2f; // re-reveal after the player moves this far
 
         public static FogOfWar Instance { get; private set; }

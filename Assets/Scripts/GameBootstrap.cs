@@ -272,10 +272,10 @@ namespace Caveman
             cam.backgroundColor = new Color(0.16f, 0.19f, 0.16f);
 
             // --- Ground backdrop (behind everything; revealed as the fog clears) ---
-            MakeSprite("Ground", Color.white, Vector2.zero, 220f, -100, PlaceholderArt.Ground(new Color(0.22f, 0.31f, 0.19f)));
+            MakeSprite("Ground", Color.white, Vector2.zero, 420f, -100, PlaceholderArt.Ground(new Color(0.22f, 0.31f, 0.19f)));
             // World as a system: biome map with a clear starting basin. Water blocks building,
             // so geography forces routing/expansion decisions. Rendered after resource spawns.
-            TerrainGrid.Generate(120, Random.value * 1000f, 15f);
+            TerrainGrid.Generate(200, Random.value * 1000f, 15f); // big world (~400 across); compact start basin
 
             // --- Player ---
             var player = MakeSprite("Player", new Color(0.92f, 0.82f, 0.25f), Vector2.zero, 0.7f, 10, PlaceholderArt.Circle());
@@ -299,7 +299,7 @@ namespace Caveman
 
             // --- Fog of war (explore to reveal the map) ---
             var fog = new GameObject("FogOfWar").AddComponent<FogOfWar>();
-            fog.target = player.transform;
+            fog.target = player.transform; // size/res come from FogOfWar defaults (set for the big world)
 
             // --- Colony (population) ---
             var colony = new GameObject("Colony").AddComponent<Colony>();
@@ -424,6 +424,29 @@ namespace Caveman
             // Gem deposits — rarest, farthest (a third exploration direction), finite.
             SpawnPatches("Gem Deposit", gems, new Color(0.50f, 0.82f, 0.76f), 3,
                 new Vector2(48f, -42f), new Vector2(10f, 10f), new Vector2(1.0f, 1.4f), PlaceholderArt.Hexagon(), 45, 32f, 0);
+
+            // --- FRONTIER (the big world): rich clusters spread far out in every direction, so
+            //     exploration uncovers a lot and expansion has real targets. Finite ore/gems out
+            //     here are the late-game economy (you must reach + supply-line them home). ---
+            SpawnPatches("Tree", wood, new Color(0.27f, 0.55f, 0.22f), 16,
+                new Vector2(120f, 70f), new Vector2(40f, 40f), new Vector2(1.0f, 1.6f), PlaceholderArt.Triangle(), 30, 60f);
+            SpawnPatches("Tree", wood, new Color(0.27f, 0.55f, 0.22f), 16,
+                new Vector2(-110f, 90f), new Vector2(40f, 40f), new Vector2(1.0f, 1.6f), PlaceholderArt.Triangle(), 30, 60f);
+            SpawnPatches("Rock", stone, new Color(0.55f, 0.55f, 0.6f), 16,
+                new Vector2(-120f, -80f), new Vector2(40f, 40f), new Vector2(1.0f, 1.6f), PlaceholderArt.Hexagon(), 30, 60f);
+            SpawnPatches("Clay", clay, new Color(0.68f, 0.46f, 0.36f), 10,
+                new Vector2(100f, -100f), new Vector2(30f, 30f), new Vector2(1.0f, 1.5f), PlaceholderArt.Hexagon(), 40, 60f);
+            SpawnPatches("Cotton", fiber, new Color(0.80f, 0.84f, 0.66f), 10,
+                new Vector2(40f, 130f), new Vector2(30f, 24f), new Vector2(0.7f, 1.1f), PlaceholderArt.Circle(), 36, 60f);
+            SpawnPatches("Herd", meat, new Color(0.66f, 0.34f, 0.34f), 10,
+                new Vector2(-60f, -130f), new Vector2(30f, 24f), new Vector2(0.8f, 1.2f), PlaceholderArt.Circle(), 30, 60f);
+            // Rich finite ore + gems far out — the frontier economy.
+            SpawnPatches("Ore Vein", ore, new Color(0.62f, 0.58f, 0.42f), 6,
+                new Vector2(150f, -40f), new Vector2(28f, 40f), new Vector2(1.1f, 1.6f), PlaceholderArt.Hexagon(), 80, 60f, 0);
+            SpawnPatches("Ore Vein", ore, new Color(0.62f, 0.58f, 0.42f), 6,
+                new Vector2(-150f, 30f), new Vector2(28f, 40f), new Vector2(1.1f, 1.6f), PlaceholderArt.Hexagon(), 80, 60f, 0);
+            SpawnPatches("Gem Deposit", gems, new Color(0.50f, 0.82f, 0.76f), 5,
+                new Vector2(30f, -160f), new Vector2(26f, 26f), new Vector2(1.0f, 1.5f), PlaceholderArt.Hexagon(), 60, 60f, 0);
 
             // Guarantee a reachable water feature just outside the starting basin so you can
             // build a Water Hole early (carved last so resource ClearAround can't erase it).
