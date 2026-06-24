@@ -70,6 +70,18 @@ no Inspector wiring). Scripts in `Assets/Scripts/`:
   the player (`CameraFollow`); HUD via `OnGUI` (`InventoryHud`).
 
 ## Recently built
+- **Transport tiers + exploration-to-win + masonry (content wave).**
+  - **Route vehicle tiers:** Caravan/Elephant (Stone) → **Ox Cart** (Tribal) → **Wagon
+    Train** (Iron) → **Cargo Drone** (Industrial), each bigger/faster. Vehicle speed is now
+    a data field (`BuildingDefinition.vehicleSpeed`); `MakeRoute` helper added.
+  - **Gems → Jewelry, and Jewelry is now a required Monument ingredient.** Gems are the
+    rarest resource, in finite deposits **far out in a third map corner** — so winning now
+    *demands* exploration + good long-haul transport (trains/drones) to feed the Monument.
+    Chain: Gem Deposit → **Gem Mine** (Iron) → **Jeweler** (Industrial) → Jewelry.
+  - **Masonry:** Stone finally has its own chain — **Mason** (Stone → Stone Blocks) →
+    **Stone House** (sturdy Bronze housing, cap 6). Parallels Wood → Planks → House.
+  - **Welcome/starter toasts** orient new players (goal + H/B/objectives) on first load.
+  *(All content is first-pass / untested — balance + compile to be verified.)*
 - **Textile + pottery economy (deeper demand sink).** Two new comfort-good chains:
   **Pottery** (Clay → Pottery, Bronze) and **Textiles** (Cotton patches → Fiber via a
   **Cotton Farm** → **Weaver** makes Cloth → **Tailor** makes Clothes, an Industrial

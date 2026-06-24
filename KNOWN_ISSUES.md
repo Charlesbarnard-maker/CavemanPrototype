@@ -136,6 +136,14 @@ A running record so progress/problems don't get lost. Newest first. Move items t
   Tune after a playtest: the 600-Prosperity objective threshold (vs the Prosperity
   formula in `Colony.ComputeProsperity`), the Monument's build cost + recipe + the
   10-block win target, and whether the Industrial-age gate paces into it well.
+- **Balance: the Monument win now requires Jewelry** (→ Gem Mine → distant gems →
+  Jeweler), so the endgame is a long chain gated on exploration + long-haul transport.
+  Intended as the climactic logistics test, but verify it's reachable, not a brick wall —
+  tune gem yield/spawn count (3 deposits), Jeweler/Gem Mine rates, and the 1-jewelry-per-
+  block Monument recipe. F1 sandbox grants gems+jewelry so the win is still testable fast.
+- **Balance: new buildings/recipes are first-pass** (Ox Cart/Wagon Train/Cargo Drone
+  capacities & speeds; Mason/Stone House costs; Jeweler/Gem Mine rates). Sanity-check the
+  vehicle tiers feel like real upgrades and Stone House is worth it vs House/Longhouse.
 - **Balance: comfort demand grew from 3 → 5 goods** (added Pottery@Bronze,
   Clothes@Industrial). `Colony` Happiness = fraction of *all* unlocked comforts supplied,
   each wanted at ~Population/2 per `comfortTick` (9s). At Industrial the colony now wants
