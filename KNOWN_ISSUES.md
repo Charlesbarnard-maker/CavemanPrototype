@@ -89,6 +89,15 @@ A running record so progress/problems don't get lost. Newest first. Move items t
 
 ## Open — optimisation / redundancy
 
+### Audit 2026-06-24 (blind review)
+- *(Done)* **Workshop starved-retry backoff** — starved workshops now re-check inputs
+  ~twice/sec instead of every frame, cutting the worst per-frame `Economy.Available` cost.
+- **Status bar is getting crowded** — Population/Working/Free/Age/Rank/Output/Happy/need/
+  Prosperity/Monument on one line. Widened to `Screen.width-320`, but on a small window it
+  may still clip; consider a second row or grouping if it looks cramped in testing.
+- **`WorldEvents` cadence/effects are first-pass** — every ~55–105s; tune gaps and the
+  grant/loss amounts so events feel meaningful but not swingy.
+
 ### Audit 2026-06-24 (blind review — logged, not yet fixed)
 - **`OutputBuilding` base class is the clear win (confirms "biggest" below).** Concretely,
   `ProductionBuilding` and `WorkshopBuilding` share: an **identical `UpdateVisual`**

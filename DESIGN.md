@@ -70,6 +70,14 @@ no Inspector wiring). Scripts in `Assets/Scripts/`:
   the player (`CameraFollow`); HUD via `OnGUI` (`InventoryHud`).
 
 ## Recently built
+- **Hook & optimisation wave.**
+  - **Prosperity milestones** (250/500/1k/2k/4k) pop a celebratory toast — the "one more
+    level" pull. **Settlement rank** (Camp → Hamlet → Village → Town → City → Metropolis)
+    derived from peak prosperity, shown in the status bar, with promotion toasts.
+  - **Random world events** (`WorldEvents`) every ~1 min: bountiful harvest, wandering
+    nomads (+pop), rockslide/timber finds, or hard times (−food) — variety & surprise.
+  - **Perf:** starved workshops back off their input re-check (~2×/sec instead of every
+    frame), cutting the main per-frame pool-scan cost. (More perf items logged.)
 - **Transport tiers + exploration-to-win + masonry (content wave).**
   - **Route vehicle tiers:** Caravan/Elephant (Stone) → **Ox Cart** (Tribal) → **Wagon
     Train** (Iron) → **Cargo Drone** (Industrial), each bigger/faster. Vehicle speed is now
