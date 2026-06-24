@@ -235,7 +235,7 @@ namespace Caveman
                 string prodCol = prod >= 100 ? "#9cf" : "#f99";
                 int happy = Mathf.RoundToInt(c.Happiness * 100f);
                 string happyCol = happy >= 80 ? "#9f9" : happy >= 50 ? "#ffd24d" : "#f99";
-                GUILayout.Label($"<b>Population</b> {c.Population}/{c.Capacity}   <b>Working</b> {working}   <b>Free</b> {c.FreeWorkers}   <color=#cda>{c.AgeName}</color>   <color={prodCol}>Output {prod}%</color>   <color={happyCol}>Happy {happy}%</color>{flags}", _s);
+                GUILayout.Label($"<b>Population</b> {c.Population}/{c.Capacity}   <b>Working</b> {working}   <b>Free</b> {c.FreeWorkers}   <color=#cda>{c.AgeName}</color>   <color={prodCol}>Output {prod}%</color>   <color={happyCol}>Happy {happy}%</color>   <color=#ffcf6b>Prosperity {c.Prosperity}</color>{flags}", _s);
             }
             GUILayout.EndArea();
         }

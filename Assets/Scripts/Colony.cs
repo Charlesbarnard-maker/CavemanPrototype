@@ -70,7 +70,7 @@ namespace Caveman
         public class Comfort { public ItemDefinition item; public int unlockAge; }
         public List<Comfort> comforts = new();
 
-        private float _foodT, _waterT, _growthT, _starveT, _comfortT;
+        private float _foodT, _waterT, _growthT, _starveT, _comfortT, _prosperityT;
         private float _fedBonus = 1f;
 
         /// <summary>0..1 — fraction of currently-expected comfort goods being supplied.</summary>
@@ -78,6 +78,25 @@ namespace Caveman
 
         /// <summary>Global work-speed multiplier: survival × food variety × happiness.</summary>
         public float Productivity => (Starving || Thirsty) ? 0.6f : _fedBonus * (0.85f + 0.3f * Happiness);
+
+        /// <summary>A climbing score rewarding population, happiness, tech age, and
+        /// automation (systems running for you) — the long-game "how am I doing?".</summary>
+        public int Prosperity { get; private set; }
+        /// <summary>Highest prosperity reached this game (never drops, so it always climbs).</summary>
+        public int PeakProsperity { get; private set; }
+
+        // On-pillar weighting: automation (collectors/workshops/belts/routes) is worth
+        // more than raw headcount, because the game is about systems that run themselves.
+        private int ComputeProsperity()
+        {
+            float baseScore = Population * (5f + 5f * Happiness);  // people, weighted by quality of life
+            float tech = Age * 150f;                               // progress through the ages
+            int collectors = ProductionBuilding.All.Count;
+            int workshops = WorkshopBuilding.All.Count;
+            float automation = collectors * 15f + workshops * 20f  // systems that work for you
+                               + Belt.Count * 4f + RouteVehicle.All.Count * 40f;
+            return Mathf.RoundToInt(baseScore + tech + automation);
+        }
 
         public int Capacity
         {
@@ -210,6 +229,15 @@ namespace Caveman
                     if (Economy.SpendUpTo(c.item, want, carried) > 0) met++;
                 }
                 Happiness = required == 0 ? 1f : (float)met / required;
+            }
+
+            // --- Prosperity score: recomputed once a second; the peak never drops. ---
+            _prosperityT += dt;
+            if (_prosperityT >= 1f)
+            {
+                _prosperityT -= 1f;
+                Prosperity = ComputeProsperity();
+                if (Prosperity > PeakProsperity) PeakProsperity = Prosperity;
             }
 
             // --- Growth: needs housing space AND a real food surplus; each new
