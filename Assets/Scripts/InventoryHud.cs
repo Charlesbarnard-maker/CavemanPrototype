@@ -470,12 +470,26 @@ namespace Caveman
             var wb = sel.GetComponent<WorkshopBuilding>();
             var cs = sel.GetComponent<ConstructionSite>();
             var dp = sel.GetComponent<Depot>();
+            var pbSel = sel.GetComponent<ProductionBuilding>();
             var staff = sel.GetComponent<IStaffable>();
             string name = staff != null ? staff.StaffLabel : sb != null ? sb.def.displayName
                 : hb != null ? hb.def.displayName : dp != null ? dp.def.displayName
                 : cs != null ? cs.def.displayName : "Building";
             string tag = cs != null ? "  <size=14><color=#bbb>(building)</color></size>" : "";
             GUILayout.Label($"<b>{name}</b>{tag}", _s);
+
+            // Plain-language status line for producers (the "understandable bottleneck" cue).
+            if (wb != null || pbSel != null)
+            {
+                bool paused = wb != null ? wb.Paused : pbSel.Paused;
+                Color sc = wb != null ? wb.StatusColor : pbSel.StatusColor;
+                string st = paused ? "Paused"
+                    : sc == Status.Working ? "Working"
+                    : sc == Status.BackedUp ? "Output full — needs hauling out"
+                    : sc == Status.Starved ? "Starved — inputs not arriving"
+                    : "Idle — assign a worker";
+                GUILayout.Label($"<size=13><color=#{ColorUtility.ToHtmlStringRGB(sc)}>● {st}</color></size>", _small);
+            }
 
             bool add = false, rem = false, demo, close;
             if (wb != null)
