@@ -217,8 +217,10 @@ namespace Caveman
             }
 
             foreach (var s in StorageBuilding.All) if (s != null) Dot(s.transform.position, new Color(0.6f, 0.6f, 0.72f), 3f);
-            foreach (var p in ProductionBuilding.All) if (p != null) Dot(p.transform.position, new Color(0.8f, 0.6f, 0.3f), 3f);
-            foreach (var wk in WorkshopBuilding.All) if (wk != null) Dot(wk.transform.position, new Color(0.7f, 0.5f, 0.3f), 3f);
+            // Collectors/workshops are coloured by live status, so starved (red) or
+            // backed-up (yellow) buildings stand out across a sprawling base.
+            foreach (var p in ProductionBuilding.All) if (p != null) Dot(p.transform.position, p.StatusColor, 4f);
+            foreach (var wk in WorkshopBuilding.All) if (wk != null) Dot(wk.transform.position, wk.StatusColor, 4f);
             foreach (var h in HousingBuilding.All) if (h != null) Dot(h.transform.position, new Color(0.62f, 0.5f, 0.72f), 4f);
             if (gatherer != null) Dot(gatherer.transform.position, new Color(0.96f, 0.85f, 0.2f), 6f);
         }

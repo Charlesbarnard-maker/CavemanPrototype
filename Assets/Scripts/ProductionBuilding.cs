@@ -135,15 +135,23 @@ namespace Caveman
             UpdateStatus();
         }
 
+        /// <summary>Live status colour (green working / yellow backed-up / red starved /
+        /// grey idle) — also used by the minimap to surface bottlenecks across the base.</summary>
+        public Color StatusColor
+        {
+            get
+            {
+                if (AssignedWorkers == 0) return Status.Idle;
+                if (Buffer.Total() >= Buffer.capacity) return Status.BackedUp;
+                if (_source == null || !_source.HasResource) return Status.Starved;
+                return Status.Working;
+            }
+        }
+
         private void UpdateStatus()
         {
             if (_statusDot == null) _statusDot = Status.MakeDot(transform);
-            Color col;
-            if (AssignedWorkers == 0) col = Status.Idle;
-            else if (Buffer.Total() >= Buffer.capacity) col = Status.BackedUp;
-            else if (_source == null || !_source.HasResource) col = Status.Starved;
-            else col = Status.Working;
-            _statusDot.color = col;
+            _statusDot.color = StatusColor;
         }
 
         private void UpdateVisual(bool working)

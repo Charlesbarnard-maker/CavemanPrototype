@@ -187,15 +187,22 @@ namespace Caveman
             UpdateStatus();
         }
 
+        /// <summary>Live status colour (green/yellow/red/grey) — also drives minimap dots.</summary>
+        public Color StatusColor
+        {
+            get
+            {
+                if (AssignedWorkers == 0) return Status.Idle;
+                if (Buffer.Total() >= Buffer.capacity) return Status.BackedUp;
+                if (_starved) return Status.Starved;
+                return Status.Working;
+            }
+        }
+
         private void UpdateStatus()
         {
             if (_statusDot == null) _statusDot = Status.MakeDot(transform);
-            Color col;
-            if (AssignedWorkers == 0) col = Status.Idle;
-            else if (Buffer.Total() >= Buffer.capacity) col = Status.BackedUp;
-            else if (_starved) col = Status.Starved;
-            else col = Status.Working;
-            _statusDot.color = col;
+            _statusDot.color = StatusColor;
         }
 
         private void UpdateVisual(bool working)
