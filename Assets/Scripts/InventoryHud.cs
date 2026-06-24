@@ -236,6 +236,17 @@ namespace Caveman
                 if (c.Starving) flags += "   <color=#f55>STARVING</color>";
                 if (c.Thirsty) flags += "   <color=#5cf>THIRSTY</color>";
                 int working = c.Population - c.FreeWorkers; // assigned + builders + transporters
+
+                // Bottleneck summary — count starved/backed-up machines (only shown when
+                // there's a problem). Pairs with the minimap so you can find & fix it.
+                int starved = 0, backed = 0;
+                foreach (var pb in ProductionBuilding.All)
+                { if (pb == null) continue; var sc = pb.StatusColor; if (sc == Status.Starved) starved++; else if (sc == Status.BackedUp) backed++; }
+                foreach (var wkb in WorkshopBuilding.All)
+                { if (wkb == null) continue; var sc = wkb.StatusColor; if (sc == Status.Starved) starved++; else if (sc == Status.BackedUp) backed++; }
+                string bottleneck = "";
+                if (starved > 0) bottleneck += $"   <color=#f66>⚠ {starved} starved</color>";
+                if (backed > 0) bottleneck += $"   <color=#fd4>⏸ {backed} backed-up</color>";
                 int prod = Mathf.RoundToInt(c.Productivity * 100f);
                 string prodCol = prod >= 100 ? "#9cf" : "#f99";
                 int happy = Mathf.RoundToInt(c.Happiness * 100f);
@@ -261,7 +272,7 @@ namespace Caveman
                     if (hasMon || mb > 0) monu = $"   <color=#ffe08a>Monument {Mathf.Min(mb, 10)}/10</color>";
                 }
 
-                GUILayout.Label($"<b>Population</b> {c.Population}/{c.Capacity}   <b>Working</b> {working}   <b>Free</b> {c.FreeWorkers}   <color=#cda>{c.AgeName}</color>   <color=#dca>{c.Rank}</color>   <color={prodCol}>Output {prod}%</color>   <color={happyCol}>Happy {happy}%</color>{needComfort}   <color=#ffcf6b>Prosperity {c.Prosperity}</color>{monu}{flags}", _s);
+                GUILayout.Label($"<b>Population</b> {c.Population}/{c.Capacity}   <b>Working</b> {working}   <b>Free</b> {c.FreeWorkers}{bottleneck}   <color=#cda>{c.AgeName}</color>   <color=#dca>{c.Rank}</color>   <color={prodCol}>Output {prod}%</color>   <color={happyCol}>Happy {happy}%</color>{needComfort}   <color=#ffcf6b>Prosperity {c.Prosperity}</color>{monu}{flags}", _s);
             }
             GUILayout.EndArea();
         }
