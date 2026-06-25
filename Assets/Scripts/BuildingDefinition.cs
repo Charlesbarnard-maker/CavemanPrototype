@@ -33,6 +33,7 @@ namespace Caveman
         Bridge,    // a plank tile placed on water to make it passable (feet + belts)
         Pipe,      // a liquid-network segment (continuous flow, not items)
         Pump,      // draws water from adjacent water terrain into the pipe network
+        Research,  // a Research Lodge: consumes crafted research items into research points
     }
 
     /// <summary>Data for a placeable structure.</summary>

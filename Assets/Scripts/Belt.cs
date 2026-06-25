@@ -173,6 +173,8 @@ namespace Caveman
                 && (item == null || w.WantsInput(item))) return true;
             if (WorldGrid.Depots.TryGetValue(ahead, out var dp) && dp != null
                 && (item == null || dp.item == null || dp.item == item)) return true; // depots omnidirectional
+            if (WorldGrid.Research.TryGetValue(ahead, out var rb) && rb != null
+                && (item == null || rb.Accepts(item))) return true; // research sink (omnidirectional)
             if (At(ahead) != null) return LeadsToSink(_cell, dir); // follow the chain
             return false;
         }
@@ -185,7 +187,7 @@ namespace Caveman
             {
                 var ahead = cell + Step(dir);
                 if (WorldGrid.Storages.ContainsKey(ahead) || WorldGrid.Workshops.ContainsKey(ahead)
-                    || WorldGrid.Depots.ContainsKey(ahead)) return true;
+                    || WorldGrid.Depots.ContainsKey(ahead) || WorldGrid.Research.ContainsKey(ahead)) return true;
                 var nb = At(ahead);
                 if (nb == null) return false; // chain ends in empty space → dead end
                 cell = ahead; dir = nb.dir;
@@ -229,6 +231,13 @@ namespace Caveman
             {
                 if (dp.def != null && dp.store.Total() >= dp.def.capacity) return;
                 dp.store.Add(item, 1); count--; if (count <= 0) item = null; return;
+            }
+
+            // ...or into a Research Lodge, if it's the item currently being researched.
+            if (WorldGrid.Research.TryGetValue(ahead, out var rb) && rb != null && rb.Accepts(item))
+            {
+                if (rb.InBuffer.Total() >= rb.InBuffer.capacity) return;
+                rb.InBuffer.Add(item, 1); count--; if (count <= 0) item = null; return;
             }
         }
 

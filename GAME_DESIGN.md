@@ -13,6 +13,39 @@ Status tags: ✅ in game · 🔶 partial · 📝 designed/proposed.
 
 ---
 
+# PROGRESSION = RESEARCH (production-driven, the only way to advance an age)  ✅
+
+There are **no automatic / resource-cost age unlocks**. The single progression spine:
+
+> **Craft a RESEARCH ITEM (a multi-input factory product) → deliver it to a Research Lodge →
+> it converts items to research POINTS → reaching a tier's cost advances the Age → that Age's
+> buildings unlock (`unlockAge` gate).**
+
+Gathering earns **zero** research; only delivered crafted items do. You cannot hand-craft (there is
+no manual crafting — workshops need workers), so progress *requires* building & scaling a factory.
+
+**Research tree (data-driven; append a Tier per future age):**
+
+| Tier | Advances | Research item | Recipe (maker, unlock) | Worth | Cost | ≈ items |
+|---|---|---|---|---|---|---|
+| 1 | Stone → Tribal | **Idea Tablet** | Planks + Stone (Idea Bench, age 0) | 1 pt | **20** | 20 |
+| 2 | Tribal → Bronze | **Study Scroll** | Charcoal + Planks (Scroll Maker, age 1) | 2 pt | **50** | 25 |
+| 3 | Bronze → Iron | **Schematic** | Bricks + Pottery (Drafting Table, age 2) | 3 pt | **100** | 33 |
+| 4 | Iron → Industrial | **Blueprint** | Metal + Tools (Engineering Lab, age 3) | 5 pt | **200** | 40 |
+
+- **Maker workshops are age-gated to the PRIOR age**, so the next item is craftable only once you
+  reach the age before it — no circular locks. Each tier needs a deeper chain than the last
+  (planks → charcoal+planks → bricks+pottery → metal+tools), so the *required output* climbs hard
+  even though item-counts climb gently. **Scaling research = scaling the factory.**
+- **Research Lodge** = a worker-free SINK: belt the current research item in (or place it beside a
+  stock of it); it eats ≤ 1/sec → so throughput is capped by how fast you PRODUCE items. Build more
+  Lodges + more makers to research faster.
+- **UI:** top status bar shows `🔬 <item> pts/cost`; the Build panel shows the target age + a
+  progress bar + items-remaining; the Lodge's panel shows holdings + pts/min.
+- **Files:** `Research` (static tree + points), `ResearchBuilding` (the Lodge), `Colony.ResearchAdvance`.
+
+---
+
 # SYSTEM RATIOS (canonical v1 — the numbers must have logic)
 
 Every throughput number hangs off **one base unit** so the player can reason, not guess:

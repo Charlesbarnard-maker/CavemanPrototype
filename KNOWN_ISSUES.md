@@ -3,7 +3,36 @@
 A running record so progress/problems don't get lost. Newest first. Move items to
 **Fixed** when done. Maintained alongside the code — see DESIGN.md for the roadmap.
 
-## System clarity + resource distribution pass (2026-06-25 #5) — most recent
+## Production-driven RESEARCH progression (2026-06-25 #6) — most recent
+Replaced automatic/resource-cost age unlocks with a research system. **All progression now flows
+through research.** See the new **PROGRESSION = RESEARCH** section in GAME_DESIGN.md.
+- **The loop:** craft a RESEARCH ITEM (multi-input factory product) → deliver to a **Research Lodge**
+  → it converts items to research **points** → reaching a tier's cost **advances the Age** → that
+  age's buildings unlock (existing `unlockAge` gate). Gathering earns 0 research; there's no manual
+  crafting, so you MUST build & scale a factory to progress.
+- **New files:** `Research.cs` (static tree: tiers, points, deliver/advance), `ResearchBuilding.cs`
+  (the Lodge — worker-free sink, belt-fed InBuffer + adjacent pickup, ≤1 item/sec → points).
+- **New content (GameBootstrap):** 4 research items (Idea Tablet / Study Scroll / Schematic /
+  Blueprint), 4 age-gated maker workshops (Idea Bench a0 / Scroll Maker a1 / Drafting Table a2 /
+  Engineering Lab a3), the Research Lodge (a0), and the tier table (cost 20→50→100→200, worth
+  1/2/3/5 pt). Recipes: Planks+Stone → Charcoal+Planks → Bricks+Pottery → Metal+Tools.
+- **Integration:** new `BuildingKind.Research` + `WorldGrid.Research` dict + Belt sink branches
+  (HasForwardTarget/LeadsToSink/PushForward, omnidirectional like a Depot) + `ConstructionSite`
+  SpawnFinished case + BuildController place/select/demolish/copy + InventoryHud category
+  ("Production"). **Removed:** `Colony.AgeReq`/`ageReqs`/`CanAdvance`/`AdvanceAge` and the build-menu
+  "▲ Advance" button; added `Colony.ResearchAdvance`. The age-up announcer (watches `Age`) still
+  fires. F3 still force-advances age (sandbox). Two early objectives teach the loop.
+- **UI:** status bar `🔬 <item> pts/cost`; Build panel shows target age + progress bar + items-left;
+  Lodge panel shows holdings + pts/min.
+- **Balance / watch (needs the playtest):** (a) the FIRST advance now requires a real factory
+  (Wood→Sawmill→Planks + Stone Pit → Idea Bench → Lodge) — intended, but verify it's not too steep
+  vs the old "40 wood, pop 8"; tier-1 is deliberately cheap (20 × 1-pt tablets, short chain). (b)
+  Lodge eats ≤1/sec so one maker (~30/min) → tier-1 in ~40s; confirm it feels right and that
+  scaling (more makers/lodges) visibly speeds it. (c) leftover old-tier research items are ignored
+  by the Lodge (belt shows red dead-end) — clear, but watch for confusion. (d) it leans on the
+  60/min ratio system from pass #5 (maker demand = collector/belt output) — a nice tie-in to verify.
+
+## System clarity + resource distribution pass (2026-06-25 #5)
 A clarity/balance/readability pass (NOT a feature add). Goal: the player can *diagnose* problems
 and reason about throughput. See the new **SYSTEM RATIOS** section in GAME_DESIGN.md.
 - **Resource distribution → CLUSTERS.** Lone scattered nodes replaced by natural groves/outcrops

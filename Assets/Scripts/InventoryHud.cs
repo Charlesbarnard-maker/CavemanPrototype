@@ -51,7 +51,7 @@ namespace Caveman
         // Meta-groups keep the menu to a handful of headers (not one per building kind).
         private static readonly (string label, BuildingKind[] kinds)[] Cats =
         {
-            ("Production", new[] { BuildingKind.Collector, BuildingKind.Workshop, BuildingKind.Power }),
+            ("Production", new[] { BuildingKind.Collector, BuildingKind.Workshop, BuildingKind.Power, BuildingKind.Research }),
             ("Logistics", new[] { BuildingKind.Belt, BuildingKind.Bridge, BuildingKind.Pipe, BuildingKind.Pump, BuildingKind.Depot, BuildingKind.Route }),
             ("Infrastructure", new[] { BuildingKind.Build, BuildingKind.Storage }),
             ("Settlement", new[] { BuildingKind.Housing }),
@@ -360,7 +360,13 @@ namespace Caveman
                     power = $"   <color={pc}>⚡ {Mathf.RoundToInt(Power.Generation)}/{Mathf.RoundToInt(Power.Demand)}{(brown ? " BROWNOUT" : "")}</color>";
                 }
 
-                GUILayout.Label($"<b>Population</b> {c.Population}/{c.Capacity}   <b>Working</b> {working}   <b>Free</b> {c.FreeWorkers}{bottleneck}   <color=#cda>{c.AgeName}</color>   <color=#dca>{c.Rank}</color>   <color={prodCol}>Output {prod}%</color>   <color={happyCol}>Happy {happy}%</color>{needComfort}   <color=#ffcf6b>Prosperity {c.Prosperity}</color>{power}{monu}{flags}", _s);
+                // Research (the progression spine): always-visible target + progress next to the Age.
+                string research = "";
+                var rTier = Research.Current;
+                if (rTier != null)
+                    research = $"   <color=#9cf>🔬 {(rTier.item != null ? rTier.item.displayName : "?")} {Research.Points}/{rTier.cost}</color>";
+
+                GUILayout.Label($"<b>Population</b> {c.Population}/{c.Capacity}   <b>Working</b> {working}   <b>Free</b> {c.FreeWorkers}{bottleneck}   <color=#cda>{c.AgeName}</color>{research}   <color=#dca>{c.Rank}</color>   <color={prodCol}>Output {prod}%</color>   <color={happyCol}>Happy {happy}%</color>{needComfort}   <color=#ffcf6b>Prosperity {c.Prosperity}</color>{power}{monu}{flags}", _s);
             }
             GUILayout.EndArea();
         }
@@ -502,12 +508,21 @@ namespace Caveman
             if (col != null)
             {
                 GUILayout.Label($"<b><color=#cda>{col.AgeName}</color></b>", _small);
-                if (col.NextReq != null) // guard: last age has no requirement (was crashing the menu)
+                // Research progress (the unlock target). Age advances ONLY by delivering the current
+                // research item to a Research Lodge — no resource/pop "advance" button any more.
+                var rt = Research.Current;
+                if (rt != null)
                 {
-                    var r = col.NextReq;
-                    string c = col.CanAdvance() ? "#9f9" : "#f99";
-                    if (GUILayout.Button($"<size=12>▲ Advance to {col.NextAgeName}\n<color={c}>(pop {r.pop}, {CostList(r.cost)})</color></size>", _btn))
-                        col.AdvanceAge();
+                    string itemN = rt.item != null ? rt.item.displayName : "?";
+                    int filled = Mathf.RoundToInt(Research.Fraction * 12f);
+                    string bar = new string('█', Mathf.Clamp(filled, 0, 12)) + new string('░', Mathf.Clamp(12 - filled, 0, 12));
+                    GUILayout.Label($"<size=12>🔬 <b>Research → {col.NextAgeName}</b></size>", _small);
+                    GUILayout.Label($"<size=11><color=#bcd>Craft <b>{itemN}</b> → deliver to a Research Lodge  <color=#999>({rt.pointsPerItem} pt each)</color></color></size>", _small);
+                    GUILayout.Label($"<size=12><color=#9cf>[{bar}]</color>  {Research.Points}/{rt.cost} pts  <color=#bbb>(~{Research.ItemsRemaining} left)</color></size>", _small);
+                }
+                else
+                {
+                    GUILayout.Label("<size=12><color=#9f9>✔ All ages researched</color></size>", _small);
                 }
             }
             GUILayout.Space(4);
@@ -652,9 +667,11 @@ namespace Caveman
             var cs = sel.GetComponent<ConstructionSite>();
             var dp = sel.GetComponent<Depot>();
             var pbSel = sel.GetComponent<ProductionBuilding>();
+            var resB = sel.GetComponent<ResearchBuilding>();
             var staff = sel.GetComponent<IStaffable>();
             string name = staff != null ? staff.StaffLabel : sb != null ? sb.def.displayName
                 : hb != null ? hb.def.displayName : dp != null ? dp.def.displayName
+                : resB != null ? resB.def.displayName
                 : cs != null ? cs.def.displayName : "Building";
             string tag = cs != null ? "  <size=14><color=#bbb>(building)</color></size>" : "";
             GUILayout.Label($"<b>{name}</b>{tag}", _s);
@@ -752,6 +769,19 @@ namespace Caveman
                 }
                 else GUILayout.Label("<size=11><color=#888>empty it to change type</color></size>", _small);
                 GUILayout.Label("<size=11><color=#bbb>Belt goods in; link with a Caravan route.</color></size>", _small);
+            }
+            else if (resB != null)
+            {
+                var rt = Research.Current;
+                if (rt != null)
+                {
+                    string itemN = rt.item != null ? rt.item.displayName : "?";
+                    GUILayout.Label($"<size=14>Research → <b>{(Colony.Instance != null ? Colony.Instance.NextAgeName : "")}</b></size>", _small);
+                    GUILayout.Label($"<size=12>Wants: <b>{itemN}</b>  <color=#bbb>({rt.pointsPerItem} pt each)</color></size>", _small);
+                    GUILayout.Label($"<size=12>Holding {resB.InBuffer.Count(rt.item)}  ·  {Research.Points}/{rt.cost} pts  ·  {resB.PointsPerMin:0.#} pts/min</size>", _small);
+                    GUILayout.Label("<size=11><color=#bbb>Belt the research item here, or place it beside a stock of it.</color></size>", _small);
+                }
+                else GUILayout.Label("<size=13><color=#9f9>✔ All research complete</color></size>", _small);
             }
             else if (hb != null)
             {

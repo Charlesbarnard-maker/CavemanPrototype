@@ -26,8 +26,9 @@ logistics delivers them to storage/HQ/your hands; nothing teleports. Each age ch
 logistics works, never *what* the loop is.
 
 ## Current build status (what's actually in the game)
-- **Ages** Stone→Tribal→Bronze→Iron→Industrial (advance costs pop+resources). Power is the
-  Industrial constraint. (Mid-age rule-shifts + future ages are designed, partly built.)
+- **Ages** Stone→Tribal→Bronze→Iron→Industrial. Advancing is **research-driven**: craft a research
+  item (Idea Tablet → Study Scroll → Schematic → Blueprint) and deliver it to a **Research Lodge**
+  for points (no resource/pop "advance" button). Power is the Industrial constraint.
 - **Economy** "stored, not summoned" (`Economy.StoredOnly`) — usable pool = carried + storages;
   local production for workshops (adjacent/belt-fed).
 - **Solids logistics** hand-carry → belts (drag, auto-corner, I/O **ports**: output arrow / input

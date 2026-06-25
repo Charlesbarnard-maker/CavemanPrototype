@@ -14,6 +14,7 @@ namespace Caveman
         public static readonly Dictionary<Vector2Int, WorkshopBuilding> Workshops = new();
         public static readonly Dictionary<Vector2Int, StorageBuilding> Storages = new();
         public static readonly Dictionary<Vector2Int, Depot> Depots = new();
+        public static readonly Dictionary<Vector2Int, ResearchBuilding> Research = new();
 
         public static void Remove<T>(Dictionary<Vector2Int, T> map, Vector2Int cell, T who) where T : class
         {

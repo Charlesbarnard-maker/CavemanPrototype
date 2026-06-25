@@ -44,6 +44,17 @@ namespace Caveman
             var jewelry = MakeItem("jewelry", "Jewelry", new Color(0.90f, 0.80f, 0.40f));
             // Masonry: gives Stone its own processing chain (like Wood -> Planks).
             var stoneBlock = MakeItem("stoneblock", "Stone Block", new Color(0.58f, 0.60f, 0.66f));
+            // RESEARCH ITEMS — crafted (never gathered) multi-input products delivered to a Research
+            // Lodge to earn research points → the ONLY way to advance an age. Each tier needs a
+            // deeper production chain than the last (see the Research system + GAME_DESIGN).
+            var ideaTablet = MakeItem("idea", "Idea Tablet", new Color(0.88f, 0.82f, 0.52f));
+            var studyScroll = MakeItem("scroll", "Study Scroll", new Color(0.92f, 0.86f, 0.60f));
+            var schematic = MakeItem("schematic", "Schematic", new Color(0.55f, 0.72f, 0.88f));
+            var blueprint = MakeItem("blueprint", "Blueprint", new Color(0.38f, 0.60f, 0.88f));
+            ideaTablet.description = "RESEARCH item: Planks + Stone at an Idea Bench. Deliver to a Research Lodge to research the Tribal Age.";
+            studyScroll.description = "RESEARCH item: Charcoal + Planks at a Scroll Maker. Deliver to a Research Lodge to research the Bronze Age.";
+            schematic.description = "RESEARCH item: Bricks + Pottery at a Drafting Table. Deliver to a Research Lodge to research the Iron Age.";
+            blueprint.description = "RESEARCH item: Metal + Tools at an Engineering Lab. Deliver to a Research Lodge to research the Industrial Age.";
 
             // --- Item descriptions (shown in the in-game Guide, key G) ---
             wood.description = "The starter resource — chop it from trees. Used by nearly every building, and refined into Planks and Charcoal.";
@@ -77,6 +88,7 @@ namespace Caveman
             wood.icon = planks.icon = triangle;                                              // woody
             stone.icon = ore.icon = clay.icon = bricks.icon = stoneBlock.icon = gems.icon = charcoal.icon = hexagon; // mineral
             metal.icon = tools.icon = monument.icon = cloth.icon = clothes.icon = pot.icon = jewelry.icon = square;   // manufactured
+            ideaTablet.icon = studyScroll.icon = schematic.icon = blueprint.icon = square; // research items (manufactured look)
             // food / cooked / meat / grain / flour / bread / fiber keep the default round dot.
 
             // --- Buildings ---
@@ -270,6 +282,43 @@ namespace Caveman
             mason.description = "Stone → Stone Blocks (Stone's own processing chain). Stone Blocks build the sturdy Stone House.";
             warehouse.description = "Configurable storage: pick ONE resource it holds (open its panel). Essential for routing belt goods and feeding workshops by adjacency.";
 
+            // --- RESEARCH SYSTEM: the progression spine. Each age is unlocked by crafting that
+            //     tier's RESEARCH ITEM (a multi-input factory product) and delivering it to a
+            //     Research Lodge, which converts items → research points. Gathering earns nothing;
+            //     you must build (and scale) production chains. Maker workshops are age-gated so the
+            //     NEXT tier's item is craftable only once you reach its age (no circular locks). ---
+            var researchLodge = MakeResearch("Research Lodge", 0, new Color(0.62f, 0.55f, 0.78f),
+                new ItemAmount(wood, 10), new ItemAmount(stone, 8));
+            researchLodge.description = "Delivers research: belt (or place beside) the current RESEARCH ITEM here and it converts each into research points. Reaching the point cost advances the Age. No workers — the limit is how fast your factory makes research items. Open the Build panel (top) to see the current target + progress.";
+            var ideaBench = MakeWorkshop("Idea Bench", ideaTablet, 1, 2.0f, 2, 12, new Color(0.80f, 0.74f, 0.46f),
+                new List<ItemAmount> { new ItemAmount(planks, 1), new ItemAmount(stone, 1) },
+                new ItemAmount(wood, 6), new ItemAmount(stone, 4)); // age 0 — first research chain
+            ideaBench.description = "Planks + Stone → Idea Tablet (a RESEARCH item). The first research chain: feed it from a Sawmill + Stone Pit, then belt the Tablets to a Research Lodge to reach the Tribal Age.";
+            var scrollMaker = MakeWorkshop("Scroll Maker", studyScroll, 1, 2.0f, 2, 12, new Color(0.84f, 0.78f, 0.50f),
+                new List<ItemAmount> { new ItemAmount(charcoal, 1), new ItemAmount(planks, 1) },
+                new ItemAmount(wood, 8), new ItemAmount(stone, 6)); scrollMaker.unlockAge = 1;
+            scrollMaker.description = "Charcoal + Planks → Study Scroll (a RESEARCH item). Research the Bronze Age. Charcoal is also shared with the Smelter/Kiln later — a real chain to scale.";
+            var draftingTable = MakeWorkshop("Drafting Table", schematic, 1, 2.5f, 2, 12, new Color(0.52f, 0.66f, 0.82f),
+                new List<ItemAmount> { new ItemAmount(bricks, 1), new ItemAmount(pot, 1) },
+                new ItemAmount(planks, 6), new ItemAmount(bricks, 4)); draftingTable.unlockAge = 2;
+            draftingTable.description = "Bricks + Pottery → Schematic (a RESEARCH item). Research the Iron Age. Needs two Bronze chains (Kiln + Potter) feeding it — scaling research now means scaling your factory.";
+            var engineeringLab = MakeWorkshop("Engineering Lab", blueprint, 1, 3.0f, 2, 12, new Color(0.40f, 0.56f, 0.82f),
+                new List<ItemAmount> { new ItemAmount(metal, 1), new ItemAmount(tools, 1) },
+                new ItemAmount(planks, 8), new ItemAmount(metal, 4)); engineeringLab.unlockAge = 3;
+            engineeringLab.description = "Metal + Tools → Blueprint (a RESEARCH item). Research the Industrial Age — the deepest chain (Smelter + Toolmaker), so the final unlock demands a real factory.";
+
+            // The research tree (data → extendable: append a Tier per future age). Costs scale
+            // 20 → 50 → 100 → 200; later items are worth more points (harder to make) so item-counts
+            // climb modestly (20 → 25 → 33 → 40) while REQUIRED OUTPUT climbs a lot (deeper chains).
+            Research.Reset();
+            Research.Tiers = new List<Research.Tier>
+            {
+                new Research.Tier { targetAge = 1, item = ideaTablet,  pointsPerItem = 1, cost = 20 },  // Stone → Tribal
+                new Research.Tier { targetAge = 2, item = studyScroll, pointsPerItem = 2, cost = 50 },  // Tribal → Bronze
+                new Research.Tier { targetAge = 3, item = schematic,   pointsPerItem = 3, cost = 100 }, // Bronze → Iron
+                new Research.Tier { targetAge = 4, item = blueprint,   pointsPerItem = 5, cost = 200 }, // Iron → Industrial
+            };
+
             // --- Camera (follows the player) ---
             var cam = Camera.main;
             if (cam == null)
@@ -298,6 +347,7 @@ namespace Caveman
             builder.buildables = new List<BuildingDefinition>
             { woodHut, stonePit, foragerHut, waterHole, sawmill, campfire,
               woodStore, stoneStore, foodStore, waterStore, warehouse, house, buildYard, bridge, pipe, pump, booster,
+              researchLodge, ideaBench, scrollMaker, draftingTable, engineeringLab,
               hunter, clayPit, charcoalBurner, clayStore, smokehouse, longhouse,
               kiln, farm, mill, bakery, brickStore, mason, stoneHouse, woodBelt, fastBelt,
               mine, oreStore, smelter, toolmaker, monumentBldg, generator,
@@ -320,13 +370,8 @@ namespace Caveman
             colony.SetStartingPopulation(5);
             gatherer.Inventory.Add(food, 90);   // generous starting larder while you learn the ropes
             gatherer.Inventory.Add(water, 90);  // generous starting water
-            colony.ageReqs = new List<Colony.AgeReq>
-            {
-                new Colony.AgeReq { pop = 8,  cost = new List<ItemAmount> { new ItemAmount(wood, 40), new ItemAmount(stone, 25) } },
-                new Colony.AgeReq { pop = 12, cost = new List<ItemAmount> { new ItemAmount(planks, 25), new ItemAmount(clay, 20), new ItemAmount(stone, 30) } },
-                new Colony.AgeReq { pop = 18, cost = new List<ItemAmount> { new ItemAmount(bricks, 30), new ItemAmount(planks, 30), new ItemAmount(ore, 20) } },
-                new Colony.AgeReq { pop = 28, cost = new List<ItemAmount> { new ItemAmount(metal, 30), new ItemAmount(tools, 15), new ItemAmount(planks, 40) } },
-            };
+            // Age advancement is now driven by the Research system (crafted research items →
+            // Research Lodge → points), set up above — there is no resource/pop "advance" cost here.
             // Comfort goods (the demand sink): people want better food as the colony evolves.
             colony.comforts = new List<Colony.Comfort>
             {
@@ -371,6 +416,8 @@ namespace Caveman
                 new Quest { title = "Gather 12 Wood by hand",            done = () => Have(wood) >= 12,      reward = () => carriedInv.Add(stone, 8),  rewardText = "+8 Stone" },
                 new Quest { title = "Build a Forager Hut for food",      done = () => HasCollectorOf(food),  reward = () => carriedInv.Add(food, 20),  rewardText = "+20 Food" },
                 new Quest { title = "Build a Water Hole + a Water Barrel beside it", done = () => HasCollectorOf(water) && HasStorageOf(water), reward = () => carriedInv.Add(water, 20), rewardText = "+20 Water" },
+                new Quest { title = "Build a Sawmill, an Idea Bench & a Research Lodge", done = () => HasWorkshopOf(planks) && HasWorkshopOf(ideaTablet) && ResearchBuilding.All.Count > 0, reward = () => carriedInv.Add(stone, 12), rewardText = "+12 Stone" },
+                new Quest { title = "Deliver your first Idea Tablet to research", done = () => Research.TotalDelivered >= 1, reward = () => carriedInv.Add(planks, 8), rewardText = "+8 Planks" },
                 new Quest { title = "Grow your settlement to 8 people",  done = () => Pop() >= 8,            reward = () => carriedInv.Add(wood, 25),  rewardText = "+25 Wood" },
                 new Quest { title = "Advance to the Tribal Age",         done = () => AgeNow() >= 1,         reward = () => carriedInv.Add(stone, 25), rewardText = "+25 Stone" },
                 new Quest { title = "Build a Sawmill & make 25 Planks",  done = () => Have(planks) >= 25,    reward = () => carriedInv.Add(planks, 10),rewardText = "+10 Planks" },
@@ -635,6 +682,18 @@ namespace Caveman
             def.kind = BuildingKind.Route;
             def.capacity = capacity;
             def.vehicleSpeed = speed;
+            def.unlockAge = unlockAge;
+            def.color = color;
+            def.cost = new List<ItemAmount>(cost);
+            return def;
+        }
+
+        // A Research Lodge: consumes the current age's research item into research points.
+        private static BuildingDefinition MakeResearch(string name, int unlockAge, Color color, params ItemAmount[] cost)
+        {
+            var def = ScriptableObject.CreateInstance<BuildingDefinition>();
+            def.displayName = name;
+            def.kind = BuildingKind.Research;
             def.unlockAge = unlockAge;
             def.color = color;
             def.cost = new List<ItemAmount>(cost);
