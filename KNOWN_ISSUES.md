@@ -3,7 +3,28 @@
 A running record so progress/problems don't get lost. Newest first. Move items to
 **Fixed** when done. Maintained alongside the code — see DESIGN.md for the roadmap.
 
-## Placement/collision fixes + Splitters (2026-06-25 #7) — most recent
+## Transport → Station rework (2026-06-25 #8) — most recent
+Phase 6 of the factory brief. Transport is now managed INSIDE buildings, not via a global tool.
+- **Depot rebranded "Station"** (display only — class stays `Depot` to avoid churn across 6 files).
+- **The 4 vehicles (Caravan/Ox Cart/Wagon/Drone) are OUT of the build menu.** They're now
+  `BuildController.routeTiers` (data), surfaced through the Station's panel instead.
+- **Routes are created from a Station's panel:** select a Station → "+ Add route (<tier>)" →
+  click a destination Station. Uses the newest unlocked tier (`BestRouteTier`). The panel shows
+  route count and a "✕ Remove a route" button. Linking state lives in `BuildController.LinkFrom`
+  / `BeginStationLink` / `CompleteStationLink` / `CancelLink`; Esc/right-click/placing cancels it.
+- **Vehicles now LOAD → TRAVEL → UNLOAD with timing** (`RouteVehicle` states ToSource/Loading/
+  ToDest/Unloading, ~1.5s load + 1.5s unload) instead of instant transfer — so distance + handling
+  cap throughput, which is what makes multiple vehicles/routes worth building.
+- **Legacy global Route tool** (`UpdateRoutePlacement`, `RoutePickingFirst`, `BuildingKind.Route`
+  in Cats/Describe) is now unreachable (no Route buildable) but left in place — compiles, harmless;
+  remove in a later cleanup. Quest reworded to "Build 2 Stations & add a transport route".
+- **Watch:** (a) Station panel is now ~6 widgets tall — verify it doesn't clip the Demolish/Close
+  row at the fixed 188px height (shrink/group if so). (b) only ONE vehicle per "+ Add route" press;
+  add several for more throughput — confirm that reads clearly. (c) tier is auto-selected (newest);
+  a tier picker can come later. (d) a vehicle whose Station is demolished self-destroys next frame
+  (a/b null) — confirm no stragglers.
+
+## Placement/collision fixes + Splitters (2026-06-25 #7)
 A "layout matters" pass (the factory-feel brief). NOTE: that brief's Research, tree-clusters and
 debug-visibility asks were already delivered in passes #5/#6 — this pass does the genuinely-new
 parts (placement/collision + splitters) and scopes the transport rework separately.

@@ -157,9 +157,10 @@ namespace Caveman
             buildYard.description = "Raises your builder cap by 3. Build more yards (and keep spare people) to construct faster — scaling construction is infrastructure, not a slider. Builders still haul materials from storage, so supply rate caps build speed.";
             // Long-distance logistics: depots + caravan routes (replaces the old haulers).
             var depot = ScriptableObject.CreateInstance<BuildingDefinition>();
-            depot.displayName = "Depot"; depot.kind = BuildingKind.Depot; depot.unlockAge = 0;
+            depot.displayName = "Station"; depot.kind = BuildingKind.Depot; depot.unlockAge = 0;
             depot.item = null; depot.capacity = 80; depot.color = new Color(0.50f, 0.45f, 0.55f);
             depot.cost = new List<ItemAmount> { new ItemAmount(wood, 10), new ItemAmount(stone, 6) };
+            depot.description = "Transport Station. Belt goods IN; then SELECT it and '+ Add route' to another Station — a vehicle shuttles goods across the map (load → travel → unload, so distance & handling cap throughput). Build a Station at each end of a supply line; add more vehicles/routes to move more.";
             // Route vehicle tiers — each links two depots; bigger/faster as ages advance.
             var caravan = MakeRoute("Caravan (Elephant)", 12, 3.5f, 0, new Color(0.55f, 0.50f, 0.50f),
                 new ItemAmount(wood, 8));
@@ -360,7 +361,9 @@ namespace Caveman
               kiln, farm, mill, bakery, brickStore, mason, stoneHouse, woodBelt, fastBelt, splitter,
               mine, oreStore, smelter, toolmaker, monumentBldg, generator,
               potter, cottonFarm, weaver, tailor, gemMine, jeweler,
-              depot, caravan, oxCart, wagonTrain, cargoDrone };
+              depot };
+            // Transport vehicles are NOT in the build menu — they're created from a Station's panel.
+            builder.routeTiers = new List<BuildingDefinition> { caravan, oxCart, wagonTrain, cargoDrone };
 
             var follow = cam.GetComponent<CameraFollow>();
             if (follow == null) follow = cam.gameObject.AddComponent<CameraFollow>();
@@ -430,7 +433,7 @@ namespace Caveman
                 new Quest { title = "Advance to the Tribal Age",         done = () => AgeNow() >= 1,         reward = () => carriedInv.Add(stone, 25), rewardText = "+25 Stone" },
                 new Quest { title = "Build a Sawmill & make 25 Planks",  done = () => Have(planks) >= 25,    reward = () => carriedInv.Add(planks, 10),rewardText = "+10 Planks" },
                 new Quest { title = "Lay 5 conveyor belts",              done = () => Belt.Count >= 5,       reward = () => carriedInv.Add(wood, 15),  rewardText = "+15 Wood" },
-                new Quest { title = "Run a Caravan route (2 depots)",    done = () => RouteVehicle.All.Count >= 1, reward = () => carriedInv.Add(wood, 30), rewardText = "+30 Wood" },
+                new Quest { title = "Build 2 Stations & add a transport route", done = () => RouteVehicle.All.Count >= 1, reward = () => carriedInv.Add(wood, 30), rewardText = "+30 Wood" },
                 new Quest { title = "Cook 15 Cooked Food",               done = () => Have(cookedFood) >= 15,reward = () => carriedInv.Add(stone, 15), rewardText = "+15 Stone" },
                 new Quest { title = "Grow to 12 people",                 done = () => Pop() >= 12,           reward = () => carriedInv.Add(planks, 15),rewardText = "+15 Planks" },
                 new Quest { title = "Advance to the Bronze Age",         done = () => AgeNow() >= 2,         reward = () => carriedInv.Add(stone, 30), rewardText = "+30 Stone" },

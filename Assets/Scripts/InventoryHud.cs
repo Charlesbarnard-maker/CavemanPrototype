@@ -762,13 +762,36 @@ namespace Caveman
             else if (dp != null)
             {
                 string acc = dp.item != null ? dp.item.displayName : "(not set)";
-                GUILayout.Label($"<size=15>Depot — {acc}: {dp.store.Total()}/{dp.def.capacity}</size>", _small);
+                GUILayout.Label($"<size=15>Station — {acc}: {dp.store.Total()}/{dp.def.capacity}</size>", _small);
                 if (dp.store.Total() == 0)
                 {
                     if (GUILayout.Button($"<size=12>Handle: {acc} (change)</size>", _btn)) dp.CycleItem();
                 }
                 else GUILayout.Label("<size=11><color=#888>empty it to change type</color></size>", _small);
-                GUILayout.Label("<size=11><color=#bbb>Belt goods in; link with a Caravan route.</color></size>", _small);
+
+                // Routes managed here (no global vehicle in the build menu any more).
+                int rcount = 0;
+                foreach (var rv in RouteVehicle.All) if (rv != null && (rv.a == dp || rv.b == dp)) rcount++;
+                GUILayout.Label($"<size=12>Routes from/to here: <b>{rcount}</b></size>", _small);
+
+                if (builder.LinkFrom == dp)
+                    GUILayout.Label("<size=11><color=#ffd24d>▶ Click another Station to link… (Esc cancels)</color></size>", _small);
+                else
+                {
+                    var tier = builder.BestRouteTier();
+                    if (tier != null)
+                    {
+                        if (GUILayout.Button($"<size=12>+ Add route  <color=#bbb>({tier.displayName})</color></size>", _btn))
+                            builder.BeginStationLink(dp);
+                    }
+                    else GUILayout.Label("<size=11><color=#888>No transport unlocked yet</color></size>", _small);
+                    if (rcount > 0 && GUILayout.Button("<size=12>✕ Remove a route</size>", _btn))
+                        for (int k = RouteVehicle.All.Count - 1; k >= 0; k--)
+                        {
+                            var rv = RouteVehicle.All[k];
+                            if (rv != null && (rv.a == dp || rv.b == dp)) { Destroy(rv.gameObject); break; }
+                        }
+                }
             }
             else if (resB != null)
             {

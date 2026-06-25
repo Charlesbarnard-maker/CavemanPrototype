@@ -18,8 +18,13 @@ namespace Caveman
         void OnEnable() => All.Add(this);
         void OnDisable() => All.Remove(this);
 
-        private enum State { ToA, ToB }
-        private State _state = State.ToA;
+        // A trip is a real cycle: travel to source → LOAD (takes time) → travel to dest → UNLOAD
+        // (takes time). So throughput is gated by distance + handling, not instant teleport — which
+        // is what makes multiple vehicles / multiple routes worthwhile.
+        private enum State { ToSource, Loading, ToDest, Unloading }
+        private State _state = State.ToSource;
+        public float loadTime = 1.5f, unloadTime = 1.5f;
+        private float _phaseTimer;
         private int _carry;
         private ItemDefinition _carryItem;
         private SpriteRenderer _sr;
@@ -61,31 +66,45 @@ namespace Caveman
             _line.SetPosition(0, a.transform.position);
             _line.SetPosition(1, b.transform.position);
 
-            if (_state == State.ToA)
+            switch (_state)
             {
-                if (MoveTo(a.transform.position))
-                {
-                    if (a.item != null)
+                case State.ToSource:
+                    if (MoveTo(a.transform.position)) { _phaseTimer = 0f; _state = State.Loading; }
+                    break;
+
+                case State.Loading:
+                    if (_carry > 0) { _state = State.ToDest; break; } // carrying leftovers → just deliver
+                    _phaseTimer += Time.deltaTime;
+                    if (_phaseTimer >= loadTime)
                     {
-                        int got = a.store.RemoveUpTo(a.item, capacity);
-                        if (got > 0) { _carry = got; _carryItem = a.item; }
+                        _phaseTimer = 0f;
+                        if (a.item != null)
+                        {
+                            int got = a.store.RemoveUpTo(a.item, capacity);
+                            if (got > 0) { _carry = got; _carryItem = a.item; _state = State.ToDest; }
+                            // else: nothing to load — idle at the source and retry next load cycle
+                        }
                     }
-                    _state = State.ToB;
-                }
-            }
-            else
-            {
-                if (MoveTo(b.transform.position))
-                {
-                    if (_carry > 0 && _carryItem != null)
+                    break;
+
+                case State.ToDest:
+                    if (MoveTo(b.transform.position)) { _phaseTimer = 0f; _state = State.Unloading; }
+                    break;
+
+                case State.Unloading:
+                    _phaseTimer += Time.deltaTime;
+                    if (_phaseTimer >= unloadTime)
                     {
-                        if (b.item == null) b.item = _carryItem;
-                        int accepted = b.store.Add(_carryItem, _carry);
-                        _carry -= accepted; // if full, keep the remainder and try again next trip
+                        _phaseTimer = 0f;
+                        if (_carry > 0 && _carryItem != null)
+                        {
+                            if (b.item == null) b.item = _carryItem;
+                            _carry -= b.store.Add(_carryItem, _carry); // keep remainder if dest is full
+                        }
+                        if (_carry <= 0) _carryItem = null;
+                        _state = State.ToSource; // head back (deliver any remainder on the next loop)
                     }
-                    if (_carry <= 0) { _carryItem = null; _state = State.ToA; }
-                    else _state = State.ToA; // partially delivered; head back to pick up more anyway
-                }
+                    break;
             }
 
             if (_sr != null)

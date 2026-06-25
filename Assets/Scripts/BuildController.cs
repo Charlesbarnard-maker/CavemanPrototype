@@ -33,7 +33,54 @@ namespace Caveman
         private SpriteRenderer _ghostSr;
         private bool _dragging;
         private Vector2Int _dragLast;
-        private Depot _routeA; // first depot picked when linking a route
+        private Depot _routeA; // first depot picked when linking a route (legacy global tool)
+
+        // Transport is now managed FROM a Station: vehicle tiers live here (not the build menu), and
+        // a route is created by selecting a Station, pressing "+ Add route", then clicking another.
+        public List<BuildingDefinition> routeTiers = new();
+        public Depot LinkFrom { get; private set; } // the Station we're drawing a route FROM (or null)
+        private BuildingDefinition _linkTier;
+
+        /// <summary>Newest unlocked vehicle tier (highest unlockAge ≤ current age; ties → bigger).</summary>
+        public BuildingDefinition BestRouteTier()
+        {
+            BuildingDefinition best = null;
+            int age = Colony.Instance != null ? Colony.Instance.Age : 0;
+            foreach (var t in routeTiers)
+            {
+                if (t == null || t.unlockAge > age) continue;
+                if (best == null || t.unlockAge > best.unlockAge
+                    || (t.unlockAge == best.unlockAge && t.capacity > best.capacity)) best = t;
+            }
+            return best;
+        }
+
+        /// <summary>Start drawing a route from this Station; the next Station click completes it.</summary>
+        public void BeginStationLink(Depot from)
+        {
+            if (from == null) return;
+            _linkTier = BestRouteTier();
+            if (_linkTier == null) { Toast.Show("<color=#f99>No transport vehicle unlocked yet.</color>"); return; }
+            CancelPlacement(); // leave any build-placement mode
+            LinkFrom = from;
+            Toast.Show($"<color=#ffd24d>Click a destination Station for the {_linkTier.displayName} (Esc cancels).</color>");
+        }
+
+        public void CancelLink() { LinkFrom = null; _linkTier = null; }
+
+        private void CompleteStationLink(Depot dst)
+        {
+            if (LinkFrom == null || _linkTier == null) { CancelLink(); return; }
+            if (Economy.CanAfford(_linkTier.cost, Carried))
+            {
+                Economy.Spend(_linkTier.cost, Carried);
+                RouteVehicle.Spawn(LinkFrom, dst, Mathf.Max(1, _linkTier.capacity),
+                    Mathf.Max(0.5f, _linkTier.vehicleSpeed), _linkTier.color);
+                Toast.Show($"<color=#9f9>Route created: {_linkTier.displayName}.</color>");
+            }
+            else Toast.Show($"<color=#f99>Can't afford a {_linkTier.displayName}.</color>");
+            CancelLink();
+        }
         private GameObject _highlight; // glow ring around the selected building
         public Belt.Dir BuildDir { get; private set; } = Belt.Dir.E; // output side for the building being placed
         // Per-cell I/O markers on the ghost — one per edge cell, so a 2×2 warehouse shows
@@ -62,7 +109,8 @@ namespace Caveman
 
             if (kb.escapeKey.wasPressedThisFrame)
             {
-                if (PendingIndex >= 0) CancelPlacement();
+                if (LinkFrom != null) CancelLink();
+                else if (PendingIndex >= 0) CancelPlacement();
                 else Selected = null;
             }
 
@@ -89,6 +137,22 @@ namespace Caveman
 
             // --- Selection mode ---
             bool overUI = InventoryHud.PointerOverUI;
+
+            // Station route linking: after "+ Add route", the next click on another Station creates
+            // the route; clicking empty space (or right-click) cancels. Consumes the click.
+            if (LinkFrom != null)
+            {
+                if (mouse != null && mouse.leftButton.wasPressedThisFrame && !overUI)
+                {
+                    var go = BuildingGOUnderCursor(mouse);
+                    var dst = go != null ? go.GetComponent<Depot>() : null;
+                    if (dst != null && dst != LinkFrom) CompleteStationLink(dst);
+                    else CancelLink();
+                }
+                if (mouse != null && mouse.rightButton.wasPressedThisFrame) CancelLink();
+                return;
+            }
+
             if (mouse != null && mouse.leftButton.wasPressedThisFrame && !overUI)
                 Selected = BuildingGOUnderCursor(mouse);
 
@@ -171,6 +235,7 @@ namespace Caveman
             PendingIndex = index;
             IsPlacing = true;
             Selected = null;
+            CancelLink(); // can't be route-linking and placing at once
             EnsureGhost();
         }
 
