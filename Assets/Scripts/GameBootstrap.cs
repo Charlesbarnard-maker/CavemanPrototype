@@ -330,7 +330,7 @@ namespace Caveman
             // building-unlock branches you CHOOSE to spend points on. Age costs scale 20→50→100→200.
             Research.Tree = new List<Research.Tech>
             {
-                new Research.Tech { id = "tribal",     name = "Tribal Age",     cost = 20,  advanceToAge = 1, prereq = null,     desc = "Advance to the Tribal Age — hunting, clay, charcoal, the Longhouse." },
+                new Research.Tech { id = "tribal",     name = "Tribal Age",     cost = 12,  advanceToAge = 1, prereq = null,     desc = "Advance to the Tribal Age — hunting, clay, charcoal, the Longhouse." },
                 new Research.Tech { id = "bronze",     name = "Bronze Age",     cost = 50,  advanceToAge = 2, prereq = "tribal", desc = "Advance to the Bronze Age — kilns, farming/baking, masonry, smelting." },
                 new Research.Tech { id = "iron",       name = "Iron Age",       cost = 100, advanceToAge = 3, prereq = "bronze", desc = "Advance to the Iron Age — toolmaking, weaving, gem mining." },
                 new Research.Tech { id = "industrial", name = "Industrial Age", cost = 200, advanceToAge = 4, prereq = "iron",   desc = "Advance to the Industrial Age — power, the Monument, the endgame." },

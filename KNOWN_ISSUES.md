@@ -3,7 +3,22 @@
 A running record so progress/problems don't get lost. Newest first. Move items to
 **Fixed** when done. Maintained alongside the code — see DESIGN.md for the roadmap.
 
-## Spendable research TREE + multi-input ports + tutorial/UI (2026-06-25 #9) — most recent
+## Multi-input deadlock FIX + early-flow ease (2026-06-25 #10) — most recent
+- **BUG FIXED: Idea Bench (any multi-input workshop) stuck "waiting for stone".** The shared
+  `InBuffer` (24 total across all types) could be entirely filled by the faster/first-arriving
+  input, leaving no room for the other → permanent starve while the missing item backed up on its
+  belt. Added `WorkshopBuilding.CanAcceptBeltInput` giving each input a FAIR SHARE of the buffer
+  (capacity / #inputs); belt delivery now uses it. Fixes the deadlock for unbalanced belts, a
+  not-yet-staffed bench, or a momentarily-dry source. Helps every multi-input machine (Smelter,
+  Kiln, Campfire, …), not just the Idea Bench.
+- **Early-flow ease:** first research node (Tribal) cost 20 → **12** so the opening research loop
+  pays off quickly (later ages stay 50/100/200). Validates the build→produce→research→unlock loop
+  in the first couple of minutes.
+- Self-test note: with wooden belts (60/min) one Sawmill + one Stone Pit comfortably feed one Idea
+  Bench (needs ~30 planks + ~30 stone/min at 1 worker). Conveyors/pipes are research-gated now, so
+  early game is wooden-belt only — intended, and sufficient for the first research factory.
+
+## Spendable research TREE + multi-input ports + tutorial/UI (2026-06-25 #9)
 Addresses: "Idea Bench needs 2 inputs", "add a research tree where we spend points", tutorial/UI, QoL.
 - **Research is now a SPENDABLE TREE (press T).** Delivered research items add to a research POINT
   pool (no longer auto-advances). A new **Research Tree panel** lists Tech nodes — age spine

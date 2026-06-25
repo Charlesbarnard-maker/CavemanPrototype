@@ -254,10 +254,10 @@ namespace Caveman
                 s.Store.Add(item, 1); count--; if (count <= 0) item = null; return true;
             }
 
-            // ...or into a workshop's input buffer, on its INPUT side, if it uses this item.
-            if (WorkshopAt(ahead) is WorkshopBuilding w && AcceptsInputSide(w, d) && w.WantsInput(item))
+            // ...or into a workshop's input buffer, on a valid input side, if it can take this item
+            // (fair-share per input → no mixed-buffer deadlock; see CanAcceptBeltInput).
+            if (WorkshopAt(ahead) is WorkshopBuilding w && AcceptsInputSide(w, d) && w.CanAcceptBeltInput(item))
             {
-                if (w.InBuffer.Total() >= w.InBuffer.capacity) return false;
                 w.InBuffer.Add(item, 1); count--; if (count <= 0) item = null; return true;
             }
 

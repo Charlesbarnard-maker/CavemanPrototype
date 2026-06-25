@@ -143,6 +143,19 @@ namespace Caveman
             return false;
         }
 
+        /// <summary>Belt-delivery gate. Beyond "is it an input and is there room", a multi-input
+        /// recipe gives EACH input a fair share of the shared InBuffer — so a fast belt of one item
+        /// can't fill the whole buffer and starve the other input (the mixed-buffer DEADLOCK that
+        /// made e.g. the Idea Bench sit "waiting for stone" while stone backed up on its belt).</summary>
+        public bool CanAcceptBeltInput(ItemDefinition i)
+        {
+            if (!WantsInput(i) || InBuffer.Total() >= InBuffer.capacity) return false;
+            int distinct = inputs != null ? inputs.Count : 1;
+            if (distinct <= 1) return true; // single input may use the whole buffer
+            int per = Mathf.Max(2, InBuffer.capacity / distinct); // fair share per input type
+            return InBuffer.Count(i) < per;
+        }
+
         // Inputs: belt-fed InBuffer first, then —
         //   LocalProduction ON  → only ADJACENT storage/collector/workshop (logistics matters).
         //   LocalProduction OFF → the global pool (old "everything teleports" behaviour).
