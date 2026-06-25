@@ -47,14 +47,17 @@ namespace Caveman
             if (kb.aKey.isPressed || kb.leftArrowKey.isPressed) dir.x -= 1;
             if (kb.dKey.isPressed || kb.rightArrowKey.isPressed) dir.x += 1;
 
-            // Water is a hard barrier — you can't walk onto it unless it's bridged. Resolve
-            // each axis separately so you slide along a shoreline instead of sticking.
+            // Water is a hard barrier (unless bridged) and SOLID BUILDINGS block you too, so layout
+            // matters — you route around your factory. Resolve each axis separately so you slide
+            // along an obstacle instead of sticking. Escape valve: if you're already standing inside
+            // a building (e.g. one was just built on you), don't block movement — let yourself out.
             Vector3 step = (Vector3)(dir.normalized * (speed * Time.deltaTime));
             Vector3 p = transform.position;
+            bool insideBuilding = BuildController.SolidBuildingAt(p);
             Vector3 tryX = new Vector3(p.x + step.x, p.y, 0f);
-            if (TerrainGrid.Walkable(tryX)) p = tryX;
+            if (TerrainGrid.Walkable(tryX) && (insideBuilding || !BuildController.SolidBuildingAt(tryX))) p = tryX;
             Vector3 tryY = new Vector3(p.x, p.y + step.y, 0f);
-            if (TerrainGrid.Walkable(tryY)) p = tryY;
+            if (TerrainGrid.Walkable(tryY) && (insideBuilding || !BuildController.SolidBuildingAt(tryY))) p = tryY;
             transform.position = p;
         }
     }

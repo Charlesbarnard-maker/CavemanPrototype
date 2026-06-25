@@ -80,6 +80,8 @@ namespace Caveman
         public bool fromWaterTerrain = false;
         [Tooltip("Pump: a BOOSTER (no water source) — re-pressurises a pipe network to extend its range.")]
         public bool booster = false;
+        [Tooltip("Belt: this is a 1→2 SPLITTER (distributes items evenly to two outputs) rather than a plain belt.")]
+        public bool splitter = false;
 
         [Header("Progression")]
         [Tooltip("Age at which this becomes buildable (0 = Stone Age, available from the start).")]

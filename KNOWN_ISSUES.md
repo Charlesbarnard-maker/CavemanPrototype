@@ -3,7 +3,38 @@
 A running record so progress/problems don't get lost. Newest first. Move items to
 **Fixed** when done. Maintained alongside the code — see DESIGN.md for the roadmap.
 
-## Production-driven RESEARCH progression (2026-06-25 #6) — most recent
+## Placement/collision fixes + Splitters (2026-06-25 #7) — most recent
+A "layout matters" pass (the factory-feel brief). NOTE: that brief's Research, tree-clusters and
+debug-visibility asks were already delivered in passes #5/#6 — this pass does the genuinely-new
+parts (placement/collision + splitters) and scopes the transport rework separately.
+- **Water buildings now need ADJACENT water** (BuildController `waterAdj = 1.6f`, was the loose
+  `placeNodeRange` = 6). A Water Hole / Pump must sit on land in a cell touching water, not "nearby".
+- **Belts can't be laid on buildings** — belt placement (ghost validity + `EnsureBelt`) now rejects
+  any cell with a solid building (`BuildController.SolidBuildingAt`). Belts still go on land/bridges.
+- **Player collides with solid buildings** (`PlayerController`, per-axis like the water check) so you
+  route around your factory. Escape valve: if you're already inside a building (one built on you) you
+  can still walk out. Belts/bridges/pipes/nodes are NOT solid (you walk over them).
+- **Splitters (1→2, even distribution).** New `Splitter` buildable (Belt kind + `def.splitter`).
+  `Belt.isSplitter`: pulls from behind, sends items EVENLY to two outputs — forward + right
+  (`RotateCW(dir)`, R rotates) — alternating, with fallback to the other output if one is full (never
+  stalls). Refactored `PushForward`→`TryDepositTo(Dir)` and `HasForwardTarget`→`OutputConnected(Dir)`
+  so normal belts are unchanged and the splitter just drives both outputs. Distinct hexagon sprite.
+  Upgrade path (smart/filtered splitters) is open via the same flag pattern.
+- **Deliberately DEFERRED (need a supervised batch — too risky/large to do blind):**
+  - **Worker collision with buildings.** Workers move in straight lines (no pathfinding); blocking
+    them would FREEZE gatherers against buildings → softlock. Needs simple pathfinding/steering
+    first. Player collision (above) is the safe half.
+  - **Transport/Station rework (Phase 6).** Plan: a "Station" building that owns transport units +
+    a route-management panel (load → travel → unload timing), replacing the global Caravan/Ox
+    Cart/Wagon/Drone "Route" tool. Removing those from the menu BEFORE the Station exists would
+    remove the only cross-region transport → kept them for now to stay playable. Do as its own pass
+    with a compile/playtest loop (touches BuildController route mode, Depot panel, RouteVehicle).
+- **Watch:** (a) player bumping its own buildings should feel "layout matters", not annoying — tune
+  if it sticks at corners (per-axis slide should handle it). (b) splitter dragged (vs single-click)
+  lays a row of splitters — harmless but odd; single-click is the intended use. (c) splitter dot
+  animation always shows the forward edge even when it routed right — cosmetic.
+
+## Production-driven RESEARCH progression (2026-06-25 #6)
 Replaced automatic/resource-cost age unlocks with a research system. **All progression now flows
 through research.** See the new **PROGRESSION = RESEARCH** section in GAME_DESIGN.md.
 - **The loop:** craft a RESEARCH ITEM (multi-input factory product) → deliver to a **Research Lodge**

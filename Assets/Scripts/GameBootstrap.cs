@@ -218,6 +218,14 @@ namespace Caveman
             fastBelt.color = new Color(0.72f, 0.63f, 0.40f);
             fastBelt.cost = new List<ItemAmount> { new ItemAmount(planks, 1) };
             fastBelt.description = "The belt upgrade: 120/min — 2× the wooden lane. One conveyor carries two collectors' worth, or feeds a 2-worker machine on a single line.";
+            // Splitter: a 1→2 belt that distributes items EVENLY between two outputs. Lets one
+            // supply line feed two machines. (Belt kind, flagged splitter — placed like a belt.)
+            var splitter = ScriptableObject.CreateInstance<BuildingDefinition>();
+            splitter.displayName = "Splitter"; splitter.kind = BuildingKind.Belt; splitter.splitter = true; splitter.unlockAge = 0;
+            splitter.interval = 0.6f;
+            splitter.color = new Color(0.45f, 0.62f, 0.72f);
+            splitter.cost = new List<ItemAmount> { new ItemAmount(wood, 2) };
+            splitter.description = "1→2 SPLITTER: pulls from behind and sends items EVENLY to two outputs — forward and to its right (R rotates). If one output backs up it sends to the other, so it never stalls. Feed two machines from one supply line. (Smart/filtered splitters come later.)";
 
             // Exploration payoff: Ore is mined from distant veins, hauled home, and is
             // required to reach the Iron Age.
@@ -349,7 +357,7 @@ namespace Caveman
               woodStore, stoneStore, foodStore, waterStore, warehouse, house, buildYard, bridge, pipe, pump, booster,
               researchLodge, ideaBench, scrollMaker, draftingTable, engineeringLab,
               hunter, clayPit, charcoalBurner, clayStore, smokehouse, longhouse,
-              kiln, farm, mill, bakery, brickStore, mason, stoneHouse, woodBelt, fastBelt,
+              kiln, farm, mill, bakery, brickStore, mason, stoneHouse, woodBelt, fastBelt, splitter,
               mine, oreStore, smelter, toolmaker, monumentBldg, generator,
               potter, cottonFarm, weaver, tailor, gemMine, jeweler,
               depot, caravan, oxCart, wagonTrain, cargoDrone };

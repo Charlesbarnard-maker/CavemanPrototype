@@ -211,13 +211,16 @@ namespace Caveman
             _ghost.transform.localScale = new Vector3(def.FootW * gb, def.FootH * gb, 1f);
             UpdateGhostPorts(world, def);
 
+            // Water buildings must sit on LAND in a cell ADJACENT to water (not just "nearby"):
+            // a tight range so the player can't plonk them at a distance from the shore.
+            const float waterAdj = 1.6f; // reaches an orthogonally/diagonally adjacent water cell
             bool affordable = Economy.CanAfford(def.cost, Carried);
             bool placeOk;
             if (def.kind == BuildingKind.Collector)
                 placeOk = HasMatchingNodeNear(world, def.item, placeNodeRange)
-                          || (def.fromWaterTerrain && TerrainGrid.HasWaterNear(world, placeNodeRange));
+                          || (def.fromWaterTerrain && TerrainGrid.HasWaterNear(world, waterAdj));
             else if (def.kind == BuildingKind.Pump)
-                placeOk = def.booster || TerrainGrid.HasWaterNear(world, placeNodeRange); // pump needs water; booster doesn't
+                placeOk = def.booster || TerrainGrid.HasWaterNear(world, waterAdj); // pump needs adjacent water; booster doesn't
             else placeOk = true;
             bool free = !FootprintBlocked(world, def) && FootprintOnLand(world, def);
             PlacementValid = affordable && placeOk && free;
@@ -317,7 +320,12 @@ namespace Caveman
             return true;
         }
 
-        private bool CellOccupied(Vector3 world)
+        private bool CellOccupied(Vector3 world) => SolidBuildingAt(world);
+
+        /// <summary>True if a SOLID building (or construction site) overlaps this point — used for
+        /// placement blocking, belt-on-building blocking, and player/worker collision. Belts,
+        /// bridges, pipes and resource nodes are NOT solid (you build/walk over them).</summary>
+        public static bool SolidBuildingAt(Vector3 world)
         {
             var hits = Physics2D.OverlapPointAll(world);
             foreach (var h in hits)
@@ -357,7 +365,9 @@ namespace Caveman
             _ghostSr.sprite = PlaceholderArt.Triangle();
 
             bool affordable = Economy.CanAfford(def.cost, Carried);
-            bool free = Belt.At(cell) == null && TerrainGrid.BeltAllowed(cell); // water only if bridged
+            // Belts can't sit on water (unless bridged) OR on top of a building.
+            bool free = Belt.At(cell) == null && TerrainGrid.BeltAllowed(cell)
+                        && !SolidBuildingAt(new Vector3(cell.x, cell.y, 0f));
             PlacementValid = affordable && free;
             _ghostSr.color = PlacementValid
                 ? new Color(0.35f, 1f, 0.4f, 0.6f)
@@ -396,9 +406,10 @@ namespace Caveman
             var existing = Belt.At(cell);
             if (existing != null) { existing.SetDir(d); return; }
             if (!TerrainGrid.BeltAllowed(cell)) return; // water only if bridged
+            if (SolidBuildingAt(new Vector3(cell.x, cell.y, 0f))) return; // never lay a belt on a building
             if (!Economy.CanAfford(def.cost, Carried)) return;
             Economy.Spend(def.cost, Carried);
-            Belt.Spawn(cell, d, def.interval);
+            Belt.Spawn(cell, d, def.interval, def.splitter);
             BuildingsPlaced++;
         }
 

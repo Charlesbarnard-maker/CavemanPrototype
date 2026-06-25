@@ -20,6 +20,12 @@ namespace Caveman
         public ItemDefinition item;
         public int count;
 
+        // Splitter: a 1→2 belt that sends items EVENLY to two outputs — its facing `dir` (forward)
+        // and the cell to its right (RotateCW(dir)). `_splitToggle` flips the preferred output each
+        // item; a full output falls back to the other so it never stalls.
+        public bool isSplitter;
+        private bool _splitToggle;
+
         private float _timer;
         private SpriteRenderer _sr;
         private SpriteRenderer _dot; // visible item sliding along the belt
@@ -44,21 +50,22 @@ namespace Caveman
 
         public static float Angle(Dir d) => d switch { Dir.N => 0f, Dir.E => -90f, Dir.S => 180f, _ => 90f };
 
-        public static Belt Spawn(Vector2Int cell, Dir dir, float interval = 0.5f)
+        public static Belt Spawn(Vector2Int cell, Dir dir, float interval = 0.5f, bool isSplitter = false)
         {
-            var go = new GameObject("Belt");
+            var go = new GameObject(isSplitter ? "Splitter" : "Belt");
             go.transform.position = new Vector3(cell.x, cell.y, 0f);
             go.transform.localScale = Vector3.one * 0.8f;
             go.transform.rotation = Quaternion.Euler(0f, 0f, Angle(dir));
 
             var sr = go.AddComponent<SpriteRenderer>();
-            sr.sprite = PlaceholderArt.Triangle(); // arrow shows flow direction
+            sr.sprite = isSplitter ? PlaceholderArt.Hexagon() : PlaceholderArt.Triangle(); // splitter looks distinct
             sr.sortingOrder = 1;
 
             go.AddComponent<BoxCollider2D>(); // clickable to demolish
 
             var b = go.AddComponent<Belt>();
             b.dir = dir;
+            b.isSplitter = isSplitter;
             b._inDir = Opposite(dir); // default: item enters from directly behind
             b.interval = Mathf.Max(0.05f, interval);
             b._sr = sr;
@@ -163,19 +170,27 @@ namespace Caveman
         // lose them from circulation. This is what stops belts "conveying into nothing".
         private bool HasForwardTarget()
         {
-            var ahead = _cell + Step(dir);
+            // A splitter is connected if EITHER of its two outputs can take goods.
+            if (isSplitter) return OutputConnected(dir) || OutputConnected(RotateCW(dir));
+            return OutputConnected(dir);
+        }
+
+        // Can goods LEAVE via direction d? A sink directly there, or a belt chain that reaches one.
+        private bool OutputConnected(Dir d)
+        {
+            var ahead = _cell + Step(d);
             // Input ports: a belt may only DELIVER into a building's INPUT side (opposite its
             // output). Geometrically that means the belt must travel in the building's output
-            // direction (dir == OutputSide) to enter the input face.
-            if (WorldGrid.Storages.TryGetValue(ahead, out var s) && s != null && dir == s.OutputSide
+            // direction (d == OutputSide) to enter the input face.
+            if (WorldGrid.Storages.TryGetValue(ahead, out var s) && s != null && d == s.OutputSide
                 && (item == null || s.accepts == item || (s.accepts == null && s.configurable))) return true;
-            if (WorldGrid.Workshops.TryGetValue(ahead, out var w) && w != null && dir == w.OutputSide
+            if (WorldGrid.Workshops.TryGetValue(ahead, out var w) && w != null && d == w.OutputSide
                 && (item == null || w.WantsInput(item))) return true;
             if (WorldGrid.Depots.TryGetValue(ahead, out var dp) && dp != null
                 && (item == null || dp.item == null || dp.item == item)) return true; // depots omnidirectional
             if (WorldGrid.Research.TryGetValue(ahead, out var rb) && rb != null
                 && (item == null || rb.Accepts(item))) return true; // research sink (omnidirectional)
-            if (At(ahead) != null) return LeadsToSink(_cell, dir); // follow the chain
+            if (At(ahead) != null) return LeadsToSink(_cell, d); // follow the chain
             return false;
         }
 
@@ -198,47 +213,68 @@ namespace Caveman
         private void PushForward()
         {
             if (count <= 0 || item == null) return;
-            var ahead = _cell + Step(dir);
+
+            if (isSplitter)
+            {
+                // 1→2 even split: alternate the PREFERRED output each successful item; if that side
+                // is blocked, fall back to the other so a full lane never stalls the splitter.
+                Dir a = _splitToggle ? RotateCW(dir) : dir;
+                Dir b = _splitToggle ? dir : RotateCW(dir);
+                if (TryDepositTo(a)) { _splitToggle = !_splitToggle; return; }
+                TryDepositTo(b);
+                return;
+            }
+
+            TryDepositTo(dir);
+        }
+
+        // Move ONE item out in direction d — into a belt, or a building sink (storage/workshop/depot/
+        // research) on its input side. Returns true if an item left. Shared by belts AND splitters.
+        private bool TryDepositTo(Dir d)
+        {
+            if (count <= 0 || item == null) return false;
+            var ahead = _cell + Step(d);
 
             var nb = At(ahead);
             if (nb != null)
             {
                 // The item enters the next belt from the edge facing us (Opposite our dir).
-                if (nb.CanAccept(item)) { nb.Receive(item, Opposite(dir)); count--; if (count <= 0) item = null; }
-                return;
+                if (nb.CanAccept(item)) { nb.Receive(item, Opposite(d)); count--; if (count <= 0) item = null; return true; }
+                return false;
             }
 
-            // No belt ahead — drop into a storage, but only on its INPUT side (dir == OutputSide).
+            // No belt ahead — drop into a storage, but only on its INPUT side (d == OutputSide).
             // A configurable warehouse with no type yet AUTO-REGISTERS the first item belted in
             // (so goods aren't lost into an "unset" store) — it then only accepts that type.
-            if (WorldGrid.Storages.TryGetValue(ahead, out var s) && s != null && dir == s.OutputSide
+            if (WorldGrid.Storages.TryGetValue(ahead, out var s) && s != null && d == s.OutputSide
                 && (s.accepts == item || (s.accepts == null && s.configurable)))
             {
-                if (s.def != null && s.Store.Total() >= s.def.capacity) return;
+                if (s.def != null && s.Store.Total() >= s.def.capacity) return false;
                 if (s.accepts == null) s.accepts = item; // adopt the first delivered item's type
-                s.Store.Add(item, 1); count--; if (count <= 0) item = null; return;
+                s.Store.Add(item, 1); count--; if (count <= 0) item = null; return true;
             }
 
             // ...or into a workshop's input buffer, on its INPUT side, if it uses this item.
-            if (WorkshopAt(ahead) is WorkshopBuilding w && dir == w.OutputSide && w.WantsInput(item))
+            if (WorkshopAt(ahead) is WorkshopBuilding w && d == w.OutputSide && w.WantsInput(item))
             {
-                if (w.InBuffer.Total() >= w.InBuffer.capacity) return;
-                w.InBuffer.Add(item, 1); count--; if (count <= 0) item = null; return;
+                if (w.InBuffer.Total() >= w.InBuffer.capacity) return false;
+                w.InBuffer.Add(item, 1); count--; if (count <= 0) item = null; return true;
             }
 
             // ...or into a depot that handles this item (route endpoint).
             if (WorldGrid.Depots.TryGetValue(ahead, out var dp) && dp != null && dp.item == item)
             {
-                if (dp.def != null && dp.store.Total() >= dp.def.capacity) return;
-                dp.store.Add(item, 1); count--; if (count <= 0) item = null; return;
+                if (dp.def != null && dp.store.Total() >= dp.def.capacity) return false;
+                dp.store.Add(item, 1); count--; if (count <= 0) item = null; return true;
             }
 
             // ...or into a Research Lodge, if it's the item currently being researched.
             if (WorldGrid.Research.TryGetValue(ahead, out var rb) && rb != null && rb.Accepts(item))
             {
-                if (rb.InBuffer.Total() >= rb.InBuffer.capacity) return;
-                rb.InBuffer.Add(item, 1); count--; if (count <= 0) item = null; return;
+                if (rb.InBuffer.Total() >= rb.InBuffer.capacity) return false;
+                rb.InBuffer.Add(item, 1); count--; if (count <= 0) item = null; return true;
             }
+            return false;
         }
 
         private static WorkshopBuilding WorkshopAt(Vector2Int c)
