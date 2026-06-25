@@ -99,6 +99,7 @@ namespace Caveman
             WorldGrid.Collectors.ContainsKey(c) || WorldGrid.Workshops.ContainsKey(c);
 
         private bool _connected;
+        private bool _blocked; // had an item but couldn't move it forward (dead end / backed up)
 
         void Update()
         {
@@ -109,7 +110,9 @@ namespace Caveman
             {
                 _timer -= interval;
                 _connected = HasForwardTarget();
+                int before = count;
                 PushForward();
+                _blocked = count > 0 && count == before; // item present and it didn't leave
                 if (_connected) PullFromNeighbour(); // don't pull goods onto a belt that leads nowhere
             }
 
@@ -127,9 +130,8 @@ namespace Caveman
             {
                 var go = new GameObject("BeltItem");
                 var sr = go.AddComponent<SpriteRenderer>();
-                sr.sprite = PlaceholderArt.Circle();
                 sr.sortingOrder = 2;
-                go.transform.localScale = Vector3.one * 0.24f;
+                go.transform.localScale = Vector3.one * 0.26f;
                 _dot = sr;
             }
 
@@ -137,14 +139,15 @@ namespace Caveman
             _dot.enabled = show;
             if (!show) return;
 
-            // Slide from the edge the item arrived at, through the centre, to the exit
-            // edge — so at a corner it tracks the bend instead of teleporting across.
-            // 0.5 offsets put the exit edge of one belt exactly on the entry edge of the
-            // next, so an item handed forward is visually continuous (no gap/jump).
-            float progress = interval > 0f ? Mathf.Clamp01(_timer / interval) : 0f;
+            // Slide from the edge the item arrived at, through the centre, to the exit edge —
+            // so at a corner it tracks the bend (0.5 offsets make one belt's exit == the next's
+            // entry, seamless). When BLOCKED (dead end / backed up) the item HOLDS at the front
+            // and stops animating, so a broken belt reads as "stuck", not phantom-travelling.
+            float progress = _blocked ? 1f : (interval > 0f ? Mathf.Clamp01(_timer / interval) : 0f);
             Vector3 inE = new Vector3(Step(_inDir).x, Step(_inDir).y, 0f) * 0.5f;
             Vector3 outE = new Vector3(Step(dir).x, Step(dir).y, 0f) * 0.5f;
             _dot.transform.position = transform.position + Vector3.Lerp(inE, outE, progress);
+            _dot.sprite = item.icon != null ? item.icon : PlaceholderArt.Circle(); // per-item look
             _dot.color = item.color;
         }
 

@@ -10,6 +10,39 @@ namespace Caveman
     /// </summary>
     public static class Ports
     {
+        /// <summary>Place PER-CELL port markers along the building's edges so they line up with the
+        /// belt grid: one marker per edge cell (a 2×2 warehouse → 2 inputs + 2 outputs), aligned to
+        /// each cell's outer face. Output = green arrow on `outputSide`; input = cyan notch opposite.</summary>
+        public static void PlacePorts(Transform t, int w, int h, Belt.Dir outputSide, bool hasIn, bool hasOut)
+        {
+            if (hasOut) PlaceSide(t, w, h, outputSide, true);
+            if (hasIn) PlaceSide(t, w, h, Belt.Opposite(outputSide), false);
+        }
+
+        private static void PlaceSide(Transform t, int w, int h, Belt.Dir side, bool isOutput)
+        {
+            float ps = Mathf.Max(0.01f, t.localScale.x); // building scale (square footprints → uniform)
+            var step = Belt.Step(side);
+            Vector3 c = t.position;
+            float ax = c.x - (w - 1) * 0.5f, ay = c.y - (h - 1) * 0.5f; // bottom-left cell centre
+            for (int i = 0; i < w; i++)
+                for (int j = 0; j < h; j++)
+                {
+                    bool edge = side == Belt.Dir.E ? i == w - 1 : side == Belt.Dir.W ? i == 0
+                              : side == Belt.Dir.N ? j == h - 1 : j == 0;
+                    if (!edge) continue;
+                    var go = new GameObject(isOutput ? "outport" : "inport");
+                    go.transform.SetParent(t);
+                    go.transform.position = new Vector3(ax + i + step.x * 0.55f, ay + j + step.y * 0.55f, 0f);
+                    go.transform.localScale = Vector3.one * (0.3f / ps);
+                    if (isOutput) go.transform.localRotation = Quaternion.Euler(0f, 0f, Belt.Angle(side));
+                    var sr = go.AddComponent<SpriteRenderer>();
+                    sr.sprite = isOutput ? PlaceholderArt.Triangle() : PlaceholderArt.Square();
+                    sr.color = isOutput ? new Color(0.25f, 0.95f, 0.35f, 0.95f) : new Color(0.35f, 0.70f, 1f, 0.95f);
+                    sr.sortingOrder = 11;
+                }
+        }
+
         /// <summary>A small green arrow on the building's output edge, pointing outward.</summary>
         public static SpriteRenderer MakeOutputArrow(Transform parent, Belt.Dir side)
         {

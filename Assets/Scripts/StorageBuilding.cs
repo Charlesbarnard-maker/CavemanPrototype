@@ -64,8 +64,7 @@ namespace Caveman
             sb.OutputSide = outputSide;
             sb._cells = Footprint.Cells(go.transform.position, def.FootW, def.FootH);
             foreach (var c in sb._cells) WorldGrid.Storages[c] = sb;
-            Ports.MakeInputNotch(go.transform, Belt.Opposite(outputSide)); // belts deliver on this side
-            Ports.MakeOutputArrow(go.transform, outputSide);                // belts pull from this side
+            Ports.PlacePorts(go.transform, def.FootW, def.FootH, outputSide, true, true); // in + out, per cell
             return sb;
         }
 

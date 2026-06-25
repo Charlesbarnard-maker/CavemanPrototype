@@ -73,7 +73,7 @@ namespace Caveman
             pb.OutputSide = outputSide;
             pb._cells = Footprint.Cells(go.transform.position, def.FootW, def.FootH);
             foreach (var c in pb._cells) WorldGrid.Collectors[c] = pb;
-            Ports.MakeOutputArrow(go.transform, outputSide);
+            Ports.PlacePorts(go.transform, def.FootW, def.FootH, outputSide, false, true);
             pb.Bind();
             return pb;
         }

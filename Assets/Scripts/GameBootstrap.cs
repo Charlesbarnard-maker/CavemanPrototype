@@ -71,6 +71,14 @@ namespace Caveman
             jewelry.description = "A Jeweler crafts Gems into Jewelry — a high-value luxury good.";
             stoneBlock.description = "A Mason cuts Stone into Stone Blocks — used to build the sturdy Stone House.";
 
+            // --- Belt icons (placeholder shapes by material family, so items are distinguishable
+            //     on conveyors; real per-item art drops into ItemDefinition.icon later). ---
+            var triangle = PlaceholderArt.Triangle(); var hexagon = PlaceholderArt.Hexagon(); var square = PlaceholderArt.Square();
+            wood.icon = planks.icon = triangle;                                              // woody
+            stone.icon = ore.icon = clay.icon = bricks.icon = stoneBlock.icon = gems.icon = charcoal.icon = hexagon; // mineral
+            metal.icon = tools.icon = monument.icon = cloth.icon = clothes.icon = pot.icon = jewelry.icon = square;   // manufactured
+            // food / cooked / meat / grain / flour / bread / fiber keep the default round dot.
+
             // --- Buildings ---
             var woodHut = MakeCollector("Wood Hut", wood, 1, 2.0f, 2, 12, new Color(0.80f, 0.52f, 0.25f),
                 new ItemAmount(wood, 5), new ItemAmount(stone, 3));
