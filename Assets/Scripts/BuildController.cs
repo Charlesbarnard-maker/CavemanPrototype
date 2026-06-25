@@ -36,10 +36,10 @@ namespace Caveman
         private Depot _routeA; // first depot picked when linking a route
         private GameObject _highlight; // glow ring around the selected building
         public Belt.Dir BuildDir { get; private set; } = Belt.Dir.E; // output side for the building being placed
-        private GameObject _ghostArrow; // output-side marker on the ghost
-        private SpriteRenderer _ghostArrowSr;
-        private GameObject _ghostNotch; // input-side marker on the ghost
-        private SpriteRenderer _ghostNotchSr;
+        // Per-cell I/O markers on the ghost — one per edge cell, so a 2×2 warehouse shows
+        // 2 output arrows + 2 input notches (matching the built ports), not a single marker.
+        private readonly List<GameObject> _ghostOutPorts = new();
+        private readonly List<GameObject> _ghostInPorts = new();
 
         void Awake() => _cam = Camera.main;
 
@@ -240,35 +240,64 @@ namespace Caveman
             if (mouse.rightButton.wasPressedThisFrame) CancelPlacement();
         }
 
-        // Show the ghost's I/O markers: green output arrow (collectors/workshops) on BuildDir,
-        // cyan input notch (workshops/storages) on the opposite side. Hidden otherwise.
+        // Show the ghost's I/O markers PER EDGE CELL (so a 2×2 warehouse previews 2 outputs +
+        // 2 inputs, exactly like the built building): green output arrows on BuildDir, cyan
+        // input notches on the opposite side. Hidden for kinds with no belt I/O.
         private void UpdateGhostPorts(Vector3 center, BuildingDefinition def)
         {
             bool hasOut = def.kind == BuildingKind.Collector || def.kind == BuildingKind.Workshop
                           || def.kind == BuildingKind.Storage;
             bool hasIn = def.kind == BuildingKind.Workshop || def.kind == BuildingKind.Storage;
-            PlaceGhostMarker(ref _ghostArrow, ref _ghostArrowSr, hasOut, center, def, BuildDir, true);
-            PlaceGhostMarker(ref _ghostNotch, ref _ghostNotchSr, hasIn, center, def, Belt.Opposite(BuildDir), false);
+            PlaceGhostSide(_ghostOutPorts, hasOut, center, def, BuildDir, true);
+            PlaceGhostSide(_ghostInPorts, hasIn, center, def, Belt.Opposite(BuildDir), false);
         }
 
-        private void PlaceGhostMarker(ref GameObject go, ref SpriteRenderer sr, bool show,
-            Vector3 center, BuildingDefinition def, Belt.Dir side, bool isOutput)
+        // One marker per edge cell on `side`, positioned just outside that cell's face (mirrors
+        // Ports.PlacePorts). Reuses a pooled list, deactivating any surplus markers.
+        private void PlaceGhostSide(List<GameObject> pool, bool show, Vector3 center,
+            BuildingDefinition def, Belt.Dir side, bool isOutput)
         {
-            if (go == null)
+            int used = 0;
+            if (show && def != null)
             {
-                go = new GameObject(isOutput ? "GhostArrow" : "GhostNotch");
-                sr = go.AddComponent<SpriteRenderer>();
+                int w = def.FootW, h = def.FootH;
+                var s = Belt.Step(side);
+                float ax = center.x - (w - 1) * 0.5f, ay = center.y - (h - 1) * 0.5f; // bottom-left cell centre
+                for (int i = 0; i < w; i++)
+                    for (int j = 0; j < h; j++)
+                    {
+                        bool edge = side == Belt.Dir.E ? i == w - 1 : side == Belt.Dir.W ? i == 0
+                                  : side == Belt.Dir.N ? j == h - 1 : j == 0;
+                        if (!edge) continue;
+                        var go = GhostMarker(pool, used++, isOutput);
+                        go.transform.position = new Vector3(ax + i + s.x * 0.55f, ay + j + s.y * 0.55f, 0f);
+                        go.transform.rotation = isOutput ? Quaternion.Euler(0f, 0f, Belt.Angle(side)) : Quaternion.identity;
+                        go.transform.localScale = Vector3.one * (isOutput ? 0.5f : 0.4f);
+                    }
+            }
+            for (int k = used; k < pool.Count; k++) if (pool[k].activeSelf) pool[k].SetActive(false);
+        }
+
+        private GameObject GhostMarker(List<GameObject> pool, int index, bool isOutput)
+        {
+            while (pool.Count <= index)
+            {
+                var go = new GameObject(isOutput ? "GhostArrow" : "GhostNotch");
+                var sr = go.AddComponent<SpriteRenderer>();
                 sr.sprite = isOutput ? PlaceholderArt.Triangle() : PlaceholderArt.Square();
                 sr.color = isOutput ? new Color(0.25f, 0.95f, 0.35f, 0.95f) : new Color(0.35f, 0.70f, 1f, 0.95f);
                 sr.sortingOrder = 21;
+                pool.Add(go);
             }
-            if (!show) { if (go.activeSelf) go.SetActive(false); return; }
-            if (!go.activeSelf) go.SetActive(true);
-            var s = Belt.Step(side);
-            float ext = (s.x != 0 ? def.FootW : def.FootH) * 0.5f + 0.25f;
-            go.transform.position = center + new Vector3(s.x, s.y, 0f) * ext;
-            go.transform.rotation = isOutput ? Quaternion.Euler(0f, 0f, Belt.Angle(side)) : Quaternion.identity;
-            go.transform.localScale = Vector3.one * (isOutput ? 0.5f : 0.4f);
+            if (!pool[index].activeSelf) pool[index].SetActive(true);
+            return pool[index];
+        }
+
+        // Hide all ghost I/O markers (belt/bridge/pipe/route modes & on cancel).
+        private void HideGhostPorts()
+        {
+            foreach (var g in _ghostOutPorts) if (g != null && g.activeSelf) g.SetActive(false);
+            foreach (var g in _ghostInPorts) if (g != null && g.activeSelf) g.SetActive(false);
         }
 
         // True if ANY cell this footprint would cover is already taken.
@@ -307,8 +336,7 @@ namespace Caveman
         private void UpdateBeltPlacement(Mouse mouse, Keyboard kb)
         {
             if (_cam == null || mouse == null || _ghost == null) return;
-            if (_ghostArrow != null) _ghostArrow.SetActive(false); // belts have no I/O ports
-            if (_ghostNotch != null) _ghostNotch.SetActive(false);
+            HideGhostPorts(); // belts have no I/O ports
             var def = buildables[PendingIndex];
 
             if (kb.rKey.wasPressedThisFrame) BeltDir = Belt.RotateCW(BeltDir);
@@ -405,8 +433,7 @@ namespace Caveman
         private void UpdateBridgePlacement(Mouse mouse)
         {
             if (_cam == null || mouse == null || _ghost == null) return;
-            if (_ghostArrow != null) _ghostArrow.SetActive(false);
-            if (_ghostNotch != null) _ghostNotch.SetActive(false);
+            HideGhostPorts();
             var def = buildables[PendingIndex];
 
             Vector3 world = _cam.ScreenToWorldPoint(mouse.position.ReadValue());
@@ -440,8 +467,7 @@ namespace Caveman
         private void UpdatePipePlacement(Mouse mouse)
         {
             if (_cam == null || mouse == null || _ghost == null) return;
-            if (_ghostArrow != null) _ghostArrow.SetActive(false);
-            if (_ghostNotch != null) _ghostNotch.SetActive(false);
+            HideGhostPorts();
             var def = buildables[PendingIndex];
 
             Vector3 world = _cam.ScreenToWorldPoint(mouse.position.ReadValue());
@@ -486,8 +512,7 @@ namespace Caveman
         private void UpdateRoutePlacement(Mouse mouse)
         {
             if (_ghost != null) _ghost.SetActive(false);
-            if (_ghostArrow != null) _ghostArrow.SetActive(false);
-            if (_ghostNotch != null) _ghostNotch.SetActive(false);
+            HideGhostPorts();
             if (_cam == null || mouse == null) return;
 
             if (mouse.rightButton.wasPressedThisFrame) { _routeA = null; CancelPlacement(); return; }
@@ -520,8 +545,7 @@ namespace Caveman
             _dragging = false;
             _routeA = null;
             if (_ghost != null) _ghost.SetActive(false);
-            if (_ghostArrow != null) _ghostArrow.SetActive(false);
-            if (_ghostNotch != null) _ghostNotch.SetActive(false);
+            HideGhostPorts();
         }
 
         public bool CanAfford(BuildingDefinition def) => def != null && Economy.CanAfford(def.cost, Carried);

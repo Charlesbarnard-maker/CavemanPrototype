@@ -3,7 +3,24 @@
 A running record so progress/problems don't get lost. Newest first. Move items to
 **Fixed** when done. Maintained alongside the code — see DESIGN.md for the roadmap.
 
-## Belt / port / storage polish (2026-06-25 #3) — most recent
+## Warehouse fixes — auto-register, ghost ports, empty button (2026-06-25 #4) — most recent
+Three player-reported issues from the #3 belt/port test, all fixed:
+- **Configurable Warehouse now AUTO-REGISTERS its type** from the first item belted in
+  (`Belt.PushForward` + `HasForwardTarget`): an unset (`accepts == null`) configurable warehouse
+  adopts the delivered item's type and stores it, instead of the item stalling/vanishing at an
+  "unset" store. After that it only accepts that one type (unchanged). Non-configurable stores
+  (fixed `def.item`) are unaffected.
+- **Placement GHOST now shows per-cell ports** (`BuildController.PlaceGhostSide`/`GhostMarker`):
+  a 2×2 warehouse previews **2 output arrows + 2 input notches**, matching the built building
+  (`Ports.PlacePorts`). Was a single marker before. Belt I/O was already per-cell (WorldGrid
+  registers every footprint cell → both port cells work), so this was purely the ghost preview.
+- **Empty button** on a configurable warehouse's panel (`InventoryHud.EmptyStorage`): moves all
+  contents into the player's carried hands (unlimited, so no loss — carried+storages is the
+  "stored" pool) and clears the type, so you can re-purpose a full warehouse to a new resource.
+- **Open/next:** unchanged — per-cell biome FRICTION (forest slow build/move, hills mining-favoured)
+  is still the next planned gameplay step.
+
+## Belt / port / storage polish (2026-06-25 #3)
 - **Warehouses now have a belt OUTPUT** (belts pull from a storage's output side) — you can
   conveyor warehouse → sawmill. I/O audit confirmed all belt buildings symmetric: collector=out,
   workshop=in+out, storage=in+out, depot=both; power/yard/housing/bridge/pipe/pump have no belt I/O.

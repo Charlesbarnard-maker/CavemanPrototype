@@ -732,7 +732,11 @@ namespace Caveman
                     {
                         if (GUILayout.Button($"<size=12>Store: {acc} (change)</size>", _btn)) sb.CycleAccepts();
                     }
-                    else GUILayout.Label("<size=11><color=#888>empty it to change type</color></size>", _small);
+                    else
+                    {
+                        GUILayout.Label("<size=11><color=#888>empty it to change type</color></size>", _small);
+                        if (GUILayout.Button("<size=12>Empty (to hands)</size>", _btn)) EmptyStorage(sb);
+                    }
                 }
             }
             else if (dp != null)
@@ -779,6 +783,20 @@ namespace Caveman
             if (rem) { if (hq) Colony.Instance?.RemoveBuilder(); else builder.UnassignSelected(); }
             if (demo) builder.DemolishSelected();
             if (close) builder.Deselect();
+        }
+
+        // Empty a configurable warehouse so its type can be changed. Contents move into the
+        // player's carried hands (no loss — carried + storages is the "stored" pool), then the
+        // type is cleared so the next belted-in item (or the change button) re-sets it.
+        private void EmptyStorage(StorageBuilding sb)
+        {
+            if (sb == null || gatherer == null) return;
+            foreach (var kv in new List<KeyValuePair<ItemDefinition, int>>(sb.Store.Items))
+            {
+                int moved = gatherer.Inventory.Add(kv.Key, kv.Value); // carried is unlimited
+                if (moved > 0) sb.Store.RemoveUpTo(kv.Key, moved);     // remove only what transferred
+            }
+            if (sb.configurable && sb.Store.Total() == 0) sb.accepts = null; // ready to adopt a new type
         }
 
         // ---- Resource finder: arrows to the nearest Wood/Stone/Food/Water you haven't

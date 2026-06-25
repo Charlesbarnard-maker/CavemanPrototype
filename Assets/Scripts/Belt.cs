@@ -162,7 +162,7 @@ namespace Caveman
             // output). Geometrically that means the belt must travel in the building's output
             // direction (dir == OutputSide) to enter the input face.
             if (WorldGrid.Storages.TryGetValue(ahead, out var s) && s != null && dir == s.OutputSide
-                && (item == null || s.accepts == null || s.accepts == item)) return true;
+                && (item == null || s.accepts == item || (s.accepts == null && s.configurable))) return true;
             if (WorldGrid.Workshops.TryGetValue(ahead, out var w) && w != null && dir == w.OutputSide
                 && (item == null || w.WantsInput(item))) return true;
             if (WorldGrid.Depots.TryGetValue(ahead, out var dp) && dp != null
@@ -201,9 +201,13 @@ namespace Caveman
             }
 
             // No belt ahead — drop into a storage, but only on its INPUT side (dir == OutputSide).
-            if (WorldGrid.Storages.TryGetValue(ahead, out var s) && s != null && dir == s.OutputSide && s.accepts == item)
+            // A configurable warehouse with no type yet AUTO-REGISTERS the first item belted in
+            // (so goods aren't lost into an "unset" store) — it then only accepts that type.
+            if (WorldGrid.Storages.TryGetValue(ahead, out var s) && s != null && dir == s.OutputSide
+                && (s.accepts == item || (s.accepts == null && s.configurable)))
             {
                 if (s.def != null && s.Store.Total() >= s.def.capacity) return;
+                if (s.accepts == null) s.accepts = item; // adopt the first delivered item's type
                 s.Store.Add(item, 1); count--; if (count <= 0) item = null; return;
             }
 
