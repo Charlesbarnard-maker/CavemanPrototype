@@ -3,6 +3,37 @@
 A running record so progress/problems don't get lost. Newest first. Move items to
 **Fixed** when done. Maintained alongside the code — see DESIGN.md for the roadmap.
 
+## Refinement + critical-review pass (2026-06-25 #2)
+**Issues found (review of the prior pass):**
+1. **Discoverability / Iron soft-lock [worst]:** ore/forest/clay were placed in *randomly-located,
+   fogged* biomes → a player could follow a corridor and find nothing, or never find hills →
+   Iron blocks with no understandable cause ("world feels empty / I went the wrong way").
+2. **No expansion guidance:** the finder only pointed at home basics (wood/stone/food/water), never
+   at the expansion targets → "where do I go next?" unclear.
+3. **Artificial corridors:** straight rays read as generated, not natural.
+4. **Food scaling:** berries only at home (limited) + forest forage random → food could stall.
+
+**Changes made (+ why):**
+- **3 corridors now each lead to a GUARANTEED, distinct region** (`Region()` + `TerrainGrid.Paint`):
+  corridor 0 → plains **meat + clay** (~46m, first expansion), corridor 1 → **forest** with bulk
+  wood + forage (~72m, food/wood scale), corridor 2 → **hills** with stone + **ore** (~86m, Iron can
+  never soft-lock). Exploration is now intentional (follow a path → find something); broad biome
+  scatter still adds density elsewhere. Fixes #1 + #4.
+- **Finder = expansion guide:** from the Tribal age it also points to nearest **meat / clay / ore**
+  (drops each once you build its collector). Subtle, reuses the existing arrows. Fixes #2 →
+  "see the next step before you're blocked."
+- **Corridors meander + vary width** (`CarveCorridors` rewritten) → natural valleys, not rays. Fixes #3.
+
+**Tuning:** region distances 46/72/86; corridor length 95, width ~3 (+jitter); ore region capacity
+80 finite. **Pressure point (Task 5):** the existing wooden-belt (1.1s) vs conveyor (0.45s) gap is
+the throughput hook — left as-is (clear "want faster belts" without new complexity).
+
+**Remaining risks:** (a) regions sit on the corridor *heading* but corridors meander — verify the
+region is actually on/near the cleared path (bump corridor width or align if not). (b) Water Hole
+still needs a Water Barrel beside it (taught, but a missed step → thirst). (c) three fixed corridor
+headings could feel samey across playthroughs. **Next step:** per-biome build/move *friction*
+(forest slow, hills mining-only) so the regions *play* differently, not just contain different goods.
+
 ## Early-game vertical-slice pass (2026-06-25) — what changed & why
 Goal: make the first 5–10 min clear, and make expansion *forced by the systems*.
 - **Water → routes, not walls:** + **3 guaranteed dry corridors** carved out of spawn

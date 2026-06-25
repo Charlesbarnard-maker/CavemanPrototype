@@ -15,6 +15,7 @@ namespace Caveman
         public PlayerGatherer gatherer;
         public BuildController builder;
         public ItemDefinition woodItem, stoneItem, foodItem, waterItem;
+        public ItemDefinition meatItem, clayItem, oreItem; // expansion-target hints (shown from Tribal)
         public ItemDefinition monumentItem; // endgame win-goal tracker (10 blocks = win)
         public List<ItemDefinition> debugItems; // all resources, for the sandbox resource dump
         private float _speed = 1f;
@@ -794,8 +795,18 @@ namespace Caveman
         {
             if (gatherer == null) { _finderRect = default; return; }
             Vector2 p = gatherer.transform.position;
-            var keys = new (ItemDefinition item, string label)[]
+            var keys = new List<(ItemDefinition item, string label)>
             { (woodItem, "Wood"), (stoneItem, "Stone"), (foodItem, "Food"), (waterItem, "Water") };
+            // From the Tribal age, also point toward the expansion resources (meat/clay/ore) so
+            // the player SEES the next step before feeling blocked. Each drops once its collector
+            // is built (HasCollector). Subtle — reuses the existing arrows, no extra panels.
+            int age = Colony.Instance != null ? Colony.Instance.Age : 0;
+            if (age >= 1)
+            {
+                keys.Add((meatItem, "Meat"));
+                keys.Add((clayItem, "Clay"));
+                keys.Add((oreItem, "Ore"));
+            }
 
             var lines = new List<string>();
             foreach (var k in keys)

@@ -67,23 +67,41 @@ namespace Caveman
             _map[gy * _size + gx] = t;
         }
 
-        /// <summary>Clear `count` dry corridors (water→plains) radiating from spawn, so the basin
-        /// always has expansion paths out — never water-locked. Rays are offset off-axis.</summary>
+        /// <summary>Base heading of corridor `k` (shared so resource regions can sit at its end).</summary>
+        public static float CorridorAngle(int k, int count) => (k / (float)Mathf.Max(1, count)) * Mathf.PI * 2f + 0.45f;
+
+        /// <summary>Clear `count` dry corridors (water→plains) from spawn so the basin always has
+        /// expansion paths out — never water-locked. Corridors MEANDER and vary in width so they
+        /// read as natural valleys, not straight rays.</summary>
         public static void CarveCorridors(int count, float length, int halfWidth)
         {
             if (_map == null || count <= 0) return;
             for (int k = 0; k < count; k++)
             {
-                float ang = (k / (float)count) * Mathf.PI * 2f + 0.45f;
-                float dx = Mathf.Cos(ang), dy = Mathf.Sin(ang);
+                float baseAng = CorridorAngle(k, count);
+                float x = 0f, y = 0f;
                 for (float r = 0f; r <= length; r += 0.5f)
                 {
-                    int cx = Mathf.RoundToInt(dx * r), cy = Mathf.RoundToInt(dy * r);
-                    for (int ox = -halfWidth; ox <= halfWidth; ox++)
-                        for (int oy = -halfWidth; oy <= halfWidth; oy++)
+                    float a = baseAng + 0.45f * Mathf.Sin(r * 0.06f + k * 2f); // gentle wander
+                    x += Mathf.Cos(a) * 0.5f; y += Mathf.Sin(a) * 0.5f;
+                    int cx = Mathf.RoundToInt(x), cy = Mathf.RoundToInt(y);
+                    int hw = halfWidth + (Mathf.PerlinNoise(r * 0.1f, k * 5f) > 0.6f ? 1 : 0); // varied width
+                    for (int ox = -hw; ox <= hw; ox++)
+                        for (int oy = -hw; oy <= hw; oy++)
                             if (At(cx + ox, cy + oy) == Terrain.Water) Set(cx + ox, cy + oy, Terrain.Plains);
                 }
             }
+        }
+
+        /// <summary>Paint a disc of cells to a biome (used to guarantee a region at a corridor end).</summary>
+        public static void Paint(Vector3 center, float radius, Terrain biome)
+        {
+            if (_map == null) return;
+            int cx = Mathf.RoundToInt(center.x), cy = Mathf.RoundToInt(center.y);
+            int r = Mathf.CeilToInt(radius); float r2 = radius * radius;
+            for (int dy = -r; dy <= r; dy++)
+                for (int dx = -r; dx <= r; dx++)
+                    if (dx * dx + dy * dy <= r2) Set(cx + dx, cy + dy, biome);
         }
 
         /// <summary>Force a disc of water (a lake) — used to guarantee a water feature near spawn.</summary>

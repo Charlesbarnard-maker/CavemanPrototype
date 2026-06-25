@@ -276,7 +276,6 @@ namespace Caveman
             // World as a system: biome map with a clear starting basin. Water blocks building,
             // so geography forces routing/expansion decisions. Rendered after resource spawns.
             TerrainGrid.Generate(200, Random.value * 1000f, 22f); // big world (~400 across); open start basin
-            TerrainGrid.CarveCorridors(3, 75f, 1); // 3 guaranteed dry expansion paths out (no water-lock)
 
             // --- Player ---
             var player = MakeSprite("Player", new Color(0.92f, 0.82f, 0.25f), Vector2.zero, 0.7f, 10, PlaceholderArt.Circle());
@@ -340,6 +339,9 @@ namespace Caveman
             hud.stoneItem = stone;
             hud.foodItem = food;
             hud.waterItem = water;
+            hud.meatItem = meat;
+            hud.clayItem = clay;
+            hud.oreItem = ore;
             hud.monumentItem = monument;
             hud.debugItems = new List<ItemDefinition>
             { wood, stone, food, water, planks, cookedFood, meat, clay, charcoal, bricks, grain, flour, bread, ore, metal, tools, monument, fiber, cloth, clothes, pot, gems, jewelry, stoneBlock };
@@ -402,9 +404,34 @@ namespace Caveman
             SpawnPatches("Bush", food, new Color(0.45f, 0.55f, 0.25f), 9,
                 new Vector2(0f, -24f), new Vector2(20f, 10f), new Vector2(0.7f, 1.0f), PlaceholderArt.Circle(), 30, baseClear);
             // STARTER BASIN holds only the BASICS (wood/stone/food above + the carved water pond
-            // below). Everything else — meat, clay, cotton, ore, gems — lives OUT in its biome
-            // (scattered below), so the player must EXPAND for them. Ore (Iron) and gems are only
-            // in distant hills: a critical resource deliberately NOT in the starting area.
+            // below). Everything else lives OUT in its biome, so the player must EXPAND for it.
+
+            // --- GUARANTEED EXPANSION REGIONS: 3 meandering corridors out of spawn, each leading
+            //     to a distinct, reachable region — so exploration is intentional (follow a path →
+            //     find something) and Iron can NEVER soft-lock for want of findable ore. ---
+            TerrainGrid.CarveCorridors(3, 95f, 1);
+            void Region(int k, float dist, Terrain biome, System.Action<Vector2> place)
+            {
+                float a = TerrainGrid.CorridorAngle(k, 3);
+                var center = new Vector2(Mathf.Cos(a) * dist, Mathf.Sin(a) * dist);
+                TerrainGrid.Paint(new Vector3(center.x, center.y, 0f), 16f, biome);
+                place(center);
+            }
+            // Corridor 0 — nearest: a PLAINS region with the first-expansion goods (meat + clay).
+            Region(0, 46f, Terrain.Plains, c => {
+                SpawnPatches("Herd", meat, new Color(0.66f, 0.34f, 0.34f), 6, c, new Vector2(9f, 9f), new Vector2(0.8f, 1.2f), PlaceholderArt.Circle(), 30, 0f);
+                SpawnPatches("Clay", clay, new Color(0.68f, 0.46f, 0.36f), 6, c, new Vector2(9f, 9f), new Vector2(1.0f, 1.5f), PlaceholderArt.Hexagon(), 40, 0f);
+            });
+            // Corridor 1 — a FOREST region: bulk lumber + forage so wood/food scale by expanding.
+            Region(1, 72f, Terrain.Forest, c => {
+                SpawnPatches("Tree", wood, new Color(0.27f, 0.55f, 0.22f), 12, c, new Vector2(12f, 12f), new Vector2(1.0f, 1.6f), PlaceholderArt.Triangle(), 30, 0f);
+                SpawnPatches("Bush", food, new Color(0.45f, 0.55f, 0.25f), 7, c, new Vector2(12f, 12f), new Vector2(0.7f, 1.0f), PlaceholderArt.Circle(), 30, 0f);
+            });
+            // Corridor 2 — a HILLS region: stone + the guaranteed reachable ORE (Iron unlock).
+            Region(2, 86f, Terrain.Hills, c => {
+                SpawnPatches("Rock", stone, new Color(0.55f, 0.55f, 0.6f), 8, c, new Vector2(12f, 12f), new Vector2(1.0f, 1.6f), PlaceholderArt.Hexagon(), 30, 0f);
+                SpawnPatches("Ore Vein", ore, new Color(0.62f, 0.58f, 0.42f), 6, c, new Vector2(12f, 12f), new Vector2(1.1f, 1.6f), PlaceholderArt.Hexagon(), 80, 0f, 0);
+            });
 
             // --- Welcome / starter guidance (fades after a few seconds) ---
             Toast.Show("<color=#ffd24d>Welcome, chief!</color>  Click trees & rocks to gather by hand.");
