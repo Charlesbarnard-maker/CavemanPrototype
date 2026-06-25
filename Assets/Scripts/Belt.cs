@@ -246,6 +246,15 @@ namespace Caveman
                     if (w.Buffer.RemoveUpTo(w.output, 1) > 0) { item = w.output; count++; _inDir = (Dir)di; _timer = 0f; return; }
                 }
 
+                // Storages have an OUTPUT side too — a belt on it pulls the stored item, so you
+                // can belt FROM a warehouse to a workshop (e.g. warehouse → sawmill).
+                if (WorldGrid.Storages.TryGetValue(c, out var st) && st != null && st.accepts != null && !st.accepts.isLiquid
+                    && st.OutputSide == Opposite((Dir)di)
+                    && (item == null || item == st.accepts) && st.Store.Count(st.accepts) > 0)
+                {
+                    if (st.Store.RemoveUpTo(st.accepts, 1) > 0) { item = st.accepts; count++; _inDir = (Dir)di; _timer = 0f; return; }
+                }
+
                 if (WorldGrid.Depots.TryGetValue(c, out var dp) && dp != null && dp.item != null && !dp.item.isLiquid
                     && (item == null || item == dp.item) && dp.store.Count(dp.item) > 0)
                 {

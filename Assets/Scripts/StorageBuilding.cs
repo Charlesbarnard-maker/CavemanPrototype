@@ -14,8 +14,8 @@ namespace Caveman
         public ItemDefinition accepts;
         public bool configurable;
         public Inventory Store { get; private set; }
-        // Orientation: belts deliver only on the INPUT side (opposite OutputSide). Storage
-        // has no belt-output, so OutputSide just sets which side is the input face.
+        // Orientation: belts DELIVER on the input side (opposite OutputSide) and PULL from the
+        // OutputSide — so a warehouse is a pass-through node (e.g. warehouse → belt → sawmill).
         public Belt.Dir OutputSide = Belt.Dir.E;
 
         /// <summary>Choose which resource this (configurable) warehouse holds — only while empty.</summary>
@@ -64,7 +64,8 @@ namespace Caveman
             sb.OutputSide = outputSide;
             sb._cells = Footprint.Cells(go.transform.position, def.FootW, def.FootH);
             foreach (var c in sb._cells) WorldGrid.Storages[c] = sb;
-            Ports.MakeInputNotch(go.transform, Belt.Opposite(outputSide)); // delivery (input) side
+            Ports.MakeInputNotch(go.transform, Belt.Opposite(outputSide)); // belts deliver on this side
+            Ports.MakeOutputArrow(go.transform, outputSide);                // belts pull from this side
             return sb;
         }
 

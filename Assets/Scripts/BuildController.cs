@@ -244,7 +244,8 @@ namespace Caveman
         // cyan input notch (workshops/storages) on the opposite side. Hidden otherwise.
         private void UpdateGhostPorts(Vector3 center, BuildingDefinition def)
         {
-            bool hasOut = def.kind == BuildingKind.Collector || def.kind == BuildingKind.Workshop;
+            bool hasOut = def.kind == BuildingKind.Collector || def.kind == BuildingKind.Workshop
+                          || def.kind == BuildingKind.Storage;
             bool hasIn = def.kind == BuildingKind.Workshop || def.kind == BuildingKind.Storage;
             PlaceGhostMarker(ref _ghostArrow, ref _ghostArrowSr, hasOut, center, def, BuildDir, true);
             PlaceGhostMarker(ref _ghostNotch, ref _ghostNotchSr, hasIn, center, def, Belt.Opposite(BuildDir), false);
