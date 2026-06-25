@@ -276,6 +276,7 @@ namespace Caveman
             // World as a system: biome map with a clear starting basin. Water blocks building,
             // so geography forces routing/expansion decisions. Rendered after resource spawns.
             TerrainGrid.Generate(200, Random.value * 1000f, 22f); // big world (~400 across); open start basin
+            TerrainGrid.CarveCorridors(3, 75f, 1); // 3 guaranteed dry expansion paths out (no water-lock)
 
             // --- Player ---
             var player = MakeSprite("Player", new Color(0.92f, 0.82f, 0.25f), Vector2.zero, 0.7f, 10, PlaceholderArt.Circle());
@@ -400,30 +401,15 @@ namespace Caveman
                 new Vector2(-24f, 4f), new Vector2(18f, 18f), new Vector2(1.0f, 1.5f), PlaceholderArt.Hexagon(), 30, baseClear);
             SpawnPatches("Bush", food, new Color(0.45f, 0.55f, 0.25f), 9,
                 new Vector2(0f, -24f), new Vector2(20f, 10f), new Vector2(0.7f, 1.0f), PlaceholderArt.Circle(), 30, baseClear);
-            // Water is now real TERRAIN (rivers/lakes), not abstract nodes — see CarveWater
-            // below + the river generation. Build a Water Hole next to water to draw from it.
-            // Animal herds (meat — Tribal age) and clay deposits (Bronze age), spread out.
-            SpawnPatches("Herd", meat, new Color(0.66f, 0.34f, 0.34f), 8,
-                new Vector2(26f, -18f), new Vector2(14f, 12f), new Vector2(0.8f, 1.2f), PlaceholderArt.Circle(), 30, baseClear);
-            SpawnPatches("Clay", clay, new Color(0.68f, 0.46f, 0.36f), 9,
-                new Vector2(-26f, -18f), new Vector2(14f, 12f), new Vector2(1.0f, 1.4f), PlaceholderArt.Hexagon(), 40, baseClear);
-            // Cotton fields (fiber for the textile chain) — mid-distance, north-west.
-            SpawnPatches("Cotton", fiber, new Color(0.80f, 0.84f, 0.66f), 8,
-                new Vector2(-8f, 26f), new Vector2(16f, 8f), new Vector2(0.7f, 1.1f), PlaceholderArt.Circle(), 36, baseClear);
-            // Ore veins — rare, far from base (must explore to find them), high yield.
-            SpawnPatches("Ore Vein", ore, new Color(0.62f, 0.58f, 0.42f), 4,
-                new Vector2(46f, 34f), new Vector2(12f, 12f), new Vector2(1.1f, 1.5f), PlaceholderArt.Hexagon(), 60, 26f, 0);
-            SpawnPatches("Ore Vein", ore, new Color(0.62f, 0.58f, 0.42f), 4,
-                new Vector2(-46f, -34f), new Vector2(12f, 12f), new Vector2(1.1f, 1.5f), PlaceholderArt.Hexagon(), 60, 26f, 0);
+            // STARTER BASIN holds only the BASICS (wood/stone/food above + the carved water pond
+            // below). Everything else — meat, clay, cotton, ore, gems — lives OUT in its biome
+            // (scattered below), so the player must EXPAND for them. Ore (Iron) and gems are only
+            // in distant hills: a critical resource deliberately NOT in the starting area.
 
             // --- Welcome / starter guidance (fades after a few seconds) ---
             Toast.Show("<color=#ffd24d>Welcome, chief!</color>  Click trees & rocks to gather by hand.");
             Toast.Show("<size=15>Goal: grow from caveman to a self-running civilisation — build the Monument to win.</size>");
             Toast.Show("<size=14>Press <b>H</b> for help · <b>G</b> for the Guide · <b>B</b> to build · follow the Objectives (top-right).</size>");
-
-            // Gem deposits — rarest, farthest (a third exploration direction), finite.
-            SpawnPatches("Gem Deposit", gems, new Color(0.50f, 0.82f, 0.76f), 3,
-                new Vector2(48f, -42f), new Vector2(10f, 10f), new Vector2(1.0f, 1.4f), PlaceholderArt.Hexagon(), 45, 32f, 0);
 
             // --- BIOME FRONTIER: resources live in their biome, so each region means something
             //     and expansion is a planning problem (find the region → route it home). FORESTS
@@ -433,16 +419,20 @@ namespace Caveman
                 Terrain.Forest, 70, 50f, 30, 1, new Vector2(1.0f, 1.6f));
             ScatterInBiome("Cotton", fiber, new Color(0.80f, 0.84f, 0.66f), PlaceholderArt.Circle(),
                 Terrain.Forest, 14, 50f, 36, 1, new Vector2(0.7f, 1.1f));
+            // Forage (berries) in forests too, so FOOD can scale by expanding (start bushes are limited).
+            ScatterInBiome("Bush", food, new Color(0.45f, 0.55f, 0.25f), PlaceholderArt.Circle(),
+                Terrain.Forest, 22, 30f, 30, 1, new Vector2(0.7f, 1.0f));
             ScatterInBiome("Rock", stone, new Color(0.55f, 0.55f, 0.6f), PlaceholderArt.Hexagon(),
                 Terrain.Hills, 55, 50f, 30, 1, new Vector2(1.0f, 1.6f));
             ScatterInBiome("Ore Vein", ore, new Color(0.62f, 0.58f, 0.42f), PlaceholderArt.Hexagon(),
                 Terrain.Hills, 28, 55f, 80, 0, new Vector2(1.1f, 1.6f)); // finite
             ScatterInBiome("Gem Deposit", gems, new Color(0.50f, 0.82f, 0.76f), PlaceholderArt.Hexagon(),
                 Terrain.Hills, 9, 90f, 60, 0, new Vector2(1.0f, 1.5f)); // finite, far
+            // Meat + clay are the FIRST expansion target — just outside the basin (minClear 26).
             ScatterInBiome("Herd", meat, new Color(0.66f, 0.34f, 0.34f), PlaceholderArt.Circle(),
-                Terrain.Plains, 14, 60f, 30, 1, new Vector2(0.8f, 1.2f));
+                Terrain.Plains, 18, 26f, 30, 1, new Vector2(0.8f, 1.2f));
             ScatterInBiome("Clay", clay, new Color(0.68f, 0.46f, 0.36f), PlaceholderArt.Hexagon(),
-                Terrain.Plains, 12, 60f, 40, 1, new Vector2(1.0f, 1.5f));
+                Terrain.Plains, 16, 26f, 40, 1, new Vector2(1.0f, 1.5f));
 
             // Guarantee a reachable water feature just outside the starting basin so you can
             // build a Water Hole early (carved last so resource ClearAround can't erase it).

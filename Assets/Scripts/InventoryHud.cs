@@ -31,7 +31,7 @@ namespace Caveman
         private bool _showBuild;
         private readonly List<int> _recent = new(); // recently-placed buildable indices
         private readonly HashSet<int> _pinned = new(); // pinned (favourite) buildable indices
-        private string _activeCat = "Gathering"; // build-menu accordion: only this category is open
+        private string _activeCat = "Production"; // build-menu accordion: only this group is open
         private bool _showMinimap = true;
         private bool _showGuide;
         private Vector2 _guideScroll;
@@ -47,21 +47,15 @@ namespace Caveman
         private GUIStyle _toast;
         private int _lastAge = -1;
 
-        private static readonly (BuildingKind kind, string label)[] Cats =
+        // Meta-groups keep the menu to a handful of headers (not one per building kind).
+        private static readonly (string label, BuildingKind[] kinds)[] Cats =
         {
-            (BuildingKind.Collector, "Gathering"),
-            (BuildingKind.Workshop, "Workshops"),
-            (BuildingKind.Belt, "Belts"),
-            (BuildingKind.Bridge, "Bridges"),
-            (BuildingKind.Pump, "Liquids"),
-            (BuildingKind.Pipe, "Pipes"),
-            (BuildingKind.Depot, "Depots"),
-            (BuildingKind.Route, "Routes"),
-            (BuildingKind.Power, "Power"),
-            (BuildingKind.Build, "Construction"),
-            (BuildingKind.Storage, "Storage"),
-            (BuildingKind.Housing, "Housing"),
+            ("Production", new[] { BuildingKind.Collector, BuildingKind.Workshop, BuildingKind.Power }),
+            ("Logistics", new[] { BuildingKind.Belt, BuildingKind.Bridge, BuildingKind.Pipe, BuildingKind.Pump, BuildingKind.Depot, BuildingKind.Route }),
+            ("Infrastructure", new[] { BuildingKind.Build, BuildingKind.Storage }),
+            ("Settlement", new[] { BuildingKind.Housing }),
         };
+        private static bool InGroup(BuildingKind[] kinds, BuildingKind k) => System.Array.IndexOf(kinds, k) >= 0;
 
         void Update()
         {
@@ -575,7 +569,7 @@ namespace Caveman
                 for (int i = 0; i < builder.buildables.Count; i++)
                 {
                     var d = builder.buildables[i];
-                    if (d != null && d.kind == cat.kind && d.unlockAge <= curAge + 1) { hasAny = true; break; }
+                    if (d != null && InGroup(cat.kinds, d.kind) && d.unlockAge <= curAge + 1) { hasAny = true; break; }
                 }
                 if (!hasAny) continue;
 
@@ -587,7 +581,7 @@ namespace Caveman
                 for (int i = 0; i < builder.buildables.Count; i++)
                 {
                     var def = builder.buildables[i];
-                    if (def == null || def.kind != cat.kind) continue;
+                    if (def == null || !InGroup(cat.kinds, def.kind)) continue;
                     if (def.unlockAge > curAge + 1) continue; // hide far-future buildings
                     Entry(i);
                 }

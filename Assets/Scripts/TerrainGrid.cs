@@ -67,6 +67,25 @@ namespace Caveman
             _map[gy * _size + gx] = t;
         }
 
+        /// <summary>Clear `count` dry corridors (water→plains) radiating from spawn, so the basin
+        /// always has expansion paths out — never water-locked. Rays are offset off-axis.</summary>
+        public static void CarveCorridors(int count, float length, int halfWidth)
+        {
+            if (_map == null || count <= 0) return;
+            for (int k = 0; k < count; k++)
+            {
+                float ang = (k / (float)count) * Mathf.PI * 2f + 0.45f;
+                float dx = Mathf.Cos(ang), dy = Mathf.Sin(ang);
+                for (float r = 0f; r <= length; r += 0.5f)
+                {
+                    int cx = Mathf.RoundToInt(dx * r), cy = Mathf.RoundToInt(dy * r);
+                    for (int ox = -halfWidth; ox <= halfWidth; ox++)
+                        for (int oy = -halfWidth; oy <= halfWidth; oy++)
+                            if (At(cx + ox, cy + oy) == Terrain.Water) Set(cx + ox, cy + oy, Terrain.Plains);
+                }
+            }
+        }
+
         /// <summary>Force a disc of water (a lake) — used to guarantee a water feature near spawn.</summary>
         public static void CarveWater(Vector3 center, float radius)
         {

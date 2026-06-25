@@ -3,6 +3,29 @@
 A running record so progress/problems don't get lost. Newest first. Move items to
 **Fixed** when done. Maintained alongside the code — see DESIGN.md for the roadmap.
 
+## Early-game vertical-slice pass (2026-06-25) — what changed & why
+Goal: make the first 5–10 min clear, and make expansion *forced by the systems*.
+- **Water → routes, not walls:** + **3 guaranteed dry corridors** carved out of spawn
+  (`TerrainGrid.CarveCorridors`) so the basin is never water-locked; basin widened to 22; lakes
+  rare + rivers thin + ocean rim (from prior pass). *Why:* navigation friction was too high.
+- **Starter basin = BASICS only** (wood / stone / food / water). Removed the near meat/clay/cotton
+  and the near ore/gem clusters. *Why:* a critical resource must NOT be at home → forces expansion.
+- **Resource arc by distance:** basics at home → **meat + clay just outside** (plains scatter,
+  minClear 26 = first expansion) → **forests** (lumber, fibre, **berries so food scales**) →
+  **hills** (stone, **ore = Iron**, gems) far out. Ore/gems are hills-only: the critical pull.
+- **Expansion pressure (soft limit):** few starter patches + limited regen vs growing demand +
+  "stored, not summoned" → you outgrow home and must push out. Not told to expand; *made* to.
+- **UI:** build menu consolidated to **4 meta-groups** (Production / Logistics / Infrastructure /
+  Settlement) instead of 11 per-kind headers + pinned/dim-obsolete/delete-under-cursor (prior pass).
+- **Self-review (can't run Unity — reasoned):** likely-good early flow (hand-gather → Forager+belt+
+  Granary, Water Hole+Barrel; 90 buffers cover setup). **Watchpoints:** (a) hills can be far/sparse →
+  ore hunt may be long; if so, raise hills frequency (`e>0.70`) or lower ore minClear. (b) meat/clay
+  are random-direction just-outside — corridors help but verify they're findable. (c) confirm
+  corridors don't read as ugly straight lines. **Not added** (per brief): liquids/pipes already
+  separate (system prep done); no new transport this pass.
+- **Next logical steps:** per-biome build/move *friction* (forest slow, hills mining-only) so biomes
+  *play* differently; then multi-stop routes/stations for mid-game route-thinking.
+
 ## Latest state + top tuning watchpoints (2026-06-24) — read first
 - **"Stored, not summoned" is LIVE** (`Economy.StoredOnly`, F9 to toggle off). Usable pool =
   carried + storages only. **Watch early-game balance:** solids must be belted/hand-carried to
