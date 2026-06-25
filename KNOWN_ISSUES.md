@@ -3,7 +3,37 @@
 A running record so progress/problems don't get lost. Newest first. Move items to
 **Fixed** when done. Maintained alongside the code — see DESIGN.md for the roadmap.
 
-## Warehouse fixes — auto-register, ghost ports, empty button (2026-06-25 #4) — most recent
+## System clarity + resource distribution pass (2026-06-25 #5) — most recent
+A clarity/balance/readability pass (NOT a feature add). Goal: the player can *diagnose* problems
+and reason about throughput. See the new **SYSTEM RATIOS** section in GAME_DESIGN.md.
+- **Resource distribution → CLUSTERS.** Lone scattered nodes replaced by natural groves/outcrops
+  (`SpawnClusters` / `SpawnClustersInBiome` / `SpawnCluster` in GameBootstrap, replacing
+  `SpawnPatches`/`ScatterInBiome`). Starter basin = small clusters (3–5, bootstrap only); biome
+  regions = dense clusters (forest lumber 5–9, hills stone/ore 4–8); plains = sparse but mixed
+  (3–4). Node *totals* kept ≈ the same — only the spatial shape changed. Resources now read as
+  part of the world, and a collector on a cluster has many nodes to chew before it must rebind.
+- **Canonical throughput ratios defined + tuned to clean numbers.** The base unit = **1 lane =
+  60/min.** Wooden belt 1.1→**1.0s (60/min)**; conveyor 0.45→**0.5s (120/min)**; basic collectors
+  normalised to **2.0s (~60/min)**; **Sawmill 2.5→2.0s** so 1 Wood Hut → 1 belt → 1 Sawmill is an
+  EXACT 60/min match (the flagship "1 gatherer → 1 belt → 1 machine" lesson). Distant/finite
+  collectors (Mine, Gem Mine 3.5→**2.5s**) and advanced recipes stay deliberately slower.
+- **Bottleneck VISIBILITY (no new UI):**
+  - **Belts** now have 3 states: **red** = dead end, **yellow** = backed up (downstream full),
+    base brown = flowing/empty (empty = upstream/supply issue). (Was red-or-base only.)
+  - **Resource nodes** fade toward a dull grey-brown as they deplete (`ResourceNode.ApplyTint`),
+    so an over-harvested patch reads as "tapped out" — not just smaller.
+  - **Machine panel** gains a `Needs X/min · 1 belt lane = 60/min` line (`WorkshopBuilding.
+    InputDemandText`) so supply vs demand is a direct numeric comparison. (Machine status dots
+    green/yellow/red/grey + pulse already existed.)
+  - Wooden/Conveyor belt + Sawmill tooltips now teach the actual ratio numbers in-context.
+- **Open / watch (needs the playtest to confirm):** (a) cluster overlap — nodes within a cluster
+  can visually overlap at tight radii; bump `clusterRadius` if it looks mushy. (b) Verify the
+  flagship chain actually saturates at 1 worker and *visibly* starves at 2 (the core loop). (c)
+  Collector commute still lowers real rate below 60/min if the hut isn't placed on the cluster —
+  intended ("build close"), but watch it doesn't feel broken. (d) processor baseline is only
+  enforced early; mid/late processTimes left as-is (didn't blind-rebalance the whole economy).
+
+## Warehouse fixes — auto-register, ghost ports, empty button (2026-06-25 #4)
 Three player-reported issues from the #3 belt/port test, all fixed:
 - **Configurable Warehouse now AUTO-REGISTERS its type** from the first item belted in
   (`Belt.PushForward` + `HasForwardTarget`): an unset (`accepts == null`) configurable warehouse

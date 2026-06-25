@@ -118,6 +118,23 @@ namespace Caveman
             return missing.Count > 0 ? string.Join(", ", missing) : "";
         }
 
+        /// <summary>Per-input consumption at full speed (current workers, min 1) in items/min, so
+        /// the player can size belts/collectors against the 60/min lane. Theoretical — ignores
+        /// brownouts/productivity. e.g. a 1-worker Sawmill (wood 2, 2.0s) → "60 Wood/min".</summary>
+        public string InputDemandText()
+        {
+            if (inputs == null || inputs.Count == 0 || processTime <= 0f) return "";
+            int workers = Mathf.Max(1, AssignedWorkers);
+            var parts = new List<string>();
+            foreach (var c in inputs)
+            {
+                if (c == null || c.item == null) continue;
+                float perMin = c.amount * (60f / processTime) * workers;
+                parts.Add($"{perMin:0} {c.item.displayName}/min");
+            }
+            return parts.Count > 0 ? string.Join(", ", parts) : "";
+        }
+
         /// <summary>Is this item one of the recipe inputs (so a belt may deliver it here)?</summary>
         public bool WantsInput(ItemDefinition i)
         {

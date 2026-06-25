@@ -677,6 +677,9 @@ namespace Caveman
             {
                 GUILayout.Label($"<size=15>{RecipeText(wb)}</size>", _small);
                 GUILayout.Label($"<size=11><color=#bbb>Belt inputs: {InStockText(wb)}   ·   Output: {wb.RatePerMin:0.#}/min</color></size>", _small);
+                string demand = wb.InputDemandText();
+                if (!string.IsNullOrEmpty(demand))
+                    GUILayout.Label($"<size=11><color=#9cf>Needs {demand}  ·  1 belt lane = 60/min</color></size>", _small);
                 string miss = wb.MissingText();
                 if (!string.IsNullOrEmpty(miss))
                     GUILayout.Label($"<size=12><color=#f66>⚠ Waiting for: {miss}</color>  <size=10>(deliver via belt or adjacent storage)</size></size>", _small);

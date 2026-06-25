@@ -29,6 +29,7 @@ namespace Caveman
         private Vector3 _baseScale;
         private Color _baseColor;
         private SpriteRenderer _sr;
+        private bool _highlighted;
 
         private const float ShakeDur = 0.3f;
 
@@ -100,13 +101,26 @@ namespace Caveman
         {
             float f = capacity > 0 ? (float)_amount / capacity : 0f;
             transform.localScale = _baseScale * Mathf.Lerp(0.35f, 1f, f);
+            ApplyTint(f);
+        }
+
+        // Fade a depleting patch toward a dull grey-brown so an over-harvested node visibly reads
+        // as "nearly tapped out" (slow/failing production) — not just smaller. Skipped while the
+        // patch is highlighted (placement targeting), which owns the colour then.
+        private void ApplyTint(float f)
+        {
+            if (_sr == null || _highlighted) return;
+            Color spent = Color.Lerp(_baseColor, new Color(0.32f, 0.30f, 0.28f), 0.65f); // washed-out / exhausted
+            _sr.color = Color.Lerp(spent, _baseColor, Mathf.Clamp01(0.25f + 0.75f * f));
         }
 
         /// <summary>Brighten the patch when the player can target it.</summary>
         public void SetHighlighted(bool on)
         {
             if (_sr == null) return;
-            _sr.color = on ? Color.Lerp(_baseColor, Color.white, 0.45f) : _baseColor;
+            _highlighted = on;
+            if (on) _sr.color = Color.Lerp(_baseColor, Color.white, 0.45f);
+            else ApplyTint(capacity > 0 ? (float)_amount / capacity : 0f); // restore depletion shade
         }
     }
 }

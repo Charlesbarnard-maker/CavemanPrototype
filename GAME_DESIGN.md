@@ -13,6 +13,28 @@ Status tags: ✅ in game · 🔶 partial · 📝 designed/proposed.
 
 ---
 
+# SYSTEM RATIOS (canonical v1 — the numbers must have logic)
+
+Every throughput number hangs off **one base unit** so the player can reason, not guess:
+
+> **The lane = 60 items/min (1/sec).** Everything is a clean multiple of it.
+
+| System | Rate | In lanes | Notes |
+|---|---|---|---|
+| **Wooden Belt** | **60/min** (interval 1.0s) | **1 lane** | the reference; one item per second |
+| **Conveyor Belt** | **120/min** (interval 0.5s) | **2 lanes** | the clean ×2 upgrade |
+| **Collector** (1 worker, node adjacent) | **~60/min** (interval 2.0s, carry 3) | fills **1 lane** | commute lowers it → place ON the cluster |
+| **Processor** (1 worker) | **1 craft / 2.0s = 30 crafts/min** | — | a 2-input recipe consumes **60/min = 1 lane** |
+
+**The rule the player learns:** **1 gatherer → 1 belt → 1 machine.**
+Flagship chain, exact: **1 Wood Hut (60 wood/min) → 1 wooden belt (60/min) → 1 Sawmill (eats 60 wood/min at 1 worker, makes 30 planks/min).** Add a 2nd Sawmill worker → it now wants 120/min → the single hut/belt starves → the player *sees* the bottleneck and adds a 2nd hut or a conveyor. That is the core loop made legible.
+
+- **Workers scale linearly:** N workers = N× the rate (so a 2-worker machine needs 2 lanes in).
+- **Deliberate exceptions** (slower = harder, by design, not by accident): distant/finite collectors (Mine, Gem Mine) at 2.5s; advanced recipes (Smelter/Toolmaker/Monument) at 3.5–6.0s. Everything *early* is on the clean baseline.
+- **Where to read it live:** a machine's panel shows `Needs X/min` per input next to `1 belt lane = 60/min`, and `Output: Y/min`. Compare the two numbers to size your supply.
+
+---
+
 # PHASE 1 — SYSTEM AUDIT (what's actually wrong)
 
 Honest findings from the real codebase, not generic ones.

@@ -82,7 +82,7 @@ namespace Caveman
             // --- Buildings ---
             var woodHut = MakeCollector("Wood Hut", wood, 1, 2.0f, 2, 12, new Color(0.80f, 0.52f, 0.25f),
                 new ItemAmount(wood, 5), new ItemAmount(stone, 3));
-            var stonePit = MakeCollector("Stone Pit", stone, 1, 2.5f, 2, 12, new Color(0.45f, 0.52f, 0.62f),
+            var stonePit = MakeCollector("Stone Pit", stone, 1, 2.0f, 2, 12, new Color(0.45f, 0.52f, 0.62f),
                 new ItemAmount(wood, 5), new ItemAmount(stone, 5));
             var foragerHut = MakeCollector("Forager Hut", food, 1, 2.0f, 2, 12, new Color(0.78f, 0.40f, 0.40f),
                 new ItemAmount(wood, 4));
@@ -117,7 +117,7 @@ namespace Caveman
             booster.color = new Color(0.45f, 0.62f, 0.72f);
             booster.cost = new List<ItemAmount> { new ItemAmount(planks, 3), new ItemAmount(stone, 3) };
             booster.description = "Re-pressurises a pipe network next to it, extending how far water reaches. No water source needed — place it partway along a long pipe run so distant consumers stop starving. Chain several for very long networks.";
-            var sawmill = MakeWorkshop("Sawmill", planks, 1, 2.5f, 2, 12, new Color(0.66f, 0.50f, 0.30f),
+            var sawmill = MakeWorkshop("Sawmill", planks, 1, 2.0f, 2, 12, new Color(0.66f, 0.50f, 0.30f),
                 new List<ItemAmount> { new ItemAmount(wood, 2) },
                 new ItemAmount(wood, 6), new ItemAmount(stone, 4));
             // Campfire: needs Wood as fuel and Water to cook, plus the raw Food.
@@ -159,9 +159,9 @@ namespace Caveman
                 new ItemAmount(metal, 10), new ItemAmount(tools, 4));
 
             // --- Age 1: Tribal ---
-            var hunter = MakeCollector("Hunter's Hut", meat, 1, 2.5f, 2, 12, new Color(0.66f, 0.34f, 0.34f),
+            var hunter = MakeCollector("Hunter's Hut", meat, 1, 2.0f, 2, 12, new Color(0.66f, 0.34f, 0.34f),
                 new ItemAmount(wood, 6)); hunter.unlockAge = 1;
-            var clayPit = MakeCollector("Clay Pit", clay, 1, 2.5f, 2, 12, new Color(0.68f, 0.46f, 0.36f),
+            var clayPit = MakeCollector("Clay Pit", clay, 1, 2.0f, 2, 12, new Color(0.68f, 0.46f, 0.36f),
                 new ItemAmount(wood, 5)); clayPit.unlockAge = 1;
             var charcoalBurner = MakeWorkshop("Charcoal Burner", charcoal, 1, 3.0f, 2, 12, new Color(0.30f, 0.30f, 0.33f),
                 new List<ItemAmount> { new ItemAmount(wood, 2) },
@@ -196,18 +196,20 @@ namespace Caveman
                 new ItemAmount(stoneBlock, 6), new ItemAmount(planks, 4)); stoneHouse.unlockAge = 2;
             var woodBelt = ScriptableObject.CreateInstance<BuildingDefinition>();
             woodBelt.displayName = "Wooden Belt"; woodBelt.kind = BuildingKind.Belt; woodBelt.unlockAge = 0;
-            woodBelt.interval = 1.1f; // slow — the early tier
+            woodBelt.interval = 1.0f; // 60 items/min — exactly one collector's output (the baseline lane)
             woodBelt.color = new Color(0.60f, 0.50f, 0.35f);
             woodBelt.cost = new List<ItemAmount> { new ItemAmount(wood, 1) };
+            woodBelt.description = "Carries items along its arrow at 60/min — exactly one collector's output (one Wood Hut fills one belt). Drag to lay a line; R rotates. Belt colour shows trouble: RED = dead end, YELLOW = backed up (downstream full).";
             var fastBelt = ScriptableObject.CreateInstance<BuildingDefinition>();
             fastBelt.displayName = "Conveyor Belt"; fastBelt.kind = BuildingKind.Belt; fastBelt.unlockAge = 2;
-            fastBelt.interval = 0.45f; // fast — the upgrade
+            fastBelt.interval = 0.5f; // 120 items/min — exactly 2× the wooden lane (the clean upgrade)
             fastBelt.color = new Color(0.72f, 0.63f, 0.40f);
             fastBelt.cost = new List<ItemAmount> { new ItemAmount(planks, 1) };
+            fastBelt.description = "The belt upgrade: 120/min — 2× the wooden lane. One conveyor carries two collectors' worth, or feeds a 2-worker machine on a single line.";
 
             // Exploration payoff: Ore is mined from distant veins, hauled home, and is
             // required to reach the Iron Age.
-            var mine = MakeCollector("Mine", ore, 1, 3.0f, 2, 12, new Color(0.50f, 0.48f, 0.40f),
+            var mine = MakeCollector("Mine", ore, 1, 2.5f, 2, 12, new Color(0.50f, 0.48f, 0.40f),
                 new ItemAmount(wood, 6), new ItemAmount(stone, 4)); mine.unlockAge = 1;
             var oreStore = MakeStorage("Ore Stockpile", ore, 100, new Color(0.52f, 0.50f, 0.42f),
                 new ItemAmount(wood, 8)); oreStore.unlockAge = 1;
@@ -238,7 +240,7 @@ namespace Caveman
                 new List<ItemAmount> { new ItemAmount(clay, 2) },
                 new ItemAmount(wood, 6), new ItemAmount(stone, 4)); potter.unlockAge = 2;
             // Textiles: Cotton -> Fiber -> Cloth -> Clothes (an Industrial luxury).
-            var cottonFarm = MakeCollector("Cotton Farm", fiber, 1, 2.5f, 2, 12, new Color(0.70f, 0.78f, 0.55f),
+            var cottonFarm = MakeCollector("Cotton Farm", fiber, 1, 2.0f, 2, 12, new Color(0.70f, 0.78f, 0.55f),
                 new ItemAmount(wood, 6)); cottonFarm.unlockAge = 2;
             var weaver = MakeWorkshop("Weaver", cloth, 1, 3.5f, 2, 12, new Color(0.80f, 0.78f, 0.70f),
                 new List<ItemAmount> { new ItemAmount(fiber, 2) },
@@ -247,7 +249,7 @@ namespace Caveman
                 new List<ItemAmount> { new ItemAmount(cloth, 2) },
                 new ItemAmount(planks, 6), new ItemAmount(bricks, 4)); tailor.unlockAge = 4;
             // Gems (Iron, mined from distant deposits) -> Jewelry (Industrial) for the Monument.
-            var gemMine = MakeCollector("Gem Mine", gems, 1, 3.5f, 2, 10, new Color(0.45f, 0.70f, 0.66f),
+            var gemMine = MakeCollector("Gem Mine", gems, 1, 2.5f, 2, 10, new Color(0.45f, 0.70f, 0.66f),
                 new ItemAmount(wood, 8), new ItemAmount(stone, 6)); gemMine.unlockAge = 3;
             var jeweler = MakeWorkshop("Jeweler", jewelry, 1, 4.5f, 2, 10, new Color(0.85f, 0.78f, 0.45f),
                 new List<ItemAmount> { new ItemAmount(gems, 2) },
@@ -255,6 +257,7 @@ namespace Caveman
 
             // --- Hand-written descriptions for buildings that need strategic context
             //     (everything else auto-generates a full tooltip from its data). ---
+            sawmill.description = "Wood → Planks. The baseline chain: a 1-worker Sawmill eats 60 Wood/min — exactly one Wood Hut down one belt (1 gatherer → 1 belt → 1 machine). Add a 2nd worker and it needs 120/min (a 2nd hut, or a conveyor).";
             campfire.description = "Food + Wood + Water → Cooked Food (worth more nourishment). Your people's first comfort good. Needs workers + inputs delivered.";
             charcoalBurner.description = "Wood → Charcoal. Charcoal feeds BOTH the Kiln and the Smelter — scaling one can starve the other. A key shared-bottleneck.";
             kiln.description = "Clay + Charcoal → Bricks. Charcoal is shared with the Smelter, so watch that bottleneck. Bricks build advanced structures.";
@@ -402,21 +405,24 @@ namespace Caveman
             events.wood = wood;
             events.stone = stone;
 
-            // --- Resource patches: spread WIDE across the map so you must explore.
+            // --- Resource patches: natural CLUSTERS (groves & outcrops), never lone nodes, so
+            //     resources read as PART OF THE WORLD. Starter clusters are SMALL (bootstrap only);
+            //     biome clusters are LARGER & DENSER — the visible upgrade that rewards expansion.
             //     A clear central area stays open as the player's base/processing yard. ---
             const float baseClear = 11f;
-            SpawnPatches("Tree", wood, new Color(0.27f, 0.55f, 0.22f), 12,
-                new Vector2(24f, 4f), new Vector2(18f, 18f), new Vector2(1.0f, 1.5f), PlaceholderArt.Triangle(), 30, baseClear);
-            SpawnPatches("Rock", stone, new Color(0.55f, 0.55f, 0.6f), 12,
-                new Vector2(-24f, 4f), new Vector2(18f, 18f), new Vector2(1.0f, 1.5f), PlaceholderArt.Hexagon(), 30, baseClear);
-            SpawnPatches("Bush", food, new Color(0.45f, 0.55f, 0.25f), 9,
-                new Vector2(0f, -24f), new Vector2(20f, 10f), new Vector2(0.7f, 1.0f), PlaceholderArt.Circle(), 30, baseClear);
-            // STARTER BASIN holds only the BASICS (wood/stone/food above + the carved water pond
-            // below). Everything else lives OUT in its biome, so the player must EXPAND for it.
+            // STARTER BASIN — a few SMALL clusters of the BASICS only (wood/stone/food + the carved
+            // water pond below). Enough to get going, NOT to scale: you outgrow them and must push out.
+            SpawnClusters("Tree", wood, new Color(0.27f, 0.55f, 0.22f), PlaceholderArt.Triangle(),
+                new Vector2(24f, 4f), 13f, 3, 3, 5, 2.2f, new Vector2(1.0f, 1.5f), 30, 1, baseClear);
+            SpawnClusters("Rock", stone, new Color(0.55f, 0.55f, 0.6f), PlaceholderArt.Hexagon(),
+                new Vector2(-24f, 4f), 13f, 3, 3, 5, 2.2f, new Vector2(1.0f, 1.5f), 30, 1, baseClear);
+            SpawnClusters("Bush", food, new Color(0.45f, 0.55f, 0.25f), PlaceholderArt.Circle(),
+                new Vector2(0f, -24f), 12f, 3, 3, 4, 1.9f, new Vector2(0.7f, 1.0f), 30, 1, baseClear);
 
             // --- GUARANTEED EXPANSION REGIONS: 3 meandering corridors out of spawn, each leading
             //     to a distinct, reachable region — so exploration is intentional (follow a path →
-            //     find something) and Iron can NEVER soft-lock for want of findable ore. ---
+            //     find something) and Iron can NEVER soft-lock for want of findable ore. Each region
+            //     is seeded with DENSE clusters — a clear density upgrade over the starter basin. ---
             TerrainGrid.CarveCorridors(3, 95f, 1);
             void Region(int k, float dist, Terrain biome, System.Action<Vector2> place)
             {
@@ -425,20 +431,26 @@ namespace Caveman
                 TerrainGrid.Paint(new Vector3(center.x, center.y, 0f), 16f, biome);
                 place(center);
             }
-            // Corridor 0 — nearest: a PLAINS region with the first-expansion goods (meat + clay).
+            // Corridor 0 — nearest: a PLAINS region, SPARSE but MIXED (meat + clay) — first expansion.
             Region(0, 46f, Terrain.Plains, c => {
-                SpawnPatches("Herd", meat, new Color(0.66f, 0.34f, 0.34f), 6, c, new Vector2(9f, 9f), new Vector2(0.8f, 1.2f), PlaceholderArt.Circle(), 30, 0f);
-                SpawnPatches("Clay", clay, new Color(0.68f, 0.46f, 0.36f), 6, c, new Vector2(9f, 9f), new Vector2(1.0f, 1.5f), PlaceholderArt.Hexagon(), 40, 0f);
+                SpawnClusters("Herd", meat, new Color(0.66f, 0.34f, 0.34f), PlaceholderArt.Circle(),
+                    c, 7f, 2, 3, 4, 2.0f, new Vector2(0.8f, 1.2f), 30, 1, 0f);
+                SpawnClusters("Clay", clay, new Color(0.68f, 0.46f, 0.36f), PlaceholderArt.Hexagon(),
+                    c, 7f, 2, 3, 5, 2.4f, new Vector2(1.0f, 1.5f), 40, 1, 0f);
             });
-            // Corridor 1 — a FOREST region: bulk lumber + forage so wood/food scale by expanding.
+            // Corridor 1 — a FOREST region: DENSE lumber groves + forage so wood/food scale by expanding.
             Region(1, 72f, Terrain.Forest, c => {
-                SpawnPatches("Tree", wood, new Color(0.27f, 0.55f, 0.22f), 12, c, new Vector2(12f, 12f), new Vector2(1.0f, 1.6f), PlaceholderArt.Triangle(), 30, 0f);
-                SpawnPatches("Bush", food, new Color(0.45f, 0.55f, 0.25f), 7, c, new Vector2(12f, 12f), new Vector2(0.7f, 1.0f), PlaceholderArt.Circle(), 30, 0f);
+                SpawnClusters("Tree", wood, new Color(0.27f, 0.55f, 0.22f), PlaceholderArt.Triangle(),
+                    c, 11f, 3, 6, 9, 3.2f, new Vector2(1.0f, 1.6f), 35, 1, 0f);
+                SpawnClusters("Bush", food, new Color(0.45f, 0.55f, 0.25f), PlaceholderArt.Circle(),
+                    c, 11f, 2, 4, 6, 2.6f, new Vector2(0.7f, 1.0f), 30, 1, 0f);
             });
-            // Corridor 2 — a HILLS region: stone + the guaranteed reachable ORE (Iron unlock).
+            // Corridor 2 — a HILLS region: DENSE stone outcrops + the guaranteed reachable ORE (Iron unlock).
             Region(2, 86f, Terrain.Hills, c => {
-                SpawnPatches("Rock", stone, new Color(0.55f, 0.55f, 0.6f), 8, c, new Vector2(12f, 12f), new Vector2(1.0f, 1.6f), PlaceholderArt.Hexagon(), 30, 0f);
-                SpawnPatches("Ore Vein", ore, new Color(0.62f, 0.58f, 0.42f), 6, c, new Vector2(12f, 12f), new Vector2(1.1f, 1.6f), PlaceholderArt.Hexagon(), 80, 0f, 0);
+                SpawnClusters("Rock", stone, new Color(0.55f, 0.55f, 0.6f), PlaceholderArt.Hexagon(),
+                    c, 11f, 3, 5, 8, 3.0f, new Vector2(1.0f, 1.6f), 35, 1, 0f);
+                SpawnClusters("Ore Vein", ore, new Color(0.62f, 0.58f, 0.42f), PlaceholderArt.Hexagon(),
+                    c, 11f, 2, 4, 6, 2.8f, new Vector2(1.1f, 1.6f), 80, 0, 0f); // finite
             });
 
             // --- Welcome / starter guidance (fades after a few seconds) ---
@@ -446,28 +458,28 @@ namespace Caveman
             Toast.Show("<size=15>Goal: grow from caveman to a self-running civilisation — build the Monument to win.</size>");
             Toast.Show("<size=14>Press <b>H</b> for help · <b>G</b> for the Guide · <b>B</b> to build · follow the Objectives (top-right).</size>");
 
-            // --- BIOME FRONTIER: resources live in their biome, so each region means something
-            //     and expansion is a planning problem (find the region → route it home). FORESTS
-            //     = lumber + fibre; HILLS = stone, ore, gems; PLAINS = herds + clay. Finite
-            //     ore/gems out here are the late-game economy. ---
-            ScatterInBiome("Tree", wood, new Color(0.27f, 0.55f, 0.22f), PlaceholderArt.Triangle(),
-                Terrain.Forest, 70, 50f, 30, 1, new Vector2(1.0f, 1.6f));
-            ScatterInBiome("Cotton", fiber, new Color(0.80f, 0.84f, 0.66f), PlaceholderArt.Circle(),
-                Terrain.Forest, 14, 50f, 36, 1, new Vector2(0.7f, 1.1f));
+            // --- BIOME FRONTIER: each region's resources live in DENSE clusters, so a biome is a
+            //     real place worth routing home (find the region → route it home). FORESTS = lumber
+            //     + fibre + forage; HILLS = stone, ore, gems; PLAINS = sparse but mixed (herds +
+            //     clay). Finite ore/gems out here are the late-game economy. ---
+            SpawnClustersInBiome("Tree", wood, new Color(0.27f, 0.55f, 0.22f), PlaceholderArt.Triangle(),
+                Terrain.Forest, 11, 5, 8, 3.2f, 50f, 35, 1, new Vector2(1.0f, 1.6f));
+            SpawnClustersInBiome("Cotton", fiber, new Color(0.80f, 0.84f, 0.66f), PlaceholderArt.Circle(),
+                Terrain.Forest, 4, 3, 5, 2.6f, 50f, 36, 1, new Vector2(0.7f, 1.1f));
             // Forage (berries) in forests too, so FOOD can scale by expanding (start bushes are limited).
-            ScatterInBiome("Bush", food, new Color(0.45f, 0.55f, 0.25f), PlaceholderArt.Circle(),
-                Terrain.Forest, 22, 30f, 30, 1, new Vector2(0.7f, 1.0f));
-            ScatterInBiome("Rock", stone, new Color(0.55f, 0.55f, 0.6f), PlaceholderArt.Hexagon(),
-                Terrain.Hills, 55, 50f, 30, 1, new Vector2(1.0f, 1.6f));
-            ScatterInBiome("Ore Vein", ore, new Color(0.62f, 0.58f, 0.42f), PlaceholderArt.Hexagon(),
-                Terrain.Hills, 28, 55f, 80, 0, new Vector2(1.1f, 1.6f)); // finite
-            ScatterInBiome("Gem Deposit", gems, new Color(0.50f, 0.82f, 0.76f), PlaceholderArt.Hexagon(),
-                Terrain.Hills, 9, 90f, 60, 0, new Vector2(1.0f, 1.5f)); // finite, far
+            SpawnClustersInBiome("Bush", food, new Color(0.45f, 0.55f, 0.25f), PlaceholderArt.Circle(),
+                Terrain.Forest, 5, 4, 6, 2.6f, 30f, 30, 1, new Vector2(0.7f, 1.0f));
+            SpawnClustersInBiome("Rock", stone, new Color(0.55f, 0.55f, 0.6f), PlaceholderArt.Hexagon(),
+                Terrain.Hills, 10, 5, 7, 3.0f, 50f, 35, 1, new Vector2(1.0f, 1.6f));
+            SpawnClustersInBiome("Ore Vein", ore, new Color(0.62f, 0.58f, 0.42f), PlaceholderArt.Hexagon(),
+                Terrain.Hills, 6, 4, 6, 2.8f, 55f, 80, 0, new Vector2(1.1f, 1.6f)); // finite
+            SpawnClustersInBiome("Gem Deposit", gems, new Color(0.50f, 0.82f, 0.76f), PlaceholderArt.Hexagon(),
+                Terrain.Hills, 3, 2, 3, 2.2f, 90f, 60, 0, new Vector2(1.0f, 1.5f)); // finite, far
             // Meat + clay are the FIRST expansion target — just outside the basin (minClear 26).
-            ScatterInBiome("Herd", meat, new Color(0.66f, 0.34f, 0.34f), PlaceholderArt.Circle(),
-                Terrain.Plains, 18, 26f, 30, 1, new Vector2(0.8f, 1.2f));
-            ScatterInBiome("Clay", clay, new Color(0.68f, 0.46f, 0.36f), PlaceholderArt.Hexagon(),
-                Terrain.Plains, 16, 26f, 40, 1, new Vector2(1.0f, 1.5f));
+            SpawnClustersInBiome("Herd", meat, new Color(0.66f, 0.34f, 0.34f), PlaceholderArt.Circle(),
+                Terrain.Plains, 5, 3, 4, 2.2f, 26f, 30, 1, new Vector2(0.8f, 1.2f));
+            SpawnClustersInBiome("Clay", clay, new Color(0.68f, 0.46f, 0.36f), PlaceholderArt.Hexagon(),
+                Terrain.Plains, 5, 3, 4, 2.4f, 26f, 40, 1, new Vector2(1.0f, 1.5f));
 
             // Guarantee a reachable water feature just outside the starting basin so you can
             // build a Water Hole early (carved last so resource ClearAround can't erase it).
@@ -476,32 +488,45 @@ namespace Caveman
             TerrainGrid.SpawnRenderer();
         }
 
-        // Scatters `count` resource patches onto cells of a given BIOME (forest/hills/plains),
-        // so each region has its own resources — expansion becomes a planning problem.
-        private static void ScatterInBiome(string name, ItemDefinition item, Color color, Sprite sprite,
-            Terrain biome, int count, float minClear, int capacity, int regen, Vector2 sizeRange)
+        // Spawn `clusterCount` natural clusters in an AREA (areaCenter ± areaSpread), each a tight
+        // knot of nodes — so resources look like groves/outcrops, not isolated dots. Clusters are
+        // kept at least `minClear` from the world origin so the base area stays open.
+        private static void SpawnClusters(string name, ItemDefinition item, Color color, Sprite sprite,
+            Vector2 areaCenter, float areaSpread, int clusterCount, int minNodes, int maxNodes,
+            float clusterRadius, Vector2 sizeRange, int capacity, int regen, float minClear)
         {
-            for (int i = 0; i < count; i++)
+            for (int k = 0; k < clusterCount; k++)
             {
-                if (!TerrainGrid.TryRandomCellOfBiome(biome, minClear, 50, out var p)) continue;
-                float size = Random.Range(sizeRange.x, sizeRange.y);
-                float b = Random.Range(0.9f, 1.1f);
-                var c = new Color(Mathf.Clamp01(color.r * b), Mathf.Clamp01(color.g * b), Mathf.Clamp01(color.b * b));
-                SpawnNode(name, item, c, p, size, sprite, capacity, regen);
+                Vector2 c = areaCenter + Random.insideUnitCircle * areaSpread;
+                if (c.magnitude < minClear) c = c.normalized * minClear; // keep the base clear
+                int n = Random.Range(minNodes, maxNodes + 1);
+                SpawnCluster(name, item, color, sprite, c, n, clusterRadius, sizeRange, capacity, regen);
             }
         }
 
-        // Scatters `count` patches around `center`, jittered by ±spread, random size,
-        // and kept at least `minClear` from the origin so the base area stays open.
-        private static void SpawnPatches(string name, ItemDefinition item, Color color, int count,
-            Vector2 center, Vector2 spread, Vector2 sizeRange, Sprite sprite, int capacity, float minClear, int regen = 1)
+        // Spawn `clusterCount` clusters onto random cells of a BIOME (forest/hills/plains), each a
+        // dense knot — so each biome reads as a resource-rich region worth expanding into.
+        private static void SpawnClustersInBiome(string name, ItemDefinition item, Color color, Sprite sprite,
+            Terrain biome, int clusterCount, int minNodes, int maxNodes, float clusterRadius,
+            float minClear, int capacity, int regen, Vector2 sizeRange)
         {
-            for (int i = 0; i < count; i++)
+            for (int k = 0; k < clusterCount; k++)
             {
-                Vector2 pos = center + new Vector2(Random.Range(-spread.x, spread.x), Random.Range(-spread.y, spread.y));
-                if (pos.magnitude < minClear) pos = pos.normalized * minClear; // keep the base clear
+                if (!TerrainGrid.TryRandomCellOfBiome(biome, minClear, 50, out var c)) continue;
+                int n = Random.Range(minNodes, maxNodes + 1);
+                SpawnCluster(name, item, color, sprite, c, n, clusterRadius, sizeRange, capacity, regen);
+            }
+        }
+
+        // One cluster: `nodeCount` patches packed within `radius` of `center` (a grove / outcrop).
+        private static void SpawnCluster(string name, ItemDefinition item, Color color, Sprite sprite,
+            Vector2 center, int nodeCount, float radius, Vector2 sizeRange, int capacity, int regen)
+        {
+            for (int i = 0; i < nodeCount; i++)
+            {
+                Vector2 pos = center + Random.insideUnitCircle * radius;
                 float size = Random.Range(sizeRange.x, sizeRange.y);
-                float b = Random.Range(0.9f, 1.1f); // slight colour variation
+                float b = Random.Range(0.9f, 1.1f); // slight per-node colour variation
                 var c = new Color(Mathf.Clamp01(color.r * b), Mathf.Clamp01(color.g * b), Mathf.Clamp01(color.b * b));
                 SpawnNode(name, item, c, pos, size, sprite, capacity, regen);
             }

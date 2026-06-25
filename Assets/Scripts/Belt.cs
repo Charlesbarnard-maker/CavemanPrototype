@@ -116,8 +116,14 @@ namespace Caveman
                 if (_connected) PullFromNeighbour(); // don't pull goods onto a belt that leads nowhere
             }
 
+            // Belt colour reads the bottleneck at a glance:
+            //   red    = dead end (goes nowhere — no sink ahead),
+            //   yellow = backed up (connected but item can't move → DOWNSTREAM is full/blocked),
+            //   base   = flowing or empty (an empty connected belt = an UPSTREAM/supply issue).
             if (_sr != null)
-                _sr.color = _connected ? _baseColor : new Color(0.55f, 0.25f, 0.25f); // red = dead end
+                _sr.color = !_connected ? new Color(0.62f, 0.24f, 0.24f)      // red — dead end
+                          : _blocked   ? new Color(0.85f, 0.66f, 0.18f)        // yellow — backed up downstream
+                          : _baseColor;                                         // brown — ok (empty = supply issue)
 
             UpdateDot();
         }
