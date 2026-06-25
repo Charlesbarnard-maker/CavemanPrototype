@@ -54,9 +54,9 @@ logistics works, never *what* the loop is.
 
 ## Controls
 WASD/arrows move (Shift sprint) · mouse-wheel zoom · **M** overview · **B** build menu (accordion
-categories + Recent) · **G** Guide · **H** help · **N** hide minimap · Space pause · click a
-building to manage · **X** demolish · **C** copy selected · **R** rotate (belt / building output) ·
-hover anything for a name tooltip.
+categories + Recent) · **T** research tree (spend points) · **G** Guide · **H** help · **N** hide
+minimap · Space pause · click a building to manage · **X** demolish · **C** copy selected · **R**
+rotate (belt / building output) · hover anything for a name tooltip.
 
 **Sandbox/testing hotkeys:** **F1** +500 of every resource · **F2** +5 people · **F3** advance age ·
 **F4** free/instant build · **F5** game speed · **F7** toggle local/global production · **F8** reveal

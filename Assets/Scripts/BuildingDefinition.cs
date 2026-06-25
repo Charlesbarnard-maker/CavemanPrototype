@@ -86,6 +86,8 @@ namespace Caveman
         [Header("Progression")]
         [Tooltip("Age at which this becomes buildable (0 = Stone Age, available from the start).")]
         public int unlockAge = 0;
+        [Tooltip("Optional Research Tech id that must be PURCHASED before this can be built (empty = none).")]
+        public string requiredTech = "";
 
         [Header("Power (Industrial age)")]
         [Tooltip("Workshop: electrical power drawn while running (0 = none).")]

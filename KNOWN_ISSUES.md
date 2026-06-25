@@ -3,7 +3,33 @@
 A running record so progress/problems don't get lost. Newest first. Move items to
 **Fixed** when done. Maintained alongside the code — see DESIGN.md for the roadmap.
 
-## Transport → Station rework (2026-06-25 #8) — most recent
+## Spendable research TREE + multi-input ports + tutorial/UI (2026-06-25 #9) — most recent
+Addresses: "Idea Bench needs 2 inputs", "add a research tree where we spend points", tutorial/UI, QoL.
+- **Research is now a SPENDABLE TREE (press T).** Delivered research items add to a research POINT
+  pool (no longer auto-advances). A new **Research Tree panel** lists Tech nodes — age spine
+  (Tribal 20 / Bronze 50 / Iron 100 / Industrial 200, each needs the prior) + building-unlock
+  branches (Splitters 15, Conveyors 30, Pipes 30) — each with cost / prereq / buy button. The
+  player SPENDS points to advance ages and unlock buildings. (`Research` rewritten: `Tiers` =
+  what the Lodge consumes per age; `Tree` = spend nodes; `Buy/CanBuy/IsPurchased`.)
+- **Buildings gated behind research:** new `BuildingDefinition.requiredTech` checked in
+  `BuildController.IsUnlocked`. Splitter→"splitters", fast Conveyor→"conveyors",
+  Pipe/Pump/Booster→"pipes" (their unlockAge dropped to 0 so the Tech is the gate; prereqs keep
+  the age pacing). Locked build-menu entries show "🔒 … — research <Tech>".
+- **Multi-input ports (the Idea Bench fix):** workshops with >1 input now accept belt deliveries on
+  ANY non-output side (`Belt.AcceptsInputSide`), and show input notches on every non-output side
+  (placed `Ports.PlacePorts` + the placement GHOST `PlaceGhostSides`). So you can belt Planks into
+  one side and Stone into another. Single-input workshops are unchanged. (Also fixes the Smelter etc.)
+- **Tutorial/UI:** status-bar `🔬 N pts (T)` token; build-panel research section (points + current
+  item to craft + progress bar + "Research Tree (T)" button); Research Lodge panel updated; Guide (G)
+  has a "Research drives progress" section; welcome toasts + controls hint + README mention T; a
+  one-time "Research available — press T" toast when a node first becomes affordable.
+- **Watch:** (a) first advance now needs the research factory AND a T-press to spend — verify the
+  guidance makes that obvious (lots of hints added). (b) Splitter now needs Tribal+15pts (was free)
+  — minor. (c) research tree panel scroll/height on small windows. (d) multi-input workshops show
+  many port notches (e.g. 2×2 Smelter) — busy but functional. (e) age-spend competes with
+  building-unlock spend — intended tension; watch it isn't too grindy early.
+
+## Transport → Station rework (2026-06-25 #8)
 Phase 6 of the factory brief. Transport is now managed INSIDE buildings, not via a global tool.
 - **Depot rebranded "Station"** (display only — class stays `Depot` to avoid churn across 6 files).
 - **The 4 vehicles (Caravan/Ox Cart/Wagon/Drone) are OUT of the build menu.** They're now

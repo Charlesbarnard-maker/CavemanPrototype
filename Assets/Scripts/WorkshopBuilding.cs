@@ -79,7 +79,8 @@ namespace Caveman
             w._cells = Footprint.Cells(go.transform.position, def.FootW, def.FootH);
             foreach (var c in w._cells) WorldGrid.Workshops[c] = w;
             Ports.PlacePorts(go.transform, def.FootW, def.FootH, outputSide,
-                def.inputs != null && def.inputs.Count > 0, true);
+                def.inputs != null && def.inputs.Count > 0, true,
+                def.inputs != null && def.inputs.Count > 1); // multi-input → input ports on all non-output sides
             return w;
         }
 

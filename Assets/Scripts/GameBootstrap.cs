@@ -316,17 +316,34 @@ namespace Caveman
                 new ItemAmount(planks, 8), new ItemAmount(metal, 4)); engineeringLab.unlockAge = 3;
             engineeringLab.description = "Metal + Tools → Blueprint (a RESEARCH item). Research the Industrial Age — the deepest chain (Smelter + Toolmaker), so the final unlock demands a real factory.";
 
-            // The research tree (data → extendable: append a Tier per future age). Costs scale
-            // 20 → 50 → 100 → 200; later items are worth more points (harder to make) so item-counts
-            // climb modestly (20 → 25 → 33 → 40) while REQUIRED OUTPUT climbs a lot (deeper chains).
+            // Tiers = which research item the Lodge consumes at each age + its point value (later
+            // items are worth more because their chains are deeper).
             Research.Reset();
             Research.Tiers = new List<Research.Tier>
             {
-                new Research.Tier { targetAge = 1, item = ideaTablet,  pointsPerItem = 1, cost = 20 },  // Stone → Tribal
-                new Research.Tier { targetAge = 2, item = studyScroll, pointsPerItem = 2, cost = 50 },  // Tribal → Bronze
-                new Research.Tier { targetAge = 3, item = schematic,   pointsPerItem = 3, cost = 100 }, // Bronze → Iron
-                new Research.Tier { targetAge = 4, item = blueprint,   pointsPerItem = 5, cost = 200 }, // Iron → Industrial
+                new Research.Tier { targetAge = 1, item = ideaTablet,  pointsPerItem = 1 },  // craft at Stone
+                new Research.Tier { targetAge = 2, item = studyScroll, pointsPerItem = 2 },  // craft at Tribal
+                new Research.Tier { targetAge = 3, item = schematic,   pointsPerItem = 3 },  // craft at Bronze
+                new Research.Tier { targetAge = 4, item = blueprint,   pointsPerItem = 5 },  // craft at Iron
             };
+            // The spendable research TREE (press T to open). Age spine (each needs the prior) + a few
+            // building-unlock branches you CHOOSE to spend points on. Age costs scale 20→50→100→200.
+            Research.Tree = new List<Research.Tech>
+            {
+                new Research.Tech { id = "tribal",     name = "Tribal Age",     cost = 20,  advanceToAge = 1, prereq = null,     desc = "Advance to the Tribal Age — hunting, clay, charcoal, the Longhouse." },
+                new Research.Tech { id = "bronze",     name = "Bronze Age",     cost = 50,  advanceToAge = 2, prereq = "tribal", desc = "Advance to the Bronze Age — kilns, farming/baking, masonry, smelting." },
+                new Research.Tech { id = "iron",       name = "Iron Age",       cost = 100, advanceToAge = 3, prereq = "bronze", desc = "Advance to the Iron Age — toolmaking, weaving, gem mining." },
+                new Research.Tech { id = "industrial", name = "Industrial Age", cost = 200, advanceToAge = 4, prereq = "iron",   desc = "Advance to the Industrial Age — power, the Monument, the endgame." },
+                new Research.Tech { id = "splitters",  name = "Splitters",      cost = 15,  prereq = "tribal", unlocks = new List<BuildingDefinition>{ splitter },          desc = "Unlocks the 1→2 Splitter — feed two machines from one supply line." },
+                new Research.Tech { id = "conveyors",  name = "Conveyor Belts", cost = 30,  prereq = "bronze", unlocks = new List<BuildingDefinition>{ fastBelt },          desc = "Unlocks the fast Conveyor Belt (120/min — 2× the wooden lane)." },
+                new Research.Tech { id = "pipes",      name = "Pipe Network",   cost = 30,  prereq = "bronze", unlocks = new List<BuildingDefinition>{ pipe, pump, booster }, desc = "Unlocks liquid logistics — Pipes, the Water Pump and Booster Pump." },
+            };
+            // Gate those buildings behind their Tech (and off the age gate, so the Tech IS the gate).
+            splitter.requiredTech = "splitters";
+            fastBelt.requiredTech = "conveyors"; fastBelt.unlockAge = 0;
+            pipe.requiredTech = "pipes"; pipe.unlockAge = 0;
+            pump.requiredTech = "pipes"; pump.unlockAge = 0;
+            booster.requiredTech = "pipes"; booster.unlockAge = 0;
 
             // --- Camera (follows the player) ---
             var cam = Camera.main;
@@ -514,7 +531,8 @@ namespace Caveman
             // --- Welcome / starter guidance (fades after a few seconds) ---
             Toast.Show("<color=#ffd24d>Welcome, chief!</color>  Click trees & rocks to gather by hand.");
             Toast.Show("<size=15>Goal: grow from caveman to a self-running civilisation — build the Monument to win.</size>");
-            Toast.Show("<size=14>Press <b>H</b> for help · <b>G</b> for the Guide · <b>B</b> to build · follow the Objectives (top-right).</size>");
+            Toast.Show("<size=14><color=#9cf>Progress = RESEARCH:</color> build a Sawmill + an <b>Idea Bench</b> (Planks+Stone → Idea Tablet), belt Tablets to a <b>Research Lodge</b>, then press <b>T</b> to spend points & advance.</size>");
+            Toast.Show("<size=14>Press <b>H</b> help · <b>G</b> Guide · <b>B</b> build · <b>T</b> research tree · follow the Objectives (top-right).</size>");
 
             // --- BIOME FRONTIER: each region's resources live in DENSE clusters, so a biome is a
             //     real place worth routing home (find the region → route it home). FORESTS = lumber

@@ -184,7 +184,7 @@ namespace Caveman
             // direction (d == OutputSide) to enter the input face.
             if (WorldGrid.Storages.TryGetValue(ahead, out var s) && s != null && d == s.OutputSide
                 && (item == null || s.accepts == item || (s.accepts == null && s.configurable))) return true;
-            if (WorldGrid.Workshops.TryGetValue(ahead, out var w) && w != null && d == w.OutputSide
+            if (WorldGrid.Workshops.TryGetValue(ahead, out var w) && w != null && AcceptsInputSide(w, d)
                 && (item == null || w.WantsInput(item))) return true;
             if (WorldGrid.Depots.TryGetValue(ahead, out var dp) && dp != null
                 && (item == null || dp.item == null || dp.item == item)) return true; // depots omnidirectional
@@ -255,7 +255,7 @@ namespace Caveman
             }
 
             // ...or into a workshop's input buffer, on its INPUT side, if it uses this item.
-            if (WorkshopAt(ahead) is WorkshopBuilding w && d == w.OutputSide && w.WantsInput(item))
+            if (WorkshopAt(ahead) is WorkshopBuilding w && AcceptsInputSide(w, d) && w.WantsInput(item))
             {
                 if (w.InBuffer.Total() >= w.InBuffer.capacity) return false;
                 w.InBuffer.Add(item, 1); count--; if (count <= 0) item = null; return true;
@@ -279,6 +279,12 @@ namespace Caveman
 
         private static WorkshopBuilding WorkshopAt(Vector2Int c)
             => WorldGrid.Workshops.TryGetValue(c, out var w) ? w : null;
+
+        // A belt at this cell moving `d` sits on the workshop's `Opposite(d)` side. Multi-input
+        // workshops accept inputs on ANY non-output side (so each of their different items can come
+        // on its own belt); single-input workshops keep just the one input side (opposite the output).
+        private static bool AcceptsInputSide(WorkshopBuilding w, Dir d)
+            => (w.inputs != null && w.inputs.Count > 1) ? Opposite(d) != w.OutputSide : d == w.OutputSide;
 
         private void PullFromNeighbour()
         {

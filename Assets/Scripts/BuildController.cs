@@ -85,6 +85,8 @@ namespace Caveman
         // 2 output arrows + 2 input notches (matching the built ports), not a single marker.
         private readonly List<GameObject> _ghostOutPorts = new();
         private readonly List<GameObject> _ghostInPorts = new();
+        private readonly Belt.Dir[] _ghostOutSides = new Belt.Dir[1];
+        private readonly Belt.Dir[] _ghostInSides = new Belt.Dir[4];
 
         void Awake() => _cam = Camera.main;
 
@@ -223,7 +225,8 @@ namespace Caveman
             Selected != null ? Selected.GetComponent<IStaffable>() : null;
 
         public bool IsUnlocked(BuildingDefinition def) =>
-            def != null && (Colony.Instance == null || def.unlockAge <= Colony.Instance.Age);
+            def != null && (Colony.Instance == null || def.unlockAge <= Colony.Instance.Age)
+            && Research.IsPurchased(def.requiredTech); // also gated behind a research Tech, if set
 
         public void BeginPlacement(int index)
         {
@@ -314,33 +317,44 @@ namespace Caveman
             bool hasOut = def.kind == BuildingKind.Collector || def.kind == BuildingKind.Workshop
                           || def.kind == BuildingKind.Storage;
             bool hasIn = def.kind == BuildingKind.Workshop || def.kind == BuildingKind.Storage;
-            PlaceGhostSide(_ghostOutPorts, hasOut, center, def, BuildDir, true);
-            PlaceGhostSide(_ghostInPorts, hasIn, center, def, Belt.Opposite(BuildDir), false);
+            bool multiIn = def.kind == BuildingKind.Workshop && def.inputs != null && def.inputs.Count > 1;
+
+            _ghostOutSides[0] = BuildDir;
+            PlaceGhostSides(_ghostOutPorts, hasOut, center, def, _ghostOutSides, 1, true);
+
+            // Multi-input workshops show input notches on EVERY non-output side (matches the placed
+            // building); everything else shows the single input side opposite the output.
+            int n = 0;
+            if (multiIn) { for (int i = 0; i < 4; i++) { var d = (Belt.Dir)i; if (d != BuildDir) _ghostInSides[n++] = d; } }
+            else { _ghostInSides[0] = Belt.Opposite(BuildDir); n = 1; }
+            PlaceGhostSides(_ghostInPorts, hasIn, center, def, _ghostInSides, n, false);
         }
 
-        // One marker per edge cell on `side`, positioned just outside that cell's face (mirrors
-        // Ports.PlacePorts). Reuses a pooled list, deactivating any surplus markers.
-        private void PlaceGhostSide(List<GameObject> pool, bool show, Vector3 center,
-            BuildingDefinition def, Belt.Dir side, bool isOutput)
+        // One marker per edge cell across `sideCount` sides, positioned just outside each cell's face
+        // (mirrors Ports.PlacePorts). Reuses a pooled list, deactivating any surplus markers.
+        private void PlaceGhostSides(List<GameObject> pool, bool show, Vector3 center,
+            BuildingDefinition def, Belt.Dir[] sides, int sideCount, bool isOutput)
         {
             int used = 0;
             if (show && def != null)
-            {
-                int w = def.FootW, h = def.FootH;
-                var s = Belt.Step(side);
-                float ax = center.x - (w - 1) * 0.5f, ay = center.y - (h - 1) * 0.5f; // bottom-left cell centre
-                for (int i = 0; i < w; i++)
-                    for (int j = 0; j < h; j++)
-                    {
-                        bool edge = side == Belt.Dir.E ? i == w - 1 : side == Belt.Dir.W ? i == 0
-                                  : side == Belt.Dir.N ? j == h - 1 : j == 0;
-                        if (!edge) continue;
-                        var go = GhostMarker(pool, used++, isOutput);
-                        go.transform.position = new Vector3(ax + i + s.x * 0.55f, ay + j + s.y * 0.55f, 0f);
-                        go.transform.rotation = isOutput ? Quaternion.Euler(0f, 0f, Belt.Angle(side)) : Quaternion.identity;
-                        go.transform.localScale = Vector3.one * (isOutput ? 0.5f : 0.4f);
-                    }
-            }
+                for (int si = 0; si < sideCount; si++)
+                {
+                    var side = sides[si];
+                    int w = def.FootW, h = def.FootH;
+                    var s = Belt.Step(side);
+                    float ax = center.x - (w - 1) * 0.5f, ay = center.y - (h - 1) * 0.5f; // bottom-left cell centre
+                    for (int i = 0; i < w; i++)
+                        for (int j = 0; j < h; j++)
+                        {
+                            bool edge = side == Belt.Dir.E ? i == w - 1 : side == Belt.Dir.W ? i == 0
+                                      : side == Belt.Dir.N ? j == h - 1 : j == 0;
+                            if (!edge) continue;
+                            var go = GhostMarker(pool, used++, isOutput);
+                            go.transform.position = new Vector3(ax + i + s.x * 0.55f, ay + j + s.y * 0.55f, 0f);
+                            go.transform.rotation = isOutput ? Quaternion.Euler(0f, 0f, Belt.Angle(side)) : Quaternion.identity;
+                            go.transform.localScale = Vector3.one * (isOutput ? 0.5f : 0.4f);
+                        }
+                }
             for (int k = used; k < pool.Count; k++) if (pool[k].activeSelf) pool[k].SetActive(false);
         }
 

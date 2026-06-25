@@ -13,10 +13,19 @@ namespace Caveman
         /// <summary>Place PER-CELL port markers along the building's edges so they line up with the
         /// belt grid: one marker per edge cell (a 2×2 warehouse → 2 inputs + 2 outputs), aligned to
         /// each cell's outer face. Output = green arrow on `outputSide`; input = cyan notch opposite.</summary>
-        public static void PlacePorts(Transform t, int w, int h, Belt.Dir outputSide, bool hasIn, bool hasOut)
+        public static void PlacePorts(Transform t, int w, int h, Belt.Dir outputSide, bool hasIn, bool hasOut,
+            bool inputsAllSides = false)
         {
             if (hasOut) PlaceSide(t, w, h, outputSide, true);
-            if (hasIn) PlaceSide(t, w, h, Belt.Opposite(outputSide), false);
+            if (hasIn)
+            {
+                if (inputsAllSides) // multi-input: accept on EVERY non-output side
+                {
+                    for (int i = 0; i < 4; i++)
+                    { var d = (Belt.Dir)i; if (d != outputSide) PlaceSide(t, w, h, d, false); }
+                }
+                else PlaceSide(t, w, h, Belt.Opposite(outputSide), false);
+            }
         }
 
         private static void PlaceSide(Transform t, int w, int h, Belt.Dir side, bool isOutput)

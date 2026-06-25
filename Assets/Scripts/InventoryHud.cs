@@ -37,6 +37,10 @@ namespace Caveman
         private bool _showGuide;
         private Vector2 _guideScroll;
         private Rect _guideRect;
+        private bool _showResearch;       // the research tree panel (T)
+        private Vector2 _researchScroll;
+        private Rect _researchRect;
+        private readonly HashSet<string> _affordToasted = new(); // "research available" hint fires once per node
         private Rect _finderRect;
         private bool _localTipShown; // one-time hint when a workshop first starves
         private Texture2D _panelTex; // dark panel background for readability
@@ -71,6 +75,13 @@ namespace Caveman
             if (kb.bKey.wasPressedThisFrame) _showBuild = !_showBuild;
             if (kb.nKey.wasPressedThisFrame) _showMinimap = !_showMinimap;
             if (kb.gKey.wasPressedThisFrame) _showGuide = !_showGuide;
+            if (kb.tKey.wasPressedThisFrame) _showResearch = !_showResearch;
+
+            // QoL: one-time "research available" toast when a tree node first becomes affordable.
+            if (Research.Tree != null)
+                foreach (var n in Research.Tree)
+                    if (Research.CanBuy(n) && _affordToasted.Add(n.id))
+                        Toast.Show($"<color=#9cf>🔬 Research available: {n.name} ({n.cost} pts) — press T</color>");
 
             // --- Sandbox / debug hotkeys ---
             if (kb.f1Key.wasPressedThisFrame && debugItems != null)
@@ -155,6 +166,7 @@ namespace Caveman
             if (Objectives.Instance != null && Objectives.Instance.Won) DrawWin();
             if (_showHelp) DrawHelp();
             if (_showGuide) DrawGuide();
+            if (_showResearch) DrawResearchPanel();
             if (_paused) GUI.Label(new Rect(0, 60, Screen.width, 60), "<b>PAUSED</b>  <size=18>(space)</size>", _big);
 
             var col = Colony.Instance;
@@ -172,7 +184,8 @@ namespace Caveman
                 var m = Event.current.mousePosition;
                 PointerOverUI = (_buildShown && _buildRect.Contains(m)) || (_selShown && _selRect.Contains(m))
                                 || _topRect.Contains(m) || _miniRect.Contains(m) || _objRect.Contains(m)
-                                || _finderRect.Contains(m) || (_showGuide && _guideRect.Contains(m));
+                                || _finderRect.Contains(m) || (_showGuide && _guideRect.Contains(m))
+                                || (_showResearch && _researchRect.Contains(m));
             }
         }
 
@@ -360,11 +373,8 @@ namespace Caveman
                     power = $"   <color={pc}>⚡ {Mathf.RoundToInt(Power.Generation)}/{Mathf.RoundToInt(Power.Demand)}{(brown ? " BROWNOUT" : "")}</color>";
                 }
 
-                // Research (the progression spine): always-visible target + progress next to the Age.
-                string research = "";
-                var rTier = Research.Current;
-                if (rTier != null)
-                    research = $"   <color=#9cf>🔬 {(rTier.item != null ? rTier.item.displayName : "?")} {Research.Points}/{rTier.cost}</color>";
+                // Research pool — always visible; press T for the spend tree.
+                string research = $"   <color=#9cf>🔬 {Research.Points} pts <size=11>(T)</size></color>";
 
                 GUILayout.Label($"<b>Population</b> {c.Population}/{c.Capacity}   <b>Working</b> {working}   <b>Free</b> {c.FreeWorkers}{bottleneck}   <color=#cda>{c.AgeName}</color>{research}   <color=#dca>{c.Rank}</color>   <color={prodCol}>Output {prod}%</color>   <color={happyCol}>Happy {happy}%</color>{needComfort}   <color=#ffcf6b>Prosperity {c.Prosperity}</color>{power}{monu}{flags}", _s);
             }
@@ -501,22 +511,20 @@ namespace Caveman
             if (col != null)
             {
                 GUILayout.Label($"<b><color=#cda>{col.AgeName}</color></b>", _small);
-                // Research progress (the unlock target). Age advances ONLY by delivering the current
-                // research item to a Research Lodge — no resource/pop "advance" button any more.
-                var rt = Research.Current;
-                if (rt != null)
+                // Research: craft the current item → deliver to a Lodge → SPEND points in the tree (T).
+                GUILayout.Label($"<size=12>🔬 <b>{Research.Points} research pts</b></size>", _small);
+                var rTierB = Research.CurrentTier;
+                if (rTierB != null)
+                    GUILayout.Label($"<size=11><color=#bcd>Craft <b>{(rTierB.item != null ? rTierB.item.displayName : "?")}</b> → deliver to a Research Lodge <color=#999>({rTierB.pointsPerItem} pt)</color></color></size>", _small);
+                var nextTechB = Research.NextAgeTech;
+                if (nextTechB != null)
                 {
-                    string itemN = rt.item != null ? rt.item.displayName : "?";
                     int filled = Mathf.RoundToInt(Research.Fraction * 12f);
                     string bar = new string('█', Mathf.Clamp(filled, 0, 12)) + new string('░', Mathf.Clamp(12 - filled, 0, 12));
-                    GUILayout.Label($"<size=12>🔬 <b>Research → {col.NextAgeName}</b></size>", _small);
-                    GUILayout.Label($"<size=11><color=#bcd>Craft <b>{itemN}</b> → deliver to a Research Lodge  <color=#999>({rt.pointsPerItem} pt each)</color></color></size>", _small);
-                    GUILayout.Label($"<size=12><color=#9cf>[{bar}]</color>  {Research.Points}/{rt.cost} pts  <color=#bbb>(~{Research.ItemsRemaining} left)</color></size>", _small);
+                    GUILayout.Label($"<size=12><color=#9cf>[{bar}]</color>  {Research.Points}/{nextTechB.cost} → {nextTechB.name}</size>", _small);
                 }
-                else
-                {
-                    GUILayout.Label("<size=12><color=#9f9>✔ All ages researched</color></size>", _small);
-                }
+                else GUILayout.Label("<size=12><color=#9f9>✔ All ages researched</color></size>", _small);
+                if (GUILayout.Button("<size=12>🔬 Research Tree  <color=#bbb>(T)</color></size>", _btn)) _showResearch = !_showResearch;
             }
             GUILayout.Space(4);
             GUILayout.Label("<b>Build</b>  <size=11>(click, then click the map · headers collapse)</size>", _small);
@@ -538,8 +546,11 @@ namespace Caveman
 
                 if (!builder.IsUnlocked(def))
                 {
-                    string ageName = def.unlockAge < Colony.AgeNames.Length ? Colony.AgeNames[def.unlockAge] : "later";
-                    GUILayout.Label(new GUIContent($"<size=11><color=#888>🔒 {def.displayName} — {ageName}</color></size>", Describe(def)), _small);
+                    string reason;
+                    if (!string.IsNullOrEmpty(def.requiredTech) && !Research.IsPurchased(def.requiredTech))
+                    { var t = Research.Node(def.requiredTech); reason = "research " + (t != null ? t.name : def.requiredTech); }
+                    else reason = def.unlockAge < Colony.AgeNames.Length ? Colony.AgeNames[def.unlockAge] : "later";
+                    GUILayout.Label(new GUIContent($"<size=11><color=#888>🔒 {def.displayName} — {reason}</color></size>", Describe(def)), _small);
                 }
                 else
                 {
@@ -787,14 +798,14 @@ namespace Caveman
             }
             else if (resB != null)
             {
-                var rt = Research.Current;
+                var rt = Research.CurrentTier;
                 if (rt != null)
                 {
                     string itemN = rt.item != null ? rt.item.displayName : "?";
-                    GUILayout.Label($"<size=14>Research → <b>{(Colony.Instance != null ? Colony.Instance.NextAgeName : "")}</b></size>", _small);
+                    GUILayout.Label($"<size=14>Research Lodge</size>", _small);
                     GUILayout.Label($"<size=12>Wants: <b>{itemN}</b>  <color=#bbb>({rt.pointsPerItem} pt each)</color></size>", _small);
-                    GUILayout.Label($"<size=12>Holding {resB.InBuffer.Count(rt.item)}  ·  {Research.Points}/{rt.cost} pts  ·  {resB.PointsPerMin:0.#} pts/min</size>", _small);
-                    GUILayout.Label("<size=11><color=#bbb>Belt the research item here, or place it beside a stock of it.</color></size>", _small);
+                    GUILayout.Label($"<size=12>Holding {resB.InBuffer.Count(rt.item)}  ·  pool {Research.Points} pts  ·  {resB.PointsPerMin:0.#} pts/min</size>", _small);
+                    GUILayout.Label("<size=11><color=#bbb>Belt the research item here (or place it beside a stock). Spend points in the tree (T).</color></size>", _small);
                 }
                 else GUILayout.Label("<size=13><color=#9f9>✔ All research complete</color></size>", _small);
             }
@@ -932,7 +943,7 @@ namespace Caveman
         private void DrawFooter()
         {
             GUILayout.BeginArea(new Rect(Screen.width - 330, 10, 320, 50));
-            GUILayout.Label($"<size=15>B build · G guide · Space pause · H help · M overview · N map {(_showMinimap ? "on" : "off")}</size>", _small);
+            GUILayout.Label($"<size=15>B build · <color=#9cf>T research</color> · G guide · Space pause · H help · M overview · N map {(_showMinimap ? "on" : "off")}</size>", _small);
             string sandbox = Economy.FreeBuild ? "<color=#9f9>SANDBOX</color> · " : "";
             string mode = Economy.LocalProduction ? "<color=#fc8>Local logistics</color>" : "<color=#8cf>Global pool</color>";
             GUILayout.Label($"<size=12>{sandbox}Speed x{_speed:0} · {mode} (F7) · F1–F5 sandbox</size>", _small);
@@ -940,6 +951,46 @@ namespace Caveman
         }
 
         // ---- Victory banner (shown once the Monument is completed) ----
+        // ---- Research tree (T): spend research points on age advances + building unlocks ----
+        private void DrawResearchPanel()
+        {
+            var r = new Rect(Screen.width / 2f - 200f, 80f, 400f, Mathf.Min(Screen.height - 130f, 470f));
+            _researchRect = r;
+            PanelBg(r);
+            GUILayout.BeginArea(new Rect(r.x + 14, r.y + 12, r.width - 28, r.height - 24));
+
+            GUILayout.Label($"<size=18><b>🔬 Research Tree</b></size>   <color=#9cf><b>{Research.Points} pts</b></color>", _s);
+            GUILayout.Label("<size=12><color=#bbb>Craft research items → deliver to a Research Lodge → spend points here. (T closes)</color></size>", _small);
+            GUILayout.Space(4);
+
+            _researchScroll = GUILayout.BeginScrollView(_researchScroll);
+            if (Research.Tree != null)
+                foreach (var n in Research.Tree)
+                {
+                    GUILayout.Space(3);
+                    if (n.purchased)
+                        GUILayout.Label($"<size=13><color=#9f9>✔ {n.name}</color></size>", _small);
+                    else if (!Research.PrereqMet(n))
+                    {
+                        var pre = Research.Node(n.prereq);
+                        GUILayout.Label($"<size=13><color=#888>🔒 {n.name} — {n.cost} pts <i>(needs {(pre != null ? pre.name : n.prereq)})</i></color></size>", _small);
+                    }
+                    else if (Research.CanBuy(n))
+                    {
+                        if (GUILayout.Button($"<size=13><b>{n.name}</b> — {n.cost} pts  <color=#9f9>✦ Research</color></size>", _btn))
+                            Research.Buy(n);
+                    }
+                    else // prereq met, not enough points yet
+                        GUILayout.Label($"<size=13>{n.name} — <color=#f99>{n.cost} pts</color> <color=#888>(need {n.cost - Research.Points} more)</color></size>", _small);
+
+                    if (!string.IsNullOrEmpty(n.desc))
+                        GUILayout.Label($"<size=11><color=#bbb>{n.desc}</color></size>", _small);
+                }
+            GUILayout.EndScrollView();
+            if (GUILayout.Button("<size=12>Close (T)</size>", _btn)) _showResearch = false;
+            GUILayout.EndArea();
+        }
+
         private void DrawWin()
         {
             var r = new Rect(Screen.width / 2f - 240, 150f, 480, 140);
@@ -973,8 +1024,10 @@ namespace Caveman
                 "Population grows while fed and housed. They eat Food and drink Water — running out causes decline. Beyond survival they want comfort goods (cooked food, bread, pottery, tools, clothes). How much you supply sets Happiness, which boosts productivity and growth. Growth raises demand — the escalating pull to keep scaling.");
             Section("<color=#ffcf6b>Prosperity & Rank</color>",
                 "A climbing score from population, happiness and automation (collectors, workshops, belts, routes). Your settlement ranks up: Camp → Hamlet → Village → Town → City → Metropolis.");
+            Section("<color=#cda>Research drives progress (press T)</color>",
+                "You advance by RESEARCH, not by buying ages. Craft a RESEARCH ITEM in a chain (e.g. Planks + Stone → Idea Tablet at an Idea Bench), belt it into a RESEARCH LODGE to earn research points, then open the Research Tree (T) and SPEND points to advance the Age or unlock buildings (Splitters, Conveyors, Pipes). Gathering earns no research — you must build and scale a factory. Each age needs a deeper research chain than the last.");
             Section("<color=#cda>Ages</color>",
-                "Stone → Tribal → Bronze → Iron → Industrial. Advancing costs resources + population and unlocks new buildings.");
+                "Stone → Tribal → Bronze → Iron → Industrial — each unlocked from the Research Tree. Reach Industrial and build the Monument to win.");
             Section("<color=#6c6>Bottlenecks</color>",
                 "Status dots: green working, yellow output-full (haul it out), red starved (no input), grey no worker. Problems pulse and show on the minimap. Click a building to see what it's waiting for, its rate, and to Pause it (free a scarce shared input for another).");
             Section("<color=#9f9>Expansion</color>",
