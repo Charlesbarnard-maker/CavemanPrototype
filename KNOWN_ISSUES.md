@@ -15,9 +15,13 @@ Phase 6 of the factory brief. Transport is now managed INSIDE buildings, not via
 - **Vehicles now LOAD → TRAVEL → UNLOAD with timing** (`RouteVehicle` states ToSource/Loading/
   ToDest/Unloading, ~1.5s load + 1.5s unload) instead of instant transfer — so distance + handling
   cap throughput, which is what makes multiple vehicles/routes worth building.
-- **Legacy global Route tool** (`UpdateRoutePlacement`, `RoutePickingFirst`, `BuildingKind.Route`
-  in Cats/Describe) is now unreachable (no Route buildable) but left in place — compiles, harmless;
-  remove in a later cleanup. Quest reworded to "Build 2 Stations & add a transport route".
+- **Legacy global Route tool REMOVED** (cleanup #9): deleted `UpdateRoutePlacement`,
+  `RoutePickingFirst`, `_routeA`, the Route placement-mode hint, the `BuildingKind.Route` Cats entry
+  and Describe case, and the stale help line. The `BuildingKind.Route` enum value remains (the
+  vehicle tier defs still use it as data). Quest reworded to "Build 2 Stations & add a transport route".
+- **Polish (cleanup #9):** selected-building panel is taller (210px, bottom-anchored) so the
+  Station's route buttons don't crowd the Demolish/Close row; splitter placement GHOST now shows the
+  hexagon (matches the placed splitter); README build-status refreshed.
 - **Watch:** (a) Station panel is now ~6 widgets tall — verify it doesn't clip the Demolish/Close
   row at the fixed 188px height (shrink/group if so). (b) only ONE vehicle per "+ Add route" press;
   add several for more throughput — confirm that reads clearly. (c) tier is auto-selected (newest);

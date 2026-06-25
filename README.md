@@ -32,7 +32,15 @@ logistics works, never *what* the loop is.
 - **Economy** "stored, not summoned" (`Economy.StoredOnly`) — usable pool = carried + storages;
   local production for workshops (adjacent/belt-fed).
 - **Solids logistics** hand-carry → belts (drag, auto-corner, I/O **ports**: output arrow / input
-  notch, rotate R) → depots + caravan/vehicle routes (cross-region).
+  notch, rotate R) + **Splitters** (1→2 even split) → **Stations** + transport routes (cross-region,
+  created from a Station's panel; vehicles load → travel → unload).
+- **Resources** appear in natural **clusters** (groves/outcrops): small starter clusters → dense
+  biome clusters. **Throughput ratios** are normalized to *1 lane = 60/min* (wooden belt 60,
+  conveyor 120, collector ≈60, standard machine eats 60 at 1 worker → "1 gatherer → 1 belt → 1
+  machine"). **Bottleneck cues:** belt red=dead-end / yellow=backed-up; depleting nodes grey out;
+  machine status dots + a `Needs X/min` panel line.
+- **Placement/collision** water buildings need an adjacent water cell; belts can't sit on buildings;
+  the player collides with solid buildings (workers don't yet — pending pathfinding).
 - **Liquids** (distinct system) carried water (Water Hole) → **pipes + mechanical Pump** → direct
   pipe-fed consumers + barrels → **pressure/range + Booster Pumps**. Water is a liquid: never on belts.
 - **Construction** logistics-driven (builders haul materials from storage) + visible **builder

@@ -52,7 +52,7 @@ namespace Caveman
         private static readonly (string label, BuildingKind[] kinds)[] Cats =
         {
             ("Production", new[] { BuildingKind.Collector, BuildingKind.Workshop, BuildingKind.Power, BuildingKind.Research }),
-            ("Logistics", new[] { BuildingKind.Belt, BuildingKind.Bridge, BuildingKind.Pipe, BuildingKind.Pump, BuildingKind.Depot, BuildingKind.Route }),
+            ("Logistics", new[] { BuildingKind.Belt, BuildingKind.Bridge, BuildingKind.Pipe, BuildingKind.Pump, BuildingKind.Depot }),
             ("Infrastructure", new[] { BuildingKind.Build, BuildingKind.Storage }),
             ("Settlement", new[] { BuildingKind.Housing }),
         };
@@ -464,13 +464,6 @@ namespace Caveman
                     GUILayout.Label($"<b>Laying Belt</b> — facing <color=#9cf>{builder.BeltDir}</color>  <size=14>(R to rotate)</size>", _s);
                     GUILayout.Label("<size=14>click or drag to lay · right-click to finish</size>", _small);
                 }
-                else if (def.kind == BuildingKind.Route)
-                {
-                    GUILayout.Label(builder.RoutePickingFirst
-                        ? "<b>Caravan route</b> — click the <color=#9cf>FROM</color> depot"
-                        : "<b>Caravan route</b> — click the <color=#9cf>TO</color> depot", _s);
-                    GUILayout.Label("<size=14>right-click to finish</size>", _small);
-                }
                 else
                 {
                     bool isColl = def.kind == BuildingKind.Collector;
@@ -638,9 +631,7 @@ namespace Caveman
                 case BuildingKind.Belt:
                     return $"Conveyor — carries items one cell in the way it faces ({(def.interval <= 0.6f ? "fast tier" : "slow tier")}). Click/drag to lay a line, R to rotate. Feeds storage or workshop inputs.{age}";
                 case BuildingKind.Depot:
-                    return $"Long-distance transfer station. Belt goods in/out and link two depots with a route vehicle. Holds {def.capacity}.{age}";
-                case BuildingKind.Route:
-                    return $"Sends a vehicle between two depots, hauling goods over distance (travel time scales with distance). Capacity {def.capacity}. Pick the FROM depot, then the TO depot.{age}";
+                    return $"Transport Station. Belt goods in, then SELECT it and add a route to another Station — a vehicle hauls goods across the map (load → travel → unload). Holds {def.capacity}.{age}";
                 default:
                     return def.displayName;
             }
@@ -652,9 +643,10 @@ namespace Caveman
             var sel = builder != null ? builder.Selected : null;
             if (sel == null) { _selShown = false; return; }
 
-            // Sit above the minimap when it's shown, so the two never overlap.
-            float panelY = _showMinimap ? Screen.height - 384 : Screen.height - 200;
-            var rect = new Rect(Screen.width - 290, panelY, 278, 188);
+            // Sit above the minimap when it's shown, so the two never overlap. Taller now so the
+            // Station's route buttons don't crowd out the Demolish/Close row (kept bottom-anchored).
+            float panelY = _showMinimap ? Screen.height - 406 : Screen.height - 222;
+            var rect = new Rect(Screen.width - 290, panelY, 278, 210);
             _selRect = rect;
             _selShown = true;
 
@@ -1017,7 +1009,7 @@ namespace Caveman
                 "• Collectors/workshops need WORKERS — each is one person.\n" +
                 "• <b>Logistics matter:</b> a workshop only runs on inputs that ARRIVE — belt-fed or\n" +
                 "  in an ADJACENT storage/machine. Lay it out so each machine is fed. (F7 = old mode.)\n" +
-                "• Lay Belts (Bronze) — or Depots + a Caravan route — to move goods to storage.\n" +
+                "• Lay Belts/Splitters — or Stations + a transport route — to move goods to storage.\n" +
                 "• Click a building to manage it (workers, demolish).\n" +
                 "• People need Food + Housing. Space = pause, Esc = cancel.\n" +
                 "• <b>X</b> or <b>Delete</b> removes the building under the cursor (fast un-do). " +
