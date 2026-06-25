@@ -3,6 +3,22 @@
 A running record so progress/problems don't get lost. Newest first. Move items to
 **Fixed** when done. Maintained alongside the code — see DESIGN.md for the roadmap.
 
+## Belt / port / storage polish (2026-06-25 #3) — most recent
+- **Warehouses now have a belt OUTPUT** (belts pull from a storage's output side) — you can
+  conveyor warehouse → sawmill. I/O audit confirmed all belt buildings symmetric: collector=out,
+  workshop=in+out, storage=in+out, depot=both; power/yard/housing/bridge/pipe/pump have no belt I/O.
+- **Per-cell ports**: multi-cell buildings (2×2 warehouse/smelter) draw a port marker PER EDGE CELL
+  (`Ports.PlacePorts`), aligned to the belt grid → a 2×2 warehouse = 2 inputs + 2 outputs that line
+  up with conveyors. (Belt logic was already per-cell; only the markers were wrong.)
+- **Per-item belt icons**: `ItemDefinition.icon` (placeholder shapes by material family now — wood/
+  planks=triangle, minerals=hexagon, manufactured=square, organics=round dot). **Real per-item art
+  slots into `icon` later with no rewrite.**
+- **Belt-delete visual fixed**: a blocked belt (dead-end after deleting a middle piece, or backed
+  up) now HOLDS its item at the front and stops animating (`Belt._blocked`) instead of looping
+  toward the gap — broken belts read as "stuck", not phantom-travelling.
+- **Open/next:** placement GHOST still shows a single orientation marker (not per-cell) — cosmetic;
+  per-cell friction (forest slow / hills mining-only) is the next planned gameplay step.
+
 ## Refinement + critical-review pass (2026-06-25 #2)
 **Issues found (review of the prior pass):**
 1. **Discoverability / Iron soft-lock [worst]:** ore/forest/clay were placed in *randomly-located,
