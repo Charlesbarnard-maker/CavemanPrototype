@@ -3,7 +3,31 @@
 A running record so progress/problems don't get lost. Newest first. Move items to
 **Fixed** when done. Maintained alongside the code — see DESIGN.md for the roadmap.
 
-## Playtest feedback batch — 8 of 9 items (2026-06-26 #16) — most recent
+## New playtest feedback #17 — part 1: collector range ring + click-to-close age card (2026-06-26) — most recent
+First slice of a 6-item playtest batch (range indicator / popup / belts / progression). Whole batch
+mapped with a 6-agent workflow; this slice 2-lens adversarially verified (PASS, 0 compile blockers).
+**NOT yet Unity-compiled — needs the recompile + playtest.**
+- **1. Collector RANGE ring + node glow (#1).** Selecting a collector now draws a translucent yellow
+  ring at its harvest radius (`sourceRange` = 6u) via a `LineRenderer`, and brightens the resource
+  nodes within reach (reuses `ResourceNode.SetHighlighted`). Clears on deselect / hidden while placing.
+  New: `BuildController.UpdateCollectorRange` + `DrawRangeRing` (called before the placement glow so
+  starting a placement re-lights cleanly). Placement still glows all nodes of the target type, as before.
+- **3. Age-advance card is CLICK-TO-CLOSE (#3).** The "🎉 \<Age\> reached!" card no longer auto-fades
+  after 8.5s — it persists until dismissed: a **"Got it ✓" button** OR a click anywhere on the card.
+  `_ageCardT` is now a shown-flag (set 1f, cleared 0f); the card rect is added to the `PointerOverUI`
+  test so the dismiss click doesn't leak into the world. Always enough time to read the new-buildings tips.
+  (`InventoryHud.DrawAgeCard` + the removed per-frame decrement.)
+- **Watch / nits (non-blocking, from verify):** (a) a range-lit node that depletes WHILE its collector
+  stays selected keeps glowing (won't show the exhausted shade) until you deselect — cosmetic only.
+  (b) `ResourceNode.SetHighlighted` is a plain bool toggle shared by the placement glow + the range
+  glow; they don't fight today only because "collector selected" and "placing a collector" are
+  mutually exclusive in time (could refcount later if that ever changes).
+- **Also:** committed the previously-untracked `Harvester.cs.meta` (Unity-generated GUID, was missed in #16).
+- **Next in this batch:** B1 belt look/feel (splitter/merger in-out arrows + drop-on-belt, item piling,
+  conveyor visuals) · B2 belt tiers (wooden→30/min, 4-tier ladder + costs + overlay-upgrade) · C
+  progression depth (ore→iron/copper, multi-stage chains, per-age special item + build/delivery gate).
+
+## Playtest feedback batch — 8 of 9 items (2026-06-26 #16)
 Verified by a 3-lens adversarial workflow (PASS, 0 blockers). Items by the user's list:
 1. **Visual cutters BACK (cosmetic).** New `Harvester.cs` — a little NPC each collector sends out to
    walk → chop (shakes the node) → carry home, on a loop. Pure eye-candy; does NOT gather or gate

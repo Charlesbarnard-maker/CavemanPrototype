@@ -52,9 +52,11 @@ namespace Caveman
         private readonly List<(string label, int value, string detail, Color color)> _chips = new();
         private GUIStyle _toast;
         private int _lastAge = -1;
-        // Temporary "what just changed" card shown on an age advance, then fades (Priority 2).
-        private float _ageCardT;
+        // "What just changed" card shown on an age advance. It now PERSISTS until the player
+        // dismisses it (click-to-close), so the new-buildings tips are never missed.
+        private float _ageCardT;             // >0 = the card is shown (no longer a countdown)
         private string _ageCardTitle, _ageCardBody;
+        private Rect _ageCardRect;           // cached each draw for the click-to-dismiss hit-test
 
         // Meta-groups keep the menu to a handful of headers (not one per building kind).
         private static readonly (string label, BuildingKind[] kinds)[] Cats =
@@ -132,7 +134,8 @@ namespace Caveman
             // Toasts fade out.
             for (int i = 0; i < Toast.Items.Count; i++) Toast.Items[i].t -= Time.unscaledDeltaTime;
             Toast.Items.RemoveAll(t => t.t <= 0f);
-            if (_ageCardT > 0f) _ageCardT -= Time.unscaledDeltaTime; // age-change card fades
+            // The age-advance card no longer auto-dismisses — it stays up until the player clicks
+            // "Got it" / the card (see DrawAgeCard), so there's always time to read the new tips.
 
             // One-time onboarding hint the first time a workshop starves under local
             // production — so a new player learns inputs must be delivered, not pooled.
@@ -191,29 +194,36 @@ namespace Caveman
             _ageCardBody = $"<b>New buildings:</b> {unlocked}"
                 + (string.IsNullOrEmpty(rule) ? "" : $"\n{rule}")
                 + "\n<color=#9cf>🔬 Press T to research what's next  ·  B to build.</color>";
-            _ageCardT = 8.5f; // visible, then fades (see DrawAgeCard)
+            _ageCardT = 1f; // a "shown" flag now — the card stays up until dismissed (DrawAgeCard)
         }
 
-        // The temporary age-transition card: an explicit "what just changed" moment that fades
-        // away (no permanent panel). Centred upper-middle so it doesn't sit on the build area.
+        // The age-transition card: an explicit "what just changed" moment. It PERSISTS until the
+        // player dismisses it (a "Got it" button OR a click anywhere on the card), so the tips never
+        // vanish before they're read. Centred upper-middle so it doesn't sit on the build area.
         private void DrawAgeCard()
         {
             if (_ageCardT <= 0f || string.IsNullOrEmpty(_ageCardBody)) return;
-            float a = Mathf.Clamp01(_ageCardT / 1.5f); // fade over the final 1.5s
             float w = Mathf.Min(600f, Screen.width - 40f);
             float inner = w - 36f;
-            // Auto-size height to the wrapped content so a long "New buildings:" list never clips.
+            // Auto-size height to the wrapped content (so a long "New buildings:" list never clips)
+            // plus a row for the dismiss button.
             string title = $"<size=20>{_ageCardTitle}</size>", body = $"<size=14>{_ageCardBody}</size>";
-            float h = _s.CalcHeight(new GUIContent(title), inner) + _small.CalcHeight(new GUIContent(body), inner) + 34f;
+            float h = _s.CalcHeight(new GUIContent(title), inner)
+                    + _small.CalcHeight(new GUIContent(body), inner) + 34f + 30f;
             var r = new Rect(Screen.width / 2f - w / 2f, 188f, w, h); // below the toast stack (~124+) so they don't overlap
-            var prev = GUI.color;
-            GUI.color = new Color(1f, 1f, 1f, a);
+            _ageCardRect = r;
             PanelBg(r);
             GUILayout.BeginArea(new Rect(r.x + 18, r.y + 12, inner, h - 24));
             GUILayout.Label(title, _s);
             GUILayout.Label(body, _small);
+            GUILayout.Space(4f);
+            if (GUILayout.Button("<b>Got it ✓</b>   <size=11>(or click this card)</size>", _btn)) _ageCardT = 0f;
             GUILayout.EndArea();
-            GUI.color = prev;
+
+            // Click anywhere on the card (outside the button) also dismisses it. If the button was
+            // pressed, GUILayout.Button already consumed the event (type==Used) so this won't double-fire.
+            var e = Event.current;
+            if (e.type == EventType.MouseDown && r.Contains(e.mousePosition)) { _ageCardT = 0f; e.Use(); }
         }
 
         void OnDisable() => Time.timeScale = 1f;
@@ -272,7 +282,8 @@ namespace Caveman
                 PointerOverUI = modal
                                 || (_buildShown && _buildRect.Contains(m)) || (_selShown && _selRect.Contains(m))
                                 || _topRect.Contains(m) || _miniRect.Contains(m) || _objRect.Contains(m)
-                                || _finderRect.Contains(m);
+                                || _finderRect.Contains(m)
+                                || (_ageCardT > 0f && _ageCardRect.Contains(m));
             }
         }
 

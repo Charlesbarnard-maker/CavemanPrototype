@@ -101,11 +101,22 @@ namespace Caveman
         private readonly Belt.Dir[] _ghostOutSides = new Belt.Dir[1];
         private readonly Belt.Dir[] _ghostInSides = new Belt.Dir[4];
 
+        // Collector range overlay (#1): a ring around the selected collector + a glow on the
+        // resource nodes within its harvest reach, so "what this collector can reach" is visible.
+        private GameObject _ringGo;
+        private LineRenderer _ring;
+        private const int RingSegments = 48;
+        private readonly List<ResourceNode> _rangeLit = new();
+        private ProductionBuilding _rangeFor;
+
         void Awake() => _cam = Camera.main;
 
         void Update()
         {
             UpdateHighlight();
+            // Selected-collector harvest reach (ring + in-range node glow). Runs BEFORE the
+            // placement highlight so that starting a placement cleanly re-lights the nodes.
+            UpdateCollectorRange();
             // While placing a collector, make its target resource patches glow so it's
             // obvious where it must go. Cleared whenever we're not placing a collector.
             var pd = PendingDef;
@@ -225,6 +236,55 @@ namespace Caveman
                 _highlight.transform.localScale = Vector3.one * (1.25f + 0.08f * Mathf.Sin(Time.unscaledTime * 5f));
             }
             else if (_highlight.activeSelf) _highlight.SetActive(false);
+        }
+
+        // Ring + node glow for the SELECTED collector, so its harvest reach is visible. The
+        // in-range node set is recomputed only when the selection changes (cheap), then those
+        // nodes are brightened via the same SetHighlighted hook the placement glow uses.
+        private void UpdateCollectorRange()
+        {
+            var pb = Selected != null ? Selected.GetComponent<ProductionBuilding>() : null;
+            if (_rangeFor != pb)
+            {
+                foreach (var n in _rangeLit) if (n != null) n.SetHighlighted(false);
+                _rangeLit.Clear();
+                _rangeFor = pb;
+                if (pb != null && pb.produces != null)
+                {
+                    float r = pb.sourceRange;
+                    foreach (var n in ResourceNode.All)
+                        if (n != null && n.yields == pb.produces && n.HasResource
+                            && ((Vector2)(n.transform.position - pb.transform.position)).sqrMagnitude <= r * r)
+                        { n.SetHighlighted(true); _rangeLit.Add(n); }
+                }
+            }
+            if (pb != null) DrawRangeRing(pb.transform.position, pb.sourceRange);
+            else if (_ringGo != null && _ringGo.activeSelf) _ringGo.SetActive(false);
+        }
+
+        // A translucent circle (LineRenderer) marking a collector's harvest radius.
+        private void DrawRangeRing(Vector3 center, float radius)
+        {
+            if (_ringGo == null)
+            {
+                _ringGo = new GameObject("CollectorRange");
+                _ring = _ringGo.AddComponent<LineRenderer>();
+                var sh = Shader.Find("Sprites/Default");
+                if (sh != null) _ring.material = new Material(sh);
+                _ring.widthMultiplier = 0.12f;
+                _ring.loop = true;
+                _ring.useWorldSpace = true;
+                _ring.numCornerVertices = 0;
+                _ring.positionCount = RingSegments;
+                _ring.startColor = _ring.endColor = new Color(1f, 0.95f, 0.4f, 0.5f);
+                _ring.sortingOrder = 3; // under the selection square (4), above the ground
+            }
+            if (!_ringGo.activeSelf) _ringGo.SetActive(true);
+            for (int i = 0; i < RingSegments; i++)
+            {
+                float a = (i / (float)RingSegments) * Mathf.PI * 2f;
+                _ring.SetPosition(i, new Vector3(center.x + Mathf.Cos(a) * radius, center.y + Mathf.Sin(a) * radius, 0f));
+            }
         }
 
         public bool IsUnlocked(BuildingDefinition def) =>
