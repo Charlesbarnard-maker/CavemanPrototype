@@ -132,7 +132,7 @@ namespace Caveman
             booster.color = new Color(0.45f, 0.62f, 0.72f);
             booster.cost = new List<ItemAmount> { new ItemAmount(planks, 3), new ItemAmount(stone, 3) };
             booster.description = "Re-pressurises a pipe network next to it, extending how far water reaches. No water source needed — place it partway along a long pipe run so distant consumers stop starving. Chain several for very long networks.";
-            var sawmill = MakeWorkshop("Sawmill", planks, 1, 2.0f, 2, 12, new Color(0.66f, 0.50f, 0.30f),
+            var sawmill = MakeWorkshop("Sawmill", planks, 1, 3.0f, 2, 12, new Color(0.66f, 0.50f, 0.30f),
                 new List<ItemAmount> { new ItemAmount(wood, 2) },
                 new ItemAmount(wood, 6), new ItemAmount(stone, 4));
             // Campfire: needs Wood as fuel and Water to cook, plus the raw Food.
@@ -228,6 +228,14 @@ namespace Caveman
             splitter.color = new Color(0.45f, 0.62f, 0.72f);
             splitter.cost = new List<ItemAmount> { new ItemAmount(wood, 2) };
             splitter.description = "1→2 SPLITTER: pulls from behind and sends items EVENLY to two outputs — forward and to its right (R rotates). If one output backs up it sends to the other, so it never stalls. Feed two machines from one supply line. (Smart/filtered splitters come later.)";
+            // Merger: the reverse of a splitter — COMBINES two belt lines into one. Needed because a
+            // plain belt now refuses a 2nd feeder (no silent merging by pointing a belt onto a line).
+            var merger = ScriptableObject.CreateInstance<BuildingDefinition>();
+            merger.displayName = "Merger"; merger.kind = BuildingKind.Belt; merger.merger = true; merger.unlockAge = 0;
+            merger.interval = 0.5f;
+            merger.color = new Color(0.72f, 0.55f, 0.45f);
+            merger.cost = new List<ItemAmount> { new ItemAmount(wood, 2) };
+            merger.description = "N→1 MERGER: combines belt lines — point two belts into it and it pushes their items out forward (R rotates). Plain belts refuse a 2nd feeder, so a Merger is how you deliberately join two lanes of the same item.";
 
             // Exploration payoff: Ore is mined from distant veins, hauled home, and is
             // required to reach the Iron Age.
@@ -279,7 +287,7 @@ namespace Caveman
 
             // --- Hand-written descriptions for buildings that need strategic context
             //     (everything else auto-generates a full tooltip from its data). ---
-            sawmill.description = "Wood → Planks. The baseline chain: a Sawmill eats 60 Wood/min — exactly one Wood Hut down one belt (1 collector → 1 belt → 1 machine). Runs automatically once fed.";
+            sawmill.description = "Wood → Planks. Runs automatically once fed. A Sawmill eats ~40 Wood/min and makes ~20 Planks/min — one Wood Hut (60/min) over-feeds it, so wood backs up. Build a 2nd Sawmill (split the wood belt) to use the surplus and double your planks: the first 'build more / split' bottleneck.";
             campfire.description = "Food + Wood + Water → Cooked Food. Runs automatically once its inputs are delivered.";
             charcoalBurner.description = "Wood → Charcoal. Charcoal feeds BOTH the Kiln and the Smelter — scaling one can starve the other. A key shared-bottleneck.";
             kiln.description = "Clay + Charcoal → Bricks. Charcoal is shared with the Smelter, so watch that bottleneck. Bricks build advanced structures.";
@@ -290,7 +298,7 @@ namespace Caveman
             jeweler.description = "Gems → Jewelry, a high-value luxury good. Pairs with long-haul routes to bring distant gems home.";
             monumentBldg.description = "ENDGAME: pour Metal + Tools + Bricks + Planks in to produce Monument Blocks. Make 10 to WIN. A massive, sustained resource sink.";
             mason.description = "Stone → Stone Blocks (Stone's own processing chain). Stone Blocks build the sturdy Stone House.";
-            warehouse.description = "The GENERAL store: YOU pick which one resource it holds (open its panel, or it adopts the first item a belt delivers). Use the named stores (Woodpile/Granary/Water Barrel/…) for the basics; reach for a Warehouse when routing belt goods or feeding a workshop by adjacency.";
+            warehouse.description = "Warehouse — stores ONE resource of your choice (Stone, Ore, Planks, anything). It adopts the first item a belt delivers, or pick it in the panel. This one building replaces a separate store per resource.";
 
             // --- RESEARCH SYSTEM: the progression spine. Each age is unlocked by crafting that
             //     tier's RESEARCH ITEM (a multi-input factory product) and delivering it to a
@@ -324,17 +332,17 @@ namespace Caveman
             {
                 new Research.Tier { targetAge = 1, item = ideaTablet,  pointsPerItem = 1 },  // craft at Stone
                 new Research.Tier { targetAge = 2, item = studyScroll, pointsPerItem = 2 },  // craft at Tribal
-                new Research.Tier { targetAge = 3, item = schematic,   pointsPerItem = 3 },  // craft at Bronze
-                new Research.Tier { targetAge = 4, item = blueprint,   pointsPerItem = 5 },  // craft at Iron
+                new Research.Tier { targetAge = 3, item = schematic,   pointsPerItem = 4 },  // craft at Bronze
+                new Research.Tier { targetAge = 4, item = blueprint,   pointsPerItem = 8 },  // craft at Iron
             };
             // The spendable research TREE (press T to open). Age spine (each needs the prior) + a few
-            // building-unlock branches you CHOOSE to spend points on. Age costs scale 20→50→100→200.
+            // building-unlock branches you CHOOSE to spend points on. Age costs scale 12→60→160→360.
             Research.Tree = new List<Research.Tech>
             {
                 new Research.Tech { id = "tribal",     name = "Tribal Age",     cost = 12,  advanceToAge = 1, prereq = null,     desc = "Advance to the Tribal Age — Charcoal & Clay open up deeper production." },
-                new Research.Tech { id = "bronze",     name = "Bronze Age",     cost = 50,  advanceToAge = 2, prereq = "tribal", desc = "Advance to the Bronze Age — Kiln & Bricks, Pottery, the start of smelting." },
-                new Research.Tech { id = "iron",       name = "Iron Age",       cost = 100, advanceToAge = 3, prereq = "bronze", desc = "Advance to the Iron Age — Ore mining, Metal smelting, Toolmaking." },
-                new Research.Tech { id = "industrial", name = "Industrial Age", cost = 200, advanceToAge = 4, prereq = "iron",   desc = "Advance to the Industrial Age — Power, the Monument, the endgame." },
+                new Research.Tech { id = "bronze",     name = "Bronze Age",     cost = 60,  advanceToAge = 2, prereq = "tribal", desc = "Advance to the Bronze Age — Kiln & Bricks, Pottery, the start of smelting." },
+                new Research.Tech { id = "iron",       name = "Iron Age",       cost = 160, advanceToAge = 3, prereq = "bronze", desc = "Advance to the Iron Age — Ore mining, Metal smelting, Toolmaking." },
+                new Research.Tech { id = "industrial", name = "Industrial Age", cost = 360, advanceToAge = 4, prereq = "iron",   desc = "Advance to the Industrial Age — Power, the Monument, the endgame." },
                 new Research.Tech { id = "splitters",  name = "Splitters",      cost = 15,  prereq = "tribal", unlocks = new List<BuildingDefinition>{ splitter },          desc = "Unlocks the 1→2 Splitter — feed two machines from one supply line." },
                 new Research.Tech { id = "conveyors",  name = "Conveyor Belts", cost = 30,  prereq = "bronze", unlocks = new List<BuildingDefinition>{ fastBelt },          desc = "Unlocks the fast Conveyor Belt (120/min — 2× the wooden lane)." },
             };
@@ -379,9 +387,10 @@ namespace Caveman
               // Research
               ideaBench, scrollMaker, draftingTable, engineeringLab, researchLodge,
               // Logistics
-              woodBelt, fastBelt, splitter, depot, bridge,
-              // Storage
-              woodStore, stoneStore, clayStore, brickStore, oreStore, warehouse,
+              woodBelt, fastBelt, splitter, merger, depot, bridge,
+              // Storage — Woodpile for the starter resource + one configurable Warehouse for
+              // everything else (stone/ore/planks/…), so storage doesn't eat menu slots.
+              woodStore, clayStore, brickStore, warehouse,
               // Infrastructure / power / endgame
               generator, monumentBldg };
             // Transport vehicles are NOT in the build menu — they're created from a Station's panel.

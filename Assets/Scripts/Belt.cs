@@ -26,6 +26,11 @@ namespace Caveman
         public bool isSplitter;
         private bool _splitToggle;
 
+        // Merger: an N→1 belt that ACCEPTS hand-offs from any feeder (used to deliberately combine
+        // two belt lines). Normal belts reject a 2nd feeder (so you can't silently merge by pointing
+        // a belt onto a line — you must place a Merger; see AcceptsHandoffFrom).
+        public bool isMerger;
+
         private float _timer;
         private SpriteRenderer _sr;
         private SpriteRenderer _dot; // visible item sliding along the belt
@@ -50,15 +55,15 @@ namespace Caveman
 
         public static float Angle(Dir d) => d switch { Dir.N => 0f, Dir.E => -90f, Dir.S => 180f, _ => 90f };
 
-        public static Belt Spawn(Vector2Int cell, Dir dir, float interval = 0.5f, bool isSplitter = false)
+        public static Belt Spawn(Vector2Int cell, Dir dir, float interval = 0.5f, bool isSplitter = false, bool isMerger = false)
         {
-            var go = new GameObject(isSplitter ? "Splitter" : "Belt");
+            var go = new GameObject(isSplitter ? "Splitter" : isMerger ? "Merger" : "Belt");
             go.transform.position = new Vector3(cell.x, cell.y, 0f);
             go.transform.localScale = Vector3.one * 0.8f;
             go.transform.rotation = Quaternion.Euler(0f, 0f, Angle(dir));
 
             var sr = go.AddComponent<SpriteRenderer>();
-            sr.sprite = isSplitter ? PlaceholderArt.Hexagon() : PlaceholderArt.Triangle(); // splitter looks distinct
+            sr.sprite = isSplitter || isMerger ? PlaceholderArt.Hexagon() : PlaceholderArt.Triangle(); // splitter/merger distinct
             sr.sortingOrder = 1;
 
             go.AddComponent<BoxCollider2D>(); // clickable to demolish
@@ -66,6 +71,7 @@ namespace Caveman
             var b = go.AddComponent<Belt>();
             b.dir = dir;
             b.isSplitter = isSplitter;
+            b.isMerger = isMerger;
             b._inDir = Opposite(dir); // default: item enters from directly behind
             b.interval = Mathf.Max(0.05f, interval);
             b._sr = sr;
@@ -84,6 +90,27 @@ namespace Caveman
         // Reset the move timer on receive so the item dwells a full interval here and the
         // dot animates from the entry edge — no popping to a free-running clock's position.
         public void Receive(ItemDefinition i, Dir fromEdge) { item = i; count++; _inDir = fromEdge; _timer = 0f; }
+
+        // Whether this belt accepts a hand-off pushed by belt `from`. A MERGER accepts any feeder.
+        // A normal belt accepts only ONE upstream: the belt directly behind it (a straight run), or
+        // — if nothing is directly behind — the single first side-feeder (one corner). Any 2nd feeder
+        // is rejected (it backs up), so you can't silently merge two lines: place a Merger instead.
+        public bool AcceptsHandoffFrom(Belt from)
+        {
+            if (isMerger) return true;
+            var behind = _cell + Step(Opposite(dir));
+            if (from._cell == behind) return true;   // inline / straight feeder — always allowed
+            if (At(behind) != null) return false;     // a straight feeder exists → side feeders blocked
+            // No straight feeder: allow the FIRST side-belt that points into me (deterministic), reject others.
+            for (int di = 0; di < 4; di++)
+            {
+                var nc = _cell + Step((Dir)di);
+                if (nc == behind) continue;
+                var nb = At(nc);
+                if (nb != null && nb._cell + Step(nb.dir) == _cell) return nb == from; // it points into me
+            }
+            return false;
+        }
 
         public static Dir Opposite(Dir d) => (Dir)(((int)d + 2) % 4);
         public static Dir FromTo(Vector2Int a, Vector2Int b)
@@ -188,8 +215,8 @@ namespace Caveman
                 && (item == null || w.WantsInput(item))) return true;
             if (WorldGrid.Depots.TryGetValue(ahead, out var dp) && dp != null
                 && (item == null || dp.item == null || dp.item == item)) return true; // depots omnidirectional
-            if (WorldGrid.Research.TryGetValue(ahead, out var rb) && rb != null
-                && (item == null || rb.Accepts(item))) return true; // research sink (omnidirectional)
+            if (WorldGrid.Research.TryGetValue(ahead, out var rb) && rb != null && d == rb.OutputSide
+                && (item == null || rb.Accepts(item))) return true; // research sink — input side only
             if (At(ahead) != null) return LeadsToSink(_cell, d); // follow the chain
             return false;
         }
@@ -238,8 +265,10 @@ namespace Caveman
             var nb = At(ahead);
             if (nb != null)
             {
-                // The item enters the next belt from the edge facing us (Opposite our dir).
-                if (nb.CanAccept(item)) { nb.Receive(item, Opposite(d)); count--; if (count <= 0) item = null; return true; }
+                // The item enters the next belt from the edge facing us (Opposite our dir). A normal
+                // belt only accepts ONE feeder (straight or a single corner) — a 2nd feeder is rejected
+                // (it backs up) so you must place a MERGER to combine two lines.
+                if (nb.CanAccept(item) && nb.AcceptsHandoffFrom(this)) { nb.Receive(item, Opposite(d)); count--; if (count <= 0) item = null; return true; }
                 return false;
             }
 
@@ -268,8 +297,8 @@ namespace Caveman
                 dp.store.Add(item, 1); count--; if (count <= 0) item = null; return true;
             }
 
-            // ...or into a Research Lodge, if it's the item currently being researched.
-            if (WorldGrid.Research.TryGetValue(ahead, out var rb) && rb != null && rb.Accepts(item))
+            // ...or into a Research Lodge, on its INPUT side, if it's a research item.
+            if (WorldGrid.Research.TryGetValue(ahead, out var rb) && rb != null && d == rb.OutputSide && rb.Accepts(item))
             {
                 if (rb.InBuffer.Total() >= rb.InBuffer.capacity) return false;
                 rb.InBuffer.Add(item, 1); count--; if (count <= 0) item = null; return true;

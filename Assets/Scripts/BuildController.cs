@@ -38,18 +38,22 @@ namespace Caveman
         public Depot LinkFrom { get; private set; } // the Station we're drawing a route FROM (or null)
         private BuildingDefinition _linkTier;
 
-        /// <summary>Newest unlocked vehicle tier (highest unlockAge ≤ current age; ties → bigger).</summary>
+        /// <summary>Best vehicle tier the player can AFFORD right now (newest/biggest first). Falls
+        /// back to the cheapest unlocked tier when nothing is affordable, so the panel still shows a
+        /// tier + its cost to gather toward (instead of dead-ending on an unaffordable top tier).</summary>
         public BuildingDefinition BestRouteTier()
         {
-            BuildingDefinition best = null;
             int age = Colony.Instance != null ? Colony.Instance.Age : 0;
+            BuildingDefinition bestAfford = null, fallback = null;
             foreach (var t in routeTiers)
             {
                 if (t == null || t.unlockAge > age) continue;
-                if (best == null || t.unlockAge > best.unlockAge
-                    || (t.unlockAge == best.unlockAge && t.capacity > best.capacity)) best = t;
+                if (fallback == null || t.unlockAge < fallback.unlockAge) fallback = t; // earliest = cheapest
+                if (Economy.CanAfford(t.cost, Carried)
+                    && (bestAfford == null || t.unlockAge > bestAfford.unlockAge
+                        || (t.unlockAge == bestAfford.unlockAge && t.capacity > bestAfford.capacity))) bestAfford = t;
             }
-            return best;
+            return bestAfford ?? fallback;
         }
 
         /// <summary>Start drawing a route from this Station; the next Station click completes it.</summary>
@@ -60,7 +64,7 @@ namespace Caveman
             if (_linkTier == null) { Toast.Show("<color=#f99>No transport vehicle unlocked yet.</color>"); return; }
             CancelPlacement(); // leave any build-placement mode
             LinkFrom = from;
-            Toast.Show($"<color=#ffd24d>Click a destination Station for the {_linkTier.displayName} (Esc cancels).</color>");
+            Toast.Show($"<color=#ffd24d>Click the DESTINATION Station.</color> A {_linkTier.displayName} will auto-shuttle goods between them — no track to lay. (Esc cancels.)");
         }
 
         public void CancelLink() { LinkFrom = null; _linkTier = null; }
@@ -261,7 +265,7 @@ namespace Caveman
             // on BuildDir; input (cyan notch) is opposite. Belts pull output only from the
             // arrow side and deliver inputs only on the notch side.
             bool hasPorts = def.kind == BuildingKind.Collector || def.kind == BuildingKind.Workshop
-                            || def.kind == BuildingKind.Storage;
+                            || def.kind == BuildingKind.Storage || def.kind == BuildingKind.Research;
             if (hasPorts && kb != null && kb.rKey.wasPressedThisFrame) BuildDir = Belt.RotateCW(BuildDir);
 
             Vector3 raw = _cam.ScreenToWorldPoint(mouse.position.ReadValue());
@@ -318,7 +322,8 @@ namespace Caveman
         {
             bool hasOut = def.kind == BuildingKind.Collector || def.kind == BuildingKind.Workshop
                           || def.kind == BuildingKind.Storage;
-            bool hasIn = def.kind == BuildingKind.Workshop || def.kind == BuildingKind.Storage;
+            bool hasIn = def.kind == BuildingKind.Workshop || def.kind == BuildingKind.Storage
+                         || def.kind == BuildingKind.Research; // Lodge = input only
             bool multiIn = def.kind == BuildingKind.Workshop && def.inputs != null && def.inputs.Count > 1;
 
             _ghostOutSides[0] = BuildDir;
@@ -440,7 +445,7 @@ namespace Caveman
             _ghost.transform.position = new Vector3(cell.x, cell.y, 0f);
             _ghost.transform.rotation = Quaternion.Euler(0f, 0f, Belt.Angle(dir));
             _ghost.transform.localScale = Vector3.one * 0.8f;
-            _ghostSr.sprite = def.splitter ? PlaceholderArt.Hexagon() : PlaceholderArt.Triangle(); // splitter looks distinct
+            _ghostSr.sprite = def.splitter || def.merger ? PlaceholderArt.Hexagon() : PlaceholderArt.Triangle(); // splitter/merger distinct
 
             bool affordable = Economy.CanAfford(def.cost, Carried);
             // Belts can't sit on water (unless bridged) OR on top of a building.
@@ -487,7 +492,7 @@ namespace Caveman
             if (SolidBuildingAt(new Vector3(cell.x, cell.y, 0f))) return; // never lay a belt on a building
             if (!Economy.CanAfford(def.cost, Carried)) return;
             Economy.Spend(def.cost, Carried);
-            Belt.Spawn(cell, d, def.interval, def.splitter);
+            Belt.Spawn(cell, d, def.interval, def.splitter, def.merger);
             BuildingsPlaced++;
         }
 

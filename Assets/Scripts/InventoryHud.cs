@@ -200,14 +200,18 @@ namespace Caveman
         {
             if (_ageCardT <= 0f || string.IsNullOrEmpty(_ageCardBody)) return;
             float a = Mathf.Clamp01(_ageCardT / 1.5f); // fade over the final 1.5s
-            float w = Mathf.Min(560f, Screen.width - 40f);
-            var r = new Rect(Screen.width / 2f - w / 2f, 132f, w, 116f);
+            float w = Mathf.Min(600f, Screen.width - 40f);
+            float inner = w - 36f;
+            // Auto-size height to the wrapped content so a long "New buildings:" list never clips.
+            string title = $"<size=20>{_ageCardTitle}</size>", body = $"<size=14>{_ageCardBody}</size>";
+            float h = _s.CalcHeight(new GUIContent(title), inner) + _small.CalcHeight(new GUIContent(body), inner) + 34f;
+            var r = new Rect(Screen.width / 2f - w / 2f, 188f, w, h); // below the toast stack (~124+) so they don't overlap
             var prev = GUI.color;
             GUI.color = new Color(1f, 1f, 1f, a);
             PanelBg(r);
-            GUILayout.BeginArea(new Rect(r.x + 18, r.y + 12, r.width - 36, r.height - 24));
-            GUILayout.Label($"<size=20>{_ageCardTitle}</size>", _s);
-            GUILayout.Label($"<size=14>{_ageCardBody}</size>", _small);
+            GUILayout.BeginArea(new Rect(r.x + 18, r.y + 12, inner, h - 24));
+            GUILayout.Label(title, _s);
+            GUILayout.Label(body, _small);
             GUILayout.EndArea();
             GUI.color = prev;
         }
@@ -217,11 +221,11 @@ namespace Caveman
         void OnGUI()
         {
             if (gatherer == null) return;
-            _s ??= new GUIStyle(GUI.skin.label) { fontSize = 20, richText = true };
-            _small ??= new GUIStyle(GUI.skin.label) { fontSize = 15, richText = true };
+            _s ??= new GUIStyle(GUI.skin.label) { fontSize = 20, richText = true, wordWrap = true };
+            _small ??= new GUIStyle(GUI.skin.label) { fontSize = 15, richText = true, wordWrap = true };
             _big ??= new GUIStyle(GUI.skin.label) { fontSize = 40, richText = true, alignment = TextAnchor.MiddleCenter };
-            _btn ??= new GUIStyle(GUI.skin.button) { richText = true, alignment = TextAnchor.MiddleLeft, fontSize = 13 };
-            _toast ??= new GUIStyle(GUI.skin.label) { richText = true, fontSize = 22, alignment = TextAnchor.MiddleCenter };
+            _btn ??= new GUIStyle(GUI.skin.button) { richText = true, alignment = TextAnchor.MiddleLeft, fontSize = 13, wordWrap = true };
+            _toast ??= new GUIStyle(GUI.skin.label) { richText = true, fontSize = 20, alignment = TextAnchor.UpperCenter, wordWrap = true };
             if (_panelTex == null)
             {
                 _panelTex = new Texture2D(1, 1);
@@ -872,16 +876,18 @@ namespace Caveman
                     GUILayout.Label($"<size=11>{dirTag} {ArrowFor(d)} {Mathf.RoundToInt(d.magnitude)}m  <color=#bbb>{ritem}</color></size>", _small);
                 }
                 if (rcount > shownR) GUILayout.Label($"<size=10><color=#888>+{rcount - shownR} more route(s)</color></size>", _small);
-                if (rcount == 0) GUILayout.Label("<size=11><color=#888>No route yet — belt goods in, then add a route to another Station.</color></size>", _small);
+                if (rcount == 0) GUILayout.Label("<size=11><color=#888>No route yet. Build a 2nd Station, belt goods in, then '+ Add route' → click the other Station. A vehicle auto-shuttles — no track to lay.</color></size>", _small);
 
                 if (builder.LinkFrom == dp)
-                    GUILayout.Label("<size=11><color=#ffd24d>▶ Click the destination Station… (Esc cancels)</color></size>", _small);
+                    GUILayout.Label("<size=11><color=#ffd24d>▶ Now click the DESTINATION Station… (Esc cancels)</color></size>", _small);
                 else
                 {
                     var tier = builder.BestRouteTier();
                     if (tier != null)
                     {
-                        if (GUILayout.Button($"<size=12>+ Add route  <color=#bbb>({tier.displayName})</color></size>", _btn))
+                        bool afford = builder.CanAfford(tier);
+                        string cc = afford ? "#9f9" : "#f99";
+                        if (GUILayout.Button($"<size=12>+ Add route  <color=#bbb>{tier.displayName}</color> <color={cc}>({CostList(tier.cost)})</color></size>", _btn))
                             builder.BeginStationLink(dp);
                     }
                     else GUILayout.Label("<size=11><color=#888>No transport unlocked yet</color></size>", _small);
@@ -1016,11 +1022,16 @@ namespace Caveman
         // ---- Toasts (centre) ----
         private void DrawToasts()
         {
-            float y = 128f;
+            // Constrained-width, word-wrapped, multi-line so long tips aren't cut off. Each toast's
+            // height grows with its wrapped content so nothing clips and they don't overlap.
+            float tw = Mathf.Min(900f, Screen.width - 40f);
+            float x = (Screen.width - tw) / 2f;
+            float y = 124f;
             foreach (var t in Toast.Items)
             {
-                GUI.Label(new Rect(0, y, Screen.width, 30), t.msg, _toast);
-                y += 30f;
+                float h = Mathf.Max(30f, _toast.CalcHeight(new GUIContent(t.msg), tw) + 4f);
+                GUI.Label(new Rect(x, y, tw, h), t.msg, _toast);
+                y += h + 6f;
             }
         }
 

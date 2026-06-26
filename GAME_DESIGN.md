@@ -101,8 +101,8 @@ Every throughput number hangs off **one base unit** so the player can reason, no
 | **Collector** (auto, on its node) | **60/min** (2 units / 2.0s interval) | fills **1 lane** | fully automatic; no workers |
 | **Processor** (auto) | **1 craft / 2.0s = 30 crafts/min** | — | a 2-input recipe consumes **60/min = 1 lane** |
 
-**The rule the player learns:** **1 collector → 1 belt → 1 machine.** All fixed rates — no workers.
-Flagship chain, exact: **1 Wood Hut (60 wood/min) → 1 wooden belt (60/min) → 1 Sawmill (eats 60 wood/min, makes 30 planks/min).** Scale by building MORE machines + lanes (a 2nd Wood Hut + belt feeds a 2nd Sawmill), not by adding workers — that is the core loop made legible.
+**The rule the player learns:** build MORE machines + lanes to scale — all fixed rates, no workers.
+Flagship chain: **1 Wood Hut (60 wood/min) → wooden belt (60/min) → Sawmill (eats ~40 wood/min, makes ~20 planks/min).** Processors are deliberately the SLOW step, so one Wood Hut over-feeds one Sawmill → wood backs up → you split the belt to a 2nd Sawmill (the first "build more / split for efficiency" bottleneck). Scaling = more machines + lanes, never workers.
 
 - **Workers scale linearly:** N workers = N× the rate (so a 2-worker machine needs 2 lanes in).
 - **Deliberate exceptions** (slower = harder, by design, not by accident): distant/finite collectors (Mine, Gem Mine) at 2.5s; advanced recipes (Smelter/Toolmaker/Monument) at 3.5–6.0s. Everything *early* is on the clean baseline.

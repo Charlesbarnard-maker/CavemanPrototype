@@ -3,7 +3,43 @@
 A running record so progress/problems don't get lost. Newest first. Move items to
 **Fixed** when done. Maintained alongside the code — see DESIGN.md for the roadmap.
 
-## REMOVE WORKERS/POPULATION — fully automated machines + instant build (2026-06-26 #15) — most recent
+## Playtest feedback batch — 8 of 9 items (2026-06-26 #16) — most recent
+Verified by a 3-lens adversarial workflow (PASS, 0 blockers). Items by the user's list:
+1. **Visual cutters BACK (cosmetic).** New `Harvester.cs` — a little NPC each collector sends out to
+   walk → chop (shakes the node) → carry home, on a loop. Pure eye-candy; does NOT gather or gate
+   output (production is still the fixed timer). Cleaned up on demolish. Upgrade-per-age hook noted.
+2. **Sawmill slowed 2.0→3.0s** (eats ~40 wood/min, makes ~20 planks/min). One Wood Hut (60/min)
+   over-feeds it → wood backs up → split the belt to a 2nd Sawmill: the first "build more / split"
+   bottleneck. Tooltip + GAME_DESIGN updated to the new numbers.
+3. **Research Lodge has an INPUT side** (`OutputSide` + input notch via Ports; belt delivery gated to
+   that side, R rotates). No output. Adjacency feeding still works.
+4. **Tips + age-card no longer cut off.** GUI styles got `wordWrap`; toasts are width-constrained &
+   `CalcHeight`-sized (multi-line); the age card auto-sizes its height to content. Age card moved
+   below the toast stack.
+5. **Mergers.** Plain belts now accept a hand-off from only ONE feeder (straight, or a single
+   corner) — a 2nd feeder backs up (yellow). To combine two lanes you place a **Merger** (N→1, new
+   buildable). `Belt.AcceptsHandoffFrom`; mergers accept any feeder. (Verified: straight chains,
+   corners, splitters all still flow.)
+6. **Research scaling raised** (was "3 ages in no time"): Tree age costs 12 / **60 / 160 / 360**;
+   tier value schematic **4**, blueprint **8**. Later ages need meaningfully more delivered items
+   (sane counts at ~30/min makers) — deeper chains do the rest.
+7. **Storage compacted:** removed the dedicated Stone Storage + Ore Stockpile from the menu (the
+   configurable **Warehouse** holds any one resource — stone/ore/planks/…); Warehouse name/desc
+   clarified. (Defs remain as unused locals — harmless.)
+8. **Station "can't afford" bug FIXED.** `BestRouteTier` now offers the best AFFORDABLE tier (falls
+   back to the cheapest unlocked), so you're not dead-ended on a Wagon Train. The "+ Add route"
+   button shows tier **+ cost** (green/red), and the toast/panel clarify: click 2 Stations, a vehicle
+   **auto-shuttles — no track to lay**.
+- **9. DEFERRED (next batch):** the Station overhaul — 2×2 footprint with 2-in/2-out conveyor ports,
+  a liquid-station variant (chosen from the station panel), and an in/out direction arrow for where
+  the vehicle pulls in. Substantial subsystem (footprint + ports + belt depot side-gating + liquid)
+  — doing it half-way risks placement/I-O bugs, so it's its own focused pass. (The route already
+  draws a line + direction arrow between stations.)
+- **Watch:** (a) a rejected 2nd belt-feeder reads as yellow "backed up" (not red) — correct but note
+  it's the "use a Merger" cue. (b) first research loop is a touch grindier now (planks 20/min) — the
+  panel surfaces it (`Waiting for: Planks`). (c) NOT yet Unity-compiled — needs the playtest.
+
+## REMOVE WORKERS/POPULATION — fully automated machines + instant build (2026-06-26 #15)
 Completes the factory-first pivot: there are now NO workers, NO population, NO staffing, NO worker
 slots, and construction is INSTANT. Buildings are pure automated machines. Mapped (5-agent workflow)
 + adversarially verified (3-agent workflow: PASS, 0 compile blockers) before commit.

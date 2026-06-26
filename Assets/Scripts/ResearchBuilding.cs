@@ -15,6 +15,9 @@ namespace Caveman
         public BuildingDefinition def;
         public Inventory InBuffer { get; private set; }   // belt-delivered research items
         public float interval = 1.0f;                      // seconds between consuming one item
+        // The Lodge has an INPUT side only (no output): belts deliver on the side opposite OutputSide,
+        // exactly like a storage's input. R rotates it during placement (cyan input notch shows where).
+        public Belt.Dir OutputSide = Belt.Dir.E;
 
         public static readonly List<ResearchBuilding> All = new();
         private List<Vector2Int> _cells;
@@ -56,9 +59,11 @@ namespace Caveman
 
             var rb = go.AddComponent<ResearchBuilding>();
             rb.def = def;
+            rb.OutputSide = outputSide;
             rb.InBuffer = new Inventory { capacity = 24 };
             rb._cells = Footprint.Cells(go.transform.position, def.FootW, def.FootH);
             foreach (var c in rb._cells) WorldGrid.Research[c] = rb;
+            Ports.PlacePorts(go.transform, def.FootW, def.FootH, outputSide, true, false); // input notch only
             return rb;
         }
 

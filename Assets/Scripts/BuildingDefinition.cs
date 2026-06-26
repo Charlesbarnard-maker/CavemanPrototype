@@ -86,6 +86,8 @@ namespace Caveman
         public bool booster = false;
         [Tooltip("Belt: this is a 1→2 SPLITTER (distributes items evenly to two outputs) rather than a plain belt.")]
         public bool splitter = false;
+        [Tooltip("Belt: this is an N→1 MERGER (deliberately combines two belt lines into one) rather than a plain belt.")]
+        public bool merger = false;
 
         [Header("Progression")]
         [Tooltip("Age at which this becomes buildable (0 = Stone Age, available from the start).")]
