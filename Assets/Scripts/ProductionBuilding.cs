@@ -34,7 +34,6 @@ namespace Caveman
         {
             All.Remove(this);
             if (_cells != null) foreach (var c in _cells) WorldGrid.Remove(WorldGrid.Collectors, c, this);
-            if (_cutter != null) Destroy(_cutter.gameObject); // tidy up the cosmetic cutter
         }
 
         // Rolling gather-rate estimate (units/min).
@@ -44,7 +43,6 @@ namespace Caveman
         public void RecordProduced(int n) { if (n > 0) _producedWindow += n; }
 
         private float _timer;     // gather cadence
-        private Harvester _cutter; // cosmetic NPC that visibly walks out to chop (no effect on output)
         private ResourceNode _source;
         private float _flash;
         private SpriteRenderer _sr;
@@ -76,7 +74,6 @@ namespace Caveman
             foreach (var c in pb._cells) WorldGrid.Collectors[c] = pb;
             Ports.PlacePorts(go.transform, def.FootW, def.FootH, outputSide, false, true);
             pb.Bind();
-            pb._cutter = Harvester.Spawn(pb); // visual cutter (cosmetic; output is the timer below)
             return pb;
         }
 
@@ -117,8 +114,8 @@ namespace Caveman
         // Nearest live node of our type within `range`. BOUNDED so it never becomes a map-wide
         // scan: out-of-range nodes are rejected by a cheap squared-distance test, and at most
         // MaxSearchCandidates in-range nodes are examined (the window shrinks to the nearest).
-        // No pathfinding — just picks the patch; the worker walks there. None found → returns
-        // null and the collector idles in place (handled by the worker / status dot).
+        // No pathfinding — just binds to the nearest patch. None found → returns null and the
+        // collector idles in place (surfaced by its status dot).
         private ResourceNode FindNearestNode(float range)
         {
             ResourceNode best = null;

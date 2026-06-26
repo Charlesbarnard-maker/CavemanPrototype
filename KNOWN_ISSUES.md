@@ -3,7 +3,22 @@
 A running record so progress/problems don't get lost. Newest first. Move items to
 **Fixed** when done. Maintained alongside the code — see DESIGN.md for the roadmap.
 
-## #17 playtest FIXES — fair-share input stall + building reach indicator (2026-06-26) — most recent
+## #18 Audit cleanup — part 1: remove the Harvester NPC + stop silent demolish loss (2026-06-26) — most recent
+Acting on the deep multi-agent systems audit. **Recompile.**
+- **CRITICAL fix — Harvester worker-NPC removed (audit C1).** Deleted `Harvester.cs` and the per-collector
+  `_cutter` spawn/destroy in `ProductionBuilding` — the one LIVE worker/agent (a man-like NPC that walked out
+  to "chop" on every collector), the sole flagrant violation of "no workers / fully automated machines."
+  Collectors keep their white gather-flash as the "doing something" cue; reworded the stale "worker walks there"
+  comments.
+- **CRITICAL fix — demolish no longer silently destroys stored goods (audit C2).** `BuildController.
+  DemolishSelected` now dumps a building's Buffer/InBuffer/Store/depot.store into the player's (unlimited)
+  carried inventory before Destroy, then refunds half the build cost as before. No more losing a full
+  Warehouse/Station/smelter to an accidental X/Delete.
+- **Remaining cleanup batches (queued):** delete the dead legacy layer (ConstructionYard / TransportHub /
+  Transporter / Housing + their enum kinds & wirings; Colony pop/comfort API; maxWorkers; shelved food /
+  liquids / comfort chains), gate the sandbox F-key footer, add a static-registry reset, raise ore searchRadius.
+
+## #17 playtest FIXES — fair-share input stall + building reach indicator (2026-06-26)
 First real Unity playtest of #17 surfaced two issues; root-caused by a diagnostic workflow, fixed + 2-lens
 verified (the verify caught a 3+-input edge in the first attempt → re-fixed + re-verified PASS). **Recompile + retest.**
 - **Items "got stuck" on conveyors — FIXED (the real bug).** `WorkshopBuilding.CanAcceptBeltInput` hard-capped

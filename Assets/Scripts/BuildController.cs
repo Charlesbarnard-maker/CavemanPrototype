@@ -827,6 +827,15 @@ namespace Caveman
                 : cy != null ? cy.def : wp != null ? wp.def : rsb != null ? rsb.def : null;
             if (rdef == null) return;
 
+            // Return any stored/buffered goods to the player's hands so demolishing never SILENTLY
+            // destroys resources (carried is unlimited). Then refund half the build cost.
+            DumpToCarried(pb != null ? pb.Buffer : null);
+            DumpToCarried(wb != null ? wb.Buffer : null);
+            DumpToCarried(wb != null ? wb.InBuffer : null);
+            DumpToCarried(sb != null ? sb.Store : null);
+            DumpToCarried(dpo != null ? dpo.store : null);
+            DumpToCarried(rsb != null ? rsb.InBuffer : null);
+
             if (Carried != null)
                 foreach (var c in rdef.cost)
                     Carried.Add(c.item, Mathf.Max(0, c.amount / 2));
@@ -834,6 +843,18 @@ namespace Caveman
             BuildingsPlaced = Mathf.Max(0, BuildingsPlaced - 1);
             Destroy(Selected);
             Selected = null;
+        }
+
+        // Move every item out of a building's inventory into the player's hands (used on demolish so
+        // goods are never silently destroyed). Carried is unlimited, so nothing is lost.
+        private void DumpToCarried(Inventory inv)
+        {
+            if (inv == null || Carried == null) return;
+            foreach (var kv in new List<KeyValuePair<ItemDefinition, int>>(inv.Items))
+            {
+                int moved = Carried.Add(kv.Key, kv.Value);
+                if (moved > 0) inv.RemoveUpTo(kv.Key, moved);
+            }
         }
 
         private GameObject BuildingGOUnderCursor(Mouse mouse)
