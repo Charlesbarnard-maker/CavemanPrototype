@@ -208,23 +208,39 @@ namespace Caveman
                 new ItemAmount(wood, 6), new ItemAmount(stone, 4)); mason.unlockAge = 2;
             var stoneHouse = MakeHousing("Stone House", 6, new Color(0.62f, 0.64f, 0.70f),
                 new ItemAmount(stoneBlock, 6), new ItemAmount(planks, 4)); stoneHouse.unlockAge = 2;
+            // BELT TIER LADDER (each ~2× the last; overlay a faster tier on a slower belt to upgrade
+            // in place — no need to delete). Wooden is a deliberately SLOW starter (½ a collector's
+            // output) so upgrading belts is an early, meaningful goal: Wooden 30 → Conveyor 60 →
+            // Geared 120 → Steel 240. Splitters/Mergers run at the top rate so they never throttle.
             var woodBelt = ScriptableObject.CreateInstance<BuildingDefinition>();
             woodBelt.displayName = "Wooden Belt"; woodBelt.kind = BuildingKind.Belt; woodBelt.unlockAge = 0;
-            woodBelt.interval = 1.0f; // 60 items/min — exactly one collector's output (the baseline lane)
+            woodBelt.interval = 2.0f; // 30 items/min — a SLOW starter, only HALF a collector's 60/min
             woodBelt.color = new Color(0.60f, 0.50f, 0.35f);
             woodBelt.cost = new List<ItemAmount> { new ItemAmount(wood, 1) };
-            woodBelt.description = "Carries items along its arrow at 60/min — exactly one collector's output (one Wood Hut fills one belt). Drag to lay a line; R rotates. Belt colour shows trouble: RED = dead end, YELLOW = backed up (downstream full).";
+            woodBelt.description = "Carries items along its arrow at 30/min — a SLOW starter that can't keep up with a collector (60/min), so goods back up. Research the Conveyor Belt (your first upgrade) to double it, or run a 2nd line. Drag to lay; R rotates. RED = dead end, YELLOW = backed up.";
             var fastBelt = ScriptableObject.CreateInstance<BuildingDefinition>();
-            fastBelt.displayName = "Conveyor Belt"; fastBelt.kind = BuildingKind.Belt; fastBelt.unlockAge = 2;
-            fastBelt.interval = 0.5f; // 120 items/min — exactly 2× the wooden lane (the clean upgrade)
-            fastBelt.color = new Color(0.72f, 0.63f, 0.40f);
+            fastBelt.displayName = "Conveyor Belt"; fastBelt.kind = BuildingKind.Belt; fastBelt.unlockAge = 0;
+            fastBelt.interval = 1.0f; // 60 items/min — 2× wooden, a match for one collector
+            fastBelt.color = new Color(0.74f, 0.66f, 0.46f);
             fastBelt.cost = new List<ItemAmount> { new ItemAmount(planks, 1) };
-            fastBelt.description = "The belt upgrade: 120/min — 2× the wooden lane. One conveyor carries two collectors' worth on a single line.";
+            fastBelt.description = "Conveyor Belt — 60/min, 2× the Wooden Belt and a match for one collector. OVERLAY it on a wooden belt to upgrade that segment in place (no delete needed). The first rung of the ladder → Geared (120) → Steel (240).";
+            var gearedBelt = ScriptableObject.CreateInstance<BuildingDefinition>();
+            gearedBelt.displayName = "Geared Belt"; gearedBelt.kind = BuildingKind.Belt; gearedBelt.unlockAge = 0;
+            gearedBelt.interval = 0.5f; // 120 items/min — 2× a Conveyor
+            gearedBelt.color = new Color(0.80f, 0.55f, 0.34f);
+            gearedBelt.cost = new List<ItemAmount> { new ItemAmount(planks, 2), new ItemAmount(metal, 1) };
+            gearedBelt.description = "Geared Belt — 120/min, 2× a Conveyor. Overlay it on a slower belt to upgrade in place. For high-throughput lines once the factory grows (Bronze).";
+            var steelBelt = ScriptableObject.CreateInstance<BuildingDefinition>();
+            steelBelt.displayName = "Steel Belt"; steelBelt.kind = BuildingKind.Belt; steelBelt.unlockAge = 0;
+            steelBelt.interval = 0.25f; // 240 items/min — the fastest tier, 4× a Conveyor
+            steelBelt.color = new Color(0.62f, 0.66f, 0.72f);
+            steelBelt.cost = new List<ItemAmount> { new ItemAmount(metal, 2), new ItemAmount(planks, 2) };
+            steelBelt.description = "Steel Belt — 240/min, the fastest tier (4× a Conveyor). Overlay to upgrade. For the densest late-game lines (Iron).";
             // Splitter: a 1→2 belt that distributes items EVENLY between two outputs. Lets one
             // supply line feed two machines. (Belt kind, flagged splitter — placed like a belt.)
             var splitter = ScriptableObject.CreateInstance<BuildingDefinition>();
             splitter.displayName = "Splitter"; splitter.kind = BuildingKind.Belt; splitter.splitter = true; splitter.unlockAge = 0;
-            splitter.interval = 0.5f; // matches the fastest belt (conveyor 120/min) so it never throttles a line
+            splitter.interval = 0.25f; // runs at the TOP belt rate (240/min) so it never throttles any tier
             splitter.color = new Color(0.45f, 0.62f, 0.72f);
             splitter.cost = new List<ItemAmount> { new ItemAmount(wood, 2) };
             splitter.description = "1→2 SPLITTER: pulls from behind and sends items EVENLY to two outputs — forward and to its right (R rotates). If one output backs up it sends to the other, so it never stalls. Feed two machines from one supply line. (Smart/filtered splitters come later.)";
@@ -232,7 +248,7 @@ namespace Caveman
             // plain belt now refuses a 2nd feeder (no silent merging by pointing a belt onto a line).
             var merger = ScriptableObject.CreateInstance<BuildingDefinition>();
             merger.displayName = "Merger"; merger.kind = BuildingKind.Belt; merger.merger = true; merger.unlockAge = 0;
-            merger.interval = 0.5f;
+            merger.interval = 0.25f; // runs at the TOP belt rate (240/min) so it never throttles any tier
             merger.color = new Color(0.72f, 0.55f, 0.45f);
             merger.cost = new List<ItemAmount> { new ItemAmount(wood, 2) };
             merger.description = "N→1 MERGER: combines belt lines — point two belts into it and it pushes their items out forward (R rotates). Plain belts refuse a 2nd feeder, so a Merger is how you deliberately join two lanes of the same item.";
@@ -287,7 +303,7 @@ namespace Caveman
 
             // --- Hand-written descriptions for buildings that need strategic context
             //     (everything else auto-generates a full tooltip from its data). ---
-            sawmill.description = "Wood → Planks. Runs automatically once fed. A Sawmill eats ~40 Wood/min and makes ~20 Planks/min — one Wood Hut (60/min) over-feeds it, so wood backs up. Build a 2nd Sawmill (split the wood belt) to use the surplus and double your planks: the first 'build more / split' bottleneck.";
+            sawmill.description = "Wood → Planks. Runs automatically once fed. A Sawmill wants ~40 Wood/min — MORE than one slow Wooden Belt carries (30/min), so it can't run flat-out on wooden belts. Research the Conveyor (60/min) and overlay it to feed the Sawmill fully, or run a 2nd Wood line. Scaling planks = scaling belts + Sawmills.";
             campfire.description = "Food + Wood + Water → Cooked Food. Runs automatically once its inputs are delivered.";
             charcoalBurner.description = "Wood → Charcoal. Charcoal feeds BOTH the Kiln and the Smelter — scaling one can starve the other. A key shared-bottleneck.";
             kiln.description = "Clay + Charcoal → Bricks. Charcoal is shared with the Smelter, so watch that bottleneck. Bricks build advanced structures.";
@@ -343,12 +359,18 @@ namespace Caveman
                 new Research.Tech { id = "bronze",     name = "Bronze Age",     cost = 60,  advanceToAge = 2, prereq = "tribal", desc = "Advance to the Bronze Age — Kiln & Bricks, Pottery, the start of smelting." },
                 new Research.Tech { id = "iron",       name = "Iron Age",       cost = 160, advanceToAge = 3, prereq = "bronze", desc = "Advance to the Iron Age — Ore mining, Metal smelting, Toolmaking." },
                 new Research.Tech { id = "industrial", name = "Industrial Age", cost = 360, advanceToAge = 4, prereq = "iron",   desc = "Advance to the Industrial Age — Power, the Monument, the endgame." },
-                new Research.Tech { id = "splitters",  name = "Splitters",      cost = 15,  prereq = "tribal", unlocks = new List<BuildingDefinition>{ splitter },          desc = "Unlocks the 1→2 Splitter — feed two machines from one supply line." },
-                new Research.Tech { id = "conveyors",  name = "Conveyor Belts", cost = 30,  prereq = "bronze", unlocks = new List<BuildingDefinition>{ fastBelt },          desc = "Unlocks the fast Conveyor Belt (120/min — 2× the wooden lane)." },
+                new Research.Tech { id = "splitters",   name = "Splitters",     cost = 15,  prereq = "tribal", unlocks = new List<BuildingDefinition>{ splitter },   desc = "Unlocks the 1→2 Splitter — feed two machines from one supply line." },
+                // The belt-upgrade ladder: a cheap EARLY first rung (the wooden belt is deliberately
+                // slow), then deeper tiers gated by age so faster belts pace your factory's growth.
+                new Research.Tech { id = "conveyors",   name = "Conveyor Belts", cost = 10, prereq = null,     unlocks = new List<BuildingDefinition>{ fastBelt },   desc = "Your first belt upgrade: the Conveyor (60/min — 2× the slow wooden belt). Overlay it on wooden belts to upgrade in place." },
+                new Research.Tech { id = "geared_belts", name = "Geared Belts",  cost = 40,  prereq = "bronze", unlocks = new List<BuildingDefinition>{ gearedBelt }, desc = "The Geared Belt (120/min — 2× a Conveyor) for high-throughput lines." },
+                new Research.Tech { id = "steel_belts",  name = "Steel Belts",   cost = 80,  prereq = "iron",   unlocks = new List<BuildingDefinition>{ steelBelt },  desc = "The Steel Belt (240/min — the fastest tier) for the densest late-game lines." },
             };
             // Gate those buildings behind their Tech (and off the age gate, so the Tech IS the gate).
             splitter.requiredTech = "splitters";
             fastBelt.requiredTech = "conveyors"; fastBelt.unlockAge = 0;
+            gearedBelt.requiredTech = "geared_belts"; gearedBelt.unlockAge = 0;
+            steelBelt.requiredTech = "steel_belts"; steelBelt.unlockAge = 0;
 
             // --- Camera (follows the player) ---
             var cam = Camera.main;
@@ -386,8 +408,8 @@ namespace Caveman
               sawmill, charcoalBurner, kiln, potter, smelter, toolmaker,
               // Research
               ideaBench, scrollMaker, draftingTable, engineeringLab, researchLodge,
-              // Logistics
-              woodBelt, fastBelt, splitter, merger, depot, bridge,
+              // Logistics — belt tier ladder (wooden→conveyor→geared→steel) + junctions + transport
+              woodBelt, fastBelt, gearedBelt, steelBelt, splitter, merger, depot, bridge,
               // Storage — Woodpile for the starter resource + one configurable Warehouse for
               // everything else (stone/ore/planks/…), so storage doesn't eat menu slots.
               woodStore, clayStore, brickStore, warehouse,

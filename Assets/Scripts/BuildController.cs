@@ -513,9 +513,10 @@ namespace Caveman
             // Belts can't sit on water (unless bridged) OR on top of a building.
             bool emptyOk = existing == null && TerrainGrid.BeltAllowed(cell)
                            && !SolidBuildingAt(new Vector3(cell.x, cell.y, 0f));
-            // A Splitter/Merger may ALSO be dropped onto an existing PLAIN belt (converts it in place).
-            bool onConvertibleBelt = existing != null && !existing.isSplitter && !existing.isMerger;
-            bool placeOk = isJunction ? (emptyOk || onConvertibleBelt) : emptyOk;
+            // A Splitter/Merger may be dropped onto an existing PLAIN belt (converts it); a plain belt
+            // may be overlaid on a plain belt (upgrade/re-orient) — both read as a VALID (green) target.
+            bool onPlainBelt = existing != null && !existing.isSplitter && !existing.isMerger;
+            bool placeOk = emptyOk || onPlainBelt;
             PlacementValid = affordable && placeOk;
             _ghostSr.color = PlacementValid
                 ? new Color(0.35f, 1f, 0.4f, 0.6f)
@@ -579,6 +580,21 @@ namespace Caveman
                     }
                     return; // don't re-orient on conversion — preserve the line's flow
                 }
+                // OVERLAY-UPGRADE: dropping a FASTER plain-belt tier onto an existing plain belt
+                // upgrades it in place (overlay, no delete). Only strictly-faster (smaller interval)
+                // tiers upgrade; same/slower just re-orients. Charges the new tier's cost per segment
+                // (re-touching an already-upgraded cell is same-tier → no re-charge).
+                bool upgrade = !def.splitter && !def.merger && !existing.isSplitter && !existing.isMerger
+                               && def.interval < existing.interval - 0.001f;
+                if (upgrade)
+                {
+                    if (Economy.CanAfford(def.cost, Carried))
+                    {
+                        Economy.Spend(def.cost, Carried);
+                        existing.SetTier(def.interval, def.color);
+                    }
+                    return; // upgraded in place — keep direction + carried items
+                }
                 existing.SetDir(d);
                 return;
             }
@@ -586,7 +602,7 @@ namespace Caveman
             if (SolidBuildingAt(new Vector3(cell.x, cell.y, 0f))) return; // never lay a belt on a building
             if (!Economy.CanAfford(def.cost, Carried)) return;
             Economy.Spend(def.cost, Carried);
-            Belt.Spawn(cell, d, def.interval, def.splitter, def.merger);
+            Belt.Spawn(cell, d, def.interval, def.splitter, def.merger, def.color);
             BuildingsPlaced++;
         }
 

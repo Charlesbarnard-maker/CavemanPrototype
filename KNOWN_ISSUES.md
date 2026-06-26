@@ -3,7 +3,28 @@
 A running record so progress/problems don't get lost. Newest first. Move items to
 **Fixed** when done. Maintained alongside the code — see DESIGN.md for the roadmap.
 
-## New playtest feedback #17 — part 2: belt look/feel — splitter/merger arrows, item piling, conveyor visuals (2026-06-26) — most recent
+## New playtest feedback #17 — part 3: belt tier ladder + overlay-upgrade (2026-06-26) — most recent
+Belt-balance slice. 2-lens adversarial verify (compile + logic PASS, 0 blockers). **NOT yet Unity-compiled.**
+- **6b. Wooden belt SLOWED to 30/min + a 4-tier ladder (#6).** Wooden 30 (½ a collector) → Conveyor 60 →
+  Geared 120 → Steel 240 (intervals 2.0/1.0/0.5/0.25s). Each tier costs richer materials (wood → planks →
+  planks+metal → metal+planks) and is gated by its own research tech. The slow wooden belt is now the early
+  bottleneck, so upgrading belts is a real goal. Splitters/Mergers run at the top rate (240) so they never
+  throttle. Per-tier belt COLOURS via `def.color` (Belt.Spawn gained a colour param).
+- **6c. Overlay-upgrade — no delete needed (#6).** Dropping/dragging a FASTER belt tier over an existing belt
+  upgrades it in place (`Belt.SetTier`; `BuildController.EnsureBelt`), keeping direction + carried items.
+  Same/slower just re-orients (no charge); re-touching an upgraded cell doesn't re-charge. Ghost reads green
+  over any plain belt.
+- **Research rewiring.** The first belt upgrade (Conveyor) is now CHEAP + EARLY (tech `conveyors`, cost 10, no
+  age prereq) so the wooden bottleneck is a brief first-research payoff; new techs `geared_belts` (Bronze, 40)
+  and `steel_belts` (Iron, 80). Updated GAME_DESIGN SYSTEM RATIOS to the new belt speeds (and noted the Sawmill
+  3.0s exception, resolving the stale-doc contradiction the canon audit flagged).
+- **No machine retune** (deliberate): the slow wooden belt + the "Needs X/min" cue ARE the upgrade lesson; the
+  Sawmill (~40/min want) is intentionally under-fed by one wooden belt (30) until you upgrade. **Playtest
+  watchpoint:** if the opening feels too slow, ease it by speeding the first Conveyor unlock or the Wood Hut.
+- **Next:** C progression depth — split ore→copper/iron/tin, multi-stage chains, a special per-age item +
+  new-building gate (the "Bronze too quick" fix). Design proposed; pending go-ahead / first Unity compile.
+
+## New playtest feedback #17 — part 2: belt look/feel — splitter/merger arrows, item piling, conveyor visuals (2026-06-26)
 Second slice of the playtest batch. 3-lens adversarial verify (compile + geometry PASS; belt-flow caught
 1 blocker — drag mass-convert/over-charge — now FIXED + re-verified PASS). **NOT yet Unity-compiled.**
 - **2. Splitter/Merger now show IN vs OUT (#2).** A Splitter gets two green output arrows (forward + its

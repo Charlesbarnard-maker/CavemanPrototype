@@ -35,7 +35,7 @@ namespace Caveman
         private SpriteRenderer _sr;
         private readonly List<SpriteRenderer> _dots = new();      // items sliding along the belt (packed nose-to-tail when backed up)
         private readonly List<GameObject> _portMarkers = new();   // in/out arrows on a splitter/merger
-        private readonly Color _baseColor = new Color(0.58f, 0.50f, 0.34f);
+        private Color _baseColor = new Color(0.58f, 0.50f, 0.34f); // tier tint (overwritten each frame by flow-state colour)
         private Vector2Int _cell;
         private Dir _inDir; // edge the current item arrived from (so corners animate right)
 
@@ -56,7 +56,7 @@ namespace Caveman
 
         public static float Angle(Dir d) => d switch { Dir.N => 0f, Dir.E => -90f, Dir.S => 180f, _ => 90f };
 
-        public static Belt Spawn(Vector2Int cell, Dir dir, float interval = 0.5f, bool isSplitter = false, bool isMerger = false)
+        public static Belt Spawn(Vector2Int cell, Dir dir, float interval = 0.5f, bool isSplitter = false, bool isMerger = false, Color? baseColor = null)
         {
             var go = new GameObject(isSplitter ? "Splitter" : isMerger ? "Merger" : "Belt");
             go.transform.position = new Vector3(cell.x, cell.y, 0f);
@@ -76,6 +76,7 @@ namespace Caveman
             b._inDir = Opposite(dir); // default: item enters from directly behind
             b.interval = Mathf.Max(0.05f, interval);
             b._sr = sr;
+            if (baseColor.HasValue) b._baseColor = baseColor.Value; // per-tier tint (else the default brown)
             sr.color = b._baseColor;
             b.AddPortMarkers(); // in/out arrows if this is a splitter/merger (no-op for a plain belt)
             return b;
@@ -130,6 +131,14 @@ namespace Caveman
         {
             dir = d;
             transform.rotation = Quaternion.Euler(0f, 0f, Angle(d));
+        }
+
+        /// <summary>Upgrade this belt to a faster tier in place (new interval + colour) without
+        /// rebuilding — keeps its direction and any carried items. Mirrors RouteVehicle.SetTier.</summary>
+        public void SetTier(float newInterval, Color newColor)
+        {
+            interval = Mathf.Max(0.05f, newInterval);
+            _baseColor = newColor; // the per-frame flow-state colouring in Update uses this as the base
         }
 
         /// <summary>Overlay-convert a plain belt into a splitter or merger in place (keeps its

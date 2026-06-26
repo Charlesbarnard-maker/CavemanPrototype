@@ -92,17 +92,22 @@ no manual crafting — workshops need workers), so progress *requires* building 
 
 Every throughput number hangs off **one base unit** so the player can reason, not guess:
 
-> **The lane = 60 items/min (1/sec).** Everything is a clean multiple of it.
+> **The lane = 60 items/min (1/sec)** — the rate of a collector and a Conveyor belt. Everything is a
+> clean multiple of it. The starter **Wooden Belt is a deliberate ½-lane (30/min)** so upgrading belts
+> is an early, meaningful goal (the belt ladder: Wooden 30 → Conveyor 60 → Geared 120 → Steel 240).
 
 | System | Rate | In lanes | Notes |
 |---|---|---|---|
-| **Wooden Belt** | **60/min** (interval 1.0s) | **1 lane** | the reference; one item per second |
-| **Conveyor Belt** | **120/min** (interval 0.5s) | **2 lanes** | the clean ×2 upgrade |
+| **Wooden Belt** | **30/min** (interval 2.0s) | **½ lane** | the slow starter — half a collector's output, so it backs up until upgraded |
+| **Conveyor Belt** | **60/min** (interval 1.0s) | **1 lane** | the reference; matches one collector. The first belt upgrade (cheap, early) |
+| **Geared Belt** | **120/min** (interval 0.5s) | **2 lanes** | Bronze tier (research `geared_belts`) |
+| **Steel Belt** | **240/min** (interval 0.25s) | **4 lanes** | Iron tier (research `steel_belts`) — the fastest |
+| **Splitter / Merger** | **240/min** (interval 0.25s) | — | run at the top belt rate so they never throttle a line |
 | **Collector** (auto, on its node) | **60/min** (2 units / 2.0s interval) | fills **1 lane** | fully automatic; no workers |
-| **Processor** (auto) | **1 craft / 2.0s = 30 crafts/min** | — | a 2-input recipe consumes **60/min = 1 lane** |
+| **Processor** (auto) | **1 craft / 2.0s = 30 crafts/min** (slower exceptions exist, e.g. Sawmill 3.0s) | — | a 2-input recipe consumes **60/min = 1 lane** |
 
-**The rule the player learns:** build MORE machines + lanes to scale — all fixed rates, no workers.
-Flagship chain: **1 Wood Hut (60 wood/min) → wooden belt (60/min) → Sawmill (eats ~40 wood/min, makes ~20 planks/min).** Processors are deliberately the SLOW step, so one Wood Hut over-feeds one Sawmill → wood backs up → you split the belt to a 2nd Sawmill (the first "build more / split for efficiency" bottleneck). Scaling = more machines + lanes, never workers.
+**The rule the player learns:** build MORE machines + lanes — and UPGRADE belts — to scale; all fixed rates, no workers.
+Flagship chain: **1 Wood Hut (60 wood/min) → Wooden Belt → Sawmill.** The Wooden Belt carries only 30/min — half the Hut's output (so it backs up at the Hut) and less than the Sawmill wants (~40/min) — so the first lesson is **upgrade the belt** (research the cheap Conveyor, 60/min, and overlay it on the wooden belt) or run a 2nd line. Then deeper tiers (Geared 120, Steel 240) pace later growth. Scaling = more machines + lanes + belt tiers, never workers.
 
 - **Workers scale linearly:** N workers = N× the rate (so a 2-worker machine needs 2 lanes in).
 - **Deliberate exceptions** (slower = harder, by design, not by accident): distant/finite collectors (Mine, Gem Mine) at 2.5s; advanced recipes (Smelter/Toolmaker/Monument) at 3.5–6.0s. Everything *early* is on the clean baseline.
