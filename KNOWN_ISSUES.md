@@ -3,7 +3,28 @@
 A running record so progress/problems don't get lost. Newest first. Move items to
 **Fixed** when done. Maintained alongside the code — see DESIGN.md for the roadmap.
 
-## New playtest feedback #17 — part 4: progression depth — ore split + per-age special-item/build gate (2026-06-26) — most recent
+## #17 playtest FIXES — fair-share input stall + building reach indicator (2026-06-26) — most recent
+First real Unity playtest of #17 surfaced two issues; root-caused by a diagnostic workflow, fixed + 2-lens
+verified (the verify caught a 3+-input edge in the first attempt → re-fixed + re-verified PASS). **Recompile + retest.**
+- **Items "got stuck" on conveyors — FIXED (the real bug).** `WorkshopBuilding.CanAcceptBeltInput` hard-capped
+  each input at `capacity/distinct` (≈12 for a 2-input machine), so a belt feeding ONE input of a 2-input
+  machine (every new copper/iron/steel smelter!) backed up at ~12 items while the machine sat half-empty
+  waiting for the OTHER input — exactly "the first few go through then pile up even though there's space."
+  Now an input fills DEEPLY (~28 of 32) while every other input keeps a guaranteed 4-slot floor; the gate is
+  `Total + 1 + owed-reserve-of-others ≤ capacity`, which also stops two fast belts starving a third input on
+  Campfire/Monument (2/3/4-input cases all verified). InBuffer capacity 24→32.
+- **Range circle "didn't appear" — FIXED (scope gap, not a render bug).** The ring worked for COLLECTORS but
+  only when selected; the user clicked a SAWMILL (a workshop — no harvest radius), so nothing drew. Now: the
+  collector harvest ring ALSO shows during PLACEMENT (see the reach before you commit), and any OTHER selected
+  building (sawmill, smelter, storage, lodge…) shows a cyan BOX outline of its input-adjacency reach (a
+  processor pulls inputs from the cells around it + belts — no harvest radius). `BuildController.
+  UpdateReachIndicator` (renamed from UpdateCollectorRange) + DrawRing/DrawBox.
+- **Watchpoint (deliberate, not changed):** a 60/min collector still over-feeds the 30/min wooden belt, so the
+  collector backs up until you upgrade the belt (research the cheap early Conveyor) — the intended "upgrade
+  your belt" pressure, now that machines actually DRAIN (the fair-share fix). If the early collector-backup
+  still feels off in play, we can ease the wooden rate (30→40/min) next.
+
+## New playtest feedback #17 — part 4: progression depth — ore split + per-age special-item/build gate (2026-06-26)
 The big one — the "Bronze came too quick / no new buildings" fix. 3-lens adversarial verify (compile +
 soft-lock + playability all PASS, 0 blockers). **NOT yet Unity-compiled.**
 - **5. Each age now REQUIRES building its new chain + crafting a special item (#5).** New `Research.Tech`

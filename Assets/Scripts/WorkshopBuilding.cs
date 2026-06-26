@@ -69,7 +69,7 @@ namespace Caveman
             w.processTime = Mathf.Max(0.2f, def.interval);
             w.inputs = def.inputs;
             w.Buffer = new Inventory { capacity = Mathf.Max(1, def.capacity) };
-            w.InBuffer = new Inventory { capacity = 24 };
+            w.InBuffer = new Inventory { capacity = 32 }; // shared input buffer (fair-shared across inputs)
             w.OutputSide = outputSide;
             w._cells = Footprint.Cells(go.transform.position, def.FootW, def.FootH);
             foreach (var c in w._cells) WorldGrid.Workshops[c] = w;
@@ -133,8 +133,22 @@ namespace Caveman
             if (!WantsInput(i) || InBuffer.Total() >= InBuffer.capacity) return false;
             int distinct = inputs != null ? inputs.Count : 1;
             if (distinct <= 1) return true; // single input may use the whole buffer
-            int per = Mathf.Max(2, InBuffer.capacity / distinct); // fair share per input type
-            return InBuffer.Count(i) < per;
+            // Each OTHER input keeps a guaranteed FLOOR of slots, so one (or several) fast belts can't
+            // fill the buffer and deadlock the recipe — but this input may use everything NOT still
+            // owed to under-floor others. (The old capacity/N hard share stalled a single belted input
+            // at ≈12 and backed it up while the machine sat half-empty waiting for the other input —
+            // the "first few go through then pile up even though there's space" bug.) Gating on the
+            // free space minus the others' OWED reserve fixes that AND prevents two fast belts from
+            // jointly starving a third input on a 3-/4-input recipe (Campfire, Monument).
+            const int reservePerOther = 4;
+            int owedToOthers = 0;
+            foreach (var c in inputs)
+            {
+                if (c == null || c.item == null || c.item == i) continue;
+                int have = InBuffer.Count(c.item);
+                if (have < reservePerOther) owedToOthers += reservePerOther - have;
+            }
+            return InBuffer.Total() + 1 + owedToOthers <= InBuffer.capacity;
         }
 
         // Inputs: belt-fed InBuffer first, then —

@@ -114,9 +114,10 @@ namespace Caveman
         void Update()
         {
             UpdateHighlight();
-            // Selected-collector harvest reach (ring + in-range node glow). Runs BEFORE the
-            // placement highlight so that starting a placement cleanly re-lights the nodes.
-            UpdateCollectorRange();
+            // Building "reach" indicator: a harvest-radius RING for a collector (selected OR being
+            // placed) + a box outline of the input-adjacency cells for any other selected building.
+            // Runs BEFORE the placement highlight so that starting a placement cleanly re-lights nodes.
+            UpdateReachIndicator();
             // While placing a collector, make its target resource patches glow so it's
             // obvious where it must go. Cleared whenever we're not placing a collector.
             var pd = PendingDef;
@@ -238,16 +239,28 @@ namespace Caveman
             else if (_highlight.activeSelf) _highlight.SetActive(false);
         }
 
-        // Ring + node glow for the SELECTED collector, so its harvest reach is visible. The
-        // in-range node set is recomputed only when the selection changes (cheap), then those
-        // nodes are brightened via the same SetHighlighted hook the placement glow uses.
-        private void UpdateCollectorRange()
+        // Shows what the relevant building REACHES: a collector's harvest RADIUS (a ring) — for the
+        // building being PLACED and for a selected collector, plus a glow on the in-range nodes — and,
+        // for any OTHER selected building, a box outline of its input-adjacency cells (workshops/
+        // storages pull inputs from the cells around them + belts; they have no harvest radius).
+        private void UpdateReachIndicator()
         {
+            // Placing a collector → show its harvest reach at the ghost, so you can tell the range
+            // BEFORE committing (the node glow during placement is handled by SetResourceHighlight).
+            var pd = PendingDef;
+            if (pd != null && pd.kind == BuildingKind.Collector && _ghost != null && _ghost.activeSelf)
+            {
+                ClearRangeLit();
+                DrawRing(_ghost.transform.position, placeNodeRange);
+                return;
+            }
+
+            // A collector is selected → harvest-radius ring + glow the in-range nodes (recomputed only
+            // when the selection changes).
             var pb = Selected != null ? Selected.GetComponent<ProductionBuilding>() : null;
             if (_rangeFor != pb)
             {
-                foreach (var n in _rangeLit) if (n != null) n.SetHighlighted(false);
-                _rangeLit.Clear();
+                ClearRangeLit();
                 _rangeFor = pb;
                 if (pb != null && pb.produces != null)
                 {
@@ -258,33 +271,78 @@ namespace Caveman
                         { n.SetHighlighted(true); _rangeLit.Add(n); }
                 }
             }
-            if (pb != null) DrawRangeRing(pb.transform.position, pb.sourceRange);
-            else if (_ringGo != null && _ringGo.activeSelf) _ringGo.SetActive(false);
+            if (pb != null) { DrawRing(pb.transform.position, pb.sourceRange); return; }
+
+            // Any other selected building (Sawmill, smelter, storage, lodge, …): no harvest radius —
+            // it pulls inputs from ADJACENT cells + belts. Show that reach as a box around footprint+1.
+            var def = SelectedDef();
+            if (def != null) DrawBox(Selected.transform.position, def.FootW * 0.5f + 1f, def.FootH * 0.5f + 1f);
+            else HideRing();
         }
 
-        // A translucent circle (LineRenderer) marking a collector's harvest radius.
-        private void DrawRangeRing(Vector3 center, float radius)
+        private void ClearRangeLit()
+        {
+            foreach (var n in _rangeLit) if (n != null) n.SetHighlighted(false);
+            _rangeLit.Clear();
+            _rangeFor = null;
+        }
+
+        private void HideRing() { if (_ringGo != null && _ringGo.activeSelf) _ringGo.SetActive(false); }
+
+        // The shared LineRenderer used for both the circle (collector) and box (other) reach outlines.
+        private LineRenderer EnsureRing()
         {
             if (_ringGo == null)
             {
-                _ringGo = new GameObject("CollectorRange");
+                _ringGo = new GameObject("ReachIndicator");
                 _ring = _ringGo.AddComponent<LineRenderer>();
                 var sh = Shader.Find("Sprites/Default");
                 if (sh != null) _ring.material = new Material(sh);
-                _ring.widthMultiplier = 0.12f;
+                _ring.widthMultiplier = 0.14f;
                 _ring.loop = true;
                 _ring.useWorldSpace = true;
                 _ring.numCornerVertices = 0;
-                _ring.positionCount = RingSegments;
-                _ring.startColor = _ring.endColor = new Color(1f, 0.95f, 0.4f, 0.5f);
-                _ring.sortingOrder = 3; // under the selection square (4), above the ground
+                _ring.sortingOrder = 6; // above buildings (5) so the outline is clearly visible
             }
             if (!_ringGo.activeSelf) _ringGo.SetActive(true);
+            return _ring;
+        }
+
+        // Amber circle — a collector's harvest radius.
+        private void DrawRing(Vector3 center, float radius)
+        {
+            var lr = EnsureRing();
+            lr.startColor = lr.endColor = new Color(1f, 0.92f, 0.4f, 0.65f); // amber
+            lr.positionCount = RingSegments;
             for (int i = 0; i < RingSegments; i++)
             {
                 float a = (i / (float)RingSegments) * Mathf.PI * 2f;
-                _ring.SetPosition(i, new Vector3(center.x + Mathf.Cos(a) * radius, center.y + Mathf.Sin(a) * radius, 0f));
+                lr.SetPosition(i, new Vector3(center.x + Mathf.Cos(a) * radius, center.y + Mathf.Sin(a) * radius, 0f));
             }
+        }
+
+        // Cyan box — the input-adjacency reach of a workshop/storage/etc. (matches the cyan input notches).
+        private void DrawBox(Vector3 center, float halfX, float halfY)
+        {
+            var lr = EnsureRing();
+            lr.startColor = lr.endColor = new Color(0.4f, 0.78f, 1f, 0.65f); // cyan = inputs
+            lr.positionCount = 4;
+            lr.SetPosition(0, new Vector3(center.x - halfX, center.y - halfY, 0f));
+            lr.SetPosition(1, new Vector3(center.x + halfX, center.y - halfY, 0f));
+            lr.SetPosition(2, new Vector3(center.x + halfX, center.y + halfY, 0f));
+            lr.SetPosition(3, new Vector3(center.x - halfX, center.y + halfY, 0f));
+        }
+
+        // The BuildingDefinition of the selected building (for its footprint), or null.
+        private BuildingDefinition SelectedDef()
+        {
+            if (Selected == null) return null;
+            var wb = Selected.GetComponent<WorkshopBuilding>(); if (wb != null) return wb.def;
+            var sb = Selected.GetComponent<StorageBuilding>(); if (sb != null) return sb.def;
+            var rb = Selected.GetComponent<ResearchBuilding>(); if (rb != null) return rb.def;
+            var dp = Selected.GetComponent<Depot>(); if (dp != null) return dp.def;
+            var pp = Selected.GetComponent<PowerPlant>(); if (pp != null) return pp.def;
+            return null;
         }
 
         public bool IsUnlocked(BuildingDefinition def) =>
