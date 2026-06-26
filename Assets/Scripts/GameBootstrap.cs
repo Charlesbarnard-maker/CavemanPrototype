@@ -223,7 +223,7 @@ namespace Caveman
             // supply line feed two machines. (Belt kind, flagged splitter — placed like a belt.)
             var splitter = ScriptableObject.CreateInstance<BuildingDefinition>();
             splitter.displayName = "Splitter"; splitter.kind = BuildingKind.Belt; splitter.splitter = true; splitter.unlockAge = 0;
-            splitter.interval = 0.6f;
+            splitter.interval = 0.5f; // matches the fastest belt (conveyor 120/min) so it never throttles a line
             splitter.color = new Color(0.45f, 0.62f, 0.72f);
             splitter.cost = new List<ItemAmount> { new ItemAmount(wood, 2) };
             splitter.description = "1→2 SPLITTER: pulls from behind and sends items EVENLY to two outputs — forward and to its right (R rotates). If one output backs up it sends to the other, so it never stalls. Feed two machines from one supply line. (Smart/filtered splitters come later.)";
