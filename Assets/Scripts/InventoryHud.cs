@@ -1044,7 +1044,7 @@ namespace Caveman
             Section("<color=#ffd24d>The Goal</color>",
                 "Grow from a lone caveman to a self-running civilisation. Reach the Industrial Age and build the Monument (10 Blocks) to WIN.");
             Section("<color=#fc8>Logistics matter (the core)</color>",
-                "A workshop only runs on inputs that ARRIVE — belt-fed, or sitting in an ADJACENT storage / collector / machine. It will NOT pull from across the map. Lay out your base so every machine is fed; a shortage cascades to everything downstream. (F7 toggles the old global-pool mode to compare.)");
+                "The easiest way to connect things is ADJACENCY: a machine pulls inputs from buildings RIGHT NEXT TO it, so clustering a chain side-by-side feeds it automatically — no belts. Use BELTS only to connect things that are far apart (or to stock a Storage). A machine never pulls from across the map, so lay your base out so every machine is fed; a shortage cascades downstream. (F7 toggles the old global-pool mode to compare.)");
             Section("<color=#9cf>People</color>",
                 "Population grows while fed and housed. They eat Food and drink Water — running out causes decline. Beyond survival they want comfort goods (cooked food, bread, pottery, tools, clothes). How much you supply sets Happiness, which boosts productivity and growth. Growth raises demand — the escalating pull to keep scaling.");
             Section("<color=#ffcf6b>Prosperity & Rank</color>",
