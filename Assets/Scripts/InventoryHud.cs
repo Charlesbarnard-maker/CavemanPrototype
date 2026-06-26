@@ -888,8 +888,8 @@ namespace Caveman
                     var other = outgoing ? rv.b : rv.a;
                     Vector2 d = (Vector2)(other.transform.position - dp.transform.position);
                     string ritem = rv.a.item != null ? rv.a.item.displayName : "—";
-                    string tag = outgoing ? "<color=#9f9>→ OUT</color>" : "<color=#fc8>← IN</color>";
-                    GUILayout.Label($"<size=11>{tag} {ArrowFor(d)} {Mathf.RoundToInt(d.magnitude)}m  <color=#bbb>{ritem}</color></size>", _small);
+                    string dirTag = outgoing ? "<color=#9f9>→ OUT</color>" : "<color=#fc8>← IN</color>";
+                    GUILayout.Label($"<size=11>{dirTag} {ArrowFor(d)} {Mathf.RoundToInt(d.magnitude)}m  <color=#bbb>{ritem}</color></size>", _small);
                 }
                 if (rcount > shownR) GUILayout.Label($"<size=10><color=#888>+{rcount - shownR} more route(s)</color></size>", _small);
                 if (rcount == 0) GUILayout.Label("<size=11><color=#888>No route yet — belt goods in, then add a route to another Station.</color></size>", _small);
