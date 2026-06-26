@@ -77,6 +77,7 @@ namespace Caveman
             if (kb.nKey.wasPressedThisFrame) _showMinimap = !_showMinimap;
             if (kb.gKey.wasPressedThisFrame) _showGuide = !_showGuide;
             if (kb.tKey.wasPressedThisFrame) _showResearch = !_showResearch;
+            if (kb.jKey.wasPressedThisFrame) StaffAllIdle();
 
             // QoL: one-time "research available" toast when a tree node first becomes affordable.
             if (Research.Tree != null)
@@ -344,14 +345,17 @@ namespace Caveman
 
                 // Bottleneck summary — count starved/backed-up machines (only shown when
                 // there's a problem). Pairs with the minimap so you can find & fix it.
-                int starved = 0, backed = 0;
+                int starved = 0, backed = 0, unstaffed = 0;
                 foreach (var pb in ProductionBuilding.All)
-                { if (pb == null) continue; var sc = pb.StatusColor; if (sc == Status.Starved) starved++; else if (sc == Status.BackedUp) backed++; }
+                { if (pb == null) continue; var sc = pb.StatusColor; if (sc == Status.Starved) starved++; else if (sc == Status.BackedUp) backed++; else if (sc == Status.Idle && !pb.Paused) unstaffed++; }
                 foreach (var wkb in WorkshopBuilding.All)
-                { if (wkb == null) continue; var sc = wkb.StatusColor; if (sc == Status.Starved) starved++; else if (sc == Status.BackedUp) backed++; }
+                { if (wkb == null) continue; var sc = wkb.StatusColor; if (sc == Status.Starved) starved++; else if (sc == Status.BackedUp) backed++; else if (sc == Status.Idle && !wkb.Paused) unstaffed++; }
                 string bottleneck = "";
                 if (starved > 0) bottleneck += $"   <color=#f66>⚠ {starved} starved</color>";
                 if (backed > 0) bottleneck += $"   <color=#fd4>⏸ {backed} backed-up</color>";
+                // Labor scarcity made visible — the dominant SOFT bottleneck at scale, and it
+                // points at the real fix (assign idle workers, or grow population if there are none).
+                if (unstaffed > 0) bottleneck += $"   <color=#ccc>⚪ {unstaffed} idle — {(c.FreeWorkers > 0 ? "press J to staff" : "grow population")}</color>";
                 int prod = Mathf.RoundToInt(c.Productivity * 100f);
                 string prodCol = prod >= 100 ? "#9cf" : "#f99";
                 int happy = Mathf.RoundToInt(c.Happiness * 100f);
@@ -959,10 +963,27 @@ namespace Caveman
             }
         }
 
+        // One-shot: bring every idle (unpaused, unstaffed) building online with a free worker.
+        // Removes per-building staffing tedium at scale; LIMITED workers stay the real constraint
+        // (pause a building to free its labour for higher-priority ones).
+        private void StaffAllIdle()
+        {
+            var col = Colony.Instance;
+            if (col == null) return;
+            int staffed = 0;
+            foreach (var pb in ProductionBuilding.All)
+            { if (col.FreeWorkers <= 0) break; if (pb != null && !pb.Paused && pb.AssignedWorkers == 0 && pb.TryAssign()) staffed++; }
+            foreach (var wb in WorkshopBuilding.All)
+            { if (col.FreeWorkers <= 0) break; if (wb != null && !wb.Paused && wb.AssignedWorkers == 0 && wb.TryAssign()) staffed++; }
+            Toast.Show(staffed > 0
+                ? $"<color=#9f9>Staffed {staffed} idle building{(staffed == 1 ? "" : "s")}.</color>"
+                : (col.FreeWorkers <= 0 ? "<color=#f99>No free workers — grow your population to staff more.</color>" : "<color=#bbb>No idle buildings to staff.</color>"));
+        }
+
         private void DrawFooter()
         {
             GUILayout.BeginArea(new Rect(Screen.width - 330, 10, 320, 50));
-            GUILayout.Label($"<size=15>B build · <color=#9cf>T research</color> · G guide · Space pause · H help · M overview · N map {(_showMinimap ? "on" : "off")}</size>", _small);
+            GUILayout.Label($"<size=15>B build · <color=#9cf>T research</color> · J staff idle · G guide · Space pause · H help · M overview · N map {(_showMinimap ? "on" : "off")}</size>", _small);
             string sandbox = Economy.FreeBuild ? "<color=#9f9>SANDBOX</color> · " : "";
             string mode = Economy.LocalProduction ? "<color=#fc8>Local logistics</color>" : "<color=#8cf>Global pool</color>";
             GUILayout.Label($"<size=12>{sandbox}Speed x{_speed:0} · {mode} (F7) · F1–F5 sandbox</size>", _small);
