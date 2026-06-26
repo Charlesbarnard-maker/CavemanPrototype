@@ -91,10 +91,15 @@ namespace Caveman
                             if (accepted > 0) { _carrying -= accepted; home.Pulse(); }
                             if (_carrying > 0)
                             {
-                                // Liquids have no belt — a person carries the container to a barrel
-                                // (the Stone-age liquid carrier). Solids just back up here (build a
-                                // belt to drain me) — the intended visible bottleneck.
-                                if (_carryItem.isLiquid) { _state = State.ToStorage; break; }
+                                // Two cases carry the load onward to storage instead of backing up:
+                                //  • Liquids have no belt — a person carries the container to a barrel.
+                                //  • SURVIVAL collectors (autoStore: Forager Hut, Water Hole) deliver
+                                //    food/water to the nearest store with NO belt, so the survival loop
+                                //    works before the player has learned logistics (belts).
+                                // Every other solid just backs up here (build a belt to drain me) — the
+                                // intended visible bottleneck that teaches logistics for PRODUCTION.
+                                bool autoStore = home != null && home.def != null && home.def.autoStore;
+                                if (_carryItem.isLiquid || autoStore) { _state = State.ToStorage; break; }
                                 break;
                             }
                         }

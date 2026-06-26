@@ -5,11 +5,49 @@ The canonical, system-level design that ties together the per-system docs
 · [BUILD_SYSTEMS](BUILD_SYSTEMS.md) · [DESIGN](DESIGN.md)). Where this doc and a per-system doc
 disagree, **this doc wins** — the others are detail.
 
-> **The whole game in one sentence:** *Resources have locations; logistics moves them to where
-> people and machines consume them; population and geography create the pressure; and each age
-> changes HOW logistics works, never WHAT the loop is.*
+> **The whole game in one sentence:** *Raw materials have locations; logistics moves them to machines
+> that process them into ever-deeper goods; research turns goods into progress; and each age changes
+> HOW logistics works and WHAT you can build, never the core loop.*
 
 Status tags: ✅ in game · 🔶 partial · 📝 designed/proposed.
+
+---
+
+# ⭐ FACTORY-FIRST PIVOT (2026-06-26 — supersedes the colony/survival framing below)
+
+The game pivoted from "half colony-survival, half factory" to a **pure factory automation game**.
+This section WINS over any survival/population wording elsewhere in this doc (kept for history).
+
+**Removed entirely as gameplay:** population, food, water, housing, happiness, comfort goods,
+starvation/thirst, and labour-as-a-scarce-resource. (Code for these is neutralised/hidden, not all
+deleted, so the build keeps compiling — a later cleanup can remove it.)
+
+**The core loop (the whole game):**
+> **gather → store → process → automate (belts/stations) → research → expand → next age**
+
+- **Labour is free.** A building runs once built and supplied. Each collector/workshop has a 1..max
+  **worker speed-dial** (more workers = faster) plus NPC charm — no global pool, no bottleneck.
+- **Research is the only progression.** Craft a research item in a production chain → deliver to a
+  **Research Lodge** → spend points to advance the Age / unlock buildings. Scaling research = scaling
+  the factory.
+- **Pressure** comes from production dependencies, shared-intermediate bottlenecks (charcoal feeds
+  Kiln + Smelter + Generator), finite/far ore driving expansion + routes, and Industrial **power**.
+- **Score** is automation-based: **Industry** (collectors/workshops/belts/routes + age) → **Rank**.
+
+**Current production spine (✅ in game):**
+`Wood→Planks` (Sawmill) · `Wood→Charcoal` (Burner) · `Stone` · `Clay→Bricks` (Kiln, +Charcoal) ·
+`Clay→Pottery` (Potter) · `Ore→Metal` (Smelter, +Charcoal) · `Metal+Planks→Tools` (Toolmaker) ·
+Research: Idea Tablet→Study Scroll→Schematic→Blueprint · `Charcoal→Power` (Coal Generator) ·
+Monument (Metal+Tools+Bricks+Planks) = win.
+
+**Planned deeper age arc (📝 next — structure already supports it):**
+`Stone → Copper/Bronze → Iron → Steel/Industrial → Electrical/Automation → Space → Beyond`.
+Add metal tiers (copper ore→copper ingot→wire; iron→steel) and component chains (gears, circuits,
+motors, science packs) feeding harder research items, with later milestones pointing at engines /
+rockets. Build these with the EXISTING item/recipe/collector/workshop/research systems — no new
+framework. Implement incrementally so the playable build never breaks.
+
+---
 
 ---
 

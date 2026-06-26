@@ -51,6 +51,31 @@ namespace Caveman
             if (_cells != null) foreach (var c in _cells) WorldGrid.Remove(WorldGrid.Depots, c, this);
         }
 
+        // --- Route role + validation (read by the HUD; no behaviour change to the sim) ---
+
+        /// <summary>This station is the SOURCE of at least one route (a vehicle loads here).</summary>
+        public bool HasOutgoing { get { foreach (var rv in RouteVehicle.All) if (rv != null && rv.a == this) return true; return false; } }
+        /// <summary>This station is the SINK of at least one route (a vehicle unloads here).</summary>
+        public bool HasIncoming { get { foreach (var rv in RouteVehicle.All) if (rv != null && rv.b == this) return true; return false; } }
+
+        /// <summary>Plain-language role for the panel.</summary>
+        public string Role => HasOutgoing && HasIncoming ? "Relay (in & out)"
+            : HasOutgoing ? "Supplying →"
+            : HasIncoming ? "← Receiving"
+            : "Idle — no route";
+
+        public float FillFraction => def != null && def.capacity > 0 ? (float)store.Total() / def.capacity : 0f;
+
+        /// <summary>Subtle validation note ("" = fine): a source with nothing to send, a full sink,
+        /// or no resource set — the lightweight "is this route broken?" check. Shown small, never flashed.</summary>
+        public string Issue()
+        {
+            if (item == null) return "no resource set — belt one in, or set it below";
+            if (HasOutgoing && store.Total() == 0) return "nothing to send — belt goods in";
+            if (HasIncoming && def != null && store.Total() >= def.capacity) return "full — incoming goods will stall";
+            return "";
+        }
+
         /// <summary>Choose which resource this depot handles (only while empty).</summary>
         public void CycleItem()
         {

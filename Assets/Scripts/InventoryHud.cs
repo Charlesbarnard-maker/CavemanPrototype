@@ -52,6 +52,9 @@ namespace Caveman
         private readonly List<(string label, int value, string detail, Color color)> _chips = new();
         private GUIStyle _toast;
         private int _lastAge = -1;
+        // Temporary "what just changed" card shown on an age advance, then fades (Priority 2).
+        private float _ageCardT;
+        private string _ageCardTitle, _ageCardBody;
 
         // Meta-groups keep the menu to a handful of headers (not one per building kind).
         private static readonly (string label, BuildingKind[] kinds)[] Cats =
@@ -63,6 +66,31 @@ namespace Caveman
         };
         private static bool InGroup(BuildingKind[] kinds, BuildingKind k) => System.Array.IndexOf(kinds, k) >= 0;
 
+        // --- Context-panel layering (Priority 1): only ONE large panel is open at a time.
+        // Opening any of Build / Research / Guide / Help closes the others, so the player
+        // focuses on a single system. The minimap is a world overlay, not a context panel,
+        // so it's exempt. ---
+        private enum Panel { Build, Research, Guide, Help }
+        private void CloseAllPanels() { _showBuild = _showResearch = _showGuide = _showHelp = false; }
+        private void TogglePanel(Panel p)
+        {
+            bool wasOpen = p == Panel.Build ? _showBuild
+                         : p == Panel.Research ? _showResearch
+                         : p == Panel.Guide ? _showGuide
+                         : _showHelp;
+            CloseAllPanels();
+            if (wasOpen) return; // it was open → we just closed it
+            switch (p)
+            {
+                case Panel.Build: _showBuild = true; break;
+                case Panel.Research: _showResearch = true; break;
+                case Panel.Guide: _showGuide = true; break;
+                case Panel.Help: _showHelp = true; break;
+            }
+        }
+        // A full-screen "mode" panel is up — used to dim the world and hide competing widgets.
+        private bool ModalOpen => _showResearch || _showGuide || _showHelp;
+
         void Update()
         {
             var kb = Keyboard.current;
@@ -72,11 +100,11 @@ namespace Caveman
                 _paused = !_paused;
                 Time.timeScale = _paused ? 0f : _speed;
             }
-            if (kb.hKey.wasPressedThisFrame) _showHelp = !_showHelp;
-            if (kb.bKey.wasPressedThisFrame) _showBuild = !_showBuild;
+            if (kb.hKey.wasPressedThisFrame) TogglePanel(Panel.Help);
+            if (kb.bKey.wasPressedThisFrame) TogglePanel(Panel.Build);
             if (kb.nKey.wasPressedThisFrame) _showMinimap = !_showMinimap;
-            if (kb.gKey.wasPressedThisFrame) _showGuide = !_showGuide;
-            if (kb.tKey.wasPressedThisFrame) _showResearch = !_showResearch;
+            if (kb.gKey.wasPressedThisFrame) TogglePanel(Panel.Guide);
+            if (kb.tKey.wasPressedThisFrame) TogglePanel(Panel.Research);
             if (kb.jKey.wasPressedThisFrame) StaffAllIdle();
 
             // QoL: one-time "research available" toast when a tree node first becomes affordable.
@@ -106,6 +134,7 @@ namespace Caveman
             // Toasts fade out.
             for (int i = 0; i < Toast.Items.Count; i++) Toast.Items[i].t -= Time.unscaledDeltaTime;
             Toast.Items.RemoveAll(t => t.t <= 0f);
+            if (_ageCardT > 0f) _ageCardT -= Time.unscaledDeltaTime; // age-change card fades
 
             // One-time onboarding hint the first time a workshop starves under local
             // production — so a new player learns inputs must be delivered, not pooled.
@@ -128,7 +157,7 @@ namespace Caveman
                     if (p != null && p.StatusColor == Status.BackedUp)
                     {
                         _collectorTipShown = true;
-                        Toast.Show("<color=#ffd24d>💡 Tip:</color> a collector's output piles up until something USES it. Easiest: place a workshop right NEXT TO it — machines pull from their neighbours, no belt needed. To stock a Storage (for building/survival), belt it in from the green output arrow.");
+                        Toast.Show("<color=#ffd24d>💡 Tip:</color> a collector's output piles up until something USES it. Easiest: place a workshop right NEXT TO it — machines pull from their neighbours, no belt needed. To stock a Storage (to build with, or feed a workshop), belt it in from the green output arrow.");
                         break;
                     }
             }
@@ -136,7 +165,9 @@ namespace Caveman
             // Celebrate reaching a new age.
             int age = Colony.Instance != null ? Colony.Instance.Age : 0;
             if (_lastAge < 0) _lastAge = age;
-            else if (age > _lastAge) { _lastAge = age; AnnounceAge(age); }
+            // On an age advance, drop whatever panel was open (you just bought it in the research
+            // mode) so the "what changed" card is seen against the world, then it fades on its own.
+            else if (age > _lastAge) { _lastAge = age; CloseAllPanels(); builder?.UpgradeAllRoutes(); AnnounceAge(age); }
         }
 
         private void AnnounceAge(int age)
@@ -145,9 +176,42 @@ namespace Caveman
             if (builder != null)
                 foreach (var d in builder.buildables)
                     if (d != null && d.unlockAge == age) names.Add(d.displayName);
-            string unlocked = names.Count > 0 ? "Unlocked: " + string.Join(", ", names) : "";
+            string unlocked = names.Count > 0 ? string.Join(", ", names) : "—";
             string an = Colony.AgeNames[Mathf.Clamp(age, 0, Colony.AgeNames.Length - 1)];
-            Toast.Show($"<color=#ffd24d>🎉 {an}!</color>  <size=14>{unlocked}</size>");
+
+            // One-line "what this age adds to the factory" (existing systems only — no new ones).
+            string rule = age switch
+            {
+                1 => "New: <b>Charcoal &amp; Clay</b> chains. Cluster machines so neighbours feed each other, or link them with belts.",
+                2 => "New: <b>Kiln &amp; Bricks, Pottery, Conveyors</b> (research). Deeper multi-input recipes — plan your layout.",
+                3 => "New: <b>Ore → Metal → Tools</b>. Ore is finite &amp; far — expand outward and run transport routes home.",
+                4 => "New: <b>Power</b> — machines draw from a Coal Generator; under-supply browns out. Build the Monument to win.",
+                _ => "",
+            };
+
+            _ageCardTitle = $"<color=#ffd24d><b>🎉 {an} reached!</b></color>";
+            _ageCardBody = $"<b>New buildings:</b> {unlocked}"
+                + (string.IsNullOrEmpty(rule) ? "" : $"\n{rule}")
+                + "\n<color=#9cf>🔬 Press T to research what's next  ·  B to build.</color>";
+            _ageCardT = 8.5f; // visible, then fades (see DrawAgeCard)
+        }
+
+        // The temporary age-transition card: an explicit "what just changed" moment that fades
+        // away (no permanent panel). Centred upper-middle so it doesn't sit on the build area.
+        private void DrawAgeCard()
+        {
+            if (_ageCardT <= 0f || string.IsNullOrEmpty(_ageCardBody)) return;
+            float a = Mathf.Clamp01(_ageCardT / 1.5f); // fade over the final 1.5s
+            float w = Mathf.Min(560f, Screen.width - 40f);
+            var r = new Rect(Screen.width / 2f - w / 2f, 132f, w, 116f);
+            var prev = GUI.color;
+            GUI.color = new Color(1f, 1f, 1f, a);
+            PanelBg(r);
+            GUILayout.BeginArea(new Rect(r.x + 18, r.y + 12, r.width - 36, r.height - 24));
+            GUILayout.Label($"<size=20>{_ageCardTitle}</size>", _s);
+            GUILayout.Label($"<size=14>{_ageCardBody}</size>", _small);
+            GUILayout.EndArea();
+            GUI.color = prev;
         }
 
         void OnDisable() => Time.timeScale = 1f;
@@ -167,41 +231,57 @@ namespace Caveman
                 _panelTex.Apply();
             }
 
+            bool modal = ModalOpen;
+
+            // --- Layer 1: world-level always-on HUD (top bar, vitals, alerts, objectives). ---
             DrawTopBar();
             DrawStatus();
             DrawObjective();
-            if (builder != null) DrawBuildMenu();
-            DrawMinimap();
-            DrawSelectedPanel();
             DrawObjectives();
-            DrawResourceFinder();
+
+            // --- Layer 2: contextual / secondary widgets — hidden while a full "mode" panel
+            //     (Research / Guide / Help) is open, so the player focuses on one system. ---
+            if (!modal)
+            {
+                if (builder != null) DrawBuildMenu();
+                DrawMinimap();
+                DrawSelectedPanel();
+                DrawResourceFinder();
+                DrawFooter();
+            }
+
             DrawHoverInfo();
             DrawToasts();
-            DrawFooter();
+            if (!modal) DrawAgeCard(); // temporary "what changed" moment; yields if a mode panel is open
             if (Objectives.Instance != null && Objectives.Instance.Won) DrawWin();
+
+            // --- Layer 3: the focused mode panel, over a dimmed world. ---
+            if (modal) DimWorld();
             if (_showHelp) DrawHelp();
             if (_showGuide) DrawGuide();
             if (_showResearch) DrawResearchPanel();
             if (_paused) GUI.Label(new Rect(0, 60, Screen.width, 60), "<b>PAUSED</b>  <size=18>(space)</size>", _big);
 
-            var col = Colony.Instance;
-            if (col != null && !_paused && (col.Starving || col.Thirsty))
-            {
-                string need = col.Starving && col.Thirsty ? "NO FOOD OR WATER"
-                            : col.Thirsty ? "OUT OF WATER" : "OUT OF FOOD";
-                GUI.Label(new Rect(0, 96, Screen.width, 44),
-                    $"<size=26><color=#ff5555><b>⚠ {need} — your people are dying!</b></color></size>", _big);
-            }
-
-            // Block world clicks when the cursor is over an interactive panel.
+            // Block world clicks when the cursor is over an interactive panel. A modal mode
+            // dims the whole screen, so it blocks everywhere (clicking off-panel just focuses).
             if (Event.current.type == EventType.Repaint)
             {
                 var m = Event.current.mousePosition;
-                PointerOverUI = (_buildShown && _buildRect.Contains(m)) || (_selShown && _selRect.Contains(m))
+                PointerOverUI = modal
+                                || (_buildShown && _buildRect.Contains(m)) || (_selShown && _selRect.Contains(m))
                                 || _topRect.Contains(m) || _miniRect.Contains(m) || _objRect.Contains(m)
-                                || _finderRect.Contains(m) || (_showGuide && _guideRect.Contains(m))
-                                || (_showResearch && _researchRect.Contains(m));
+                                || _finderRect.Contains(m);
             }
+        }
+
+        // Dim the world + Layer-1 HUD behind a focused mode panel (Satisfactory/DSP style),
+        // so a single system has the player's attention. Critical alerts still draw on top.
+        private void DimWorld()
+        {
+            var c = GUI.color;
+            GUI.color = new Color(0f, 0f, 0f, 0.6f);
+            GUI.DrawTexture(new Rect(0, 0, Screen.width, Screen.height), Texture2D.whiteTexture);
+            GUI.color = c;
         }
 
         // Consistent dark panel background + border, for an organized look.
@@ -221,20 +301,16 @@ namespace Caveman
             _chips.Clear();
             _chips.Add(("Wood", Get(woodItem), null, ColorOf(woodItem)));
             _chips.Add(("Stone", Get(stoneItem), null, ColorOf(stoneItem)));
-            _chips.Add(("Water", Get(waterItem), null, ColorOf(waterItem)));
 
-            int foodSum = 0; var foodDetail = new List<string>();
+            // Everything else the factory makes, summed into "Goods" (hover for the breakdown).
             int matSum = 0; var matDetail = new List<string>();
             if (debugItems != null)
                 foreach (var it in debugItems)
                 {
-                    if (it == null) continue;
+                    if (it == null || it == woodItem || it == stoneItem) continue;
                     int v = Get(it);
-                    if (it.foodValue > 0) { foodSum += v; if (v > 0) foodDetail.Add($"{it.displayName}: {K(v)}"); }
-                    else if (it != woodItem && it != stoneItem && it != waterItem)
-                    { matSum += v; if (v > 0) matDetail.Add($"{it.displayName}: {K(v)}"); }
+                    matSum += v; if (v > 0) matDetail.Add($"{it.displayName}: {K(v)}");
                 }
-            _chips.Add(("Food", foodSum, foodDetail.Count > 0 ? string.Join("\n", foodDetail) : null, new Color(0.85f, 0.5f, 0.42f)));
             _chips.Add(("Goods", matSum, matDetail.Count > 0 ? string.Join("\n", matDetail) : null, new Color(0.72f, 0.7f, 0.55f)));
 
             var mp = Event.current.mousePosition;
@@ -334,44 +410,26 @@ namespace Caveman
         // ---- Status (population) ----
         private void DrawStatus()
         {
-            GUILayout.BeginArea(new Rect(12, 36, Mathf.Max(620f, Screen.width - 320f), 28));
+            GUILayout.BeginArea(new Rect(12, 34, Mathf.Max(620f, Screen.width - 310f), 52));
             var c = Colony.Instance;
             if (c != null)
             {
-                string flags = "";
-                if (c.Starving) flags += "   <color=#f55>STARVING</color>";
-                if (c.Thirsty) flags += "   <color=#5cf>THIRSTY</color>";
-                int working = c.Population - c.FreeWorkers; // assigned + builders + transporters
-
-                // Bottleneck summary — count starved/backed-up machines (only shown when
-                // there's a problem). Pairs with the minimap so you can find & fix it.
+                // Bottleneck summary — count starved / backed-up / idle machines. This is THE core
+                // factory alert; it pairs with the minimap dots so you can find & fix the problem.
                 int starved = 0, backed = 0, unstaffed = 0;
                 foreach (var pb in ProductionBuilding.All)
                 { if (pb == null) continue; var sc = pb.StatusColor; if (sc == Status.Starved) starved++; else if (sc == Status.BackedUp) backed++; else if (sc == Status.Idle && !pb.Paused) unstaffed++; }
                 foreach (var wkb in WorkshopBuilding.All)
                 { if (wkb == null) continue; var sc = wkb.StatusColor; if (sc == Status.Starved) starved++; else if (sc == Status.BackedUp) backed++; else if (sc == Status.Idle && !wkb.Paused) unstaffed++; }
+                // Stay quiet early (Factorio focus): only show production FAILURE (starved) until the
+                // base is actually going; non-critical states appear once established.
+                bool established = c.Age >= 1 || c.PeakProsperity >= 100;
                 string bottleneck = "";
-                if (starved > 0) bottleneck += $"   <color=#f66>⚠ {starved} starved</color>";
-                if (backed > 0) bottleneck += $"   <color=#fd4>⏸ {backed} backed-up</color>";
-                // Labor scarcity made visible — the dominant SOFT bottleneck at scale, and it
-                // points at the real fix (assign idle workers, or grow population if there are none).
-                if (unstaffed > 0) bottleneck += $"   <color=#ccc>⚪ {unstaffed} idle — {(c.FreeWorkers > 0 ? "press J to staff" : "grow population")}</color>";
-                int prod = Mathf.RoundToInt(c.Productivity * 100f);
-                string prodCol = prod >= 100 ? "#9cf" : "#f99";
-                int happy = Mathf.RoundToInt(c.Happiness * 100f);
-                string happyCol = happy >= 80 ? "#9f9" : happy >= 50 ? "#ffd24d" : "#f99";
+                if (starved > 0) bottleneck += $"   <color=#f66>⚠ {starved} starved (no input)</color>";
+                if (established && backed > 0) bottleneck += $"   <color=#fd4>⏸ {backed} backed-up (output full)</color>";
+                if (established && unstaffed > 0) bottleneck += $"   <color=#ccc>⚪ {unstaffed} idle — press J to staff</color>";
 
-                // Show which comfort goods are short, so low happiness is actionable.
-                string needComfort = "";
-                if (c.UnmetComforts != null && c.UnmetComforts.Count > 0)
-                {
-                    var names = new List<string>();
-                    foreach (var it in c.UnmetComforts) if (it != null) names.Add(it.displayName);
-                    if (names.Count > 0) needComfort = $"   <size=12><color=#f99>need: {string.Join(", ", names)}</color></size>";
-                }
-
-                // Monument progress (endgame): only shown once a Monument exists or blocks
-                // are held. Uses the per-frame cached totals — no extra pool scan.
+                // Monument progress (endgame): shown once a Monument exists or blocks are held.
                 string monu = "";
                 if (monumentItem != null)
                 {
@@ -391,10 +449,13 @@ namespace Caveman
                     power = $"   <color={pc}>⚡ {Mathf.RoundToInt(Power.Generation)}/{Mathf.RoundToInt(Power.Demand)}{(brown ? " BROWNOUT" : "")}</color>";
                 }
 
-                // Research pool — always visible; press T for the spend tree.
                 string research = $"   <color=#9cf>🔬 {Research.Points} pts <size=11>(T)</size></color>";
 
-                GUILayout.Label($"<b>Population</b> {c.Population}/{c.Capacity}   <b>Working</b> {working}   <b>Free</b> {c.FreeWorkers}{bottleneck}   <color=#cda>{c.AgeName}</color>{research}   <color=#dca>{c.Rank}</color>   <color={prodCol}>Output {prod}%</color>   <color={happyCol}>Happy {happy}%</color>{needComfort}   <color=#ffcf6b>Prosperity {c.Prosperity}</color>{power}{monu}{flags}", _s);
+                // PRIMARY line: age, research pool, and live factory bottleneck alerts.
+                GUILayout.Label($"<color=#cda><b>{c.AgeName}</b></color>{research}{bottleneck}", _s);
+                // SECONDARY line (once established): automation score + power + monument.
+                if (established)
+                    GUILayout.Label($"<size=13><color=#dca>{c.Rank}</color>   <color=#ffcf6b>Industry {c.Prosperity}</color>{power}{monu}</size>", _small);
             }
             GUILayout.EndArea();
         }
@@ -402,7 +463,7 @@ namespace Caveman
         // ---- Objective ----
         private void DrawObjective()
         {
-            GUILayout.BeginArea(new Rect(12, 64, 720, 30));
+            GUILayout.BeginArea(new Rect(12, 82, Mathf.Min(720f, Screen.width - 330f), 30));
             GUILayout.Label($"<color=#ffd24d>▶ {CurrentObjective()}</color>", _s);
             GUILayout.EndArea();
         }
@@ -410,12 +471,16 @@ namespace Caveman
         private string CurrentObjective()
         {
             int wood = Avail(woodItem);
-            if (!HasCollector("food") && wood < 4) return "Click the green trees/bushes to gather by hand.";
-            if (!HasCollector("food")) return "Build a Forager Hut near the bushes (bottom) — food keeps people alive.";
-            if (!HasCollector("wood")) return "Build a Wood Hut near the trees.";
-            if (!HasStorage("wood")) return "Build a Wood Warehouse to stockpile wood.";
-            if (HousingCount() <= 1) return "Build a House (needs Planks from a Sawmill) so your population can grow.";
-            return "Settlement running! Click a building to manage its workers; expand at will.";
+            var col = Colony.Instance;
+            if (!HasCollector("wood") && wood < 5) return "Click trees & rocks to gather Wood and Stone by hand.";
+            if (!HasCollector("wood")) return "Build a Wood Hut near the trees — it gathers Wood for you.";
+            if (!HasStorage("wood")) return "Build a Woodpile next to the Wood Hut to stockpile Wood.";
+            if (!HasCollector("stone")) return "Build a Stone Pit near the rocks.";
+            if (WorkshopBuilding.All.Count == 0) return "Build a Sawmill — it turns Wood into Planks (your first processed good).";
+            if (ResearchBuilding.All.Count == 0) return "Build an Idea Bench (Planks + Stone) and a Research Lodge beside it.";
+            if (Research.TotalDelivered < 1) return "Get an Idea Tablet into the Research Lodge (belt it in, or place it adjacent).";
+            if (col != null && col.Age < 1) return "Press T and research the Tribal Age to unlock the next chain.";
+            return "Factory running! Scale production, automate with belts, and research the next Age.";
         }
 
         // ---- Build menu (left, categorised + scrollable + clickable) ----
@@ -542,7 +607,7 @@ namespace Caveman
                     GUILayout.Label($"<size=12><color=#9cf>[{bar}]</color>  {Research.Points}/{nextTechB.cost} → {nextTechB.name}</size>", _small);
                 }
                 else GUILayout.Label("<size=12><color=#9f9>✔ All ages researched</color></size>", _small);
-                if (GUILayout.Button("<size=12>🔬 Research Tree  <color=#bbb>(T)</color></size>", _btn)) _showResearch = !_showResearch;
+                if (GUILayout.Button("<size=12>🔬 Research Tree  <color=#bbb>(T)</color></size>", _btn)) TogglePanel(Panel.Research);
             }
             GUILayout.Space(4);
             GUILayout.Label("<b>Build</b>  <size=11>(click, then click the map · headers collapse)</size>", _small);
@@ -607,9 +672,9 @@ namespace Caveman
                 for (int i = 0; i < builder.buildables.Count; i++)
                 {
                     var d = builder.buildables[i];
-                    if (d != null && InGroup(cat.kinds, d.kind) && d.unlockAge <= curAge + 1) { hasAny = true; break; }
+                    if (d != null && InGroup(cat.kinds, d.kind) && builder.IsUnlocked(d)) { hasAny = true; break; }
                 }
-                if (!hasAny) continue;
+                if (!hasAny) continue; // progressive disclosure: a category appears only once it has a buildable
 
                 bool active = _activeCat == cat.label;
                 if (GUILayout.Button($"<size=12><b><color=#d8c8a0>{(active ? "▼" : "▶")} {cat.label}</color></b></size>", _btn))
@@ -620,7 +685,7 @@ namespace Caveman
                 {
                     var def = builder.buildables[i];
                     if (def == null || !InGroup(cat.kinds, def.kind)) continue;
-                    if (def.unlockAge > curAge + 1) continue; // hide far-future buildings
+                    if (!builder.IsUnlocked(def)) continue; // hide locked/age-gated until relevant (new unlocks are announced by the age-up toast + Research panel)
                     Entry(i);
                 }
             }
@@ -737,13 +802,14 @@ namespace Caveman
                 }
                 else
                 {
-                    GUILayout.Label($"Workers: {staff.AssignedWorkers}/{staff.MaxWorkers}    <size=14>(free: {(Colony.Instance != null ? Colony.Instance.FreeWorkers : 0)})</size>", _small);
+                    // Workers are FREE in factory-first — just a speed dial (more workers = faster).
+                    GUILayout.Label($"<b>Speed:</b> {staff.AssignedWorkers}/{staff.MaxWorkers} workers <size=12><color=#bbb>(free)</color></size>", _small);
                     GUILayout.BeginHorizontal();
                     rem = GUILayout.Button("- worker", GUILayout.Height(28));
                     add = GUILayout.Button("+ worker", GUILayout.Height(28));
                     GUILayout.EndHorizontal();
                     if (staff.AssignedWorkers < staff.MaxWorkers
-                        && GUILayout.Button("<size=12>Fill (assign free workers)</size>", _btn))
+                        && GUILayout.Button("<size=12>Max speed</size>", _btn))
                         for (int k = 0; k < 64 && staff.TryAssign(); k++) { }
                 }
                 if (th != null)
@@ -788,20 +854,48 @@ namespace Caveman
             else if (dp != null)
             {
                 string acc = dp.item != null ? dp.item.displayName : "(not set)";
-                GUILayout.Label($"<size=15>Station — {acc}: {dp.store.Total()}/{dp.def.capacity}</size>", _small);
+                // Role badge — Supplying → / ← Receiving / Relay / Idle — colour-coded so you
+                // instantly know whether this station gives or takes.
+                string roleCol = dp.HasOutgoing && dp.HasIncoming ? "#9cf" : dp.HasOutgoing ? "#9f9" : dp.HasIncoming ? "#fc8" : "#999";
+                GUILayout.Label($"<size=15>Station  <color={roleCol}><b>{dp.Role}</b></color></size>", _small);
+
+                // Cargo + fill state (empty / filling / FULL) → supplying vs blocked at a glance.
+                float fill = dp.FillFraction;
+                string fillWord = dp.store.Total() == 0 ? "<color=#888>empty</color>" : fill >= 0.99f ? "<color=#fd4>FULL</color>" : "filling";
+                GUILayout.Label($"<size=12>Holds {acc}: {dp.store.Total()}/{dp.def.capacity}  ({fillWord})</size>", _small);
+
+                // Lightweight, non-flashing validation: only shows when a route can't move goods.
+                string issue = dp.Issue();
+                if (!string.IsNullOrEmpty(issue))
+                    GUILayout.Label($"<size=11><color=#f99>⚠ {issue}</color></size>", _small);
+
                 if (dp.store.Total() == 0)
                 {
                     if (GUILayout.Button($"<size=12>Handle: {acc} (change)</size>", _btn)) dp.CycleItem();
                 }
                 else GUILayout.Label("<size=11><color=#888>empty it to change type</color></size>", _small);
 
-                // Routes managed here (no global vehicle in the build menu any more).
-                int rcount = 0;
-                foreach (var rv in RouteVehicle.All) if (rv != null && (rv.a == dp || rv.b == dp)) rcount++;
-                GUILayout.Label($"<size=12>Routes from/to here: <b>{rcount}</b></size>", _small);
+                // Routes touching this station, each with explicit FROM → TO direction (OUT/IN +
+                // compass arrow + distance + the resource). Capped so the panel never overflows.
+                int rcount = 0, shownR = 0;
+                foreach (var rv in RouteVehicle.All)
+                {
+                    if (rv == null || (rv.a != dp && rv.b != dp)) continue;
+                    rcount++;
+                    if (shownR >= 2 || rv.a == null || rv.b == null) continue;
+                    shownR++;
+                    bool outgoing = rv.a == dp;
+                    var other = outgoing ? rv.b : rv.a;
+                    Vector2 d = (Vector2)(other.transform.position - dp.transform.position);
+                    string ritem = rv.a.item != null ? rv.a.item.displayName : "—";
+                    string tag = outgoing ? "<color=#9f9>→ OUT</color>" : "<color=#fc8>← IN</color>";
+                    GUILayout.Label($"<size=11>{tag} {ArrowFor(d)} {Mathf.RoundToInt(d.magnitude)}m  <color=#bbb>{ritem}</color></size>", _small);
+                }
+                if (rcount > shownR) GUILayout.Label($"<size=10><color=#888>+{rcount - shownR} more route(s)</color></size>", _small);
+                if (rcount == 0) GUILayout.Label("<size=11><color=#888>No route yet — belt goods in, then add a route to another Station.</color></size>", _small);
 
                 if (builder.LinkFrom == dp)
-                    GUILayout.Label("<size=11><color=#ffd24d>▶ Click another Station to link… (Esc cancels)</color></size>", _small);
+                    GUILayout.Label("<size=11><color=#ffd24d>▶ Click the destination Station… (Esc cancels)</color></size>", _small);
                 else
                 {
                     var tier = builder.BestRouteTier();
@@ -834,16 +928,17 @@ namespace Caveman
             }
             else if (hb != null)
             {
-                GUILayout.Label($"<size=15>Houses {hb.houseCapacity} people</size>", _small);
                 if (hb.isHQ && Colony.Instance != null)
                 {
                     var col = Colony.Instance;
-                    GUILayout.Label($"<b>Builders: {col.Builders}/{col.MaxBuilders}</b>   <size=14>(free: {col.FreeWorkers})</size>", _small);
+                    GUILayout.Label("<size=13><color=#bbb>HQ — manages your free builder squad.</color></size>", _small);
+                    GUILayout.Label($"<b>Builders: {col.Builders}/{col.MaxBuilders}</b>", _small);
                     GUILayout.BeginHorizontal();
                     rem = GUILayout.Button("- builder", GUILayout.Height(30));
                     add = GUILayout.Button("+ builder", GUILayout.Height(30));
                     GUILayout.EndHorizontal();
                 }
+                else GUILayout.Label("<size=14>Structure</size>", _small);
             }
             else if (cs != null)
             {
@@ -881,8 +976,8 @@ namespace Caveman
             if (sb.configurable && sb.Store.Total() == 0) sb.accepts = null; // ready to adopt a new type
         }
 
-        // ---- Resource finder: arrows to the nearest Wood/Stone/Food/Water you haven't
-        //      tapped yet. Each line disappears once you build that collector. ----
+        // ---- Resource finder: arrows to the nearest raw material you haven't tapped yet.
+        //      Each line disappears once you build that collector. ----
         private static readonly string[] _arrows8 = { "→", "↗", "↑", "↖", "←", "↙", "↓", "↘" };
         private static string ArrowFor(Vector2 dir)
         {
@@ -896,14 +991,13 @@ namespace Caveman
             if (gatherer == null) { _finderRect = default; return; }
             Vector2 p = gatherer.transform.position;
             var keys = new List<(ItemDefinition item, string label)>
-            { (woodItem, "Wood"), (stoneItem, "Stone"), (foodItem, "Food"), (waterItem, "Water") };
-            // From the Tribal age, also point toward the expansion resources (meat/clay/ore) so
-            // the player SEES the next step before feeling blocked. Each drops once its collector
-            // is built (HasCollector). Subtle — reuses the existing arrows, no extra panels.
+            { (woodItem, "Wood"), (stoneItem, "Stone") };
+            // From the Tribal age, also point toward the expansion materials (clay/ore) so the
+            // player SEES the next supply line before feeling blocked. Each drops once its
+            // collector is built (HasCollector). Subtle — reuses the existing arrows.
             int age = Colony.Instance != null ? Colony.Instance.Age : 0;
             if (age >= 1)
             {
-                keys.Add((meatItem, "Meat"));
                 keys.Add((clayItem, "Clay"));
                 keys.Add((oreItem, "Ore"));
             }
@@ -963,30 +1057,32 @@ namespace Caveman
             }
         }
 
-        // One-shot: bring every idle (unpaused, unstaffed) building online with a free worker.
-        // Removes per-building staffing tedium at scale; LIMITED workers stay the real constraint
-        // (pause a building to free its labour for higher-priority ones).
+        // One-shot: bring every idle (unpaused, unstaffed) building online. Workers are free in
+        // factory-first, so this just removes the tedium of clicking each new machine to start it.
         private void StaffAllIdle()
         {
-            var col = Colony.Instance;
-            if (col == null) return;
             int staffed = 0;
             foreach (var pb in ProductionBuilding.All)
-            { if (col.FreeWorkers <= 0) break; if (pb != null && !pb.Paused && pb.AssignedWorkers == 0 && pb.TryAssign()) staffed++; }
+            { if (pb != null && !pb.Paused && pb.AssignedWorkers == 0 && pb.TryAssign()) staffed++; }
             foreach (var wb in WorkshopBuilding.All)
-            { if (col.FreeWorkers <= 0) break; if (wb != null && !wb.Paused && wb.AssignedWorkers == 0 && wb.TryAssign()) staffed++; }
+            { if (wb != null && !wb.Paused && wb.AssignedWorkers == 0 && wb.TryAssign()) staffed++; }
             Toast.Show(staffed > 0
-                ? $"<color=#9f9>Staffed {staffed} idle building{(staffed == 1 ? "" : "s")}.</color>"
-                : (col.FreeWorkers <= 0 ? "<color=#f99>No free workers — grow your population to staff more.</color>" : "<color=#bbb>No idle buildings to staff.</color>"));
+                ? $"<color=#9f9>Started {staffed} idle building{(staffed == 1 ? "" : "s")}.</color>"
+                : "<color=#bbb>No idle buildings to start.</color>");
         }
 
+        // Hotkey legend + run state — lowest-priority info, pinned to the bottom-centre (out of
+        // the top resource strip it used to overlap). Hidden while placing so it never fights the
+        // placement instruction bar.
         private void DrawFooter()
         {
-            GUILayout.BeginArea(new Rect(Screen.width - 330, 10, 320, 50));
-            GUILayout.Label($"<size=15>B build · <color=#9cf>T research</color> · J staff idle · G guide · Space pause · H help · M overview · N map {(_showMinimap ? "on" : "off")}</size>", _small);
+            if (builder != null && builder.PendingIndex >= 0) return;
+            float w = Mathf.Min(760f, Screen.width - 24f);
+            GUILayout.BeginArea(new Rect(Screen.width / 2f - w / 2f, Screen.height - 40f, w, 38f));
+            GUILayout.Label($"<size=13><color=#bbb>B build · <color=#9cf>T research</color> · J staff idle · G guide · H help · M overview · N map {(_showMinimap ? "on" : "off")} · Space pause</color></size>", _small);
             string sandbox = Economy.FreeBuild ? "<color=#9f9>SANDBOX</color> · " : "";
             string mode = Economy.LocalProduction ? "<color=#fc8>Local logistics</color>" : "<color=#8cf>Global pool</color>";
-            GUILayout.Label($"<size=12>{sandbox}Speed x{_speed:0} · {mode} (F7) · F1–F5 sandbox</size>", _small);
+            GUILayout.Label($"<size=11><color=#999>{sandbox}Speed x{_speed:0} · {mode} (F7) · F1–F5 sandbox</color></size>", _small);
             GUILayout.EndArea();
         }
 
@@ -994,44 +1090,67 @@ namespace Caveman
         // ---- Research tree (T): spend research points on age advances + building unlocks ----
         private void DrawResearchPanel()
         {
-            var r = new Rect(Screen.width / 2f - 200f, 80f, 400f, Mathf.Min(Screen.height - 130f, 470f));
+            // A dedicated MODE, not a sidebar: a large centred panel over the dimmed world.
+            float w = Mathf.Min(560f, Screen.width - 40f);
+            float h = Mathf.Min(Screen.height - 120f, 580f);
+            var r = new Rect(Screen.width / 2f - w / 2f, 70f, w, h);
             _researchRect = r;
             PanelBg(r);
-            GUILayout.BeginArea(new Rect(r.x + 14, r.y + 12, r.width - 28, r.height - 24));
+            GUILayout.BeginArea(new Rect(r.x + 16, r.y + 14, r.width - 32, r.height - 28));
 
-            GUILayout.Label($"<size=18><b>🔬 Research Tree</b></size>   <color=#9cf><b>{Research.Points} pts</b></color>", _s);
-            GUILayout.Label("<size=12><color=#bbb>Craft research items → deliver to a Research Lodge → spend points here. (T closes)</color></size>", _small);
-            // Make the critical path unmistakable: name the next age to aim for + craft hint.
+            GUILayout.Label($"<size=20><b>🔬 Research</b></size>   <color=#9cf><b>{Research.Points} pts</b></color>", _s);
+            GUILayout.Label("<size=12><color=#bbb>Craft research items → deliver to a Research Lodge to earn points → spend them here.  (T or Close to exit)</color></size>", _small);
+
+            // CURRENT GOAL — the one thing to aim at, called out at the top.
             var goalTech = Research.NextAgeTech; var goalTier = Research.CurrentTier;
-            if (goalTech != null)
-                GUILayout.Label($"<size=12><color=#ffd24d>⭐ Main goal: research <b>{goalTech.name}</b> ({goalTech.cost} pts){(goalTier != null && goalTier.item != null ? $" — craft <b>{goalTier.item.displayName}</b> for points" : "")}.</color></size>", _small);
-            else
-                GUILayout.Label("<size=12><color=#9f9>⭐ All ages researched — spend any leftover points on unlocks below.</color></size>", _small);
             GUILayout.Space(4);
+            if (goalTech != null)
+            {
+                int filled = Mathf.RoundToInt(Research.Fraction * 16f);
+                string bar = new string('█', Mathf.Clamp(filled, 0, 16)) + new string('░', Mathf.Clamp(16 - filled, 0, 16));
+                GUILayout.Label($"<size=13><color=#ffd24d>⭐ Current goal: <b>{goalTech.name}</b></color>  <color=#9cf>[{bar}]</color> {Research.Points}/{goalTech.cost}</size>", _small);
+                if (goalTier != null && goalTier.item != null)
+                    GUILayout.Label($"<size=12><color=#bcd>→ craft <b>{goalTier.item.displayName}</b> ({goalTier.pointsPerItem} pt each) and deliver it to a Research Lodge.</color></size>", _small);
+            }
+            else GUILayout.Label("<size=13><color=#9f9>⭐ All ages researched — spend leftover points on upgrades below.</color></size>", _small);
+            GUILayout.Space(6);
+
+            // Render one tree node (used by both sections below).
+            void RenderNode(Research.Tech n)
+            {
+                if (n == null) return;
+                GUILayout.Space(3);
+                if (n.purchased)
+                    GUILayout.Label($"<size=13><color=#9f9>✔ {n.name}</color></size>", _small);
+                else if (!Research.PrereqMet(n))
+                {
+                    var pre = Research.Node(n.prereq);
+                    GUILayout.Label($"<size=13><color=#888>🔒 {n.name} — {n.cost} pts <i>(needs {(pre != null ? pre.name : n.prereq)})</i></color></size>", _small);
+                }
+                else if (Research.CanBuy(n))
+                {
+                    if (GUILayout.Button($"<size=13><b>{n.name}</b> — {n.cost} pts  <color=#9f9>✦ Research</color></size>", _btn))
+                        Research.Buy(n);
+                }
+                else // prereq met, not enough points yet
+                    GUILayout.Label($"<size=13>{n.name} — <color=#f99>{n.cost} pts</color> <color=#888>(need {n.cost - Research.Points} more)</color></size>", _small);
+
+                if (!string.IsNullOrEmpty(n.desc))
+                    GUILayout.Label($"<size=11><color=#bbb>{n.desc}</color></size>", _small);
+            }
 
             _researchScroll = GUILayout.BeginScrollView(_researchScroll);
             if (Research.Tree != null)
-                foreach (var n in Research.Tree)
-                {
-                    GUILayout.Space(3);
-                    if (n.purchased)
-                        GUILayout.Label($"<size=13><color=#9f9>✔ {n.name}</color></size>", _small);
-                    else if (!Research.PrereqMet(n))
-                    {
-                        var pre = Research.Node(n.prereq);
-                        GUILayout.Label($"<size=13><color=#888>🔒 {n.name} — {n.cost} pts <i>(needs {(pre != null ? pre.name : n.prereq)})</i></color></size>", _small);
-                    }
-                    else if (Research.CanBuy(n))
-                    {
-                        if (GUILayout.Button($"<size=13><b>{n.name}</b> — {n.cost} pts  <color=#9f9>✦ Research</color></size>", _btn))
-                            Research.Buy(n);
-                    }
-                    else // prereq met, not enough points yet
-                        GUILayout.Label($"<size=13>{n.name} — <color=#f99>{n.cost} pts</color> <color=#888>(need {n.cost - Research.Points} more)</color></size>", _small);
+            {
+                // Section 1 — AGES: the progression spine (locked ones read as future ages).
+                GUILayout.Label("<size=13><b><color=#cda>── Ages (progression) ──</color></b></size>", _small);
+                foreach (var n in Research.Tree) if (n != null && n.advanceToAge >= 0) RenderNode(n);
 
-                    if (!string.IsNullOrEmpty(n.desc))
-                        GUILayout.Label($"<size=11><color=#bbb>{n.desc}</color></size>", _small);
-                }
+                // Section 2 — UPGRADES: optional building unlocks you choose to spend on.
+                GUILayout.Space(8);
+                GUILayout.Label("<size=13><b><color=#cda>── Upgrades (optional unlocks) ──</color></b></size>", _small);
+                foreach (var n in Research.Tree) if (n != null && n.advanceToAge < 0) RenderNode(n);
+            }
             GUILayout.EndScrollView();
             if (GUILayout.Button("<size=12>Close (T)</size>", _btn)) _showResearch = false;
             GUILayout.EndArea();
@@ -1044,7 +1163,7 @@ namespace Caveman
             int peak = Colony.Instance != null ? Colony.Instance.PeakProsperity : 0;
             GUILayout.BeginArea(new Rect(r.x + 16, r.y + 14, r.width - 32, r.height - 28));
             GUILayout.Label("<color=#ffd24d><b>🏆 YOU WIN!</b></color>", _big);
-            GUILayout.Label($"<size=16>You built a self-running civilization.\nPeak Prosperity: <b>{peak}</b>   ·   <color=#bbb>keep playing if you like</color></size>", _toast);
+            GUILayout.Label($"<size=16>You built a self-running factory.\nPeak Industry: <b>{peak}</b>   ·   <color=#bbb>keep playing if you like</color></size>", _toast);
             GUILayout.EndArea();
         }
 
@@ -1063,21 +1182,21 @@ namespace Caveman
                 GUILayout.Label($"<size=15><b>{head}</b>\n<color=#cfcfcf>{body}</color></size>\n", _small);
 
             Section("<color=#ffd24d>The Goal</color>",
-                "Grow from a lone caveman to a self-running civilisation. Reach the Industrial Age and build the Monument (10 Blocks) to WIN.");
+                "Grow from hand-gathering to a self-running FACTORY. Reach the Industrial Age and build the Monument (10 Blocks) to WIN.");
             Section("<color=#fc8>Logistics matter (the core)</color>",
-                "The easiest way to connect things is ADJACENCY: a machine pulls inputs from buildings RIGHT NEXT TO it, so clustering a chain side-by-side feeds it automatically — no belts. Use BELTS only to connect things that are far apart (or to stock a Storage). A machine never pulls from across the map, so lay your base out so every machine is fed; a shortage cascades downstream. (F7 toggles the old global-pool mode to compare.)");
-            Section("<color=#9cf>People</color>",
-                "Population grows while fed and housed. They eat Food and drink Water — running out causes decline. Beyond survival they want comfort goods (cooked food, bread, pottery, tools, clothes). How much you supply sets Happiness, which boosts productivity and growth. Growth raises demand — the escalating pull to keep scaling.");
-            Section("<color=#ffcf6b>Prosperity & Rank</color>",
-                "A climbing score from population, happiness and automation (collectors, workshops, belts, routes). Your settlement ranks up: Camp → Hamlet → Village → Town → City → Metropolis.");
+                "The easiest way to connect things is ADJACENCY: a machine pulls inputs from buildings RIGHT NEXT TO it, so clustering a chain side-by-side feeds it automatically — no belts. Use BELTS to connect things that are far apart (or to stock a Storage). A machine never pulls from across the map, so lay your base out so every machine is fed; a shortage cascades downstream.");
+            Section("<color=#9cf>Buildings & workers</color>",
+                "Buildings run on their own once built and supplied — there is NO population to feed (no food, water or housing). Each collector/workshop has a FREE worker dial (1..max): more workers = faster. A new machine starts at 1 worker; crank it for throughput, or press J to staff every idle building at once.");
+            Section("<color=#ffcf6b>Industry score & Rank</color>",
+                "A climbing score from your AUTOMATION (collectors, workshops, belts, routes) and tech age. Your settlement ranks up: Camp → Hamlet → Village → Town → City → Metropolis.");
             Section("<color=#cda>Research drives progress (press T)</color>",
-                "You advance by RESEARCH, not by buying ages. Craft a RESEARCH ITEM in a chain (e.g. Planks + Stone → Idea Tablet at an Idea Bench), belt it into a RESEARCH LODGE to earn research points, then open the Research Tree (T) and SPEND points to advance the Age or unlock buildings (Splitters, Conveyors, Pipes). Gathering earns no research — you must build and scale a factory. Each age needs a deeper research chain than the last.");
+                "You advance by RESEARCH. Craft a RESEARCH ITEM in a production chain (e.g. Planks + Stone → Idea Tablet at an Idea Bench), deliver it to a RESEARCH LODGE to earn points, then open the Research Tree (T) and SPEND points to advance the Age or unlock buildings (Splitters, Conveyors). Gathering earns no research — you must build and scale a factory.");
             Section("<color=#cda>Ages</color>",
-                "Stone → Tribal → Bronze → Iron → Industrial — each unlocked from the Research Tree. Reach Industrial and build the Monument to win.");
+                "Stone → Tribal → Bronze → Iron → Industrial — each unlocked from the Research Tree, each adding deeper production chains (charcoal → bricks/pottery → metal/tools → power). Reach Industrial and build the Monument to win.");
             Section("<color=#6c6>Bottlenecks</color>",
-                "Status dots: green working, yellow output-full (haul it out), red starved (no input), grey no worker. Problems pulse and show on the minimap. Click a building to see what it's waiting for, its rate, and to Pause it (free a scarce shared input for another).");
+                "Status dots: green working, yellow output-full (haul it out), red starved (no input), grey idle (no worker). Problems show on the minimap. Click a building to see what it's waiting for, its rate, and to Pause it (free a scarce shared input for another).");
             Section("<color=#9f9>Expansion</color>",
-                "Patches deplete as you harvest; collectors auto-chase fresh ones nearby, and go idle when a cluster runs dry — your cue to push outward. Ore and Gems are finite and far, so exploration + long routes (cart → train → drone) matter.");
+                "Patches deplete as you harvest; collectors auto-chase fresh ones nearby and go idle when a cluster runs dry — your cue to push outward. Ore is finite and far, so exploration + transport routes (cart → train) matter.");
 
             GUILayout.Label("<size=18><b>Resources</b></size>\n", _s);
             if (debugItems != null)
@@ -1102,26 +1221,24 @@ namespace Caveman
             GUILayout.Label("<b>How to play</b>", _s);
             GUILayout.Label("<size=15>" +
                 "• WASD / arrows to move.  Mouse wheel = zoom, M = map.\n" +
-                "• Left-click a tree/rock/bush to gather by hand.\n" +
-                "• Click a building in the Build menu (left), then click the map.\n" +
-                "• Builders (from the HQ) haul materials there, then build it.\n" +
-                "• Collectors/workshops need WORKERS — each is one person.\n" +
+                "• Left-click a tree/rock to gather raw materials by hand.\n" +
+                "• Click a building in the Build menu (left), then click the map to place it.\n" +
+                "• Builders (from the HQ) haul materials there, then build it. Build cost is paid up front.\n" +
+                "• Buildings run on their own — no food, water or population. Each has a FREE worker\n" +
+                "  dial (more workers = faster); press J to staff every idle building at once.\n" +
                 "• <b>Logistics matter:</b> a workshop only runs on inputs that ARRIVE — belt-fed or\n" +
-                "  in an ADJACENT storage/machine. Lay it out so each machine is fed. (F7 = old mode.)\n" +
-                "• Lay Belts/Splitters — or Stations + a transport route — to move goods to storage.\n" +
-                "• Click a building to manage it (workers, demolish).\n" +
-                "• People need Food + Housing. Space = pause, Esc = cancel.\n" +
+                "  in an ADJACENT storage/machine. Lay it out so each machine is fed.\n" +
+                "• Lay Belts/Splitters — or Stations + a transport route — to move goods around.\n" +
+                "• Click a building to manage it (speed, pause, demolish).\n" +
                 "• <b>X</b> or <b>Delete</b> removes the building under the cursor (fast un-do). " +
-                "Build menu: ★ pins a building; old-age tech is dimmed.\n" +
+                "Build menu: ★ pins a building.\n" +
                 "• Hold-drag to place a row of buildings; C copies the selected building's type.\n" +
-                "• <b>Prosperity</b> (status bar) climbs with population, happiness & automation.\n" +
-                "• <b>Goal:</b> reach the Industrial Age, build the <b>Monument</b>, and make " +
+                "• <b>Goal:</b> reach the Industrial Age via RESEARCH, build the <b>Monument</b>, and make " +
                 "10 Monument Blocks to <color=#ffd24d>WIN</color>.\n" +
                 "• Status dots: <color=#6c6>green</color>=working, <color=#fd4>yellow</color>=output full, " +
-                "<color=#f66>red</color>=no input, <color=#999>grey</color>=no worker.\n" +
-                "\n<b>Sandbox:</b> F1 +resources · F2 +5 people · F3 advance age · " +
-                "F4 free build · F5 game speed · F7 local/global production · F8 reveal map · " +
-                "F9 stored-only economy.\n" +
+                "<color=#f66>red</color>=no input, <color=#999>grey</color>=idle.\n" +
+                "\n<b>Sandbox:</b> F1 +resources · F3 advance age · F4 free build · " +
+                "F5 game speed · F8 reveal map.\n" +
                 "</size>", _small);
             GUILayout.Label("<size=15>Press <b>H</b> to close  ·  Press <b>G</b> for the full Guide (mechanics + every resource)  ·  <b>N</b> hides the map.</size>", _small);
             GUILayout.EndArea();

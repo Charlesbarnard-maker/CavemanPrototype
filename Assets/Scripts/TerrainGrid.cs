@@ -29,7 +29,9 @@ namespace Caveman
             _map = new Terrain[_size * _size];
             _bridges.Clear();
 
-            const float eF = 0.045f, mF = 0.075f, rF = 0.018f;
+            // Lower frequencies = BIGGER features, so biomes read as large regions instead of a
+            // "golf course" of small patches. (Rivers keep their own low frequency.)
+            const float eF = 0.024f, mF = 0.032f, rF = 0.018f;
             float ox = seed, oy = seed * 1.7f + 13f, ox2 = seed * 0.3f + 100f, oy2 = seed * 2.1f + 50f;
             float rox = seed * 0.7f + 200f, roy = seed * 1.3f + 300f;
             float basin2 = basinRadius * basinRadius;
@@ -57,6 +59,48 @@ namespace Caveman
                     else t = Terrain.Plains;
                     _map[gy * _size + gx] = t;
                 }
+            }
+
+            // Clustering pass: merge stray land patches into contiguous zones so terrain
+            // transitions read clearly (forest region / hills region / plains). Deterministic
+            // (pure function of the map) and cheap (a couple of majority filters, one-time).
+            SmoothLand(2);
+        }
+
+        // Majority filter over LAND cells only: each plains/forest/hills cell becomes the most
+        // common land biome in its 3×3 neighbourhood (ties keep the current type). Water cells
+        // (rivers/lakes/ocean) are never changed, so rivers and the coastline stay intact.
+        private static void SmoothLand(int iterations)
+        {
+            if (_map == null) return;
+            var src = new Terrain[_map.Length];
+            for (int it = 0; it < iterations; it++)
+            {
+                System.Array.Copy(_map, src, _map.Length);
+                for (int gy = 1; gy < _size - 1; gy++)
+                    for (int gx = 1; gx < _size - 1; gx++)
+                    {
+                        int idx = gy * _size + gx;
+                        if (src[idx] == Terrain.Water) continue; // never move water (rivers/lakes/ocean)
+
+                        int pl = 0, fo = 0, hi = 0;
+                        for (int dy = -1; dy <= 1; dy++)
+                            for (int dx = -1; dx <= 1; dx++)
+                            {
+                                switch (src[(gy + dy) * _size + (gx + dx)])
+                                {
+                                    case Terrain.Plains: pl++; break;
+                                    case Terrain.Forest: fo++; break;
+                                    case Terrain.Hills: hi++; break;
+                                }
+                            }
+                        Terrain win = src[idx];
+                        int wc = win == Terrain.Plains ? pl : win == Terrain.Forest ? fo : hi;
+                        if (pl > wc) { win = Terrain.Plains; wc = pl; }
+                        if (fo > wc) { win = Terrain.Forest; wc = fo; }
+                        if (hi > wc) { win = Terrain.Hills; wc = hi; }
+                        _map[idx] = win;
+                    }
             }
         }
 

@@ -30,6 +30,7 @@ namespace Caveman
         private SpriteRenderer _sr;
         private Color _baseColor;
         private LineRenderer _line;
+        private Transform _arrow; // a static marker at the route midpoint showing FROM → TO direction
 
         public static RouteVehicle Spawn(Depot a, Depot b, int capacity, float speed, Color color)
         {
@@ -55,9 +56,30 @@ namespace Caveman
             v.a = a; v.b = b; v.capacity = Mathf.Max(1, capacity); v.speed = speed;
             v._sr = sr; v._baseColor = color; v._line = lr;
             sr.color = color;
+
+            // Direction arrow at the route midpoint, so FROM → TO is readable at a glance.
+            var arrowGo = new GameObject("RouteArrow");
+            var asr = arrowGo.AddComponent<SpriteRenderer>();
+            asr.sprite = PlaceholderArt.Triangle();
+            asr.color = new Color(0.96f, 0.86f, 0.45f, 0.85f);
+            asr.sortingOrder = 1;
+            v._arrow = arrowGo.transform;
+
             // Make the destination handle the same resource the source provides.
             if (b.item == null) b.item = a.item;
             return v;
+        }
+
+        void OnDestroy() { if (_arrow != null) Destroy(_arrow.gameObject); }
+
+        /// <summary>Upgrade this route's vehicle in place (donkey cart → … → train) without
+        /// rebuilding the route — the depots/endpoints and current cargo are kept.</summary>
+        public void SetTier(int newCapacity, float newSpeed, Color newColor)
+        {
+            capacity = Mathf.Max(1, newCapacity);
+            speed = newSpeed;
+            _baseColor = newColor;
+            if (_sr != null && _carry <= 0) _sr.color = newColor;
         }
 
         void Update()
@@ -65,6 +87,14 @@ namespace Caveman
             if (a == null || b == null) { Destroy(gameObject); return; }
             _line.SetPosition(0, a.transform.position);
             _line.SetPosition(1, b.transform.position);
+            if (_arrow != null)
+            {
+                Vector3 pa = a.transform.position, pb = b.transform.position;
+                Vector3 d = pb - pa;
+                _arrow.position = new Vector3((pa.x + pb.x) * 0.5f, (pa.y + pb.y) * 0.5f, 0f);
+                _arrow.rotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(d.y, d.x) * Mathf.Rad2Deg - 90f);
+                _arrow.localScale = Vector3.one * 0.5f;
+            }
 
             switch (_state)
             {

@@ -58,10 +58,10 @@ namespace Caveman
 
             // --- Item descriptions (shown in the in-game Guide, key G) ---
             wood.description = "The starter resource — chop it from trees. Used by nearly every building, and refined into Planks and Charcoal.";
-            stone.description = "Basic building material — mine it from rocks. Used in most early buildings; cut into Stone Blocks by a Mason.";
+            stone.description = "Basic building material — mine it from rocks. Used in most early buildings and recipes (and to research the Tribal Age).";
             food.description = "Berries gathered from bushes (Forager Hut). Keeps people alive; cook it for far more nourishment.";
             water.description = "Drawn from lakes (Water Hole). People drink it every day; also needed for cooking, farming and baking.";
-            planks.description = "A Sawmill turns Wood into Planks — a stronger material for houses and advanced machines.";
+            planks.description = "A Sawmill turns Wood into Planks — a core material used by advanced machines and many recipes.";
             cookedFood.description = "A Campfire cooks Food (+Wood +Water). More nourishing than raw, and your people's first comfort good (Tribal).";
             meat.description = "Hunted from animal herds (Hunter's Hut). A nourishing food; keep it in a Smokehouse.";
             clay.description = "Dug from clay deposits (Clay Pit). Fired into Bricks, and shaped into Pottery.";
@@ -72,12 +72,12 @@ namespace Caveman
             bread.description = "A Bakery bakes Flour + Water into Bread — high nourishment, and a Bronze comfort good.";
             ore.description = "Mined from FINITE veins far from base. Smelted into Metal. Its scarcity drives exploration.";
             metal.description = "A Smelter melts Ore + Charcoal into Metal — the backbone of Tools and the Monument.";
-            tools.description = "A Toolmaker crafts Metal + Planks into Tools. An Iron-age comfort good that also gates the Industrial Age.";
+            tools.description = "A Toolmaker crafts Metal + Planks into Tools — needed for Blueprints (Industrial-Age research) and the Monument.";
             monument.description = "Built at the Monument from Metal + Tools + Bricks + Planks. Collect 10 Blocks to WIN the game.";
             fiber.description = "Plant Fiber harvested from Cotton fields (Cotton Farm). Woven into Cloth.";
             cloth.description = "A Weaver turns Fiber into Cloth. Tailored into Clothes.";
             clothes.description = "A Tailor sews Cloth into Clothes — an Industrial luxury comfort good.";
-            pot.description = "A Potter shapes Clay into Pottery — a Bronze comfort good your people want.";
+            pot.description = "A Potter shapes Clay into Pottery — combined with Bricks at a Drafting Table to make Schematics (Iron-Age research).";
             gems.description = "The rarest resource, in FINITE deposits far out in the map. Cut into Jewelry; reaching them rewards exploration.";
             jewelry.description = "A Jeweler crafts Gems into Jewelry — a high-value luxury good.";
             stoneBlock.description = "A Mason cuts Stone into Stone Blocks — used to build the sturdy Stone House.";
@@ -98,10 +98,13 @@ namespace Caveman
                 new ItemAmount(wood, 5), new ItemAmount(stone, 5));
             var foragerHut = MakeCollector("Forager Hut", food, 1, 2.0f, 2, 12, new Color(0.78f, 0.40f, 0.40f),
                 new ItemAmount(wood, 4));
+            foragerHut.autoStore = true; // SURVIVAL: its worker carries Food to the nearest Granary (no belt needed)
+            foragerHut.description = "Stone-age food: a worker gathers berries and CARRIES them to the nearest Granary (build one nearby so your colony has stored food to eat). No belt needed — survival comes before logistics. Outgrow the bushes and you'll push out to forage further afield.";
             var waterHole = MakeCollector("Water Hole", water, 1, 2.0f, 2, 12, new Color(0.40f, 0.62f, 0.85f),
                 new ItemAmount(wood, 4));
             waterHole.fromWaterTerrain = true; // must sit next to real water terrain (river/lake)
-            waterHole.description = "Stone-age water: a worker draws from adjacent water terrain and CARRIES it to the nearest Water Barrel (build one beside it so your colony has stored water to drink). Adjacent buildings can also use it directly. Water is a LIQUID — it can't ride belts; pipe it (Bronze) to move it further.";
+            waterHole.autoStore = true; // SURVIVAL: its worker carries Water to the nearest Water Barrel (no belt/pipe needed)
+            waterHole.description = "Stone-age water: a worker draws from adjacent water terrain and CARRIES it to the nearest Water Barrel (build one nearby so your colony has stored water to drink). Adjacent buildings can also use it directly. No belt or pipe needed to drink — pipes (Bronze) are only for moving water FURTHER, later.";
             // Bridge: plank tile placed on water; makes it passable for feet + belts. Core
             // logistics infrastructure — strategic chokepoints across rivers.
             var bridge = ScriptableObject.CreateInstance<BuildingDefinition>();
@@ -136,8 +139,9 @@ namespace Caveman
             var campfire = MakeWorkshop("Campfire", cookedFood, 1, 3.0f, 2, 12, new Color(0.85f, 0.45f, 0.25f),
                 new List<ItemAmount> { new ItemAmount(food, 2), new ItemAmount(wood, 1), new ItemAmount(water, 1) },
                 new ItemAmount(wood, 4), new ItemAmount(stone, 2));
-            var woodStore = MakeStorage("Wood Warehouse", wood, 100, new Color(0.62f, 0.40f, 0.20f),
+            var woodStore = MakeStorage("Woodpile", wood, 100, new Color(0.62f, 0.40f, 0.20f),
                 new ItemAmount(wood, 8));
+            woodStore.description = "Resource-specific storage: holds Wood only. (Each basic store is named for what it holds — Woodpile, Stone Storage, Granary, Water Barrel. The configurable 'Warehouse' is the ONE general store you assign yourself.)";
             var stoneStore = MakeStorage("Stone Storage", stone, 100, new Color(0.40f, 0.43f, 0.50f),
                 new ItemAmount(wood, 8));
             var foodStore = MakeStorage("Granary", food, 100, new Color(0.70f, 0.45f, 0.35f),
@@ -160,9 +164,10 @@ namespace Caveman
             depot.displayName = "Station"; depot.kind = BuildingKind.Depot; depot.unlockAge = 0;
             depot.item = null; depot.capacity = 80; depot.color = new Color(0.50f, 0.45f, 0.55f);
             depot.cost = new List<ItemAmount> { new ItemAmount(wood, 10), new ItemAmount(stone, 6) };
-            depot.description = "Transport Station. Belt goods IN; then SELECT it and '+ Add route' to another Station — a vehicle shuttles goods across the map (load → travel → unload, so distance & handling cap throughput). Build a Station at each end of a supply line; add more vehicles/routes to move more.";
-            // Route vehicle tiers — each links two depots; bigger/faster as ages advance.
-            var caravan = MakeRoute("Caravan (Elephant)", 12, 3.5f, 0, new Color(0.55f, 0.50f, 0.50f),
+            depot.description = "Transport Station — the early <b>Donkey Track</b> network (it auto-upgrades to carts → wagons → trains as you advance; routes PERSIST, no rebuild). A station that a route LOADS from is a SOURCE (belt goods IN); the other end is the SINK (delivers OUT). Select it → '+ Add route' → click another station; the panel shows each route's FROM → TO direction and warns if a station has nothing to send or is full.";
+            // Route vehicle tiers — each links two depots; bigger/faster as ages advance (the
+            // donkey → train upgrade path). Existing routes upgrade in place on age-up.
+            var caravan = MakeRoute("Donkey Cart", 12, 3.5f, 0, new Color(0.62f, 0.48f, 0.34f),
                 new ItemAmount(wood, 8));
             var oxCart = MakeRoute("Ox Cart", 18, 4.5f, 1, new Color(0.60f, 0.45f, 0.30f),
                 new ItemAmount(wood, 10), new ItemAmount(planks, 4));
@@ -289,7 +294,7 @@ namespace Caveman
             jeweler.description = "Gems → Jewelry, a high-value luxury good. Pairs with long-haul routes to bring distant gems home.";
             monumentBldg.description = "ENDGAME: pour Metal + Tools + Bricks + Planks in to produce Monument Blocks. Make 10 to WIN. A massive, sustained resource sink.";
             mason.description = "Stone → Stone Blocks (Stone's own processing chain). Stone Blocks build the sturdy Stone House.";
-            warehouse.description = "Configurable storage: pick ONE resource it holds (open its panel). Essential for routing belt goods and feeding workshops by adjacency.";
+            warehouse.description = "The GENERAL store: YOU pick which one resource it holds (open its panel, or it adopts the first item a belt delivers). Use the named stores (Woodpile/Granary/Water Barrel/…) for the basics; reach for a Warehouse when routing belt goods or feeding a workshop by adjacency.";
 
             // --- RESEARCH SYSTEM: the progression spine. Each age is unlocked by crafting that
             //     tier's RESEARCH ITEM (a multi-input factory product) and delivering it to a
@@ -330,20 +335,16 @@ namespace Caveman
             // building-unlock branches you CHOOSE to spend points on. Age costs scale 20→50→100→200.
             Research.Tree = new List<Research.Tech>
             {
-                new Research.Tech { id = "tribal",     name = "Tribal Age",     cost = 12,  advanceToAge = 1, prereq = null,     desc = "Advance to the Tribal Age — hunting, clay, charcoal, the Longhouse." },
-                new Research.Tech { id = "bronze",     name = "Bronze Age",     cost = 50,  advanceToAge = 2, prereq = "tribal", desc = "Advance to the Bronze Age — kilns, farming/baking, masonry, smelting." },
-                new Research.Tech { id = "iron",       name = "Iron Age",       cost = 100, advanceToAge = 3, prereq = "bronze", desc = "Advance to the Iron Age — toolmaking, weaving, gem mining." },
-                new Research.Tech { id = "industrial", name = "Industrial Age", cost = 200, advanceToAge = 4, prereq = "iron",   desc = "Advance to the Industrial Age — power, the Monument, the endgame." },
+                new Research.Tech { id = "tribal",     name = "Tribal Age",     cost = 12,  advanceToAge = 1, prereq = null,     desc = "Advance to the Tribal Age — Charcoal & Clay open up deeper production." },
+                new Research.Tech { id = "bronze",     name = "Bronze Age",     cost = 50,  advanceToAge = 2, prereq = "tribal", desc = "Advance to the Bronze Age — Kiln & Bricks, Pottery, the start of smelting." },
+                new Research.Tech { id = "iron",       name = "Iron Age",       cost = 100, advanceToAge = 3, prereq = "bronze", desc = "Advance to the Iron Age — Ore mining, Metal smelting, Toolmaking." },
+                new Research.Tech { id = "industrial", name = "Industrial Age", cost = 200, advanceToAge = 4, prereq = "iron",   desc = "Advance to the Industrial Age — Power, the Monument, the endgame." },
                 new Research.Tech { id = "splitters",  name = "Splitters",      cost = 15,  prereq = "tribal", unlocks = new List<BuildingDefinition>{ splitter },          desc = "Unlocks the 1→2 Splitter — feed two machines from one supply line." },
                 new Research.Tech { id = "conveyors",  name = "Conveyor Belts", cost = 30,  prereq = "bronze", unlocks = new List<BuildingDefinition>{ fastBelt },          desc = "Unlocks the fast Conveyor Belt (120/min — 2× the wooden lane)." },
-                new Research.Tech { id = "pipes",      name = "Pipe Network",   cost = 30,  prereq = "bronze", unlocks = new List<BuildingDefinition>{ pipe, pump, booster }, desc = "Unlocks liquid logistics — Pipes, the Water Pump and Booster Pump." },
             };
             // Gate those buildings behind their Tech (and off the age gate, so the Tech IS the gate).
             splitter.requiredTech = "splitters";
             fastBelt.requiredTech = "conveyors"; fastBelt.unlockAge = 0;
-            pipe.requiredTech = "pipes"; pipe.unlockAge = 0;
-            pump.requiredTech = "pipes"; pump.unlockAge = 0;
-            booster.requiredTech = "pipes"; booster.unlockAge = 0;
 
             // --- Camera (follows the player) ---
             var cam = Camera.main;
@@ -370,15 +371,23 @@ namespace Caveman
             var builder = player.AddComponent<BuildController>();
             builder.gatherer = gatherer;
             builder.placeNodeRange = 6f;
+            // FACTORY-FIRST build menu: gathering → processing → research → logistics → storage →
+            // power/endgame. Survival/comfort buildings (forager, water hole, granary, campfire,
+            // farm/mill/bakery, hunter, housing, pipes, textiles, jewelry, masonry) are intentionally
+            // NOT offered — the game is now a pure production/automation loop.
             builder.buildables = new List<BuildingDefinition>
-            { woodHut, stonePit, foragerHut, waterHole, sawmill, campfire,
-              woodStore, stoneStore, foodStore, waterStore, warehouse, house, buildYard, bridge, pipe, pump, booster,
-              researchLodge, ideaBench, scrollMaker, draftingTable, engineeringLab,
-              hunter, clayPit, charcoalBurner, clayStore, smokehouse, longhouse,
-              kiln, farm, mill, bakery, brickStore, mason, stoneHouse, woodBelt, fastBelt, splitter,
-              mine, oreStore, smelter, toolmaker, monumentBldg, generator,
-              potter, cottonFarm, weaver, tailor, gemMine, jeweler,
-              depot };
+            { // Gather
+              woodHut, stonePit, clayPit, mine,
+              // Process
+              sawmill, charcoalBurner, kiln, potter, smelter, toolmaker,
+              // Research
+              ideaBench, scrollMaker, draftingTable, engineeringLab, researchLodge,
+              // Logistics
+              woodBelt, fastBelt, splitter, depot, bridge,
+              // Storage
+              woodStore, stoneStore, clayStore, brickStore, oreStore, warehouse,
+              // Infrastructure / power / endgame
+              buildYard, generator, monumentBldg };
             // Transport vehicles are NOT in the build menu — they're created from a Station's panel.
             builder.routeTiers = new List<BuildingDefinition> { caravan, oxCart, wagonTrain, cargoDrone };
 
@@ -390,27 +399,16 @@ namespace Caveman
             var fog = new GameObject("FogOfWar").AddComponent<FogOfWar>();
             fog.target = player.transform; // size/res come from FogOfWar defaults (set for the big world)
 
-            // --- Colony (population) ---
+            // --- Colony (now just age + automation-score holder; no survival loop) ---
             var colony = new GameObject("Colony").AddComponent<Colony>();
-            colony.foodItem = food;
-            colony.waterItem = water;
             colony.carried = gatherer.Inventory;
-            colony.SetStartingPopulation(5);
-            gatherer.Inventory.Add(food, 90);   // generous starting larder while you learn the ropes
-            gatherer.Inventory.Add(water, 90);  // generous starting water
-            gatherer.Inventory.Add(wood, 10);   // starter kit: enough for the first hut or two so the
-            gatherer.Inventory.Add(stone, 10);  // opening isn't a long manual-gather grind (still <12 wood, so the "gather 12 wood" objective still teaches clicking)
-            // Age advancement is now driven by the Research system (crafted research items →
-            // Research Lodge → points), set up above — there is no resource/pop "advance" cost here.
-            // Comfort goods (the demand sink): people want better food as the colony evolves.
-            colony.comforts = new List<Colony.Comfort>
-            {
-                new Colony.Comfort { item = cookedFood, unlockAge = 1 }, // Tribal: want cooked food
-                new Colony.Comfort { item = bread,      unlockAge = 2 }, // Bronze: want bread too
-                new Colony.Comfort { item = pot,        unlockAge = 2 }, // Bronze: want pottery
-                new Colony.Comfort { item = tools,      unlockAge = 3 }, // Iron: want tools
-                new Colony.Comfort { item = clothes,    unlockAge = 4 }, // Industrial: want clothes
-            };
+            // FACTORY-FIRST: no food/water consumption, so no larder is needed. A small starter
+            // kit of Wood + Stone lets you place your first hut/storage without a long gather grind.
+            gatherer.Inventory.Add(wood, 12);
+            gatherer.Inventory.Add(stone, 10);
+            // Age advancement is driven entirely by RESEARCH (craft research items → deliver to a
+            // Research Lodge → spend points). No comfort/happiness demand sink any more.
+            colony.comforts = new List<Colony.Comfort>();
 
             // --- Town Hall (pre-placed, houses 3) ---
             var townHallDef = MakeHousing("Town Hall", 5, new Color(0.60f, 0.50f, 0.70f));
@@ -429,8 +427,9 @@ namespace Caveman
             hud.clayItem = clay;
             hud.oreItem = ore;
             hud.monumentItem = monument;
+            // Factory-relevant items only (shown in the Guide reference + the "Goods" chip + F1 dump).
             hud.debugItems = new List<ItemDefinition>
-            { wood, stone, food, water, planks, cookedFood, meat, clay, charcoal, bricks, grain, flour, bread, ore, metal, tools, monument, fiber, cloth, clothes, pot, gems, jewelry, stoneBlock };
+            { wood, stone, planks, charcoal, clay, bricks, pot, ore, metal, tools, monument };
 
             // --- Guided objectives ladder (the "what next / why advance" hook) ---
             var carriedInv = gatherer.Inventory;
@@ -438,47 +437,38 @@ namespace Caveman
             bool HasCollectorOf(ItemDefinition i) { foreach (var p in ProductionBuilding.All) if (p != null && p.produces == i) return true; return false; }
             bool HasWorkshopOf(ItemDefinition i) { foreach (var w in WorkshopBuilding.All) if (w != null && w.output == i) return true; return false; }
             bool HasStorageOf(ItemDefinition i) { foreach (var s in StorageBuilding.All) if (s != null && s.accepts == i) return true; return false; }
-            int Pop() => Colony.Instance != null ? Colony.Instance.Population : 0;
             int AgeNow() => Colony.Instance != null ? Colony.Instance.Age : 0;
             var objectives = new GameObject("Objectives").AddComponent<Objectives>();
+            // FACTORY-FIRST objective ladder: gather → store → process → component → research →
+            // automate → advance ages → Monument. No survival/population/comfort goals.
             objectives.quests = new List<Quest>
             {
-                new Quest { title = "Gather 12 Wood by hand",            done = () => Have(wood) >= 12,      reward = () => carriedInv.Add(stone, 8),  rewardText = "+8 Stone" },
-                new Quest { title = "Build a Forager Hut for food",      done = () => HasCollectorOf(food),  reward = () => carriedInv.Add(food, 20),  rewardText = "+20 Food" },
-                new Quest { title = "Build a Water Hole + a Water Barrel beside it", done = () => HasCollectorOf(water) && HasStorageOf(water), reward = () => carriedInv.Add(water, 20), rewardText = "+20 Water" },
-                new Quest { title = "Build a Sawmill, Idea Bench & Research Lodge (place them side by side)", done = () => HasWorkshopOf(planks) && HasWorkshopOf(ideaTablet) && ResearchBuilding.All.Count > 0, reward = () => carriedInv.Add(stone, 12), rewardText = "+12 Stone" },
-                new Quest { title = "Deliver your first Idea Tablet to research", done = () => Research.TotalDelivered >= 1, reward = () => carriedInv.Add(planks, 8), rewardText = "+8 Planks" },
-                new Quest { title = "Grow your settlement to 8 people",  done = () => Pop() >= 8,            reward = () => carriedInv.Add(wood, 25),  rewardText = "+25 Wood" },
-                new Quest { title = "Advance to the Tribal Age",         done = () => AgeNow() >= 1,         reward = () => carriedInv.Add(stone, 25), rewardText = "+25 Stone" },
-                new Quest { title = "Build a Sawmill & make 25 Planks",  done = () => Have(planks) >= 25,    reward = () => carriedInv.Add(planks, 10),rewardText = "+10 Planks" },
-                new Quest { title = "Lay 5 conveyor belts",              done = () => Belt.Count >= 5,       reward = () => carriedInv.Add(wood, 15),  rewardText = "+15 Wood" },
-                new Quest { title = "Build 2 Stations & add a transport route", done = () => RouteVehicle.All.Count >= 1, reward = () => carriedInv.Add(wood, 30), rewardText = "+30 Wood" },
-                new Quest { title = "Cook 15 Cooked Food",               done = () => Have(cookedFood) >= 15,reward = () => carriedInv.Add(stone, 15), rewardText = "+15 Stone" },
-                new Quest { title = "Grow to 12 people",                 done = () => Pop() >= 12,           reward = () => carriedInv.Add(planks, 15),rewardText = "+15 Planks" },
-                new Quest { title = "Advance to the Bronze Age",         done = () => AgeNow() >= 2,         reward = () => carriedInv.Add(stone, 30), rewardText = "+30 Stone" },
-                new Quest { title = "Bake 15 Bread",                     done = () => Have(bread) >= 15,     reward = () => carriedInv.Add(planks, 20),rewardText = "+20 Planks" },
-                new Quest { title = "Make 10 Pottery (a Bronze comfort)", done = () => Have(pot) >= 10,       reward = () => carriedInv.Add(clay, 20), rewardText = "+20 Clay" },
-                new Quest { title = "Cut 15 Stone Blocks (Masonry)",      done = () => Have(stoneBlock) >= 15, reward = () => carriedInv.Add(stone, 25), rewardText = "+25 Stone" },
-                new Quest { title = "Explore far & mine 25 Ore",         done = () => Have(ore) >= 25,       reward = () => carriedInv.Add(stone, 40), rewardText = "+40 Stone" },
-                new Quest { title = "Smelt 20 Metal",                    done = () => Have(metal) >= 20,     reward = () => carriedInv.Add(stone, 40), rewardText = "+40 Stone" },
-                new Quest { title = "Advance to the Iron Age",           done = () => AgeNow() >= 3,         reward = () => carriedInv.Add(planks, 40),rewardText = "+40 Planks" },
-                new Quest { title = "Craft 10 Tools",                    done = () => Have(tools) >= 10,     reward = () => carriedInv.Add(planks, 30),rewardText = "+30 Planks" },
-                new Quest { title = "Weave 15 Cloth (Cotton → Fiber → Cloth)", done = () => Have(cloth) >= 15, reward = () => carriedInv.Add(planks, 15),rewardText = "+15 Planks" },
-                new Quest { title = "Keep your people happy (90%+)",     done = () => Colony.Instance != null && Colony.Instance.Happiness >= 0.9f, reward = () => carriedInv.Add(food, 30), rewardText = "+30 Food" },
-                new Quest { title = "Advance to the Industrial Age",     done = () => AgeNow() >= 4,         reward = () => carriedInv.Add(planks, 50),rewardText = "+50 Planks" },
-                new Quest { title = "Tailor 12 Clothes (Industrial comfort)", done = () => Have(clothes) >= 12, reward = () => carriedInv.Add(tools, 6), rewardText = "+6 Tools" },
-                new Quest { title = "Prospect the far reaches for 20 Gems", done = () => Have(gems) >= 20, reward = () => carriedInv.Add(metal, 10), rewardText = "+10 Metal" },
-                new Quest { title = "Craft 10 Jewelry (luxury wealth)", done = () => Have(jewelry) >= 10, reward = () => carriedInv.Add(planks, 30), rewardText = "+30 Planks" },
-                new Quest { title = "Build a thriving settlement: 30 people", done = () => Pop() >= 30, reward = () => carriedInv.Add(metal, 15), rewardText = "+15 Metal" },
-                new Quest { title = "Build a prosperous colony: 600 Prosperity", done = () => Colony.Instance != null && Colony.Instance.PeakProsperity >= 600, reward = () => carriedInv.Add(tools, 10), rewardText = "+10 Tools" },
-                new Quest { title = "Begin your legacy: build the Monument",      done = () => HasWorkshopOf(monument), reward = () => carriedInv.Add(planks, 40), rewardText = "+40 Planks" },
+                new Quest { title = "Gather 12 Wood by hand",                         done = () => Have(wood) >= 12,        reward = () => carriedInv.Add(stone, 8),   rewardText = "+8 Stone" },
+                new Quest { title = "Build a Wood Hut, then a Woodpile to store it",   done = () => HasCollectorOf(wood) && HasStorageOf(wood), reward = () => carriedInv.Add(wood, 15), rewardText = "+15 Wood" },
+                new Quest { title = "Build a Stone Pit (gather Stone)",               done = () => HasCollectorOf(stone),   reward = () => carriedInv.Add(stone, 15),  rewardText = "+15 Stone" },
+                new Quest { title = "Build a Sawmill — process Wood into 15 Planks",   done = () => Have(planks) >= 15,      reward = () => carriedInv.Add(planks, 10), rewardText = "+10 Planks" },
+                new Quest { title = "Build an Idea Bench + Research Lodge (side by side)", done = () => HasWorkshopOf(ideaTablet) && ResearchBuilding.All.Count > 0, reward = () => carriedInv.Add(stone, 12), rewardText = "+12 Stone" },
+                new Quest { title = "Deliver your first Idea Tablet to research",     done = () => Research.TotalDelivered >= 1, reward = () => carriedInv.Add(planks, 8), rewardText = "+8 Planks" },
+                new Quest { title = "Automate it: lay 5 belts to feed a machine",     done = () => Belt.Count >= 5,         reward = () => carriedInv.Add(wood, 20),   rewardText = "+20 Wood" },
+                new Quest { title = "Research the Tribal Age",                        done = () => AgeNow() >= 1,           reward = () => carriedInv.Add(stone, 25),  rewardText = "+25 Stone" },
+                new Quest { title = "Make 10 Charcoal (build a Charcoal Burner)",     done = () => Have(charcoal) >= 10,    reward = () => carriedInv.Add(planks, 10), rewardText = "+10 Planks" },
+                new Quest { title = "Research the Bronze Age",                        done = () => AgeNow() >= 2,           reward = () => carriedInv.Add(stone, 30),  rewardText = "+30 Stone" },
+                new Quest { title = "Fire 15 Bricks (Clay + Charcoal → Kiln)",        done = () => Have(bricks) >= 15,      reward = () => carriedInv.Add(clay, 20),   rewardText = "+20 Clay" },
+                new Quest { title = "Build 2 Stations & add a transport route",       done = () => RouteVehicle.All.Count >= 1, reward = () => carriedInv.Add(wood, 30), rewardText = "+30 Wood" },
+                new Quest { title = "Research the Iron Age",                          done = () => AgeNow() >= 3,           reward = () => carriedInv.Add(planks, 40), rewardText = "+40 Planks" },
+                new Quest { title = "Explore far & mine 25 Ore",                      done = () => Have(ore) >= 25,         reward = () => carriedInv.Add(stone, 40),  rewardText = "+40 Stone" },
+                new Quest { title = "Smelt 20 Metal (Ore + Charcoal → Smelter)",      done = () => Have(metal) >= 20,       reward = () => carriedInv.Add(planks, 20), rewardText = "+20 Planks" },
+                new Quest { title = "Craft 10 Tools (Metal + Planks → Toolmaker)",    done = () => Have(tools) >= 10,       reward = () => carriedInv.Add(planks, 30), rewardText = "+30 Planks" },
+                new Quest { title = "Research the Industrial Age",                    done = () => AgeNow() >= 4,           reward = () => carriedInv.Add(planks, 50), rewardText = "+50 Planks" },
+                new Quest { title = "Power up: build a Coal Generator",               done = () => PowerPlant.All.Count >= 1, reward = () => carriedInv.Add(metal, 10), rewardText = "+10 Metal" },
+                new Quest { title = "Reach 600 Industry (automation score)",          done = () => Colony.Instance != null && Colony.Instance.PeakProsperity >= 600, reward = () => carriedInv.Add(tools, 10), rewardText = "+10 Tools" },
+                new Quest { title = "Begin your legacy: build the Monument",          done = () => HasWorkshopOf(monument), reward = () => carriedInv.Add(planks, 40), rewardText = "+40 Planks" },
                 new Quest { title = "🏆 Complete the Monument — 10 Blocks. YOU WIN!", done = () => Have(monument) >= 10, isWin = true },
             };
 
             // --- Random world events (variety / surprise hook) ---
             var events = new GameObject("WorldEvents").AddComponent<WorldEvents>();
             events.carried = gatherer.Inventory;
-            events.food = food;
             events.wood = wood;
             events.stone = stone;
 
@@ -487,14 +477,12 @@ namespace Caveman
             //     biome clusters are LARGER & DENSER — the visible upgrade that rewards expansion.
             //     A clear central area stays open as the player's base/processing yard. ---
             const float baseClear = 11f;
-            // STARTER BASIN — a few SMALL clusters of the BASICS only (wood/stone/food + the carved
-            // water pond below). Enough to get going, NOT to scale: you outgrow them and must push out.
+            // STARTER BASIN — small Wood + Stone clusters: enough to bootstrap your first factory,
+            // NOT to scale on (you outgrow them and must push out to the biome regions).
             SpawnClusters("Tree", wood, new Color(0.27f, 0.55f, 0.22f), PlaceholderArt.Triangle(),
                 new Vector2(24f, 4f), 13f, 3, 3, 5, 2.2f, new Vector2(1.0f, 1.5f), 30, 1, baseClear);
             SpawnClusters("Rock", stone, new Color(0.55f, 0.55f, 0.6f), PlaceholderArt.Hexagon(),
                 new Vector2(-24f, 4f), 13f, 3, 3, 5, 2.2f, new Vector2(1.0f, 1.5f), 30, 1, baseClear);
-            SpawnClusters("Bush", food, new Color(0.45f, 0.55f, 0.25f), PlaceholderArt.Circle(),
-                new Vector2(0f, -24f), 12f, 3, 3, 4, 1.9f, new Vector2(0.7f, 1.0f), 30, 1, baseClear);
 
             // --- GUARANTEED EXPANSION REGIONS: 3 meandering corridors out of spawn, each leading
             //     to a distinct, reachable region — so exploration is intentional (follow a path →
@@ -508,19 +496,15 @@ namespace Caveman
                 TerrainGrid.Paint(new Vector3(center.x, center.y, 0f), 16f, biome);
                 place(center);
             }
-            // Corridor 0 — nearest: a PLAINS region, SPARSE but MIXED (meat + clay) — first expansion.
+            // Corridor 0 — nearest: a PLAINS region with CLAY — the first expansion (Bronze chain).
             Region(0, 46f, Terrain.Plains, c => {
-                SpawnClusters("Herd", meat, new Color(0.66f, 0.34f, 0.34f), PlaceholderArt.Circle(),
-                    c, 7f, 2, 3, 4, 2.0f, new Vector2(0.8f, 1.2f), 30, 1, 0f);
                 SpawnClusters("Clay", clay, new Color(0.68f, 0.46f, 0.36f), PlaceholderArt.Hexagon(),
-                    c, 7f, 2, 3, 5, 2.4f, new Vector2(1.0f, 1.5f), 40, 1, 0f);
+                    c, 7f, 3, 4, 6, 2.4f, new Vector2(1.0f, 1.5f), 40, 1, 0f);
             });
-            // Corridor 1 — a FOREST region: DENSE lumber groves + forage so wood/food scale by expanding.
+            // Corridor 1 — a FOREST region: DENSE lumber groves so Wood scales by expanding.
             Region(1, 72f, Terrain.Forest, c => {
                 SpawnClusters("Tree", wood, new Color(0.27f, 0.55f, 0.22f), PlaceholderArt.Triangle(),
                     c, 11f, 3, 6, 9, 3.2f, new Vector2(1.0f, 1.6f), 35, 1, 0f);
-                SpawnClusters("Bush", food, new Color(0.45f, 0.55f, 0.25f), PlaceholderArt.Circle(),
-                    c, 11f, 2, 4, 6, 2.6f, new Vector2(0.7f, 1.0f), 30, 1, 0f);
             });
             // Corridor 2 — a HILLS region: DENSE stone outcrops + the guaranteed reachable ORE (Iron unlock).
             Region(2, 86f, Terrain.Hills, c => {
@@ -531,38 +515,26 @@ namespace Caveman
             });
 
             // --- Welcome / starter guidance (fades after a few seconds) ---
-            Toast.Show("<color=#ffd24d>Welcome, chief!</color>  Click trees & rocks to gather by hand.");
-            Toast.Show("<size=15>Goal: grow from caveman to a self-running civilisation — build the Monument to win.</size>");
-            Toast.Show("<size=14><color=#ffd24d>Key idea:</color> place machines RIGHT NEXT TO each other and they feed their neighbours automatically — no belts needed. Belts are only for connecting things far apart.</size>");
-            Toast.Show("<size=14><color=#9cf>Progress = RESEARCH:</color> cluster a Sawmill + <b>Idea Bench</b> (Planks+Stone → Idea Tablet) + a <b>Research Lodge</b> side by side, then press <b>T</b> to spend points & advance.</size>");
-            Toast.Show("<size=14>Press <b>H</b> help · <b>G</b> Guide · <b>B</b> build · <b>T</b> research tree · follow the Objectives (top-right).</size>");
+            // Keep the opening minimal (Factorio focus): just WELCOME → SURVIVAL → one compact
+            // controls/goal line. Adjacency, research and the rest are taught contextually (the
+            // Objectives ladder, the one-time tips, the age card, and the Guide on G).
+            Toast.Show("<color=#ffd24d>Welcome, chief!</color>  Click trees & rocks to gather Wood and Stone by hand.");
+            Toast.Show("<size=14><color=#9f9>Build your first factory:</color> a <b>Wood Hut</b> + <b>Woodpile</b>, then a <b>Sawmill</b> to turn Wood into Planks. Machines run on their own — feed them by placing them side by side, or with belts.</size>");
+            Toast.Show("<size=13><b>B</b> build · <b>T</b> research · <b>G</b> guide · <b>H</b> help.  Craft research items → deliver to a <b>Research Lodge</b> → advance the Age.  Goal: build the Monument.</size>");
 
-            // --- BIOME FRONTIER: each region's resources live in DENSE clusters, so a biome is a
-            //     real place worth routing home (find the region → route it home). FORESTS = lumber
-            //     + fibre + forage; HILLS = stone, ore, gems; PLAINS = sparse but mixed (herds +
-            //     clay). Finite ore/gems out here are the late-game economy. ---
+            // --- BIOME FRONTIER (factory economy): each biome is a resource-rich region worth
+            //     routing home. FORESTS = lumber; HILLS = stone + finite ore; PLAINS = clay.
+            //     Finite ore out here is the late-game supply line (mine → route → smelt).
             SpawnClustersInBiome("Tree", wood, new Color(0.27f, 0.55f, 0.22f), PlaceholderArt.Triangle(),
                 Terrain.Forest, 11, 5, 8, 3.2f, 50f, 35, 1, new Vector2(1.0f, 1.6f));
-            SpawnClustersInBiome("Cotton", fiber, new Color(0.80f, 0.84f, 0.66f), PlaceholderArt.Circle(),
-                Terrain.Forest, 4, 3, 5, 2.6f, 50f, 36, 1, new Vector2(0.7f, 1.1f));
-            // Forage (berries) in forests too, so FOOD can scale by expanding (start bushes are limited).
-            SpawnClustersInBiome("Bush", food, new Color(0.45f, 0.55f, 0.25f), PlaceholderArt.Circle(),
-                Terrain.Forest, 5, 4, 6, 2.6f, 30f, 30, 1, new Vector2(0.7f, 1.0f));
             SpawnClustersInBiome("Rock", stone, new Color(0.55f, 0.55f, 0.6f), PlaceholderArt.Hexagon(),
                 Terrain.Hills, 10, 5, 7, 3.0f, 50f, 35, 1, new Vector2(1.0f, 1.6f));
             SpawnClustersInBiome("Ore Vein", ore, new Color(0.62f, 0.58f, 0.42f), PlaceholderArt.Hexagon(),
                 Terrain.Hills, 6, 4, 6, 2.8f, 55f, 80, 0, new Vector2(1.1f, 1.6f)); // finite
-            SpawnClustersInBiome("Gem Deposit", gems, new Color(0.50f, 0.82f, 0.76f), PlaceholderArt.Hexagon(),
-                Terrain.Hills, 3, 2, 3, 2.2f, 90f, 60, 0, new Vector2(1.0f, 1.5f)); // finite, far
-            // Meat + clay are the FIRST expansion target — just outside the basin (minClear 26).
-            SpawnClustersInBiome("Herd", meat, new Color(0.66f, 0.34f, 0.34f), PlaceholderArt.Circle(),
-                Terrain.Plains, 5, 3, 4, 2.2f, 26f, 30, 1, new Vector2(0.8f, 1.2f));
+            // Clay is the FIRST expansion target — just outside the basin (minClear 26).
             SpawnClustersInBiome("Clay", clay, new Color(0.68f, 0.46f, 0.36f), PlaceholderArt.Hexagon(),
-                Terrain.Plains, 5, 3, 4, 2.4f, 26f, 40, 1, new Vector2(1.0f, 1.5f));
+                Terrain.Plains, 6, 3, 4, 2.4f, 26f, 40, 1, new Vector2(1.0f, 1.5f));
 
-            // Guarantee a reachable water feature just outside the starting basin so you can
-            // build a Water Hole early (carved last so resource ClearAround can't erase it).
-            TerrainGrid.CarveWater(new Vector3(15f, 3f, 0f), 3.0f);
             // Bake the biome map into its visual now that resource cells have been cleared.
             TerrainGrid.SpawnRenderer();
         }

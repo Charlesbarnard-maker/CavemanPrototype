@@ -4,10 +4,10 @@ using UnityEngine;
 namespace Caveman
 {
     /// <summary>
-    /// A building under construction. It just holds the outstanding materials and
-    /// build progress — the Colony's shared builder squad (based at the HQ) comes
-    /// and services it: hauling materials (consumed from the pool on pickup) then
-    /// building. On completion it spawns the real building.
+    /// A building under construction. Its materials are paid UP FRONT at placement
+    /// (see BuildController); this just holds the outstanding amounts and build progress.
+    /// The Colony's shared builder squad (based at the HQ) hauls the already-paid materials
+    /// to the site and builds it. On completion it spawns the real building.
     /// </summary>
     public class ConstructionSite : MonoBehaviour
     {

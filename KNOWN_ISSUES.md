@@ -3,7 +3,28 @@
 A running record so progress/problems don't get lost. Newest first. Move items to
 **Fixed** when done. Maintained alongside the code — see DESIGN.md for the roadmap.
 
-## Scale & player-pressure design pass (2026-06-25 #13) — most recent
+## FACTORY-FIRST RESTRUCTURE (2026-06-26 #14) — most recent
+Big identity pivot: removed the colony/survival layer so the game is a pure factory automation loop.
+Also bundles the prior (uncommitted) survival/UI/depot/collector/biome passes into one commit.
+- **Removed survival pressure.** `Colony` no longer consumes food/water, no starvation/thirst, no
+  growth, no comfort/happiness. `Starving/Thirsty=>false`, `Happiness/Productivity=>1`. Prosperity
+  is now an **automation-only "Industry" score**.
+- **Labour is free.** `FreeWorkers=>9999`; builders no longer pop-gated. Buildings run when built;
+  "workers" are a free per-building **speed dial** (1..max) + NPC charm. (Old `IStaffable` kept.)
+- **Build menu curated to factory buildings only** — survival/comfort buildings (forager, water hole,
+  granary, campfire, farm/mill/bakery, hunter, housing, pipes/pumps, textiles, jewelry, masonry) are
+  still DEFINED in code (compile-safe) but removed from `builder.buildables` and the world spawns.
+- **UI/objectives/toasts/Guide/Help** rewritten to the factory flow (gather→store→process→research→
+  automate→expand). Removed food/water HUD chips, starving alert, population/happiness stats.
+- **Research is the sole progression spine** (already was): craft research item → Research Lodge →
+  spend points → advance age. Pipe-network tech node removed.
+- **Watchpoints:** (a) blind-built — NOT yet Unity-compiled; needs a recompile + 10-min playtest.
+  (b) Dead-but-defined survival code (Economy food helpers, hidden building defs, Colony.foodItem)
+  left in place to keep compiling; a later cleanup can delete them. (c) A few CS0219 "unused local"
+  warnings expected (foodStore/waterStore/house). (d) The deeper Copper→Steel→Space age arc is
+  DESIGNED in GAME_DESIGN but not yet implemented.
+
+## Scale & player-pressure design pass (2026-06-25 #13)
 Evaluated how the factory FEELS at small/medium/large scale (not numbers). Finding: the systems
 already create strong scaling pressure (local production → logistics, depletion → expansion,
 shared intermediates → cascades, escalating research/comfort). The weak spot was **LABOR** — the

@@ -66,6 +66,16 @@ namespace Caveman
 
         public void CancelLink() { LinkFrom = null; _linkTier = null; }
 
+        /// <summary>Upgrade EXISTING routes to the newest unlocked vehicle tier in place — the
+        /// "Donkey Track → Train" path persists without rebuilding. Called when the age advances.</summary>
+        public void UpgradeAllRoutes()
+        {
+            var tier = BestRouteTier();
+            if (tier == null) return;
+            foreach (var rv in RouteVehicle.All)
+                if (rv != null) rv.SetTier(Mathf.Max(1, tier.capacity), Mathf.Max(0.5f, tier.vehicleSpeed), tier.color);
+        }
+
         private void CompleteStationLink(Depot dst)
         {
             if (LinkFrom == null || _linkTier == null) { CancelLink(); return; }
@@ -302,8 +312,15 @@ namespace Caveman
             // PointerOverUI guard stops a build-menu click from also dropping a building.
             if (mouse.leftButton.wasPressedThisFrame && PlacementValid && !InventoryHud.PointerOverUI)
             {
-                if (Economy.FreeBuild) ConstructionSite.SpawnFinished(def, world, BuildDir); // sandbox: instant
-                else ConstructionSite.Spawn(def, world, BuildDir); // builders haul materials, then construct
+                if (Economy.FreeBuild) ConstructionSite.SpawnFinished(def, world, BuildDir); // sandbox: instant, free
+                else
+                {
+                    // Pay the materials UP FRONT (consistent with belts/bridges/pipes); builders
+                    // then haul & build the already-paid site. Without this, placing a building
+                    // consumed nothing until/unless a builder happened to service it.
+                    Economy.Spend(def.cost, Carried);
+                    ConstructionSite.Spawn(def, world, BuildDir);
+                }
                 BuildingsPlaced++;
             }
             if (mouse.rightButton.wasPressedThisFrame) CancelPlacement();
@@ -626,12 +643,24 @@ namespace Caveman
                 return;
             }
 
-            // Cancelling a construction site: undelivered materials were never
-            // spent, so there's nothing to refund — just remove it.
-            if (Selected.GetComponent<ConstructionSite>() != null || Selected.GetComponent<Belt>() != null
+            // Cancelling a construction site: its materials were paid at placement, so refund
+            // them in full (the real building never formed).
+            var siteCancel = Selected.GetComponent<ConstructionSite>();
+            if (siteCancel != null)
+            {
+                if (Carried != null && siteCancel.def != null)
+                    foreach (var c in siteCancel.def.cost)
+                        if (c.item != null) Carried.Add(c.item, c.amount);
+                Destroy(Selected);
+                Selected = null;
+                return;
+            }
+
+            // Belts, bridges, pipes: cheap, removed without refund (unchanged).
+            if (Selected.GetComponent<Belt>() != null
                 || Selected.GetComponent<Bridge>() != null || Selected.GetComponent<Pipe>() != null)
             {
-                Destroy(Selected); // belts, bridges, pipes & unbuilt sites: nothing to refund
+                Destroy(Selected);
                 Selected = null;
                 return;
             }

@@ -17,7 +17,9 @@ namespace Caveman
         public int outputPerCycle = 1;
         public float interval = 2f;
         public int maxWorkers = 2;
-        public float sourceRange = 6f;   // worker can commute this far
+        public float sourceRange = 6f;   // worker can commute this far (initial placement bind)
+        public float searchRadius = 16f; // when the node runs dry, look this far for a fresh one
+        private const int MaxSearchCandidates = 48; // hard cap on in-radius nodes examined (no map-wide scan)
         public Belt.Dir OutputSide = Belt.Dir.E; // belts pull output only from this side
 
         public Inventory Buffer { get; private set; }
@@ -69,6 +71,7 @@ namespace Caveman
             pb.outputPerCycle = def.outputPerCycle;
             pb.interval = def.interval;
             pb.maxWorkers = Mathf.Max(1, def.maxWorkers);
+            pb.searchRadius = def.searchRadius > 0f ? def.searchRadius : 16f;
             pb.Buffer = new Inventory { capacity = Mathf.Max(1, def.capacity) };
             pb.OutputSide = outputSide;
             pb._cells = Footprint.Cells(go.transform.position, def.FootW, def.FootH);
@@ -84,18 +87,13 @@ namespace Caveman
             if (_sr != null) _baseColor = _sr.color;
         }
 
-        public void Bind()
+        public void Bind() => Bind(sourceRange);
+
+        /// <summary>Bind to the nearest live node of our type within `range`. Used at placement
+        /// (sourceRange) and when chasing a fresh patch after depletion (searchRadius).</summary>
+        public void Bind(float range)
         {
-            ResourceNode best = null;
-            float bestSq = sourceRange * sourceRange;
-            foreach (var n in ResourceNode.All)
-            {
-                // Prefer the nearest node in range that still HAS resource, so we re-bind
-                // to a live patch when the old one is exhausted.
-                if (n == null || n.yields != produces || !n.HasResource) continue;
-                float sq = ((Vector2)(n.transform.position - transform.position)).sqrMagnitude;
-                if (sq <= bestSq) { bestSq = sq; best = n; }
-            }
+            ResourceNode best = FindNearestNode(range);
             // Water collectors draw from adjacent WATER TERRAIN, not a pre-placed node: create
             // an infinite, invisible source at the nearest water cell (location-dependent
             // extraction from a real map feature). Made once; parented so it's cleaned up.
@@ -117,6 +115,27 @@ namespace Caveman
             if (best != null) _source = best;
         }
 
+        // Nearest live node of our type within `range`. BOUNDED so it never becomes a map-wide
+        // scan: out-of-range nodes are rejected by a cheap squared-distance test, and at most
+        // MaxSearchCandidates in-range nodes are examined (the window shrinks to the nearest).
+        // No pathfinding — just picks the patch; the worker walks there. None found → returns
+        // null and the collector idles in place (handled by the worker / status dot).
+        private ResourceNode FindNearestNode(float range)
+        {
+            ResourceNode best = null;
+            float bestSq = range * range;
+            int examined = 0;
+            foreach (var n in ResourceNode.All)
+            {
+                if (n == null || n.yields != produces || !n.HasResource) continue;
+                float sq = ((Vector2)(n.transform.position - transform.position)).sqrMagnitude;
+                if (sq > bestSq) continue;                    // outside search radius — local, not global
+                if (++examined > MaxSearchCandidates) break;  // hard cap on candidates checked
+                bestSq = sq; best = n;                        // nearest-so-far
+            }
+            return best;
+        }
+
         // Re-bind to a fresh nearby patch when the current source is gone (finite vein
         // exhausted/destroyed) — so local depletion pushes you outward instead of just
         // killing the collector. Throttled so we don't scan every frame when none remain.
@@ -127,7 +146,8 @@ namespace Caveman
             _rebindT += Time.deltaTime;
             if (_rebindT < 1f) return;
             _rebindT = 0f;
-            if (_source == null || !_source.HasResource) Bind();
+            // Wider search than the placement bind: chase a fresh node within searchRadius.
+            if (_source == null || !_source.HasResource) Bind(searchRadius);
         }
 
         public bool TryAssign()

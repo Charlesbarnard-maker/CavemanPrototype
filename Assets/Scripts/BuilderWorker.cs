@@ -87,15 +87,13 @@ namespace Caveman
                     if (avail <= 0) { _targetItem = null; }
                     else
                     {
+                        // Materials were already paid for at placement (like belts/pipes), so the
+                        // builder just RESERVES and hauls them — it must not charge the pool again.
                         int want = Mathf.Min(carryCapacity, avail);
-                        int got = Economy.SpendUpTo(_targetItem, want, Carried());
-                        if (got > 0)
-                        {
-                            _site.Claim(_targetItem, got);
-                            _carryItem = _targetItem;
-                            _carryQty = got;
-                            _targetItem = null;
-                        }
+                        _site.Claim(_targetItem, want);
+                        _carryItem = _targetItem;
+                        _carryQty = want;
+                        _targetItem = null;
                     }
                 }
             }
@@ -176,8 +174,6 @@ namespace Caveman
             }
             return best != null ? best.transform.position : from;
         }
-
-        private static Inventory Carried() => Colony.Instance != null ? Colony.Instance.carried : null;
 
         private void UpdateColor()
         {

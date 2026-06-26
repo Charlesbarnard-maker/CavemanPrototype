@@ -5,7 +5,7 @@ namespace Caveman
 {
     /// <summary>
     /// A storage structure that holds a large amount of one resource type
-    /// (Wood Warehouse, Stone Storage). Collectors placed next to it drop their
+    /// (Woodpile, Stone Storage). Collectors placed next to it drop their
     /// buffer into it. Brightens as it fills.
     /// </summary>
     public class StorageBuilding : MonoBehaviour

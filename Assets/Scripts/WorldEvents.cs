@@ -11,7 +11,7 @@ namespace Caveman
     public class WorldEvents : MonoBehaviour
     {
         [System.NonSerialized] public Inventory carried; // player's carried inventory
-        public ItemDefinition food, wood, stone;
+        public ItemDefinition wood, stone;
         public float minGap = 140f;
         public float maxGap = 280f;
 
@@ -32,37 +32,30 @@ namespace Caveman
 
         private void Fire()
         {
-            var col = Colony.Instance;
-            int kind = Random.Range(0, 5);
-            if (kind == _last) kind = (kind + 1) % 5; // avoid back-to-back repeats
+            // Factory-first: events nudge your raw-material stockpiles (no food/population events).
+            int kind = Random.Range(0, 4);
+            if (kind == _last) kind = (kind + 1) % 4; // avoid back-to-back repeats
             _last = kind;
             switch (kind)
             {
-                case 0: // bountiful harvest
-                    if (carried != null && food != null)
-                    { carried.Add(food, 40); Toast.Show("<color=#9f9>🌾 Bountiful Harvest!</color>  <size=14>+40 Food</size>"); }
-                    break;
-
-                case 1: // wandering nomads
-                    if (col != null && col.Population < col.Capacity)
-                    { col.DebugAddPopulation(3); Toast.Show("<color=#9cf>🚶 Wandering nomads joined you!</color>  <size=14>+3 people</size>"); }
-                    else
-                        Toast.Show("<color=#bbb>🚶 Nomads passed by — no housing to take them in.</color>");
-                    break;
-
-                case 2: // rockslide
-                    if (carried != null && stone != null)
-                    { carried.Add(stone, 30); Toast.Show("<color=#9f9>⛏ A rockslide exposed stone!</color>  <size=14>+30 Stone</size>"); }
-                    break;
-
-                case 3: // windfall timber
+                case 0: // windfall timber
                     if (carried != null && wood != null)
                     { carried.Add(wood, 30); Toast.Show("<color=#9f9>🌲 A storm felled trees — free timber!</color>  <size=14>+30 Wood</size>"); }
                     break;
 
-                default: // hard times — lose some food
-                    if (food != null)
-                    { int lost = Economy.SpendUpTo(food, 20, carried); Toast.Show($"<color=#f99>❄ Hard times set in.</color>  <size=14>-{lost} Food</size>"); }
+                case 1: // rockslide
+                    if (carried != null && stone != null)
+                    { carried.Add(stone, 30); Toast.Show("<color=#9f9>⛏ A rockslide exposed stone!</color>  <size=14>+30 Stone</size>"); }
+                    break;
+
+                case 2: // prospectors' cache
+                    if (carried != null && wood != null && stone != null)
+                    { carried.Add(wood, 15); carried.Add(stone, 15); Toast.Show("<color=#9f9>🧭 Prospectors shared a cache!</color>  <size=14>+15 Wood, +15 Stone</size>"); }
+                    break;
+
+                default: // a cart broke down — minor setback
+                    if (carried != null && wood != null)
+                    { int lost = Economy.SpendUpTo(wood, 10, carried); Toast.Show($"<color=#f99>🛠 A cart broke down.</color>  <size=14>-{lost} Wood</size>"); }
                     break;
             }
         }
