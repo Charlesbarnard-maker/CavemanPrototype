@@ -3,7 +3,31 @@
 A running record so progress/problems don't get lost. Newest first. Move items to
 **Fixed** when done. Maintained alongside the code — see DESIGN.md for the roadmap.
 
-## Full logic & flow sweep + research soft-lock FIX (2026-06-25 #11) — most recent
+## System throughput / coherence pass (2026-06-25 #12) — most recent
+Audited every core rate against the canonical **1 lane = 60/min** baseline. Good news: the
+baseline is **genuinely coherent at the default 1 worker** (collectors auto-assign 1 on place):
+- Belts: wooden 1.0s = 60/min, conveyor 0.5s = 120/min (clean 2×). ✓
+- Workshops (1 worker): Sawmill eats 2 wood/2.0s = **exactly 60 wood/min** (1 lane), makes 30
+  planks/min. The "1 collector → 1 belt → 1 machine" baseline holds. ✓
+- Collectors (1 worker): carry 3 / 2.0s chop + travel ≈ 60/min at typical node distance. ✓
+- Research Lodge: 1.0s = 60/min consume = 1 lane. ✓
+- **FIXED — Splitter hidden throttle:** was 0.6s = 100/min, so it silently capped a 120/min
+  conveyor line (lost 20/min for no reason). Now 0.5s = 120/min — matches the fastest belt.
+**Deviations left as-is (deliberate or need playtest, NOT changed blind):**
+- **Water Pump ≈480/min total** (flowPerTick 4 × 2/s) — ~8× a lane; water is effectively
+  unconstrained once piped. Plausibly intended (liquids = infrastructure, not a bottleneck),
+  but flag to confirm; if water should require scaling, lower `flowPerTick`.
+- **Collector rate is travel-variable (~40–90/min for 1 worker)** and **2 workers ≈1.85×**
+  (travel overhead) vs workshops' clean 2×. Inherent to the walk-to-node model; tune only with
+  real play. Placing a collector adjacent to its node ≈90/min (overfeeds a wooden belt) — a
+  feature (placement matters) more than a bug, but watch it.
+- **Farm** (3 workers / 2 output) and **Mine/Gem Mine** (2.5s vs 2.0s) are pattern outliers —
+  likely intentional (bulk grain; rare ore slower). Left alone.
+- **Code cruft:** `ProductionBuilding.outputPerCycle` is set per collector but never used
+  (Worker uses `carryAmount`). Harmless, designer-facing only — make it drive carryAmount or
+  delete it in a cleanup.
+
+## Full logic & flow sweep + research soft-lock FIX (2026-06-25 #11)
 A correctness audit of all systems (crafting, economy, logistics, liquids, power, terrain,
 research, colony, construction). Most systems verified **correct** — no item loss/dup, no
 divide-by-zero, no claim leaks, no infinite loops. Findings:
