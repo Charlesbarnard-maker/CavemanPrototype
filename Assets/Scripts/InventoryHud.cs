@@ -980,6 +980,12 @@ namespace Caveman
 
             GUILayout.Label($"<size=18><b>🔬 Research Tree</b></size>   <color=#9cf><b>{Research.Points} pts</b></color>", _s);
             GUILayout.Label("<size=12><color=#bbb>Craft research items → deliver to a Research Lodge → spend points here. (T closes)</color></size>", _small);
+            // Make the critical path unmistakable: name the next age to aim for + craft hint.
+            var goalTech = Research.NextAgeTech; var goalTier = Research.CurrentTier;
+            if (goalTech != null)
+                GUILayout.Label($"<size=12><color=#ffd24d>⭐ Main goal: research <b>{goalTech.name}</b> ({goalTech.cost} pts){(goalTier != null && goalTier.item != null ? $" — craft <b>{goalTier.item.displayName}</b> for points" : "")}.</color></size>", _small);
+            else
+                GUILayout.Label("<size=12><color=#9f9>⭐ All ages researched — spend any leftover points on unlocks below.</color></size>", _small);
             GUILayout.Space(4);
 
             _researchScroll = GUILayout.BeginScrollView(_researchScroll);

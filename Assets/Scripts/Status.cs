@@ -22,15 +22,16 @@ namespace Caveman
             return sr;
         }
 
-        /// <summary>Set the dot colour, and PULSE it when the building is in a problem
-        /// state (starved/backed-up) so bottlenecks visibly draw the eye.</summary>
+        /// <summary>Set the dot colour, and make PROBLEM states (starved/backed-up) clearly
+        /// bigger AND pulsing so bottlenecks jump out at a glance — not a subtle tint.</summary>
         public static void Apply(SpriteRenderer dot, Color col)
         {
             if (dot == null) return;
             dot.color = col;
             bool problem = col == Starved || col == BackedUp;
-            float pulse = problem ? 1f + 0.22f * Mathf.Sin(Time.unscaledTime * 6f) : 1f;
-            dot.transform.localScale = Vector3.one * (0.28f * pulse);
+            float baseScale = problem ? 0.44f : 0.30f;                       // problems noticeably larger
+            float pulse = problem ? 1f + 0.30f * Mathf.Sin(Time.unscaledTime * 6f) : 1f;
+            dot.transform.localScale = Vector3.one * (baseScale * pulse);
         }
     }
 }
