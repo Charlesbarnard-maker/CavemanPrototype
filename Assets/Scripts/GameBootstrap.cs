@@ -464,7 +464,6 @@ namespace Caveman
             gatherer.Inventory.Add(stone, 10);
             // Age advancement is driven entirely by RESEARCH (craft research items → deliver to a
             // Research Lodge → spend points). No comfort/happiness demand sink any more.
-            colony.comforts = new List<Colony.Comfort>();
 
             // (No Town Hall / HQ / builders — factory-first: construction is instant, buildings auto-run.)
 

@@ -157,8 +157,7 @@ namespace Caveman
             bool working = !Paused && _source != null && _source.HasResource && Buffer.Total() < Buffer.capacity;
             if (working)
             {
-                float prod = Colony.Instance != null ? Colony.Instance.Productivity : 1f; // inert 1f now
-                _timer += Time.deltaTime * prod;
+                _timer += Time.deltaTime;
                 if (_timer >= interval)
                 {
                     _timer -= interval;

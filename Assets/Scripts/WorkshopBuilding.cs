@@ -236,9 +236,8 @@ namespace Caveman
 
             if (!Paused && output != null && Buffer.Total() < Buffer.capacity)
             {
-                float prod = Colony.Instance != null ? Colony.Instance.Productivity : 1f; // inert 1f now
                 float pw = Power.Active && PowerDraw > 0 ? Power.Factor : 1f; // brownouts slow machines
-                _timer += Time.deltaTime * prod * pw; // fixed rate (no workers); powered machines slow under brownout
+                _timer += Time.deltaTime * pw; // fixed rate (no workers); powered machines slow under brownout
                 if (_timer >= processTime)
                 {
                     if (CanMake(carried))

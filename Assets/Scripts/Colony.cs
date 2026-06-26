@@ -1,12 +1,10 @@
-using System.Collections.Generic;
 using UnityEngine;
 
 namespace Caveman
 {
     /// <summary>
     /// Factory-first settlement state: tracks the current Age and a climbing automation "Industry"
-    /// score. NO population, NO workers, NO survival — buildings run themselves and construction is
-    /// instant. Population/Comfort/FreeWorkers remain only as inert API so older references compile.
+    /// score. NO population, NO workers, NO survival — buildings run themselves and construction is instant.
     /// </summary>
     public class Colony : MonoBehaviour
     {
@@ -16,7 +14,6 @@ namespace Caveman
         public ItemDefinition waterItem;
         [System.NonSerialized] public Inventory carried; // set at runtime; not a serialized field
 
-        public int Population { get; private set; }
         // FACTORY-FIRST: survival pressure removed. These remain as inert API (always false) so
         // existing HUD/economy references keep compiling — there is no starvation/thirst loop.
         public bool Starving => false;
@@ -40,28 +37,11 @@ namespace Caveman
 
         // --- Debug / sandbox ---
         public void DebugAdvanceAge() { if (Age + 1 < AgeNames.Length) Age++; }
-        public void DebugAddPopulation(int n) { Population = Mathf.Max(0, Population + n); }
-
-        // Comfort goods (INERT in factory-first — kept as a data type so GameBootstrap still
-        // compiles; the colony no longer consumes them or derives happiness from them).
-        [System.Serializable]
-        public class Comfort { public ItemDefinition item; public int unlockAge; }
-        public List<Comfort> comforts = new();
 
         private float _prosperityT;
 
-        /// <summary>Inert (factory-first): comfort/happiness removed. Always 1.</summary>
-        public float Happiness => 1f;
-
-        /// <summary>Inert: no unmet comforts in factory-first (kept for HUD compatibility).</summary>
-        public readonly List<ItemDefinition> UnmetComforts = new();
-
-        /// <summary>Global work-speed multiplier. Factory-first: constant 1 (no food/happiness
-        /// modifiers). Power brownouts still scale machine speed separately (see Power.Factor).</summary>
-        public float Productivity => 1f;
-
-        /// <summary>A climbing score rewarding population, happiness, tech age, and
-        /// automation (systems running for you) — the long-game "how am I doing?".</summary>
+        /// <summary>A climbing score rewarding tech age + automation (systems running for you) —
+        /// the long-game "how am I doing?".</summary>
         public int Prosperity { get; private set; }
         /// <summary>Highest prosperity reached this game (never drops, so it always climbs).</summary>
         public int PeakProsperity { get; private set; }
@@ -90,31 +70,14 @@ namespace Caveman
             return Mathf.RoundToInt(tech + automation);
         }
 
-        public int Capacity
-        {
-            get
-            {
-                int c = 0;
-                foreach (var h in HousingBuilding.All) c += h.houseCapacity;
-                return c;
-            }
-        }
-
-        // FACTORY-FIRST: no workers/builders. Construction is INSTANT; buildings run themselves.
-        // Kept as inert API (always plentiful) so any legacy reference still compiles.
-        public int FreeWorkers => 9999;
-
         void Awake() => Instance = this;
         void OnDestroy() { if (Instance == this) Instance = null; }
-
-        public void SetStartingPopulation(int n) => Population = Mathf.Max(0, n);
 
         void Update()
         {
             float dt = Time.deltaTime;
 
-            // FACTORY-FIRST: no food/water/comfort/growth/starvation. Population is inert flavour;
-            // labour is free (see FreeWorkers). We only keep the automation SCORE + builder squad.
+            // FACTORY-FIRST: no survival/comfort — we only keep the automation SCORE + rank.
             _prosperityT += dt;
             if (_prosperityT >= 1f)
             {
