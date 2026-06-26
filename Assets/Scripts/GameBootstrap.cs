@@ -398,6 +398,8 @@ namespace Caveman
             colony.SetStartingPopulation(5);
             gatherer.Inventory.Add(food, 90);   // generous starting larder while you learn the ropes
             gatherer.Inventory.Add(water, 90);  // generous starting water
+            gatherer.Inventory.Add(wood, 10);   // starter kit: enough for the first hut or two so the
+            gatherer.Inventory.Add(stone, 10);  // opening isn't a long manual-gather grind (still <12 wood, so the "gather 12 wood" objective still teaches clicking)
             // Age advancement is now driven by the Research system (crafted research items →
             // Research Lodge → points), set up above — there is no resource/pop "advance" cost here.
             // Comfort goods (the demand sink): people want better food as the colony evolves.

@@ -43,6 +43,7 @@ namespace Caveman
         private readonly HashSet<string> _affordToasted = new(); // "research available" hint fires once per node
         private Rect _finderRect;
         private bool _localTipShown; // one-time hint when a workshop first starves
+        private bool _collectorTipShown; // one-time hint when a collector first backs up
         private Texture2D _panelTex; // dark panel background for readability
         private Dictionary<ItemDefinition, int> _totals;
         private readonly Dictionary<string, int> _trendSnap = new(); // chip values ~3s ago (for ▲/▼)
@@ -114,6 +115,19 @@ namespace Caveman
                     {
                         _localTipShown = true;
                         Toast.Show("<color=#ffd24d>💡 Tip:</color> a workshop only runs on inputs that ARRIVE — put it next to its input storage/source, or belt the inputs in.");
+                        break;
+                    }
+            }
+
+            // One-time hint the first time a COLLECTOR backs up — teaches the core early-game
+            // rule (its output is unusable until belted to a Storage) at the exact moment it bites.
+            if (!_collectorTipShown && Economy.StoredOnly)
+            {
+                foreach (var p in ProductionBuilding.All)
+                    if (p != null && p.StatusColor == Status.BackedUp)
+                    {
+                        _collectorTipShown = true;
+                        Toast.Show("<color=#ffd24d>💡 Tip:</color> a collector's output piles up and stops until you BELT it out — drag a belt from its green output arrow into a Storage so your colony can actually use what it gathers.");
                         break;
                     }
             }
@@ -683,11 +697,16 @@ namespace Caveman
             if (wb != null || pbSel != null)
             {
                 bool paused = wb != null ? wb.Paused : pbSel.Paused;
+                bool isCollector = pbSel != null;
                 Color sc = wb != null ? wb.StatusColor : pbSel.StatusColor;
                 string st = paused ? "Paused"
                     : sc == Status.Working ? "Working"
-                    : sc == Status.BackedUp ? "Output full — needs hauling out"
-                    : sc == Status.Starved ? "Starved — inputs not arriving"
+                    : sc == Status.BackedUp ? (isCollector
+                        ? "Output full — belt it to a Storage to use what it makes"
+                        : "Output full — belt the output away (it's blocked)")
+                    : sc == Status.Starved ? (isCollector
+                        ? "Starved — its resource patch ran dry; move or expand"
+                        : "Starved — an input isn't arriving")
                     : "Idle — assign a worker";
                 GUILayout.Label($"<size=13><color=#{ColorUtility.ToHtmlStringRGB(sc)}>● {st}</color></size>", _small);
             }
