@@ -3,7 +3,31 @@
 A running record so progress/problems don't get lost. Newest first. Move items to
 **Fixed** when done. Maintained alongside the code — see DESIGN.md for the roadmap.
 
-## New playtest feedback #17 — part 1: collector range ring + click-to-close age card (2026-06-26) — most recent
+## New playtest feedback #17 — part 2: belt look/feel — splitter/merger arrows, item piling, conveyor visuals (2026-06-26) — most recent
+Second slice of the playtest batch. 3-lens adversarial verify (compile + geometry PASS; belt-flow caught
+1 blocker — drag mass-convert/over-charge — now FIXED + re-verified PASS). **NOT yet Unity-compiled.**
+- **2. Splitter/Merger now show IN vs OUT (#2).** A Splitter gets two green output arrows (forward + its
+  right) and a cyan input notch (back); a Merger gets one green output arrow (forward) + cyan input
+  notches on the other three sides. Markers are belt children using LOCAL dirs, so they stay correct when
+  the belt is re-oriented. `Belt.AddPortMarkers`; reuses `Ports.MakeOutputArrow/MakeInputNotch`.
+- **2b. Drop a Splitter/Merger straight onto a built belt (#2).** Placing one on an existing PLAIN belt
+  CONVERTS it in place (keeps its direction + carried items) — no need to delete first (`Belt.ConvertTo`;
+  `BuildController.EnsureBelt`). Splitters/Mergers are now SINGLE-CLICK tools (not drag-laid), so a sweep
+  can't mass-convert/over-charge a whole line (the verify blocker). Ghost reads green over a convertible belt.
+- **4. Items PILE UP nose-to-tail (#4).** A belt cell holds up to `capacity` items; we now draw one dot
+  per held item, PACKED from the exit edge when backed up — so a blockage visibly queues goods instead of
+  showing one frozen dot. Flow logic is byte-for-byte unchanged (purely the renderer). `Belt.UpdateDots`.
+- **6a. Belts look like CONVEYORS, not triangles (#6 visual).** New `PlaceholderArt.Conveyor()` — a
+  rounded-rect tile with two baked-dark forward chevrons (replaces the pine-tree triangle). Items now follow
+  a quadratic-Bézier path through the cell centre → smooth ARCS around corners ("nice turns"). Splitters/
+  Mergers keep their distinct hexagon body.
+- **Nits left (non-blocking):** a Splitter's single in-flight dot animates toward `dir` even when it will
+  exit to the right output (cosmetic); no ghost-port preview before a splitter/merger is placed (the built
+  one shows arrows). True elbow belt sprites deferred — the chevron + arced item path read as turns.
+- **Next:** B2 belt tiers (wooden→30/min, Conveyor 60 / Geared 120 / Steel 240 + costs + overlay-upgrade)
+  · C progression depth.
+
+## New playtest feedback #17 — part 1: collector range ring + click-to-close age card (2026-06-26)
 First slice of a 6-item playtest batch (range indicator / popup / belts / progression). Whole batch
 mapped with a 6-agent workflow; this slice 2-lens adversarially verified (PASS, 0 compile blockers).
 **NOT yet Unity-compiled — needs the recompile + playtest.**

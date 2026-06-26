@@ -505,16 +505,33 @@ namespace Caveman
             _ghost.transform.position = new Vector3(cell.x, cell.y, 0f);
             _ghost.transform.rotation = Quaternion.Euler(0f, 0f, Belt.Angle(dir));
             _ghost.transform.localScale = Vector3.one * 0.8f;
-            _ghostSr.sprite = def.splitter || def.merger ? PlaceholderArt.Hexagon() : PlaceholderArt.Triangle(); // splitter/merger distinct
+            _ghostSr.sprite = def.splitter || def.merger ? PlaceholderArt.Hexagon() : PlaceholderArt.Conveyor(); // splitter/merger = hex; belt = conveyor tile
 
+            bool isJunction = def.splitter || def.merger; // a Splitter/Merger is placed one at a time
+            var existing = Belt.At(cell);
             bool affordable = Economy.CanAfford(def.cost, Carried);
             // Belts can't sit on water (unless bridged) OR on top of a building.
-            bool free = Belt.At(cell) == null && TerrainGrid.BeltAllowed(cell)
-                        && !SolidBuildingAt(new Vector3(cell.x, cell.y, 0f));
-            PlacementValid = affordable && free;
+            bool emptyOk = existing == null && TerrainGrid.BeltAllowed(cell)
+                           && !SolidBuildingAt(new Vector3(cell.x, cell.y, 0f));
+            // A Splitter/Merger may ALSO be dropped onto an existing PLAIN belt (converts it in place).
+            bool onConvertibleBelt = existing != null && !existing.isSplitter && !existing.isMerger;
+            bool placeOk = isJunction ? (emptyOk || onConvertibleBelt) : emptyOk;
+            PlacementValid = affordable && placeOk;
             _ghostSr.color = PlacementValid
                 ? new Color(0.35f, 1f, 0.4f, 0.6f)
                 : new Color(1f, 0.3f, 0.3f, 0.5f);
+
+            // Splitters/Mergers are single-cell tools: place (or convert a plain belt) ONE per
+            // deliberate click — NEVER drag-laid — so sweeping the cursor can't mass-convert or
+            // over-charge a whole belt line.
+            if (isJunction)
+            {
+                if (mouse.leftButton.wasPressedThisFrame && PlacementValid && !InventoryHud.PointerOverUI)
+                    EnsureBelt(cell, dir, def);
+                else if (mouse.rightButton.wasPressedThisFrame)
+                    CancelPlacement();
+                return;
+            }
 
             if (!mouse.leftButton.isPressed) _dragging = false;
 
@@ -547,7 +564,24 @@ namespace Caveman
         private void EnsureBelt(Vector2Int cell, Belt.Dir d, BuildingDefinition def)
         {
             var existing = Belt.At(cell);
-            if (existing != null) { existing.SetDir(d); return; }
+            if (existing != null)
+            {
+                // QoL: dropping a Splitter/Merger onto an existing plain belt CONVERTS it in place
+                // (keeps its direction + any carried items) — no need to delete the belt first. A
+                // plain belt dropped on a belt keeps the old behaviour (just re-orient it).
+                bool convert = (def.splitter || def.merger) && !existing.isSplitter && !existing.isMerger;
+                if (convert)
+                {
+                    if (Economy.CanAfford(def.cost, Carried))
+                    {
+                        Economy.Spend(def.cost, Carried);
+                        existing.ConvertTo(def.splitter, def.merger);
+                    }
+                    return; // don't re-orient on conversion — preserve the line's flow
+                }
+                existing.SetDir(d);
+                return;
+            }
             if (!TerrainGrid.BeltAllowed(cell)) return; // water only if bridged
             if (SolidBuildingAt(new Vector3(cell.x, cell.y, 0f))) return; // never lay a belt on a building
             if (!Economy.CanAfford(def.cost, Carried)) return;

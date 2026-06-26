@@ -33,7 +33,8 @@ namespace Caveman
 
         private float _timer;
         private SpriteRenderer _sr;
-        private SpriteRenderer _dot; // visible item sliding along the belt
+        private readonly List<SpriteRenderer> _dots = new();      // items sliding along the belt (packed nose-to-tail when backed up)
+        private readonly List<GameObject> _portMarkers = new();   // in/out arrows on a splitter/merger
         private readonly Color _baseColor = new Color(0.58f, 0.50f, 0.34f);
         private Vector2Int _cell;
         private Dir _inDir; // edge the current item arrived from (so corners animate right)
@@ -63,7 +64,7 @@ namespace Caveman
             go.transform.rotation = Quaternion.Euler(0f, 0f, Angle(dir));
 
             var sr = go.AddComponent<SpriteRenderer>();
-            sr.sprite = isSplitter || isMerger ? PlaceholderArt.Hexagon() : PlaceholderArt.Triangle(); // splitter/merger distinct
+            sr.sprite = isSplitter || isMerger ? PlaceholderArt.Hexagon() : PlaceholderArt.Conveyor(); // splitter/merger = hex; belt = conveyor tile
             sr.sortingOrder = 1;
 
             go.AddComponent<BoxCollider2D>(); // clickable to demolish
@@ -76,6 +77,7 @@ namespace Caveman
             b.interval = Mathf.Max(0.05f, interval);
             b._sr = sr;
             sr.color = b._baseColor;
+            b.AddPortMarkers(); // in/out arrows if this is a splitter/merger (no-op for a plain belt)
             return b;
         }
 
@@ -83,7 +85,9 @@ namespace Caveman
         void OnDisable()
         {
             if (Grid.TryGetValue(_cell, out var b) && b == this) Grid.Remove(_cell);
-            if (_dot != null) Destroy(_dot.gameObject);
+            foreach (var d in _dots) if (d != null) Destroy(d.gameObject);
+            _dots.Clear();
+            // _portMarkers are children of this GameObject → destroyed with it automatically.
         }
 
         public bool CanAccept(ItemDefinition i) => count < capacity && (item == null || item == i);
@@ -128,6 +132,41 @@ namespace Caveman
             transform.rotation = Quaternion.Euler(0f, 0f, Angle(d));
         }
 
+        /// <summary>Overlay-convert a plain belt into a splitter or merger in place (keeps its
+        /// direction + any carried items). Lets the player drop a Merger/Splitter straight onto an
+        /// existing conveyor without deleting it first.</summary>
+        public void ConvertTo(bool splitter, bool merger)
+        {
+            isSplitter = splitter;
+            isMerger = merger;
+            if (_sr != null) _sr.sprite = (splitter || merger) ? PlaceholderArt.Hexagon() : PlaceholderArt.Conveyor();
+            gameObject.name = splitter ? "Splitter" : merger ? "Merger" : "Belt";
+            AddPortMarkers();
+        }
+
+        // Build the in/out port arrows for a splitter/merger so which side is IN vs OUT is obvious.
+        // Markers are parented to this (rotated) belt and use LOCAL dirs — N = forward (= world dir),
+        // E = right (= RotateCW(dir)), S = back, W = left — so they land on the correct world edges
+        // AND stay correct if the belt is later re-oriented (SetDir rotates the parent + its markers).
+        private void AddPortMarkers()
+        {
+            foreach (var m in _portMarkers) if (m != null) Destroy(m);
+            _portMarkers.Clear();
+            if (isSplitter)
+            {
+                _portMarkers.Add(Ports.MakeOutputArrow(transform, Dir.N).gameObject); // forward out
+                _portMarkers.Add(Ports.MakeOutputArrow(transform, Dir.E).gameObject); // right out
+                _portMarkers.Add(Ports.MakeInputNotch(transform, Dir.S).gameObject);  // back in
+            }
+            else if (isMerger)
+            {
+                _portMarkers.Add(Ports.MakeOutputArrow(transform, Dir.N).gameObject); // forward out
+                _portMarkers.Add(Ports.MakeInputNotch(transform, Dir.S).gameObject);  // back in
+                _portMarkers.Add(Ports.MakeInputNotch(transform, Dir.E).gameObject);  // right in
+                _portMarkers.Add(Ports.MakeInputNotch(transform, Dir.W).gameObject);  // left in
+            }
+        }
+
         public static bool IsStorageCell(Vector2Int c) => WorldGrid.Storages.ContainsKey(c);
         public static bool IsSourceCell(Vector2Int c) =>
             WorldGrid.Collectors.ContainsKey(c) || WorldGrid.Workshops.ContainsKey(c);
@@ -159,37 +198,63 @@ namespace Caveman
                           : _blocked   ? new Color(0.85f, 0.66f, 0.18f)        // yellow — backed up downstream
                           : _baseColor;                                         // brown — ok (empty = supply issue)
 
-            UpdateDot();
+            UpdateDots();
         }
 
-        // A small sprite that slides from the back of the cell to the front each tick,
-        // so you can see goods physically moving along the belt.
-        private void UpdateDot()
+        // Render the carried items sliding along the belt. A belt cell can hold up to `capacity`
+        // items (they accumulate when the line ahead is blocked); we draw one dot per held item,
+        // PACKED nose-to-tail from the exit edge when backed up — so a blockage visibly piles goods
+        // instead of showing a single frozen dot. A lone flowing item animates across the cell.
+        private void UpdateDots()
         {
-            if (_dot == null)
+            int n = (item != null) ? Mathf.Clamp(count, 0, capacity) : 0;
+            while (_dots.Count < n)
             {
                 var go = new GameObject("BeltItem");
                 var sr = go.AddComponent<SpriteRenderer>();
                 sr.sortingOrder = 2;
                 go.transform.localScale = Vector3.one * 0.26f;
-                _dot = sr;
+                _dots.Add(sr);
             }
+            for (int i = 0; i < _dots.Count; i++)
+            {
+                var d = _dots[i];
+                if (d == null) continue;
+                bool on = i < n;
+                d.enabled = on;
+                if (!on) continue;
+                d.sprite = item.icon != null ? item.icon : PlaceholderArt.Circle(); // per-item look
+                d.color = item.color;
+            }
+            if (n == 0) return;
 
-            bool show = count > 0 && item != null;
-            _dot.enabled = show;
-            if (!show) return;
-
-            // Slide from the edge the item arrived at, through the centre, to the exit edge —
-            // so at a corner it tracks the bend (0.5 offsets make one belt's exit == the next's
-            // entry, seamless). When BLOCKED (dead end / backed up) the item HOLDS at the front
-            // and stops animating, so a broken belt reads as "stuck", not phantom-travelling.
-            float progress = _blocked ? 1f : (interval > 0f ? Mathf.Clamp01(_timer / interval) : 0f);
+            // 0.5 offsets make one belt's exit == the next's entry (seamless hand-off). The path is
+            // a quadratic Bézier with its control point at the cell centre → a straight line on a
+            // straight belt and a smooth ARC through a corner (so items take "nice turns").
             Vector3 inE = new Vector3(Step(_inDir).x, Step(_inDir).y, 0f) * 0.5f;
             Vector3 outE = new Vector3(Step(dir).x, Step(dir).y, 0f) * 0.5f;
-            _dot.transform.position = transform.position + Vector3.Lerp(inE, outE, progress);
-            _dot.sprite = item.icon != null ? item.icon : PlaceholderArt.Circle(); // per-item look
-            _dot.color = item.color;
+
+            if (n == 1 && !_blocked)
+            {
+                float p = interval > 0f ? Mathf.Clamp01(_timer / interval) : 0f;
+                _dots[0].transform.position = transform.position + PathPoint(p, inE, outE);
+            }
+            else
+            {
+                // Backed up / multiple held: pack from the exit edge backward (nose-to-tail).
+                const float gap = 0.26f; // item spacing along the belt when queued
+                for (int i = 0; i < n; i++)
+                {
+                    float t = Mathf.Clamp01(1f - i * gap);
+                    _dots[i].transform.position = transform.position + PathPoint(t, inE, outE);
+                }
+            }
         }
+
+        // Quadratic Bézier with the control point at the cell centre (the origin): straight when
+        // inE == -outE (a straight belt), a smooth quarter-arc when inE ⟂ outE (a corner).
+        private static Vector3 PathPoint(float t, Vector3 inE, Vector3 outE)
+            => (1f - t) * (1f - t) * inE + t * t * outE;
 
         // Connected only if goods can actually LEAVE: a sink directly ahead, or a belt
         // chain ahead that ultimately reaches a sink. A belt ahead is NOT enough on its

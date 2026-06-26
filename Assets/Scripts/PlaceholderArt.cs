@@ -13,6 +13,7 @@ namespace Caveman
         private static Sprite _triangle;
         private static Sprite _hexagon;
         private static Sprite _ground;
+        private static Sprite _conveyor;
 
         /// <summary>A soft Perlin-noise ground sprite (organic tonal variation, baked colour)
         /// so the world doesn't read as one flat slab. Deterministic — no Random.</summary>
@@ -91,6 +92,50 @@ namespace Caveman
             }
             _hexagon = Polygon(v);
             return _hexagon;
+        }
+
+        /// <summary>A conveyor-belt tile: a rounded rectangle with two forward chevrons (baked
+        /// darker so they read on any colour tint). Local +Y is "forward", so rotating the belt by
+        /// Belt.Angle(dir) aims the chevrons along travel. Replaces the old triangle so belts read
+        /// as conveyors rather than pine trees.</summary>
+        public static Sprite Conveyor()
+        {
+            if (_conveyor != null) return _conveyor;
+            const int s = 64;
+            var tex = NewTex(s);
+            var px = new Color[s * s];
+            float cx = (s - 1) * 0.5f;
+            var belt = Color.white;
+            var chev = new Color(0.42f, 0.42f, 0.42f, 1f); // baked dark → visible after any tint
+            float[] apex = { 24f, 44f };                   // two stacked chevrons
+            for (int y = 0; y < s; y++)
+                for (int x = 0; x < s; x++)
+                {
+                    if (!InRoundedRect(x, y, s, 3f, 12f)) { px[y * s + x] = Clear; continue; }
+                    Color c = belt;
+                    for (int k = 0; k < apex.Length; k++)
+                    {
+                        float dy = apex[k] - y; // rows below the apex form the "^" legs
+                        if (dy >= 0f && dy <= 12f && Mathf.Abs(Mathf.Abs(x - cx) - dy) <= 2.5f) { c = chev; break; }
+                    }
+                    px[y * s + x] = c;
+                }
+            tex.SetPixels(px);
+            tex.Apply();
+            _conveyor = Sprite.Create(tex, new Rect(0, 0, s, s), new Vector2(0.5f, 0.5f), s);
+            return _conveyor;
+        }
+
+        // Signed-distance test for a rounded square inset by `margin` (px) with corner radius `rad`.
+        private static bool InRoundedRect(int x, int y, int s, float margin, float rad)
+        {
+            float lo = margin, hi = (s - 1) - margin;
+            float c = (lo + hi) * 0.5f, half = (hi - lo) * 0.5f;
+            float qx = Mathf.Abs(x - c) - (half - rad);
+            float qy = Mathf.Abs(y - c) - (half - rad);
+            float outside = Mathf.Sqrt(Mathf.Max(qx, 0f) * Mathf.Max(qx, 0f) + Mathf.Max(qy, 0f) * Mathf.Max(qy, 0f));
+            float inside = Mathf.Min(Mathf.Max(qx, qy), 0f);
+            return outside + inside - rad <= 0f;
         }
 
         private static readonly Color Clear = new Color(0, 0, 0, 0);
