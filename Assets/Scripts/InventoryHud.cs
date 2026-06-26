@@ -105,7 +105,6 @@ namespace Caveman
             if (kb.nKey.wasPressedThisFrame) _showMinimap = !_showMinimap;
             if (kb.gKey.wasPressedThisFrame) TogglePanel(Panel.Guide);
             if (kb.tKey.wasPressedThisFrame) TogglePanel(Panel.Research);
-            if (kb.jKey.wasPressedThisFrame) StaffAllIdle();
 
             // QoL: one-time "research available" toast when a tree node first becomes affordable.
             if (Research.Tree != null)
@@ -116,7 +115,6 @@ namespace Caveman
             // --- Sandbox / debug hotkeys ---
             if (kb.f1Key.wasPressedThisFrame && debugItems != null)
                 foreach (var it in debugItems) if (it != null) gatherer.Inventory.Add(it, 500);
-            if (kb.f2Key.wasPressedThisFrame && Colony.Instance != null) Colony.Instance.DebugAddPopulation(5);
             if (kb.f3Key.wasPressedThisFrame && Colony.Instance != null) Colony.Instance.DebugAdvanceAge();
             if (kb.f4Key.wasPressedThisFrame) Economy.FreeBuild = !Economy.FreeBuild;
             if (kb.f7Key.wasPressedThisFrame) Economy.LocalProduction = !Economy.LocalProduction;
@@ -407,27 +405,26 @@ namespace Caveman
                 "<size=10><color=#6c6>●</color> ok  <color=#f66>●</color> starved  <color=#fd4>●</color> full</size>", _small);
         }
 
-        // ---- Status (population) ----
+        // ---- Status (top bar) ----
         private void DrawStatus()
         {
             GUILayout.BeginArea(new Rect(12, 34, Mathf.Max(620f, Screen.width - 310f), 52));
             var c = Colony.Instance;
             if (c != null)
             {
-                // Bottleneck summary — count starved / backed-up / idle machines. This is THE core
-                // factory alert; it pairs with the minimap dots so you can find & fix the problem.
-                int starved = 0, backed = 0, unstaffed = 0;
+                // Bottleneck summary — count starved / backed-up machines. This is THE core factory
+                // alert; it pairs with the minimap dots so you can find & fix the problem.
+                int starved = 0, backed = 0;
                 foreach (var pb in ProductionBuilding.All)
-                { if (pb == null) continue; var sc = pb.StatusColor; if (sc == Status.Starved) starved++; else if (sc == Status.BackedUp) backed++; else if (sc == Status.Idle && !pb.Paused) unstaffed++; }
+                { if (pb == null) continue; var sc = pb.StatusColor; if (sc == Status.Starved) starved++; else if (sc == Status.BackedUp) backed++; }
                 foreach (var wkb in WorkshopBuilding.All)
-                { if (wkb == null) continue; var sc = wkb.StatusColor; if (sc == Status.Starved) starved++; else if (sc == Status.BackedUp) backed++; else if (sc == Status.Idle && !wkb.Paused) unstaffed++; }
+                { if (wkb == null) continue; var sc = wkb.StatusColor; if (sc == Status.Starved) starved++; else if (sc == Status.BackedUp) backed++; }
                 // Stay quiet early (Factorio focus): only show production FAILURE (starved) until the
                 // base is actually going; non-critical states appear once established.
                 bool established = c.Age >= 1 || c.PeakProsperity >= 100;
                 string bottleneck = "";
                 if (starved > 0) bottleneck += $"   <color=#f66>⚠ {starved} starved (no input)</color>";
                 if (established && backed > 0) bottleneck += $"   <color=#fd4>⏸ {backed} backed-up (output full)</color>";
-                if (established && unstaffed > 0) bottleneck += $"   <color=#ccc>⚪ {unstaffed} idle — press J to staff</color>";
 
                 // Monument progress (endgame): shown once a Monument exists or blocks are held.
                 string monu = "";
@@ -713,15 +710,15 @@ namespace Caveman
             switch (def.kind)
             {
                 case BuildingKind.Collector:
-                    return $"Gathers {Name(def.item)} from a nearby {Name(def.item)} patch. Needs workers (1 per harvester, up to {def.maxWorkers}). Place it next to the resource.{age}";
+                    return $"Auto-gathers {Name(def.item)} from a nearby {Name(def.item)} patch at a fixed rate once built (no workers). Place it next to the resource; it re-targets a fresh patch when one runs dry.{age}";
                 case BuildingKind.Workshop:
-                    return $"Recipe: {CostList(def.inputs)} → {def.outputPerCycle} {Name(def.item)}. Needs workers, and its inputs must be DELIVERED here (belt, or an adjacent storage/machine). Red dot = starved.{age}";
+                    return $"Recipe: {CostList(def.inputs)} → {def.outputPerCycle} {Name(def.item)}. Runs automatically once its inputs are DELIVERED here (belt, or an adjacent storage/machine). Red dot = missing input.{age}";
                 case BuildingKind.Storage:
                     return def.configurable
-                        ? $"Warehouse — stores ONE resource you pick (set it in its panel); good for Planks, Cooked Food, etc. Holds {def.capacity}.{age}"
-                        : $"Stores {Name(def.item)} (up to {def.capacity}). Workers haul output here; if it fills up, production backs up.{age}";
+                        ? $"Warehouse — stores ONE resource you pick (set it in its panel); good for Planks, Charcoal, etc. Holds {def.capacity}.{age}"
+                        : $"Stores {Name(def.item)} (up to {def.capacity}). Belt output here; if it fills up, production backs up.{age}";
                 case BuildingKind.Housing:
-                    return $"Houses {def.houseCapacity} people — raises the population cap so the colony can grow.{age}";
+                    return $"A structure (no effect in the factory build).{age}";
                 case BuildingKind.Belt:
                     return $"Conveyor — carries items one cell in the way it faces ({(def.interval <= 0.6f ? "fast tier" : "slow tier")}). Click/drag to lay a line, R to rotate. Feeds storage or workshop inputs.{age}";
                 case BuildingKind.Depot:
@@ -754,13 +751,13 @@ namespace Caveman
             var dp = sel.GetComponent<Depot>();
             var pbSel = sel.GetComponent<ProductionBuilding>();
             var resB = sel.GetComponent<ResearchBuilding>();
-            var staff = sel.GetComponent<IStaffable>();
-            string name = staff != null ? staff.StaffLabel : sb != null ? sb.def.displayName
-                : hb != null ? hb.def.displayName : dp != null ? dp.def.displayName
-                : resB != null ? resB.def.displayName
+            var th = sel.GetComponent<TransportHub>();
+            string name = wb != null ? wb.def.displayName : pbSel != null ? pbSel.def.displayName
+                : th != null && th.def != null ? th.def.displayName
+                : sb != null ? sb.def.displayName : hb != null ? hb.def.displayName
+                : dp != null ? dp.def.displayName : resB != null ? resB.def.displayName
                 : cs != null ? cs.def.displayName : "Building";
-            string tag = cs != null ? "  <size=14><color=#bbb>(building)</color></size>" : "";
-            GUILayout.Label($"<b>{name}</b>{tag}", _s);
+            GUILayout.Label($"<b>{name}</b>", _s);
 
             // Plain-language status line for producers (the "understandable bottleneck" cue).
             if (wb != null || pbSel != null)
@@ -776,11 +773,11 @@ namespace Caveman
                     : sc == Status.Starved ? (isCollector
                         ? "Starved — its resource patch ran dry; move or expand"
                         : "Starved — an input isn't arriving")
-                    : "Idle — assign a worker";
+                    : "Idle";
                 GUILayout.Label($"<size=13><color=#{ColorUtility.ToHtmlStringRGB(sc)}>● {st}</color></size>", _small);
             }
 
-            bool add = false, rem = false, demo, close;
+            bool demo, close;
             if (wb != null)
             {
                 GUILayout.Label($"<size=15>{RecipeText(wb)}</size>", _small);
@@ -793,44 +790,27 @@ namespace Caveman
                     GUILayout.Label($"<size=12><color=#f66>⚠ Waiting for: {miss}</color>  <size=10>(deliver via belt or adjacent storage)</size></size>", _small);
             }
 
-            if (staff != null)
+            if (wb != null || pbSel != null || th != null)
             {
-                var th = sel.GetComponent<TransportHub>();
-                if (th != null && th.mechanical)
-                {
-                    GUILayout.Label("<size=14>Automatic conveyor (no worker)</size>", _small);
-                }
-                else
-                {
-                    // Workers are FREE in factory-first — just a speed dial (more workers = faster).
-                    GUILayout.Label($"<b>Speed:</b> {staff.AssignedWorkers}/{staff.MaxWorkers} workers <size=12><color=#bbb>(free)</color></size>", _small);
-                    GUILayout.BeginHorizontal();
-                    rem = GUILayout.Button("- worker", GUILayout.Height(28));
-                    add = GUILayout.Button("+ worker", GUILayout.Height(28));
-                    GUILayout.EndHorizontal();
-                    if (staff.AssignedWorkers < staff.MaxWorkers
-                        && GUILayout.Button("<size=12>Max speed</size>", _btn))
-                        for (int k = 0; k < 64 && staff.TryAssign(); k++) { }
-                }
+                // Buildings run automatically (no workers). Controls = pause + (transport) priority.
                 if (th != null)
                 {
+                    if (th.mechanical) GUILayout.Label("<size=14>Automatic conveyor</size>", _small);
                     string pn = th.priorityItem != null ? th.priorityItem.displayName : "Any";
                     if (GUILayout.Button($"<size=12>Haul priority: {pn}</size>", _btn)) th.CyclePriority();
                 }
 
-                // Pause toggle — halt this building to free shared inputs for others (priorities).
-                var pbPause = sel.GetComponent<ProductionBuilding>();
-                if (wb != null || pbPause != null)
+                // Pause toggle — halt this machine to free a shared input for another (priorities).
+                if (wb != null || pbSel != null)
                 {
-                    bool isPaused = wb != null ? wb.Paused : pbPause.Paused;
+                    bool isPaused = wb != null ? wb.Paused : pbSel.Paused;
                     if (GUILayout.Button(isPaused ? "<size=12><color=#9f9>▶ Resume</color></size>" : "<size=12>⏸ Pause</size>", _btn))
-                    { if (wb != null) wb.TogglePause(); if (pbPause != null) pbPause.TogglePause(); }
+                    { if (wb != null) wb.TogglePause(); if (pbSel != null) pbSel.TogglePause(); }
                 }
 
                 // What this collector/workshop currently holds in its buffer.
-                var pbb = sel.GetComponent<ProductionBuilding>();
-                if (pbb != null && pbb.produces != null)
-                    GUILayout.Label($"<size=12>Holds: {pbb.produces.displayName} {pbb.Buffer.Count(pbb.produces)}/{pbb.Buffer.capacity}   ·   Rate: {pbb.RatePerMin:0.#}/min</size>", _small);
+                if (pbSel != null && pbSel.produces != null)
+                    GUILayout.Label($"<size=12>Holds: {pbSel.produces.displayName} {pbSel.Buffer.Count(pbSel.produces)}/{pbSel.Buffer.capacity}   ·   Rate: {pbSel.RatePerMin:0.#}/min</size>", _small);
                 else if (wb != null && wb.output != null)
                     GUILayout.Label($"<size=12>Holds: {wb.output.displayName} {wb.Buffer.Count(wb.output)}/{wb.Buffer.capacity}</size>", _small);
             }
@@ -928,17 +908,7 @@ namespace Caveman
             }
             else if (hb != null)
             {
-                if (hb.isHQ && Colony.Instance != null)
-                {
-                    var col = Colony.Instance;
-                    GUILayout.Label("<size=13><color=#bbb>HQ — manages your free builder squad.</color></size>", _small);
-                    GUILayout.Label($"<b>Builders: {col.Builders}/{col.MaxBuilders}</b>", _small);
-                    GUILayout.BeginHorizontal();
-                    rem = GUILayout.Button("- builder", GUILayout.Height(30));
-                    add = GUILayout.Button("+ builder", GUILayout.Height(30));
-                    GUILayout.EndHorizontal();
-                }
-                else GUILayout.Label("<size=14>Structure</size>", _small);
+                GUILayout.Label("<size=14>Structure</size>", _small);
             }
             else if (cs != null)
             {
@@ -955,9 +925,6 @@ namespace Caveman
             GUILayout.EndHorizontal();
             GUILayout.EndArea();
 
-            bool hq = hb != null && hb.isHQ;
-            if (add) { if (hq) Colony.Instance?.AddBuilder(); else builder.AssignSelected(); }
-            if (rem) { if (hq) Colony.Instance?.RemoveBuilder(); else builder.UnassignSelected(); }
             if (demo) builder.DemolishSelected();
             if (close) builder.Deselect();
         }
@@ -1057,20 +1024,6 @@ namespace Caveman
             }
         }
 
-        // One-shot: bring every idle (unpaused, unstaffed) building online. Workers are free in
-        // factory-first, so this just removes the tedium of clicking each new machine to start it.
-        private void StaffAllIdle()
-        {
-            int staffed = 0;
-            foreach (var pb in ProductionBuilding.All)
-            { if (pb != null && !pb.Paused && pb.AssignedWorkers == 0 && pb.TryAssign()) staffed++; }
-            foreach (var wb in WorkshopBuilding.All)
-            { if (wb != null && !wb.Paused && wb.AssignedWorkers == 0 && wb.TryAssign()) staffed++; }
-            Toast.Show(staffed > 0
-                ? $"<color=#9f9>Started {staffed} idle building{(staffed == 1 ? "" : "s")}.</color>"
-                : "<color=#bbb>No idle buildings to start.</color>");
-        }
-
         // Hotkey legend + run state — lowest-priority info, pinned to the bottom-centre (out of
         // the top resource strip it used to overlap). Hidden while placing so it never fights the
         // placement instruction bar.
@@ -1079,7 +1032,7 @@ namespace Caveman
             if (builder != null && builder.PendingIndex >= 0) return;
             float w = Mathf.Min(760f, Screen.width - 24f);
             GUILayout.BeginArea(new Rect(Screen.width / 2f - w / 2f, Screen.height - 40f, w, 38f));
-            GUILayout.Label($"<size=13><color=#bbb>B build · <color=#9cf>T research</color> · J staff idle · G guide · H help · M overview · N map {(_showMinimap ? "on" : "off")} · Space pause</color></size>", _small);
+            GUILayout.Label($"<size=13><color=#bbb>B build · <color=#9cf>T research</color> · G guide · H help · M overview · N map {(_showMinimap ? "on" : "off")} · Space pause</color></size>", _small);
             string sandbox = Economy.FreeBuild ? "<color=#9f9>SANDBOX</color> · " : "";
             string mode = Economy.LocalProduction ? "<color=#fc8>Local logistics</color>" : "<color=#8cf>Global pool</color>";
             GUILayout.Label($"<size=11><color=#999>{sandbox}Speed x{_speed:0} · {mode} (F7) · F1–F5 sandbox</color></size>", _small);
@@ -1185,8 +1138,8 @@ namespace Caveman
                 "Grow from hand-gathering to a self-running FACTORY. Reach the Industrial Age and build the Monument (10 Blocks) to WIN.");
             Section("<color=#fc8>Logistics matter (the core)</color>",
                 "The easiest way to connect things is ADJACENCY: a machine pulls inputs from buildings RIGHT NEXT TO it, so clustering a chain side-by-side feeds it automatically — no belts. Use BELTS to connect things that are far apart (or to stock a Storage). A machine never pulls from across the map, so lay your base out so every machine is fed; a shortage cascades downstream.");
-            Section("<color=#9cf>Buildings & workers</color>",
-                "Buildings run on their own once built and supplied — there is NO population to feed (no food, water or housing). Each collector/workshop has a FREE worker dial (1..max): more workers = faster. A new machine starts at 1 worker; crank it for throughput, or press J to staff every idle building at once.");
+            Section("<color=#9cf>Fully automatic buildings</color>",
+                "Every building is a machine: it runs by itself at a FIXED rate the moment it's built and supplied — no workers, no population, nothing to staff. Construction is INSTANT (the cost is paid when you place it). Collectors auto-gather and re-target a fresh patch when one runs dry; processors run whenever their inputs arrive. You build and connect the system; it runs itself.");
             Section("<color=#ffcf6b>Industry score & Rank</color>",
                 "A climbing score from your AUTOMATION (collectors, workshops, belts, routes) and tech age. Your settlement ranks up: Camp → Hamlet → Village → Town → City → Metropolis.");
             Section("<color=#cda>Research drives progress (press T)</color>",
@@ -1194,7 +1147,7 @@ namespace Caveman
             Section("<color=#cda>Ages</color>",
                 "Stone → Tribal → Bronze → Iron → Industrial — each unlocked from the Research Tree, each adding deeper production chains (charcoal → bricks/pottery → metal/tools → power). Reach Industrial and build the Monument to win.");
             Section("<color=#6c6>Bottlenecks</color>",
-                "Status dots: green working, yellow output-full (haul it out), red starved (no input), grey idle (no worker). Problems show on the minimap. Click a building to see what it's waiting for, its rate, and to Pause it (free a scarce shared input for another).");
+                "Status dots: green working, yellow output-full (belt it away), red missing-input, grey paused. Problems show on the minimap. Click a building to see what it's waiting for, its rate, and to Pause it (free a scarce shared input for another).");
             Section("<color=#9f9>Expansion</color>",
                 "Patches deplete as you harvest; collectors auto-chase fresh ones nearby and go idle when a cluster runs dry — your cue to push outward. Ore is finite and far, so exploration + transport routes (cart → train) matter.");
 
@@ -1223,20 +1176,19 @@ namespace Caveman
                 "• WASD / arrows to move.  Mouse wheel = zoom, M = map.\n" +
                 "• Left-click a tree/rock to gather raw materials by hand.\n" +
                 "• Click a building in the Build menu (left), then click the map to place it.\n" +
-                "• Builders (from the HQ) haul materials there, then build it. Build cost is paid up front.\n" +
-                "• Buildings run on their own — no food, water or population. Each has a FREE worker\n" +
-                "  dial (more workers = faster); press J to staff every idle building at once.\n" +
+                "• Construction is INSTANT — the cost is paid when you place it, and it runs itself.\n" +
+                "• Buildings are fully automatic: no workers, no population, nothing to staff.\n" +
                 "• <b>Logistics matter:</b> a workshop only runs on inputs that ARRIVE — belt-fed or\n" +
                 "  in an ADJACENT storage/machine. Lay it out so each machine is fed.\n" +
                 "• Lay Belts/Splitters — or Stations + a transport route — to move goods around.\n" +
-                "• Click a building to manage it (speed, pause, demolish).\n" +
+                "• Click a building to see its status, pause it, or demolish it.\n" +
                 "• <b>X</b> or <b>Delete</b> removes the building under the cursor (fast un-do). " +
                 "Build menu: ★ pins a building.\n" +
                 "• Hold-drag to place a row of buildings; C copies the selected building's type.\n" +
                 "• <b>Goal:</b> reach the Industrial Age via RESEARCH, build the <b>Monument</b>, and make " +
                 "10 Monument Blocks to <color=#ffd24d>WIN</color>.\n" +
                 "• Status dots: <color=#6c6>green</color>=working, <color=#fd4>yellow</color>=output full, " +
-                "<color=#f66>red</color>=no input, <color=#999>grey</color>=idle.\n" +
+                "<color=#f66>red</color>=no input, <color=#999>grey</color>=paused.\n" +
                 "\n<b>Sandbox:</b> F1 +resources · F3 advance age · F4 free build · " +
                 "F5 game speed · F8 reveal map.\n" +
                 "</size>", _small);

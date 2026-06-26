@@ -4,10 +4,9 @@ using UnityEngine;
 namespace Caveman
 {
     /// <summary>
-    /// A building under construction. Its materials are paid UP FRONT at placement
-    /// (see BuildController); this just holds the outstanding amounts and build progress.
-    /// The Colony's shared builder squad (based at the HQ) hauls the already-paid materials
-    /// to the site and builds it. On completion it spawns the real building.
+    /// Factory-first: construction is INSTANT, so this is now just the static <see cref="SpawnFinished"/>
+    /// dispatcher that maps a BuildingKind to its concrete Spawn (called by BuildController on placement).
+    /// The MonoBehaviour body (materials / build progress) is legacy and no longer instantiated.
     /// </summary>
     public class ConstructionSite : MonoBehaviour
     {
@@ -149,14 +148,14 @@ namespace Caveman
             {
                 case BuildingKind.Storage: StorageBuilding.Spawn(def, pos, outDir); break;
                 case BuildingKind.Housing: HousingBuilding.Spawn(def, pos); break;
-                case BuildingKind.Workshop: WorkshopBuilding.Spawn(def, pos, outDir).TryAssign(); break;
-                case BuildingKind.Logistics: TransportHub.Spawn(def, pos).TryAssign(); break;
+                case BuildingKind.Workshop: WorkshopBuilding.Spawn(def, pos, outDir); break;
+                case BuildingKind.Logistics: TransportHub.Spawn(def, pos); break;
                 case BuildingKind.Depot: Depot.Spawn(def, pos); break;
                 case BuildingKind.Power: PowerPlant.Spawn(def, pos); break;
                 case BuildingKind.Build: ConstructionYard.Spawn(def, pos); break;
                 case BuildingKind.Pump: WaterPump.Spawn(def, pos); break;
                 case BuildingKind.Research: ResearchBuilding.Spawn(def, pos, outDir); break;
-                default: ProductionBuilding.Spawn(def, pos, outDir).TryAssign(); break;
+                default: ProductionBuilding.Spawn(def, pos, outDir); break;
             }
         }
 

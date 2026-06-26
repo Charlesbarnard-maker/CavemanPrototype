@@ -5,11 +5,10 @@ using UnityEngine.InputSystem;
 namespace Caveman
 {
     /// <summary>
-    /// Placement + selection. Number keys pick a building to place (ghost follows
-    /// cursor, green = valid). Otherwise, left-click a building to SELECT it; the
-    /// HUD shows a panel to add/remove workers or demolish it. Collectors need a
-    /// nearby patch; storage/housing place anywhere. New collectors auto-assign one
-    /// free worker.
+    /// Placement + selection. Number keys / the build menu pick a building; the ghost follows the
+    /// cursor (green = valid) and a click places the FINISHED building INSTANTLY (cost paid up front,
+    /// no construction units). Left-click a placed building to SELECT it; the HUD panel shows its
+    /// status / pause / demolish. Collectors need a nearby resource patch; most things place anywhere.
     /// </summary>
     public class BuildController : MonoBehaviour
     {
@@ -165,13 +164,6 @@ namespace Caveman
             if (mouse != null && mouse.leftButton.wasPressedThisFrame && !overUI)
                 Selected = BuildingGOUnderCursor(mouse);
 
-            var staff = SelectedStaffable;
-            if (staff != null)
-            {
-                if (kb.rightBracketKey.wasPressedThisFrame) staff.TryAssign();
-                if (kb.leftBracketKey.wasPressedThisFrame) staff.Unassign();
-            }
-
             if (kb.cKey.wasPressedThisFrame && Selected != null) CopySelected();
         }
 
@@ -230,9 +222,6 @@ namespace Caveman
             }
             else if (_highlight.activeSelf) _highlight.SetActive(false);
         }
-
-        public IStaffable SelectedStaffable =>
-            Selected != null ? Selected.GetComponent<IStaffable>() : null;
 
         public bool IsUnlocked(BuildingDefinition def) =>
             def != null && (Colony.Instance == null || def.unlockAge <= Colony.Instance.Age)
@@ -312,15 +301,11 @@ namespace Caveman
             // PointerOverUI guard stops a build-menu click from also dropping a building.
             if (mouse.leftButton.wasPressedThisFrame && PlacementValid && !InventoryHud.PointerOverUI)
             {
-                if (Economy.FreeBuild) ConstructionSite.SpawnFinished(def, world, BuildDir); // sandbox: instant, free
-                else
-                {
-                    // Pay the materials UP FRONT (consistent with belts/bridges/pipes); builders
-                    // then haul & build the already-paid site. Without this, placing a building
-                    // consumed nothing until/unless a builder happened to service it.
-                    Economy.Spend(def.cost, Carried);
-                    ConstructionSite.Spawn(def, world, BuildDir);
-                }
+                // INSTANT construction: pay the cost and drop the finished building immediately — no
+                // builder units, no hauling. (Economy.Spend no-ops in sandbox/FreeBuild, so it stays
+                // free there.) The machine starts running by itself.
+                Economy.Spend(def.cost, Carried);
+                ConstructionSite.SpawnFinished(def, world, BuildDir);
                 BuildingsPlaced++;
             }
             if (mouse.rightButton.wasPressedThisFrame) CancelPlacement();
@@ -626,22 +611,11 @@ namespace Caveman
 
         public bool CanAfford(BuildingDefinition def) => def != null && Economy.CanAfford(def.cost, Carried);
 
-        public void AssignSelected() { var s = SelectedStaffable; if (s != null) s.TryAssign(); }
-        public void UnassignSelected() { var s = SelectedStaffable; if (s != null) s.Unassign(); }
         public void Deselect() => Selected = null;
 
         public void DemolishSelected()
         {
             if (Selected == null) return;
-
-            // The Town Hall (HQ) manages builders and sets the starting pop cap —
-            // demolishing it would break both, so it's protected.
-            var hqCheck = Selected.GetComponent<HousingBuilding>();
-            if (hqCheck != null && hqCheck.isHQ)
-            {
-                Toast.Show("<color=#f99>The Town Hall can't be demolished.</color>");
-                return;
-            }
 
             // Cancelling a construction site: its materials were paid at placement, so refund
             // them in full (the real building never formed).
@@ -680,8 +654,6 @@ namespace Caveman
                 : cy != null ? cy.def : wp != null ? wp.def : rsb != null ? rsb.def : null;
             if (rdef == null) return;
 
-            var staff = Selected.GetComponent<IStaffable>();
-            if (staff != null) while (staff.AssignedWorkers > 0) staff.Unassign();
             if (Carried != null)
                 foreach (var c in rdef.cost)
                     Carried.Add(c.item, Mathf.Max(0, c.amount / 2));

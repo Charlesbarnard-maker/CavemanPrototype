@@ -3,7 +3,39 @@
 A running record so progress/problems don't get lost. Newest first. Move items to
 **Fixed** when done. Maintained alongside the code — see DESIGN.md for the roadmap.
 
-## FACTORY-FIRST RESTRUCTURE (2026-06-26 #14) — most recent
+## REMOVE WORKERS/POPULATION — fully automated machines + instant build (2026-06-26 #15) — most recent
+Completes the factory-first pivot: there are now NO workers, NO population, NO staffing, NO worker
+slots, and construction is INSTANT. Buildings are pure automated machines. Mapped (5-agent workflow)
++ adversarially verified (3-agent workflow: PASS, 0 compile blockers) before commit.
+- **Deleted:** `Worker.cs`, `IStaffable.cs`, `BuilderWorker.cs` (+ their `.meta`).
+- **Collectors** (`ProductionBuilding`) now auto-gather on a fixed timer straight into their Buffer —
+  `GatherPerCycle = 2` units / `interval` → 60/min at the standard 2.0s (the canonical "1 collector →
+  1 belt → 1 machine" lane). No NPC walk. Auto-rebind to the nearest live node within `searchRadius`
+  on depletion is unchanged.
+- **Workshops** (`WorkshopBuilding`) run automatically at a FIXED rate (the old 1-worker rate) when
+  not paused and inputs are present — dropped the `AssignedWorkers` gate + the `×workers` speed
+  multiplier. Power/brownout still applies. Pause kept (a factory tool, not a worker mechanic).
+- **Construction is INSTANT:** placement = `Economy.Spend(cost)` + `ConstructionSite.SpawnFinished`
+  (no site, no builder units). Sandbox/FreeBuild stays free.
+- **Removed:** Town Hall + Construction Yard (from the menu), the builder squad (`Colony` Builders/
+  MaxBuilders/AddBuilder/RemoveBuilder/ManageBuilders/SyncSquad) + `AssignedTotal`, all worker UI in
+  `InventoryHud` (±worker, Max-speed, J "staff all", F2 add-pop, the idle bottleneck count), the
+  worker hotkeys/AssignSelected in `BuildController`. Guide/Help/Describe/tooltips reworded to
+  "fully automatic / no workers / instant construction".
+- **Kept INERT (so the blind build still compiles — later cleanup):** `BuildingDefinition.maxWorkers`
+  + `builderSlots`, `HousingBuilding.isHQ`, `Colony.Population/FreeWorkers/DebugAddPopulation/Comfort`,
+  the `ConstructionSite` MonoBehaviour body + `ConstructionYard` + `TransportHub`/`Transporter`
+  classes (none placeable), `GameBootstrap.MakeBuildYard/MakeLogistics/MakeHousing` helpers.
+- **Verify findings (all non-blocking):** collector `outputPerCycle` is ignored (gather uses the
+  fixed `GatherPerCycle`) — intended, the field was already dead under the old Worker model; a few
+  stale dev-only doc-comments remain. **Still owed: a real Unity compile + playtest** (static
+  analysis + the prior pivot's CS0136 fix are strong signals, not a substitute).
+- **Brief's other asks confirmed already DONE** (mapping workflow): collector auto-rebind w/ radius,
+  larger grouped biomes (low-freq Perlin + SmoothLand), transport tiers by age (belt + route tiers,
+  UpgradeAllRoutes on age-up), visually-traceable movement (belt dot + route line/arrow), age-up
+  "what unlocked" card, minimal early UI (3 toasts + scrollviews), input/output/status panel.
+
+## FACTORY-FIRST RESTRUCTURE (2026-06-26 #14)
 Big identity pivot: removed the colony/survival layer so the game is a pure factory automation loop.
 Also bundles the prior (uncommitted) survival/UI/depot/collector/biome passes into one commit.
 - **Removed survival pressure.** `Colony` no longer consumes food/water, no starvation/thirst, no

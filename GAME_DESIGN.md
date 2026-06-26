@@ -19,14 +19,18 @@ The game pivoted from "half colony-survival, half factory" to a **pure factory a
 This section WINS over any survival/population wording elsewhere in this doc (kept for history).
 
 **Removed entirely as gameplay:** population, food, water, housing, happiness, comfort goods,
-starvation/thirst, and labour-as-a-scarce-resource. (Code for these is neutralised/hidden, not all
-deleted, so the build keeps compiling — a later cleanup can remove it.)
+starvation/thirst, **and — as of 2026-06-26 #15 — ALL workers/staffing/labour and construction
+units.** (`Worker`/`IStaffable`/`BuilderWorker` deleted; the rest neutralised/hidden so the build
+keeps compiling — a later cleanup can remove it.)
 
 **The core loop (the whole game):**
 > **gather → store → process → automate (belts/stations) → research → expand → next age**
 
-- **Labour is free.** A building runs once built and supplied. Each collector/workshop has a 1..max
-  **worker speed-dial** (more workers = faster) plus NPC charm — no global pool, no bottleneck.
+- **No workers. Every building is a fully automated machine.** It runs by itself at a FIXED rate the
+  moment it's built and supplied — nothing to staff. Collectors auto-gather (60/min at the 2.0s
+  baseline) and auto-rebind to a fresh node when one runs dry; processors run whenever fed. Pause is
+  kept as a routing tool (halt a machine to free a shared input). **Construction is INSTANT** — the
+  cost is paid at placement and the finished building appears; no builder units, no hauling.
 - **Research is the only progression.** Craft a research item in a production chain → deliver to a
   **Research Lodge** → spend points to advance the Age / unlock buildings. Scaling research = scaling
   the factory.
@@ -94,11 +98,11 @@ Every throughput number hangs off **one base unit** so the player can reason, no
 |---|---|---|---|
 | **Wooden Belt** | **60/min** (interval 1.0s) | **1 lane** | the reference; one item per second |
 | **Conveyor Belt** | **120/min** (interval 0.5s) | **2 lanes** | the clean ×2 upgrade |
-| **Collector** (1 worker, node adjacent) | **~60/min** (interval 2.0s, carry 3) | fills **1 lane** | commute lowers it → place ON the cluster |
-| **Processor** (1 worker) | **1 craft / 2.0s = 30 crafts/min** | — | a 2-input recipe consumes **60/min = 1 lane** |
+| **Collector** (auto, on its node) | **60/min** (2 units / 2.0s interval) | fills **1 lane** | fully automatic; no workers |
+| **Processor** (auto) | **1 craft / 2.0s = 30 crafts/min** | — | a 2-input recipe consumes **60/min = 1 lane** |
 
-**The rule the player learns:** **1 gatherer → 1 belt → 1 machine.**
-Flagship chain, exact: **1 Wood Hut (60 wood/min) → 1 wooden belt (60/min) → 1 Sawmill (eats 60 wood/min at 1 worker, makes 30 planks/min).** Add a 2nd Sawmill worker → it now wants 120/min → the single hut/belt starves → the player *sees* the bottleneck and adds a 2nd hut or a conveyor. That is the core loop made legible.
+**The rule the player learns:** **1 collector → 1 belt → 1 machine.** All fixed rates — no workers.
+Flagship chain, exact: **1 Wood Hut (60 wood/min) → 1 wooden belt (60/min) → 1 Sawmill (eats 60 wood/min, makes 30 planks/min).** Scale by building MORE machines + lanes (a 2nd Wood Hut + belt feeds a 2nd Sawmill), not by adding workers — that is the core loop made legible.
 
 - **Workers scale linearly:** N workers = N× the rate (so a 2-worker machine needs 2 lanes in).
 - **Deliberate exceptions** (slower = harder, by design, not by accident): distant/finite collectors (Mine, Gem Mine) at 2.5s; advanced recipes (Smelter/Toolmaker/Monument) at 3.5–6.0s. Everything *early* is on the clean baseline.

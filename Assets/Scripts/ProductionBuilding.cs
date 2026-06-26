@@ -4,31 +4,28 @@ using UnityEngine;
 namespace Caveman
 {
     /// <summary>
-    /// A collector. Binds to a nearby ResourceNode; each ASSIGNED worker spawns a
-    /// Worker NPC that walks out, harvests, and carries loads back into this
-    /// building's buffer. The buffer is emptied by Transporters (TransportHub) —
-    /// there's no instant teleport to storage. A full buffer stalls the collector
-    /// (backpressure), which is the signal that you need transport.
+    /// A collector — a fully automated machine. It binds to the nearest matching ResourceNode and,
+    /// once built, gathers on a fixed timer straight into its Buffer (NO workers — buildings run by
+    /// themselves). Belts/adjacency drain the Buffer; a full Buffer backs the collector up (the
+    /// BackedUp signal that you need to haul output out). When its node runs dry it auto-rebinds to
+    /// the nearest live node within searchRadius (never a map-wide scan).
     /// </summary>
-    public class ProductionBuilding : MonoBehaviour, IStaffable
+    public class ProductionBuilding : MonoBehaviour
     {
         public BuildingDefinition def;
         public ItemDefinition produces;
         public int outputPerCycle = 1;
         public float interval = 2f;
-        public int maxWorkers = 2;
-        public float sourceRange = 6f;   // worker can commute this far (initial placement bind)
+        public float sourceRange = 6f;   // how far the initial placement bind looks for a node
         public float searchRadius = 16f; // when the node runs dry, look this far for a fresh one
         private const int MaxSearchCandidates = 48; // hard cap on in-radius nodes examined (no map-wide scan)
+        private const int GatherPerCycle = 2; // units per `interval` → 60/min at the standard 2.0s (one belt lane)
         public Belt.Dir OutputSide = Belt.Dir.E; // belts pull output only from this side
 
         public Inventory Buffer { get; private set; }
         public bool Paused { get; private set; }            // player can halt it (priorities)
         public void TogglePause() => Paused = !Paused;
         public ResourceNode Source => _source;
-        public int AssignedWorkers { get; private set; }
-        public int MaxWorkers => maxWorkers;
-        public string StaffLabel => def != null ? def.displayName : "Collector";
 
         public static readonly List<ProductionBuilding> All = new();
         private List<Vector2Int> _cells; // every grid cell this building occupies
@@ -39,13 +36,13 @@ namespace Caveman
             if (_cells != null) foreach (var c in _cells) WorldGrid.Remove(WorldGrid.Collectors, c, this);
         }
 
-        // Rolling gather-rate estimate (units/min), recorded by this collector's workers.
+        // Rolling gather-rate estimate (units/min).
         private int _producedWindow;
         private float _rateTimer;
         public float RatePerMin { get; private set; }
         public void RecordProduced(int n) { if (n > 0) _producedWindow += n; }
 
-        private readonly List<Worker> _workers = new();
+        private float _timer;     // gather cadence
         private ResourceNode _source;
         private float _flash;
         private SpriteRenderer _sr;
@@ -70,7 +67,6 @@ namespace Caveman
             pb.produces = def.item;
             pb.outputPerCycle = def.outputPerCycle;
             pb.interval = def.interval;
-            pb.maxWorkers = Mathf.Max(1, def.maxWorkers);
             pb.searchRadius = def.searchRadius > 0f ? def.searchRadius : 16f;
             pb.Buffer = new Inventory { capacity = Mathf.Max(1, def.capacity) };
             pb.OutputSide = outputSide;
@@ -150,39 +146,32 @@ namespace Caveman
             if (_source == null || !_source.HasResource) Bind(searchRadius);
         }
 
-        public bool TryAssign()
-        {
-            if (AssignedWorkers >= maxWorkers) return false;
-            if (Colony.Instance == null || Colony.Instance.FreeWorkers <= 0) return false;
-            AssignedWorkers++;
-            RefreshWorkers();
-            return true;
-        }
-
-        public void Unassign()
-        {
-            if (AssignedWorkers <= 0) return;
-            AssignedWorkers--;
-            RefreshWorkers();
-        }
-
-        private void RefreshWorkers()
-        {
-            _workers.RemoveAll(w => w == null);
-            while (_workers.Count < AssignedWorkers) _workers.Add(Worker.Spawn(this));
-            while (_workers.Count > AssignedWorkers)
-            {
-                var w = _workers[_workers.Count - 1];
-                _workers.RemoveAt(_workers.Count - 1);
-                if (w != null) Destroy(w.gameObject);
-            }
-        }
-
         public void Pulse() => _flash = 0.25f;
 
         void Update()
         {
             MaybeRebind(); // chase fresh patches as nearby ones deplete
+
+            // Fully automated gather: pull GatherPerCycle from the bound node into the Buffer each
+            // interval (no worker NPC). Backs up if the Buffer is full → the BackedUp signal.
+            bool working = !Paused && _source != null && _source.HasResource && Buffer.Total() < Buffer.capacity;
+            if (working)
+            {
+                float prod = Colony.Instance != null ? Colony.Instance.Productivity : 1f; // inert 1f now
+                _timer += Time.deltaTime * prod;
+                if (_timer >= interval)
+                {
+                    _timer -= interval;
+                    int got = _source.Extract(GatherPerCycle);
+                    if (got > 0)
+                    {
+                        int accepted = Buffer.Add(produces, got);
+                        if (accepted > 0) { RecordProduced(accepted); Pulse(); }
+                    }
+                    _source.Nudge();
+                }
+            }
+            else _timer = 0f;
 
             _rateTimer += Time.deltaTime;
             if (_rateTimer >= 4f)
@@ -192,19 +181,17 @@ namespace Caveman
                 _rateTimer = 0f;
             }
 
-            bool working = !Paused && AssignedWorkers > 0 && _source != null && _source.HasResource
-                           && Buffer.Total() < Buffer.capacity;
             UpdateVisual(working);
             UpdateStatus();
         }
 
         /// <summary>Live status colour (green working / yellow backed-up / red starved /
-        /// grey idle) — also used by the minimap to surface bottlenecks across the base.</summary>
+        /// grey paused) — also used by the minimap to surface bottlenecks across the base.</summary>
         public Color StatusColor
         {
             get
             {
-                if (Paused || AssignedWorkers == 0) return Status.Idle;
+                if (Paused) return Status.Idle;
                 if (Buffer.Total() >= Buffer.capacity) return Status.BackedUp;
                 if (_source == null || !_source.HasResource) return Status.Starved;
                 return Status.Working;

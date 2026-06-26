@@ -9,10 +9,9 @@ namespace Caveman
     /// workshop output buffers to the matching storage. This is the manual tier of
     /// transport; later ages automate it (wooden rollers → conveyors).
     /// </summary>
-    public class TransportHub : MonoBehaviour, IStaffable
+    public class TransportHub : MonoBehaviour
     {
         public BuildingDefinition def;
-        public int maxWorkers = 2;
         public bool mechanical; // runs a transporter with no worker (a conveyor)
         public ItemDefinition priorityItem; // null = haul anything (nearest); else prefer this
         public float range = 14f; // transporters only serve sources within this of the hub (belts go further)
@@ -27,10 +26,6 @@ namespace Caveman
             int idx = items.IndexOf(priorityItem);
             priorityItem = items[(idx + 1) % items.Count];
         }
-
-        public int AssignedWorkers { get; private set; }
-        public int MaxWorkers => maxWorkers;
-        public string StaffLabel => def != null ? def.displayName : "Transport";
 
         public static readonly List<TransportHub> All = new();
         void OnEnable() => All.Add(this);
@@ -55,7 +50,6 @@ namespace Caveman
 
             var h = go.AddComponent<TransportHub>();
             h.def = def;
-            h.maxWorkers = Mathf.Max(1, def.maxWorkers);
             h.mechanical = def.mechanical;
             h.range = def.logisticsRange > 0f ? def.logisticsRange : 14f;
             if (h.mechanical)
@@ -73,35 +67,6 @@ namespace Caveman
             if (_sr != null) _baseColor = _sr.color;
         }
 
-        public bool TryAssign()
-        {
-            if (mechanical) return false; // conveyors run themselves
-            if (AssignedWorkers >= maxWorkers) return false;
-            if (Colony.Instance == null || Colony.Instance.FreeWorkers <= 0) return false;
-            AssignedWorkers++;
-            RefreshTransporters();
-            return true;
-        }
-
-        public void Unassign()
-        {
-            if (AssignedWorkers <= 0) return;
-            AssignedWorkers--;
-            RefreshTransporters();
-        }
-
-        private void RefreshTransporters()
-        {
-            _transporters.RemoveAll(t => t == null);
-            while (_transporters.Count < AssignedWorkers) _transporters.Add(Transporter.Spawn(this));
-            while (_transporters.Count > AssignedWorkers)
-            {
-                var t = _transporters[_transporters.Count - 1];
-                _transporters.RemoveAt(_transporters.Count - 1);
-                if (t != null) Destroy(t.gameObject);
-            }
-        }
-
         private void ClearTransporters()
         {
             foreach (var t in _transporters) if (t != null) Destroy(t.gameObject);
@@ -111,8 +76,7 @@ namespace Caveman
         void Update()
         {
             if (_sr == null) return;
-            bool working = mechanical || AssignedWorkers > 0;
-            _sr.color = working ? _baseColor : Color.Lerp(_baseColor, Color.black, 0.5f);
+            _sr.color = _baseColor; // legacy hub (not buildable) — always reads as active
         }
     }
 }

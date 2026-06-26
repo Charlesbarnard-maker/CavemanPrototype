@@ -4,10 +4,9 @@ using UnityEngine;
 namespace Caveman
 {
     /// <summary>
-    /// The settlement manager: tracks population, housing capacity, food, and
-    /// worker assignment. Population grows toward the housing cap while well fed,
-    /// and declines (starvation) when food runs out. Workers are the shared labour
-    /// pool that staff buildings.
+    /// Factory-first settlement state: tracks the current Age and a climbing automation "Industry"
+    /// score. NO population, NO workers, NO survival — buildings run themselves and construction is
+    /// instant. Population/Comfort/FreeWorkers remain only as inert API so older references compile.
     /// </summary>
     public class Colony : MonoBehaviour
     {
@@ -101,67 +100,9 @@ namespace Caveman
             }
         }
 
-        public int AssignedTotal
-        {
-            get
-            {
-                int a = 0;
-                foreach (var p in ProductionBuilding.All) a += p.AssignedWorkers;
-                foreach (var w in WorkshopBuilding.All) a += w.AssignedWorkers;
-                foreach (var h in TransportHub.All) a += h.AssignedWorkers;
-                return a;
-            }
-        }
-
-        // --- Builders: a capped HQ job, auto-filled when there's construction,
-        //     but manually adjustable so they don't hog your gatherers. The cap SCALES
-        //     with Construction Yards you build (infrastructure), not a fixed number. ---
-        [Header("Builders")]
-        public int baseBuilders = 2;
-        public int MaxBuilders => baseBuilders + ConstructionYard.TotalSlots;
-        public int Builders { get; private set; }
-        private bool _builderManual;
-        private readonly List<BuilderWorker> _builderSquad = new();
-
-        // FACTORY-FIRST: labour is NOT a scarce survival resource. Buildings run when built;
-        // "workers" are just a free per-building throughput dial (1..max) + NPC charm. This stays
-        // effectively unlimited so existing TryAssign / builder gates never block on population.
+        // FACTORY-FIRST: no workers/builders. Construction is INSTANT; buildings run themselves.
+        // Kept as inert API (always plentiful) so any legacy reference still compiles.
         public int FreeWorkers => 9999;
-
-        public void AddBuilder()
-        {
-            _builderManual = true;
-            if (Builders < MaxBuilders && FreeWorkers > 0) { Builders++; SyncSquad(); }
-        }
-
-        public void RemoveBuilder()
-        {
-            _builderManual = true;
-            if (Builders > 0) { Builders--; SyncSquad(); }
-        }
-
-        private void ManageBuilders()
-        {
-            if (!_builderManual)
-            {
-                int target = ConstructionSite.All.Count > 0 ? MaxBuilders : 0;
-                while (Builders < target) Builders++;   // factory-first: labour is free, not pop-gated
-                while (Builders > target && Builders > 0) Builders--;
-            }
-            SyncSquad();
-        }
-
-        private void SyncSquad()
-        {
-            _builderSquad.RemoveAll(b => b == null);
-            while (_builderSquad.Count < Builders) _builderSquad.Add(BuilderWorker.Spawn());
-            while (_builderSquad.Count > Builders)
-            {
-                var b = _builderSquad[_builderSquad.Count - 1];
-                _builderSquad.RemoveAt(_builderSquad.Count - 1);
-                if (b != null) Destroy(b.gameObject);
-            }
-        }
 
         void Awake() => Instance = this;
         void OnDestroy() { if (Instance == this) Instance = null; }
@@ -196,8 +137,6 @@ namespace Caveman
                     _lastRank = Rank;
                 }
             }
-
-            ManageBuilders();
         }
     }
 }

@@ -5,9 +5,10 @@ across ages (Stone → Tribal → Bronze → Iron → Industrial) into a self-ru
 Factorio, Satisfactory, Dyson Sphere Program.
 
 > **FACTORY-FIRST (current direction):** there is **no population / food / water / housing /
-> happiness** survival layer. The whole game is **gather → store → process → automate → research →
-> expand**. Buildings run when built & supplied; labour is free. See [GAME_DESIGN.md](GAME_DESIGN.md)
-> for the pivot rationale and the planned deeper age arc.
+> happiness AND no workers / staffing**. Every building is a **fully automated machine** that runs by
+> itself at a fixed rate once built & supplied, and **construction is INSTANT** (cost paid at
+> placement — no builder units). The whole game is **gather → store → process → automate → research →
+> expand**. See [GAME_DESIGN.md](GAME_DESIGN.md) for the pivot rationale and the planned deeper age arc.
 
 > **New thread / new machine? Start here, then read [GAME_DESIGN.md](GAME_DESIGN.md).**
 
@@ -41,18 +42,17 @@ logistics works, never *what* the loop is.
   created from a Station's panel; vehicles load → travel → unload).
 - **Resources** appear in natural **clusters** (groves/outcrops): small starter clusters → dense
   biome clusters. **Throughput ratios** are normalized to *1 lane = 60/min* (wooden belt 60,
-  conveyor 120, collector ≈60, standard machine eats 60 at 1 worker → "1 gatherer → 1 belt → 1
-  machine"). **Bottleneck cues:** belt red=dead-end / yellow=backed-up; depleting nodes grey out;
-  machine status dots + a `Needs X/min` panel line.
+  conveyor 120, collector 60, standard machine eats 60 → "1 collector → 1 belt → 1 machine").
+  **Bottleneck cues:** belt red=dead-end / yellow=backed-up; depleting nodes grey out; machine
+  status dots + a `Needs X/min` panel line.
 - **Placement/collision** water buildings need an adjacent water cell; belts can't sit on buildings;
-  the player collides with solid buildings (workers don't yet — pending pathfinding).
-- **Liquids** (distinct system) carried water (Water Hole) → **pipes + mechanical Pump** → direct
-  pipe-fed consumers + barrels → **pressure/range + Booster Pumps**. Water is a liquid: never on belts.
-- **Construction** logistics-driven (builders haul materials) — **build cost is paid up front** at
-  placement; **Construction Yards** scale the free builder cap.
-- **No survival layer (factory-first):** no food/water/population/housing/happiness. Buildings run
-  when built & supplied; **labour is free** — each collector/workshop has a 1..max worker *speed dial*
-  (+ NPC charm). Progress is measured by automation: **Industry** score + **Rank**; **Monument** = win.
+  the player collides with solid buildings.
+- **Liquids** (distinct system) Water Hole → **pipes + Pump** → pipe-fed consumers + barrels →
+  **pressure/range + Booster Pumps**. Water is a liquid: never on belts.
+- **No workers / no survival (factory-first):** no population/food/water/housing AND no workers or
+  staffing. Every building is a **fully automated machine** (fixed rate, runs itself once built &
+  supplied); **construction is INSTANT** (cost paid at placement). Progress is measured by
+  automation: **Industry** score + **Rank**; **Monument** = win.
 - **World/geography** biome `TerrainGrid` (Plains/Forest/Hills/Water); **water is a hard barrier**
   (no walking/building/belts) crossed by **Bridges**; **rivers** divide regions. Big world (~400 units),
   finite frontier **ore** out in the hills. Biomes now form large contiguous regions (smoothing pass).

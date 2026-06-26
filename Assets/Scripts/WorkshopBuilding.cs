@@ -4,18 +4,17 @@ using UnityEngine;
 namespace Caveman
 {
     /// <summary>
-    /// A processor: consumes input resources from the pool and produces an output
-    /// over time (a recipe). Needs assigned workers to run — more workers process
-    /// faster. Output accumulates in its buffer (counts toward the pool) and is
-    /// moved to storage by Transporters. The engine for all production chains.
+    /// A processor — a fully automated machine. Once built it runs by itself at a FIXED rate
+    /// (no workers): each processTime it consumes its recipe inputs (belt-fed InBuffer first, then
+    /// adjacent storage/machines) and adds the output to its Buffer. A full output Buffer or missing
+    /// inputs stall it (the BackedUp / Starved signals). The engine for all production chains.
     /// </summary>
-    public class WorkshopBuilding : MonoBehaviour, IStaffable
+    public class WorkshopBuilding : MonoBehaviour
     {
         public BuildingDefinition def;
         public ItemDefinition output;
         public int outputPerCycle = 1;
         public float processTime = 2.5f;
-        public int maxWorkers = 2;
         public List<ItemAmount> inputs = new();
         public Belt.Dir OutputSide = Belt.Dir.E; // belts pull output only from this side
 
@@ -23,14 +22,11 @@ namespace Caveman
         public Inventory InBuffer { get; private set; }     // inputs delivered by belts
         public bool Paused { get; private set; }            // player can halt it to free shared inputs
         public void TogglePause() => Paused = !Paused;
-        public int AssignedWorkers { get; private set; }
-        public int MaxWorkers => maxWorkers;
-        public string StaffLabel => def != null ? def.displayName : "Workshop";
 
         // Power (Industrial age): a running machine draws power; the grid's supply/demand
         // ratio scales its speed (brownouts) via Power.Factor.
         public int PowerDraw => def != null ? def.powerDraw : 0;
-        public bool DrawsPower => Power.Active && PowerDraw > 0 && AssignedWorkers > 0 && !Paused;
+        public bool DrawsPower => Power.Active && PowerDraw > 0 && !Paused; // runs automatically once built
 
         public static readonly List<WorkshopBuilding> All = new();
         private List<Vector2Int> _cells; // every grid cell this building occupies
@@ -71,7 +67,6 @@ namespace Caveman
             w.output = def.item;
             w.outputPerCycle = def.outputPerCycle;
             w.processTime = Mathf.Max(0.2f, def.interval);
-            w.maxWorkers = Mathf.Max(1, def.maxWorkers);
             w.inputs = def.inputs;
             w.Buffer = new Inventory { capacity = Mathf.Max(1, def.capacity) };
             w.InBuffer = new Inventory { capacity = 24 };
@@ -90,19 +85,6 @@ namespace Caveman
             if (_sr != null) _baseColor = _sr.color;
         }
 
-        public bool TryAssign()
-        {
-            if (AssignedWorkers >= maxWorkers) return false;
-            if (Colony.Instance == null || Colony.Instance.FreeWorkers <= 0) return false;
-            AssignedWorkers++;
-            return true;
-        }
-
-        public void Unassign()
-        {
-            if (AssignedWorkers > 0) AssignedWorkers--;
-        }
-
         /// <summary>Which recipe inputs are currently short (for the "waiting for X" panel hint).</summary>
         public string MissingText()
         {
@@ -119,18 +101,17 @@ namespace Caveman
             return missing.Count > 0 ? string.Join(", ", missing) : "";
         }
 
-        /// <summary>Per-input consumption at full speed (current workers, min 1) in items/min, so
-        /// the player can size belts/collectors against the 60/min lane. Theoretical — ignores
-        /// brownouts/productivity. e.g. a 1-worker Sawmill (wood 2, 2.0s) → "60 Wood/min".</summary>
+        /// <summary>Per-input consumption at the machine's fixed rate, in items/min, so the player can
+        /// size belts/collectors against the 60/min lane. Ignores brownouts. e.g. a Sawmill
+        /// (wood 2, 2.0s) → "60 Wood/min".</summary>
         public string InputDemandText()
         {
             if (inputs == null || inputs.Count == 0 || processTime <= 0f) return "";
-            int workers = Mathf.Max(1, AssignedWorkers);
             var parts = new List<string>();
             foreach (var c in inputs)
             {
                 if (c == null || c.item == null) continue;
-                float perMin = c.amount * (60f / processTime) * workers;
+                float perMin = c.amount * (60f / processTime);
                 parts.Add($"{perMin:0} {c.item.displayName}/min");
             }
             return parts.Count > 0 ? string.Join(", ", parts) : "";
@@ -239,11 +220,11 @@ namespace Caveman
             var carried = Colony.Instance != null ? Colony.Instance.carried : null;
             bool produced = false;
 
-            if (!Paused && AssignedWorkers > 0 && output != null && Buffer.Total() < Buffer.capacity)
+            if (!Paused && output != null && Buffer.Total() < Buffer.capacity)
             {
-                float prod = Colony.Instance != null ? Colony.Instance.Productivity : 1f;
+                float prod = Colony.Instance != null ? Colony.Instance.Productivity : 1f; // inert 1f now
                 float pw = Power.Active && PowerDraw > 0 ? Power.Factor : 1f; // brownouts slow machines
-                _timer += Time.deltaTime * AssignedWorkers * prod * pw; // more workers / well-fed / powered = faster
+                _timer += Time.deltaTime * prod * pw; // fixed rate (no workers); powered machines slow under brownout
                 if (_timer >= processTime)
                 {
                     if (CanMake(carried))
@@ -279,17 +260,18 @@ namespace Caveman
                 _rateTimer = 0f;
             }
 
-            bool working = AssignedWorkers > 0 && (produced || Buffer.Total() > 0);
+            bool working = produced || Buffer.Total() > 0;
             UpdateVisual(working);
             UpdateStatus();
         }
 
-        /// <summary>Live status colour (green/yellow/red/grey) — also drives minimap dots.</summary>
+        /// <summary>Live status colour (green working / yellow output-full / red missing-input /
+        /// grey paused) — also drives minimap dots.</summary>
         public Color StatusColor
         {
             get
             {
-                if (Paused || AssignedWorkers == 0) return Status.Idle;
+                if (Paused) return Status.Idle;
                 if (Buffer.Total() >= Buffer.capacity) return Status.BackedUp;
                 if (_starved) return Status.Starved;
                 return Status.Working;

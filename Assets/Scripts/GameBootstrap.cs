@@ -5,7 +5,7 @@ namespace Caveman
 {
     /// <summary>
     /// Builds the entire MVP scene in code so there's no Inspector wiring: camera,
-    /// player, Colony (population), a pre-placed Town Hall, resource/food patches,
+    /// player, Colony (age/Industry-score holder), resource patches,
     /// the build system, and the HUD. Add this component to one empty GameObject
     /// and press Play.
     /// </summary>
@@ -99,12 +99,12 @@ namespace Caveman
             var foragerHut = MakeCollector("Forager Hut", food, 1, 2.0f, 2, 12, new Color(0.78f, 0.40f, 0.40f),
                 new ItemAmount(wood, 4));
             foragerHut.autoStore = true; // SURVIVAL: its worker carries Food to the nearest Granary (no belt needed)
-            foragerHut.description = "Stone-age food: a worker gathers berries and CARRIES them to the nearest Granary (build one nearby so your colony has stored food to eat). No belt needed — survival comes before logistics. Outgrow the bushes and you'll push out to forage further afield.";
+            foragerHut.description = "Auto-gathers berries from a nearby bush at a fixed rate (no workers). Belt or place a Granary next to it to store the Food.";
             var waterHole = MakeCollector("Water Hole", water, 1, 2.0f, 2, 12, new Color(0.40f, 0.62f, 0.85f),
                 new ItemAmount(wood, 4));
             waterHole.fromWaterTerrain = true; // must sit next to real water terrain (river/lake)
             waterHole.autoStore = true; // SURVIVAL: its worker carries Water to the nearest Water Barrel (no belt/pipe needed)
-            waterHole.description = "Stone-age water: a worker draws from adjacent water terrain and CARRIES it to the nearest Water Barrel (build one nearby so your colony has stored water to drink). Adjacent buildings can also use it directly. No belt or pipe needed to drink — pipes (Bronze) are only for moving water FURTHER, later.";
+            waterHole.description = "Auto-draws Water from adjacent water terrain at a fixed rate (no workers). Adjacent buildings can use it directly; pipes (Bronze) move it further.";
             // Bridge: plank tile placed on water; makes it passable for feet + belts. Core
             // logistics infrastructure — strategic chokepoints across rivers.
             var bridge = ScriptableObject.CreateInstance<BuildingDefinition>();
@@ -154,11 +154,7 @@ namespace Caveman
             warehouse.footprintW = 2; warehouse.footprintH = 2; // TEST: first multi-cell building
             var house = MakeHousing("House", 2, new Color(0.72f, 0.62f, 0.45f),
                 new ItemAmount(wood, 8), new ItemAmount(stone, 4), new ItemAmount(planks, 3));
-            // Construction scaling: each yard adds builder capacity (you still need spare
-            // population + materials flowing). Build more to construct whole areas faster.
-            var buildYard = MakeBuildYard("Construction Yard", 3, 1, new Color(0.86f, 0.72f, 0.34f),
-                new ItemAmount(wood, 12), new ItemAmount(stone, 8));
-            buildYard.description = "Raises your builder cap by 3. Build more yards (and keep spare people) to construct faster — scaling construction is infrastructure, not a slider. Builders still haul materials from storage, so supply rate caps build speed.";
+            // (Construction is INSTANT now — no Construction Yard / builders.)
             // Long-distance logistics: depots + caravan routes (replaces the old haulers).
             var depot = ScriptableObject.CreateInstance<BuildingDefinition>();
             depot.displayName = "Station"; depot.kind = BuildingKind.Depot; depot.unlockAge = 0;
@@ -223,7 +219,7 @@ namespace Caveman
             fastBelt.interval = 0.5f; // 120 items/min — exactly 2× the wooden lane (the clean upgrade)
             fastBelt.color = new Color(0.72f, 0.63f, 0.40f);
             fastBelt.cost = new List<ItemAmount> { new ItemAmount(planks, 1) };
-            fastBelt.description = "The belt upgrade: 120/min — 2× the wooden lane. One conveyor carries two collectors' worth, or feeds a 2-worker machine on a single line.";
+            fastBelt.description = "The belt upgrade: 120/min — 2× the wooden lane. One conveyor carries two collectors' worth on a single line.";
             // Splitter: a 1→2 belt that distributes items EVENLY between two outputs. Lets one
             // supply line feed two machines. (Belt kind, flagged splitter — placed like a belt.)
             var splitter = ScriptableObject.CreateInstance<BuildingDefinition>();
@@ -283,8 +279,8 @@ namespace Caveman
 
             // --- Hand-written descriptions for buildings that need strategic context
             //     (everything else auto-generates a full tooltip from its data). ---
-            sawmill.description = "Wood → Planks. The baseline chain: a 1-worker Sawmill eats 60 Wood/min — exactly one Wood Hut down one belt (1 gatherer → 1 belt → 1 machine). Add a 2nd worker and it needs 120/min (a 2nd hut, or a conveyor).";
-            campfire.description = "Food + Wood + Water → Cooked Food (worth more nourishment). Your people's first comfort good. Needs workers + inputs delivered.";
+            sawmill.description = "Wood → Planks. The baseline chain: a Sawmill eats 60 Wood/min — exactly one Wood Hut down one belt (1 collector → 1 belt → 1 machine). Runs automatically once fed.";
+            campfire.description = "Food + Wood + Water → Cooked Food. Runs automatically once its inputs are delivered.";
             charcoalBurner.description = "Wood → Charcoal. Charcoal feeds BOTH the Kiln and the Smelter — scaling one can starve the other. A key shared-bottleneck.";
             kiln.description = "Clay + Charcoal → Bricks. Charcoal is shared with the Smelter, so watch that bottleneck. Bricks build advanced structures.";
             smelter.description = "Ore + Charcoal → Metal. Ore comes from distant Mines; Charcoal is shared with the Kiln. The backbone of the late game.";
@@ -387,7 +383,7 @@ namespace Caveman
               // Storage
               woodStore, stoneStore, clayStore, brickStore, oreStore, warehouse,
               // Infrastructure / power / endgame
-              buildYard, generator, monumentBldg };
+              generator, monumentBldg };
             // Transport vehicles are NOT in the build menu — they're created from a Station's panel.
             builder.routeTiers = new List<BuildingDefinition> { caravan, oxCart, wagonTrain, cargoDrone };
 
@@ -410,10 +406,7 @@ namespace Caveman
             // Research Lodge → spend points). No comfort/happiness demand sink any more.
             colony.comforts = new List<Colony.Comfort>();
 
-            // --- Town Hall (pre-placed, houses 3) ---
-            var townHallDef = MakeHousing("Town Hall", 5, new Color(0.60f, 0.50f, 0.70f));
-            var townHall = HousingBuilding.Spawn(townHallDef, new Vector2(0f, -1.6f));
-            townHall.isHQ = true; // builders are managed from here
+            // (No Town Hall / HQ / builders — factory-first: construction is instant, buildings auto-run.)
 
             // --- HUD ---
             var hud = new GameObject("HUD").AddComponent<InventoryHud>();
