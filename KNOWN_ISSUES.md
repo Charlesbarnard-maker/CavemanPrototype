@@ -3,7 +3,38 @@
 A running record so progress/problems don't get lost. Newest first. Move items to
 **Fixed** when done. Maintained alongside the code — see DESIGN.md for the roadmap.
 
-## New playtest feedback #17 — part 3: belt tier ladder + overlay-upgrade (2026-06-26) — most recent
+## New playtest feedback #17 — part 4: progression depth — ore split + per-age special-item/build gate (2026-06-26) — most recent
+The big one — the "Bronze came too quick / no new buildings" fix. 3-lens adversarial verify (compile +
+soft-lock + playability all PASS, 0 blockers). **NOT yet Unity-compiled.**
+- **5. Each age now REQUIRES building its new chain + crafting a special item (#5).** New `Research.Tech`
+  gate: an age node won't unlock until you've BUILT the required new building(s) AND delivered N of that
+  age's special research item — on top of the points. The panel shows what's missing:
+  `🔒 Bronze Age — 60 pts (build Copper Smelter · deliver Study Scroll 3/8)`. Engine: `Research.RequirementsMet`
+  /`HasBuilding`/`DeliveredByItem`/`MissingRequirementsText`; `CanBuy` extended; `InventoryHud.RenderNode`
+  shows the amber locked-reason. (Tribal is ungated — the opening stays quick.)
+- **5b. ORE SPLIT into a deeper metal tree (#5).** Generic ore/metal relabelled **Iron Ore → Iron**; a new
+  **Copper** branch added — Copper Ore (new finite deposits, guaranteed in the nearest expansion corridor +
+  Plains frontier) → Copper (new **Copper Smelter**) → **Bronze Plate** (new **Bronzeworks**), and **Steel**
+  (new **Steel Foundry**: Iron+Charcoal). "Smelter"→"Iron Smelter", "Mine"→"Iron Mine".
+- **5c. Multi-stage research chains (#5).** The age research items now pull from the new chain: Study Scroll
+  = **Copper**+Planks · Schematic = **Bronze Plate**+Pottery · Blueprint = **Steel**+Tools. So Bronze/Iron/
+  Industrial each demand a new resource + multi-stage processing. Gates: Bronze→Copper Smelter + 8 scrolls ·
+  Iron→Bronzeworks + 6 schematics · Industrial→Steel Foundry + 5 blueprints (counts are a floor below the
+  points-derived item count, so no extra grind). GAME_DESIGN spine + research table updated (also fixed the
+  stale 20/50/100/200 costs → 12/60/160/360).
+- **No circular locks (verified):** each age's new makers unlock in the PRIOR age (copper at Tribal,
+  bronzeworks at Bronze, steel foundry at Iron); gate items are research-tier items the Lodge accepts; copper
+  is on a guaranteed-carved corridor (no soft-lock). `Research.Reset` clears the new per-item delivery counts.
+- **Playtest watchpoints (from verify, all non-blocking):** (a) **Charcoal is now a 4-way shared bottleneck**
+  (Kiln + Copper/Iron Smelters + Steel Foundry) — the likeliest mid/late stall; scale Charcoal Burners.
+  (b) Copper is ~46u away (nearest guaranteed region) — a real trek before Bronze; shorten or lean on the
+  closer Plains-frontier copper if it walls. (c) Finite copper feeds the Bronze gate + ongoing Bronze Plates —
+  watch for late exhaustion forcing a 2nd copper region (intended expansion). (d) Counts (8/6/5) could rise
+  slightly for more "feel the chain" without becoming binding.
+- **Queued (per your call):** the Copper→Steel→**Space** NEW-AGE arc (beyond the 5 ages) · a Tin/true-bronze
+  alloy stage · the Station overhaul (#9) · and the owed real Unity compile + playtest of this whole #17 batch.
+
+## New playtest feedback #17 — part 3: belt tier ladder + overlay-upgrade (2026-06-26)
 Belt-balance slice. 2-lens adversarial verify (compile + logic PASS, 0 blockers). **NOT yet Unity-compiled.**
 - **6b. Wooden belt SLOWED to 30/min + a 4-tier ladder (#6).** Wooden 30 (½ a collector) → Conveyor 60 →
   Geared 120 → Steel 240 (intervals 2.0/1.0/0.5/0.25s). Each tier costs richer materials (wood → planks →

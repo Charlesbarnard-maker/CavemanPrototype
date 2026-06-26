@@ -40,16 +40,19 @@ keeps compiling — a later cleanup can remove it.)
 
 **Current production spine (✅ in game):**
 `Wood→Planks` (Sawmill) · `Wood→Charcoal` (Burner) · `Stone` · `Clay→Bricks` (Kiln, +Charcoal) ·
-`Clay→Pottery` (Potter) · `Ore→Metal` (Smelter, +Charcoal) · `Metal+Planks→Tools` (Toolmaker) ·
-Research: Idea Tablet→Study Scroll→Schematic→Blueprint · `Charcoal→Power` (Coal Generator) ·
-Monument (Metal+Tools+Bricks+Planks) = win.
+`Clay→Pottery` (Potter) · **metal tree (split):** `Copper Ore→Copper` (Copper Smelter, +Charcoal) ·
+`Copper+Bricks→Bronze Plate` (Bronzeworks) · `Iron Ore→Iron` (Iron Smelter, +Charcoal) ·
+`Iron+Charcoal→Steel` (Steel Foundry) · `Iron+Planks→Tools` (Toolmaker) · Research: Idea Tablet→
+Study Scroll(+Copper)→Schematic(+Bronze Plate)→Blueprint(+Steel) · `Charcoal→Power` (Coal Generator) ·
+Monument (Iron+Tools+Bricks+Planks) = win.  *(Charcoal is now a 4-way shared bottleneck — Kiln, Copper
+Smelter, Iron Smelter, Steel Foundry — the key scaling pressure to watch.)*
 
-**Planned deeper age arc (📝 next — structure already supports it):**
-`Stone → Copper/Bronze → Iron → Steel/Industrial → Electrical/Automation → Space → Beyond`.
-Add metal tiers (copper ore→copper ingot→wire; iron→steel) and component chains (gears, circuits,
-motors, science packs) feeding harder research items, with later milestones pointing at engines /
-rockets. Build these with the EXISTING item/recipe/collector/workshop/research systems — no new
-framework. Implement incrementally so the playable build never breaks.
+**Deeper age arc — material split ✅ (#17 part 4), new ages 📝 next:**
+The metal tree is now SPLIT (Copper→Bronze, Iron, Steel) and each age is GATED behind building that
+age's new chain + delivering its special research item (not just points). STILL PLANNED (📝): NEW ages
+beyond Industrial (`Electrical/Automation → Space → Beyond`), a Tin/true-bronze alloy stage, and
+component chains (gears, circuits, motors). Build on the EXISTING item/recipe/collector/workshop/
+research systems — no new framework; implement incrementally so the playable build never breaks.
 
 ---
 
@@ -68,12 +71,16 @@ no manual crafting — workshops need workers), so progress *requires* building 
 
 **Research tree (data-driven; append a Tier per future age):**
 
-| Tier | Advances | Research item | Recipe (maker, unlock) | Worth | Cost | ≈ items |
+| Tier | Advances | Research item | Recipe (maker, unlock) | Worth | Cost | Gate: build + deliver |
 |---|---|---|---|---|---|---|
-| 1 | Stone → Tribal | **Idea Tablet** | Planks + Stone (Idea Bench, age 0) | 1 pt | **20** | 20 |
-| 2 | Tribal → Bronze | **Study Scroll** | Charcoal + Planks (Scroll Maker, age 1) | 2 pt | **50** | 25 |
-| 3 | Bronze → Iron | **Schematic** | Bricks + Pottery (Drafting Table, age 2) | 3 pt | **100** | 33 |
-| 4 | Iron → Industrial | **Blueprint** | Metal + Tools (Engineering Lab, age 3) | 5 pt | **200** | 40 |
+| 1 | Stone → Tribal | **Idea Tablet** | Planks + Stone (Idea Bench, age 0) | 1 pt | **12** | — (opening stays quick) |
+| 2 | Tribal → Bronze | **Study Scroll** | **Copper** + Planks (Scroll Maker, age 1) | 2 pt | **60** | build **Copper Smelter** + deliver 8 |
+| 3 | Bronze → Iron | **Schematic** | **Bronze Plate** + Pottery (Drafting Table, age 2) | 4 pt | **160** | build **Bronzeworks** + deliver 6 |
+| 4 | Iron → Industrial | **Blueprint** | **Steel** + Tools (Engineering Lab, age 3) | 8 pt | **360** | build **Steel Foundry** + deliver 5 |
+
+Each age (from Bronze) is GATED behind **building that age's new processing chain AND delivering N of its
+special research item** — not just points — so advancing requires running a genuinely new chain (the
+"#17 part 4" depth pass). The age node shows what's missing (`🔒 build Copper Smelter · deliver Study Scroll 3/8`).
 
 - **Maker workshops are age-gated to the PRIOR age**, so the next item is craftable only once you
   reach the age before it — no circular locks. Each tier needs a deeper chain than the last

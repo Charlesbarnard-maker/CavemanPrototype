@@ -30,9 +30,15 @@ namespace Caveman
             var grain = MakeItem("grain", "Grain", new Color(0.86f, 0.76f, 0.36f));
             var flour = MakeItem("flour", "Flour", new Color(0.90f, 0.86f, 0.72f));
             var bread = MakeItem("bread", "Bread", new Color(0.80f, 0.58f, 0.30f)); bread.foodValue = 4;
-            var ore = MakeItem("ore", "Ore", new Color(0.62f, 0.58f, 0.42f)); // rare — found far from base
-            var metal = MakeItem("metal", "Metal", new Color(0.66f, 0.68f, 0.74f));
+            var ore = MakeItem("ore", "Iron Ore", new Color(0.62f, 0.58f, 0.42f)); // FINITE — far in the hills (Iron age)
+            var metal = MakeItem("metal", "Iron", new Color(0.66f, 0.68f, 0.74f)); // smelted from Iron Ore
             var tools = MakeItem("tools", "Tools", new Color(0.55f, 0.60f, 0.68f));
+            // ORE SPLIT (deeper material tree): metals now branch — Copper (nearer, Bronze age), Iron
+            // (far, Iron age), Steel (refined Iron, Industrial). Each age needs its own metal chain.
+            var copperOre = MakeItem("copper_ore", "Copper Ore", new Color(0.80f, 0.52f, 0.30f));
+            var copper = MakeItem("copper", "Copper", new Color(0.85f, 0.55f, 0.35f));
+            var bronzePlate = MakeItem("bronze_plate", "Bronze Plate", new Color(0.78f, 0.58f, 0.32f));
+            var steel = MakeItem("steel", "Steel", new Color(0.58f, 0.62f, 0.70f));
             var monument = MakeItem("monument", "Monument Block", new Color(0.90f, 0.86f, 0.62f)); // endgame
             // Textiles + pottery — parallel comfort-good chains that deepen the demand sink.
             var fiber = MakeItem("fiber", "Plant Fiber", new Color(0.62f, 0.74f, 0.45f));
@@ -52,9 +58,9 @@ namespace Caveman
             var schematic = MakeItem("schematic", "Schematic", new Color(0.55f, 0.72f, 0.88f));
             var blueprint = MakeItem("blueprint", "Blueprint", new Color(0.38f, 0.60f, 0.88f));
             ideaTablet.description = "RESEARCH item: Planks + Stone at an Idea Bench. Deliver to a Research Lodge to research the Tribal Age.";
-            studyScroll.description = "RESEARCH item: Charcoal + Planks at a Scroll Maker. Deliver to a Research Lodge to research the Bronze Age.";
-            schematic.description = "RESEARCH item: Bricks + Pottery at a Drafting Table. Deliver to a Research Lodge to research the Iron Age.";
-            blueprint.description = "RESEARCH item: Metal + Tools at an Engineering Lab. Deliver to a Research Lodge to research the Industrial Age.";
+            studyScroll.description = "RESEARCH item: Copper + Planks at a Scroll Maker. Deliver to a Research Lodge to research the Bronze Age.";
+            schematic.description = "RESEARCH item: Bronze Plate + Pottery at a Drafting Table. Deliver to a Research Lodge to research the Iron Age.";
+            blueprint.description = "RESEARCH item: Steel + Tools at an Engineering Lab. Deliver to a Research Lodge to research the Industrial Age.";
 
             // --- Item descriptions (shown in the in-game Guide, key G) ---
             wood.description = "The starter resource — chop it from trees. Used by nearly every building, and refined into Planks and Charcoal.";
@@ -70,10 +76,14 @@ namespace Caveman
             grain.description = "A Farm grows Grain from Water. Milled into Flour.";
             flour.description = "A Mill grinds Grain into Flour. Baked into Bread.";
             bread.description = "A Bakery bakes Flour + Water into Bread — high nourishment, and a Bronze comfort good.";
-            ore.description = "Mined from FINITE veins far from base. Smelted into Metal. Its scarcity drives exploration.";
-            metal.description = "A Smelter melts Ore + Charcoal into Metal — the backbone of Tools and the Monument.";
-            tools.description = "A Toolmaker crafts Metal + Planks into Tools — needed for Blueprints (Industrial-Age research) and the Monument.";
-            monument.description = "Built at the Monument from Metal + Tools + Bricks + Planks. Collect 10 Blocks to WIN the game.";
+            ore.description = "IRON ORE — mined from FINITE veins far in the hills. Smelted into Iron. Its scarcity drives Iron-age exploration.";
+            metal.description = "IRON — a Smelter melts Iron Ore + Charcoal into Iron. The backbone of Tools, Steel and the Monument.";
+            tools.description = "A Toolmaker crafts Iron + Planks into Tools — needed for Blueprints (Industrial-Age research) and the Monument.";
+            monument.description = "Built at the Monument from Iron + Tools + Bricks + Planks. Collect 10 Blocks to WIN the game.";
+            copperOre.description = "COPPER ORE — the first metal ore, from copper deposits in the nearest expansion region. Smelted into Copper (the Bronze-age chain).";
+            copper.description = "COPPER — a Copper Smelter melts Copper Ore + Charcoal into Copper. Feeds Study Scrolls (Bronze research) and Bronze Plates.";
+            bronzePlate.description = "BRONZE PLATE — a Bronzeworks presses Copper + Bricks into a plate. A deeper part needed to research the Iron Age (Schematics).";
+            steel.description = "STEEL — a Steel Foundry forges Iron + Charcoal into Steel. The hardest metal; needed to research the Industrial Age (Blueprints).";
             fiber.description = "Plant Fiber harvested from Cotton fields (Cotton Farm). Woven into Cloth.";
             cloth.description = "A Weaver turns Fiber into Cloth. Tailored into Clothes.";
             clothes.description = "A Tailor sews Cloth into Clothes — an Industrial luxury comfort good.";
@@ -255,12 +265,12 @@ namespace Caveman
 
             // Exploration payoff: Ore is mined from distant veins, hauled home, and is
             // required to reach the Iron Age.
-            var mine = MakeCollector("Mine", ore, 1, 2.5f, 2, 12, new Color(0.50f, 0.48f, 0.40f),
+            var mine = MakeCollector("Iron Mine", ore, 1, 2.5f, 2, 12, new Color(0.50f, 0.48f, 0.40f),
                 new ItemAmount(wood, 6), new ItemAmount(stone, 4)); mine.unlockAge = 1;
             var oreStore = MakeStorage("Ore Stockpile", ore, 100, new Color(0.52f, 0.50f, 0.42f),
                 new ItemAmount(wood, 8)); oreStore.unlockAge = 1;
             // Smelting: Ore + Charcoal -> Metal (charcoal is shared with the Kiln -> cascade).
-            var smelter = MakeWorkshop("Smelter", metal, 1, 3.5f, 2, 12, new Color(0.55f, 0.50f, 0.50f),
+            var smelter = MakeWorkshop("Iron Smelter", metal, 1, 3.5f, 2, 12, new Color(0.55f, 0.50f, 0.50f),
                 new List<ItemAmount> { new ItemAmount(ore, 1), new ItemAmount(charcoal, 1) },
                 new ItemAmount(stone, 10), new ItemAmount(clay, 6)); smelter.unlockAge = 2;
             smelter.footprintW = 2; smelter.footprintH = 2; // TEST: multi-cell workshop
@@ -268,6 +278,25 @@ namespace Caveman
             var toolmaker = MakeWorkshop("Toolmaker", tools, 1, 4.0f, 2, 12, new Color(0.50f, 0.55f, 0.60f),
                 new List<ItemAmount> { new ItemAmount(metal, 1), new ItemAmount(planks, 1) },
                 new ItemAmount(planks, 8), new ItemAmount(bricks, 6)); toolmaker.unlockAge = 3;
+            // --- DEEPER METAL TREE (ore split): a new processing chain GATES each later age. ---
+            // Copper (Bronze): a NEW, nearer ore + smelter — the first metal, gating the Bronze Age.
+            var copperMine = MakeCollector("Copper Mine", copperOre, 1, 2.5f, 2, 12, new Color(0.78f, 0.52f, 0.32f),
+                new ItemAmount(wood, 6), new ItemAmount(stone, 4)); copperMine.unlockAge = 1;
+            copperMine.description = "Build ON a Copper Deposit (in the nearest expansion region). Copper Ore is FINITE — the start of the metal chain, and the key to the Bronze Age.";
+            var copperSmelter = MakeWorkshop("Copper Smelter", copper, 1, 3.0f, 2, 12, new Color(0.80f, 0.50f, 0.34f),
+                new List<ItemAmount> { new ItemAmount(copperOre, 1), new ItemAmount(charcoal, 1) },
+                new ItemAmount(stone, 8), new ItemAmount(clay, 4)); copperSmelter.unlockAge = 1;
+            copperSmelter.description = "Copper Ore + Charcoal → Copper. The FIRST smelter — build it and feed it copper to reach the Bronze Age. (Charcoal is shared with the Kiln/Iron Smelter later.)";
+            // Bronzeworks (Bronze): Copper + Bricks → Bronze Plate — a deeper part gating the Iron Age.
+            var bronzeworks = MakeWorkshop("Bronzeworks", bronzePlate, 1, 3.5f, 2, 12, new Color(0.76f, 0.56f, 0.34f),
+                new List<ItemAmount> { new ItemAmount(copper, 1), new ItemAmount(bricks, 1) },
+                new ItemAmount(bricks, 6), new ItemAmount(stone, 6)); bronzeworks.unlockAge = 2;
+            bronzeworks.description = "Copper + Bricks → Bronze Plate. A Bronze-age part — Schematics (Iron-age research) now require Bronze Plates, so build this to advance.";
+            // Steel Foundry (Iron): Iron + Charcoal → Steel — gating the Industrial Age.
+            var steelFoundry = MakeWorkshop("Steel Foundry", steel, 1, 4.0f, 2, 12, new Color(0.56f, 0.60f, 0.68f),
+                new List<ItemAmount> { new ItemAmount(metal, 1), new ItemAmount(charcoal, 1) },
+                new ItemAmount(bricks, 10), new ItemAmount(metal, 6)); steelFoundry.unlockAge = 3;
+            steelFoundry.description = "Iron + Charcoal → Steel. The hardest metal — Blueprints (Industrial-age research) now require Steel, so build this to advance.";
             // Power: the Industrial age's new constraint. The Coal Generator burns Charcoal
             // to supply electrical power; from the Industrial age machines need it (or they
             // brown out and slow down). Unlocks in Iron so you can prepare before it bites.
@@ -307,9 +336,9 @@ namespace Caveman
             campfire.description = "Food + Wood + Water → Cooked Food. Runs automatically once its inputs are delivered.";
             charcoalBurner.description = "Wood → Charcoal. Charcoal feeds BOTH the Kiln and the Smelter — scaling one can starve the other. A key shared-bottleneck.";
             kiln.description = "Clay + Charcoal → Bricks. Charcoal is shared with the Smelter, so watch that bottleneck. Bricks build advanced structures.";
-            smelter.description = "Ore + Charcoal → Metal. Ore comes from distant Mines; Charcoal is shared with the Kiln. The backbone of the late game.";
-            toolmaker.description = "Metal + Planks → Tools. Tools are an Iron-age comfort good your people demand — and gate the Industrial Age.";
-            mine.description = "Build ON a distant Ore Vein. Ore is FINITE — veins deplete and vanish, so you must keep exploring outward and hauling it home.";
+            smelter.description = "Iron Ore + Charcoal → Iron. Iron Ore comes from distant Mines; Charcoal is shared with the Kiln. The backbone of the late game (and Steel).";
+            toolmaker.description = "Iron + Planks → Tools. Tools feed Blueprints (Industrial-age research) and the Monument.";
+            mine.description = "Build ON a distant Iron Ore vein (the far Hills). Iron Ore is FINITE — veins deplete and vanish, so keep exploring outward and hauling it home.";
             gemMine.description = "Build ON a far Gem Deposit (the rarest, finite resource). Gems → Jewelry. Reaching them rewards exploration + good transport.";
             jeweler.description = "Gems → Jewelry, a high-value luxury good. Pairs with long-haul routes to bring distant gems home.";
             monumentBldg.description = "ENDGAME: pour Metal + Tools + Bricks + Planks in to produce Monument Blocks. Make 10 to WIN. A massive, sustained resource sink.";
@@ -329,17 +358,17 @@ namespace Caveman
                 new ItemAmount(wood, 6), new ItemAmount(stone, 4)); // age 0 — first research chain
             ideaBench.description = "Planks + Stone → Idea Tablet (a RESEARCH item). The first research chain: feed it from a Sawmill + Stone Pit, then belt the Tablets to a Research Lodge to reach the Tribal Age.";
             var scrollMaker = MakeWorkshop("Scroll Maker", studyScroll, 1, 2.0f, 2, 12, new Color(0.84f, 0.78f, 0.50f),
-                new List<ItemAmount> { new ItemAmount(charcoal, 1), new ItemAmount(planks, 1) },
+                new List<ItemAmount> { new ItemAmount(copper, 1), new ItemAmount(planks, 1) },
                 new ItemAmount(wood, 8), new ItemAmount(stone, 6)); scrollMaker.unlockAge = 1;
-            scrollMaker.description = "Charcoal + Planks → Study Scroll (a RESEARCH item). Research the Bronze Age. Charcoal is also shared with the Smelter/Kiln later — a real chain to scale.";
+            scrollMaker.description = "Copper + Planks → Study Scroll (a RESEARCH item) to research the Bronze Age. Copper means you must first build a Copper Mine + Copper Smelter — the Bronze Age now demands a real new chain.";
             var draftingTable = MakeWorkshop("Drafting Table", schematic, 1, 2.5f, 2, 12, new Color(0.52f, 0.66f, 0.82f),
-                new List<ItemAmount> { new ItemAmount(bricks, 1), new ItemAmount(pot, 1) },
+                new List<ItemAmount> { new ItemAmount(bronzePlate, 1), new ItemAmount(pot, 1) },
                 new ItemAmount(planks, 6), new ItemAmount(bricks, 4)); draftingTable.unlockAge = 2;
-            draftingTable.description = "Bricks + Pottery → Schematic (a RESEARCH item). Research the Iron Age. Needs two Bronze chains (Kiln + Potter) feeding it — scaling research now means scaling your factory.";
+            draftingTable.description = "Bronze Plate + Pottery → Schematic (a RESEARCH item) to research the Iron Age. Needs a Bronzeworks (Copper + Bricks) feeding it — a deeper multi-stage chain.";
             var engineeringLab = MakeWorkshop("Engineering Lab", blueprint, 1, 3.0f, 2, 12, new Color(0.40f, 0.56f, 0.82f),
-                new List<ItemAmount> { new ItemAmount(metal, 1), new ItemAmount(tools, 1) },
+                new List<ItemAmount> { new ItemAmount(steel, 1), new ItemAmount(tools, 1) },
                 new ItemAmount(planks, 8), new ItemAmount(metal, 4)); engineeringLab.unlockAge = 3;
-            engineeringLab.description = "Metal + Tools → Blueprint (a RESEARCH item). Research the Industrial Age — the deepest chain (Smelter + Toolmaker), so the final unlock demands a real factory.";
+            engineeringLab.description = "Steel + Tools → Blueprint (a RESEARCH item) to research the Industrial Age — the deepest chain (Steel Foundry + Toolmaker), so the final unlock demands a real factory.";
 
             // Tiers = which research item the Lodge consumes at each age + its point value (later
             // items are worth more because their chains are deeper).
@@ -356,9 +385,9 @@ namespace Caveman
             Research.Tree = new List<Research.Tech>
             {
                 new Research.Tech { id = "tribal",     name = "Tribal Age",     cost = 12,  advanceToAge = 1, prereq = null,     desc = "Advance to the Tribal Age — Charcoal & Clay open up deeper production." },
-                new Research.Tech { id = "bronze",     name = "Bronze Age",     cost = 60,  advanceToAge = 2, prereq = "tribal", desc = "Advance to the Bronze Age — Kiln & Bricks, Pottery, the start of smelting." },
-                new Research.Tech { id = "iron",       name = "Iron Age",       cost = 160, advanceToAge = 3, prereq = "bronze", desc = "Advance to the Iron Age — Ore mining, Metal smelting, Toolmaking." },
-                new Research.Tech { id = "industrial", name = "Industrial Age", cost = 360, advanceToAge = 4, prereq = "iron",   desc = "Advance to the Industrial Age — Power, the Monument, the endgame." },
+                new Research.Tech { id = "bronze",     name = "Bronze Age",     cost = 60,  advanceToAge = 2, prereq = "tribal", requiredBuildings = new List<BuildingDefinition>{ copperSmelter }, gateItem = studyScroll, gateItemCount = 8, desc = "Advance to the Bronze Age — but first BUILD a Copper Smelter and deliver Study Scrolls (now made from Copper + Planks)." },
+                new Research.Tech { id = "iron",       name = "Iron Age",       cost = 160, advanceToAge = 3, prereq = "bronze", requiredBuildings = new List<BuildingDefinition>{ bronzeworks },   gateItem = schematic,   gateItemCount = 6, desc = "Advance to the Iron Age — but first BUILD a Bronzeworks and deliver Schematics (now made from Bronze Plate + Pottery)." },
+                new Research.Tech { id = "industrial", name = "Industrial Age", cost = 360, advanceToAge = 4, prereq = "iron",   requiredBuildings = new List<BuildingDefinition>{ steelFoundry },  gateItem = blueprint,   gateItemCount = 5, desc = "Advance to the Industrial Age — but first BUILD a Steel Foundry and deliver Blueprints (now made from Steel + Tools)." },
                 new Research.Tech { id = "splitters",   name = "Splitters",     cost = 15,  prereq = "tribal", unlocks = new List<BuildingDefinition>{ splitter },   desc = "Unlocks the 1→2 Splitter — feed two machines from one supply line." },
                 // The belt-upgrade ladder: a cheap EARLY first rung (the wooden belt is deliberately
                 // slow), then deeper tiers gated by age so faster belts pace your factory's growth.
@@ -403,9 +432,9 @@ namespace Caveman
             // NOT offered — the game is now a pure production/automation loop.
             builder.buildables = new List<BuildingDefinition>
             { // Gather
-              woodHut, stonePit, clayPit, mine,
-              // Process
-              sawmill, charcoalBurner, kiln, potter, smelter, toolmaker,
+              woodHut, stonePit, clayPit, copperMine, mine,
+              // Process — incl. the deeper metal chain (copper → bronze → steel) that gates each age
+              sawmill, charcoalBurner, kiln, potter, copperSmelter, smelter, bronzeworks, toolmaker, steelFoundry,
               // Research
               ideaBench, scrollMaker, draftingTable, engineeringLab, researchLodge,
               // Logistics — belt tier ladder (wooden→conveyor→geared→steel) + junctions + transport
@@ -453,7 +482,7 @@ namespace Caveman
             hud.monumentItem = monument;
             // Factory-relevant items only (shown in the Guide reference + the "Goods" chip + F1 dump).
             hud.debugItems = new List<ItemDefinition>
-            { wood, stone, planks, charcoal, clay, bricks, pot, ore, metal, tools, monument };
+            { wood, stone, planks, charcoal, clay, bricks, pot, copperOre, copper, bronzePlate, ore, metal, steel, tools, monument };
 
             // --- Guided objectives ladder (the "what next / why advance" hook) ---
             var carriedInv = gatherer.Inventory;
@@ -476,13 +505,14 @@ namespace Caveman
                 new Quest { title = "Automate it: lay 5 belts to feed a machine",     done = () => Belt.Count >= 5,         reward = () => carriedInv.Add(wood, 20),   rewardText = "+20 Wood" },
                 new Quest { title = "Research the Tribal Age",                        done = () => AgeNow() >= 1,           reward = () => carriedInv.Add(stone, 25),  rewardText = "+25 Stone" },
                 new Quest { title = "Make 10 Charcoal (build a Charcoal Burner)",     done = () => Have(charcoal) >= 10,    reward = () => carriedInv.Add(planks, 10), rewardText = "+10 Planks" },
+                new Quest { title = "Build the Copper chain: a Copper Mine + Copper Smelter", done = () => HasWorkshopOf(copper), reward = () => carriedInv.Add(copper, 8), rewardText = "+8 Copper" },
                 new Quest { title = "Research the Bronze Age",                        done = () => AgeNow() >= 2,           reward = () => carriedInv.Add(stone, 30),  rewardText = "+30 Stone" },
                 new Quest { title = "Fire 15 Bricks (Clay + Charcoal → Kiln)",        done = () => Have(bricks) >= 15,      reward = () => carriedInv.Add(clay, 20),   rewardText = "+20 Clay" },
                 new Quest { title = "Build 2 Stations & add a transport route",       done = () => RouteVehicle.All.Count >= 1, reward = () => carriedInv.Add(wood, 30), rewardText = "+30 Wood" },
                 new Quest { title = "Research the Iron Age",                          done = () => AgeNow() >= 3,           reward = () => carriedInv.Add(planks, 40), rewardText = "+40 Planks" },
-                new Quest { title = "Explore far & mine 25 Ore",                      done = () => Have(ore) >= 25,         reward = () => carriedInv.Add(stone, 40),  rewardText = "+40 Stone" },
-                new Quest { title = "Smelt 20 Metal (Ore + Charcoal → Smelter)",      done = () => Have(metal) >= 20,       reward = () => carriedInv.Add(planks, 20), rewardText = "+20 Planks" },
-                new Quest { title = "Craft 10 Tools (Metal + Planks → Toolmaker)",    done = () => Have(tools) >= 10,       reward = () => carriedInv.Add(planks, 30), rewardText = "+30 Planks" },
+                new Quest { title = "Explore far & mine 25 Iron Ore",                 done = () => Have(ore) >= 25,         reward = () => carriedInv.Add(stone, 40),  rewardText = "+40 Stone" },
+                new Quest { title = "Smelt 20 Iron (Iron Ore + Charcoal → Smelter)",  done = () => Have(metal) >= 20,       reward = () => carriedInv.Add(planks, 20), rewardText = "+20 Planks" },
+                new Quest { title = "Craft 10 Tools (Iron + Planks → Toolmaker)",     done = () => Have(tools) >= 10,       reward = () => carriedInv.Add(planks, 30), rewardText = "+30 Planks" },
                 new Quest { title = "Research the Industrial Age",                    done = () => AgeNow() >= 4,           reward = () => carriedInv.Add(planks, 50), rewardText = "+50 Planks" },
                 new Quest { title = "Power up: build a Coal Generator",               done = () => PowerPlant.All.Count >= 1, reward = () => carriedInv.Add(metal, 10), rewardText = "+10 Metal" },
                 new Quest { title = "Reach 600 Industry (automation score)",          done = () => Colony.Instance != null && Colony.Instance.PeakProsperity >= 600, reward = () => carriedInv.Add(tools, 10), rewardText = "+10 Tools" },
@@ -520,10 +550,12 @@ namespace Caveman
                 TerrainGrid.Paint(new Vector3(center.x, center.y, 0f), 16f, biome);
                 place(center);
             }
-            // Corridor 0 — nearest: a PLAINS region with CLAY — the first expansion (Bronze chain).
+            // Corridor 0 — nearest: a PLAINS region with CLAY + COPPER — the first expansion (Bronze chain).
             Region(0, 46f, Terrain.Plains, c => {
                 SpawnClusters("Clay", clay, new Color(0.68f, 0.46f, 0.36f), PlaceholderArt.Hexagon(),
                     c, 7f, 3, 4, 6, 2.4f, new Vector2(1.0f, 1.5f), 40, 1, 0f);
+                SpawnClusters("Copper Deposit", copperOre, new Color(0.80f, 0.52f, 0.30f), PlaceholderArt.Hexagon(),
+                    c, 8f, 2, 3, 5, 2.6f, new Vector2(1.0f, 1.5f), 60, 0, 0f); // finite — the Bronze-age metal
             });
             // Corridor 1 — a FOREST region: DENSE lumber groves so Wood scales by expanding.
             Region(1, 72f, Terrain.Forest, c => {
@@ -534,7 +566,7 @@ namespace Caveman
             Region(2, 86f, Terrain.Hills, c => {
                 SpawnClusters("Rock", stone, new Color(0.55f, 0.55f, 0.6f), PlaceholderArt.Hexagon(),
                     c, 11f, 3, 5, 8, 3.0f, new Vector2(1.0f, 1.6f), 35, 1, 0f);
-                SpawnClusters("Ore Vein", ore, new Color(0.62f, 0.58f, 0.42f), PlaceholderArt.Hexagon(),
+                SpawnClusters("Iron Ore Vein", ore, new Color(0.62f, 0.58f, 0.42f), PlaceholderArt.Hexagon(),
                     c, 11f, 2, 4, 6, 2.8f, new Vector2(1.1f, 1.6f), 80, 0, 0f); // finite
             });
 
@@ -553,11 +585,13 @@ namespace Caveman
                 Terrain.Forest, 11, 5, 8, 3.2f, 50f, 35, 1, new Vector2(1.0f, 1.6f));
             SpawnClustersInBiome("Rock", stone, new Color(0.55f, 0.55f, 0.6f), PlaceholderArt.Hexagon(),
                 Terrain.Hills, 10, 5, 7, 3.0f, 50f, 35, 1, new Vector2(1.0f, 1.6f));
-            SpawnClustersInBiome("Ore Vein", ore, new Color(0.62f, 0.58f, 0.42f), PlaceholderArt.Hexagon(),
+            SpawnClustersInBiome("Iron Ore Vein", ore, new Color(0.62f, 0.58f, 0.42f), PlaceholderArt.Hexagon(),
                 Terrain.Hills, 6, 4, 6, 2.8f, 55f, 80, 0, new Vector2(1.1f, 1.6f)); // finite
-            // Clay is the FIRST expansion target — just outside the basin (minClear 26).
+            // Clay + Copper are the FIRST expansion targets — just outside the basin (Bronze chain).
             SpawnClustersInBiome("Clay", clay, new Color(0.68f, 0.46f, 0.36f), PlaceholderArt.Hexagon(),
                 Terrain.Plains, 6, 3, 4, 2.4f, 26f, 40, 1, new Vector2(1.0f, 1.5f));
+            SpawnClustersInBiome("Copper Deposit", copperOre, new Color(0.80f, 0.52f, 0.30f), PlaceholderArt.Hexagon(),
+                Terrain.Plains, 5, 2, 4, 2.6f, 30f, 60, 0, new Vector2(1.0f, 1.5f)); // finite — Bronze metal
 
             // Bake the biome map into its visual now that resource cells have been cleared.
             TerrainGrid.SpawnRenderer();

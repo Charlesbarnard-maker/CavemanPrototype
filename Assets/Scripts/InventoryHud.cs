@@ -1102,6 +1102,10 @@ namespace Caveman
                     var pre = Research.Node(n.prereq);
                     GUILayout.Label($"<size=13><color=#888>🔒 {n.name} — {n.cost} pts <i>(needs {(pre != null ? pre.name : n.prereq)})</i></color></size>", _small);
                 }
+                else if (!Research.RequirementsMet(n)) // prereq + points may be fine, but the new chain isn't built/run yet
+                {
+                    GUILayout.Label($"<size=13><color=#fc8>🔒 {n.name} — {n.cost} pts <i>({Research.MissingRequirementsText(n)})</i></color></size>", _small);
+                }
                 else if (Research.CanBuy(n))
                 {
                     if (GUILayout.Button($"<size=13><b>{n.name}</b> — {n.cost} pts  <color=#9f9>✦ Research</color></size>", _btn))

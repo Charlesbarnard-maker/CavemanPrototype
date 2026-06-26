@@ -30,11 +30,21 @@ namespace Caveman
             public int advanceToAge = -1;        // if ≥0, buying advances the colony to this age
             public List<BuildingDefinition> unlocks = new(); // buildings this tech enables
             public bool purchased;
+            // STRUCTURAL GATE: buildings that must be BUILT in the world before this node can be bought
+            // (so advancing an age REQUIRES building that age's new processing chain, not just points).
+            public List<BuildingDefinition> requiredBuildings = new();
+            // ...and a SPECIAL ITEM that must actually be CRAFTED + delivered N times (so you can't fund
+            // an age with stockpiled cheap items — you must run that age's new chain). 0 = no item gate.
+            public ItemDefinition gateItem;
+            public int gateItemCount;
         }
         public static List<Tech> Tree = new();
 
         public static int Points;          // spendable pool
         public static int TotalDelivered;  // lifetime research items delivered (stat/objective)
+        // Lifetime count delivered PER item — drives the per-age "deliver N of the special item" gate.
+        public static Dictionary<ItemDefinition, int> DeliveredByItem = new();
+        public static int DeliveredOf(ItemDefinition i) => i != null && DeliveredByItem.TryGetValue(i, out var c) ? c : 0;
 
         private static int Age => Colony.Instance != null ? Colony.Instance.Age : 0;
 
@@ -96,6 +106,8 @@ namespace Caveman
             if (ppi <= 0 || count <= 0) return 0;
             Points += ppi * count;
             TotalDelivered += count;
+            DeliveredByItem.TryGetValue(item, out var have);
+            DeliveredByItem[item] = have + count; // track per-item for the age gate
             return count;
         }
 
@@ -113,7 +125,44 @@ namespace Caveman
             return n != null && n.purchased;
         }
         public static bool PrereqMet(Tech n) => n != null && (string.IsNullOrEmpty(n.prereq) || IsPurchased(n.prereq));
-        public static bool CanBuy(Tech n) => n != null && !n.purchased && PrereqMet(n) && Points >= n.cost;
+
+        /// <summary>Is at least one instance of `def` built in the world? (the structural-gate check)</summary>
+        public static bool HasBuilding(BuildingDefinition def)
+        {
+            if (def == null) return true;
+            foreach (var w in WorkshopBuilding.All) if (w != null && w.def == def) return true;
+            foreach (var p in ProductionBuilding.All) if (p != null && p.def == def) return true;
+            foreach (var r in ResearchBuilding.All) if (r != null && r.def == def) return true;
+            foreach (var s in StorageBuilding.All) if (s != null && s.def == def) return true;
+            return false;
+        }
+
+        /// <summary>All of this tech's structural requirements met: every required building exists AND
+        /// the gate item has been delivered enough times (true if none required).</summary>
+        public static bool RequirementsMet(Tech n)
+        {
+            if (n == null) return false;
+            if (n.requiredBuildings != null)
+                foreach (var d in n.requiredBuildings) if (!HasBuilding(d)) return false;
+            if (n.gateItem != null && DeliveredOf(n.gateItem) < n.gateItemCount) return false;
+            return true;
+        }
+
+        /// <summary>The unmet structural requirements as readable text (buildings to build + the special
+        /// item still owed), for the locked-node UI. Empty when everything's satisfied.</summary>
+        public static string MissingRequirementsText(Tech n)
+        {
+            if (n == null) return "";
+            var parts = new List<string>();
+            if (n.requiredBuildings != null)
+                foreach (var d in n.requiredBuildings)
+                    if (d != null && !HasBuilding(d)) parts.Add($"build {d.displayName}");
+            if (n.gateItem != null && DeliveredOf(n.gateItem) < n.gateItemCount)
+                parts.Add($"deliver {n.gateItem.displayName} {DeliveredOf(n.gateItem)}/{n.gateItemCount}");
+            return string.Join(" · ", parts);
+        }
+
+        public static bool CanBuy(Tech n) => n != null && !n.purchased && PrereqMet(n) && RequirementsMet(n) && Points >= n.cost;
 
         public static bool Buy(Tech n)
         {
@@ -131,6 +180,7 @@ namespace Caveman
             Tree = new List<Tech>();
             Points = 0;
             TotalDelivered = 0;
+            DeliveredByItem = new Dictionary<ItemDefinition, int>();
         }
     }
 }
