@@ -446,7 +446,7 @@ namespace Caveman
                 new Quest { title = "Gather 12 Wood by hand",            done = () => Have(wood) >= 12,      reward = () => carriedInv.Add(stone, 8),  rewardText = "+8 Stone" },
                 new Quest { title = "Build a Forager Hut for food",      done = () => HasCollectorOf(food),  reward = () => carriedInv.Add(food, 20),  rewardText = "+20 Food" },
                 new Quest { title = "Build a Water Hole + a Water Barrel beside it", done = () => HasCollectorOf(water) && HasStorageOf(water), reward = () => carriedInv.Add(water, 20), rewardText = "+20 Water" },
-                new Quest { title = "Build a Sawmill, an Idea Bench & a Research Lodge", done = () => HasWorkshopOf(planks) && HasWorkshopOf(ideaTablet) && ResearchBuilding.All.Count > 0, reward = () => carriedInv.Add(stone, 12), rewardText = "+12 Stone" },
+                new Quest { title = "Build a Sawmill, Idea Bench & Research Lodge (place them side by side)", done = () => HasWorkshopOf(planks) && HasWorkshopOf(ideaTablet) && ResearchBuilding.All.Count > 0, reward = () => carriedInv.Add(stone, 12), rewardText = "+12 Stone" },
                 new Quest { title = "Deliver your first Idea Tablet to research", done = () => Research.TotalDelivered >= 1, reward = () => carriedInv.Add(planks, 8), rewardText = "+8 Planks" },
                 new Quest { title = "Grow your settlement to 8 people",  done = () => Pop() >= 8,            reward = () => carriedInv.Add(wood, 25),  rewardText = "+25 Wood" },
                 new Quest { title = "Advance to the Tribal Age",         done = () => AgeNow() >= 1,         reward = () => carriedInv.Add(stone, 25), rewardText = "+25 Stone" },
@@ -533,7 +533,8 @@ namespace Caveman
             // --- Welcome / starter guidance (fades after a few seconds) ---
             Toast.Show("<color=#ffd24d>Welcome, chief!</color>  Click trees & rocks to gather by hand.");
             Toast.Show("<size=15>Goal: grow from caveman to a self-running civilisation — build the Monument to win.</size>");
-            Toast.Show("<size=14><color=#9cf>Progress = RESEARCH:</color> build a Sawmill + an <b>Idea Bench</b> (Planks+Stone → Idea Tablet), belt Tablets to a <b>Research Lodge</b>, then press <b>T</b> to spend points & advance.</size>");
+            Toast.Show("<size=14><color=#ffd24d>Key idea:</color> place machines RIGHT NEXT TO each other and they feed their neighbours automatically — no belts needed. Belts are only for connecting things far apart.</size>");
+            Toast.Show("<size=14><color=#9cf>Progress = RESEARCH:</color> cluster a Sawmill + <b>Idea Bench</b> (Planks+Stone → Idea Tablet) + a <b>Research Lodge</b> side by side, then press <b>T</b> to spend points & advance.</size>");
             Toast.Show("<size=14>Press <b>H</b> help · <b>G</b> Guide · <b>B</b> build · <b>T</b> research tree · follow the Objectives (top-right).</size>");
 
             // --- BIOME FRONTIER: each region's resources live in DENSE clusters, so a biome is a
