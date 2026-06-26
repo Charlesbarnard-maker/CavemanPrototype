@@ -3,7 +3,27 @@
 A running record so progress/problems don't get lost. Newest first. Move items to
 **Fixed** when done. Maintained alongside the code — see DESIGN.md for the roadmap.
 
-## System throughput / coherence pass (2026-06-25 #12) — most recent
+## Scale & player-pressure design pass (2026-06-25 #13) — most recent
+Evaluated how the factory FEELS at small/medium/large scale (not numbers). Finding: the systems
+already create strong scaling pressure (local production → logistics, depletion → expansion,
+shared intermediates → cascades, escalating research/comfort). The weak spot was **LABOR** — the
+dominant *soft* bottleneck at scale was the least visible and the most tedious to manage.
+- **FIXED — labor scarcity now visible:** the status-bar bottleneck summary counts idle
+  (unpaused, unstaffed) buildings: "⚪ N idle — press J to staff / grow population". Turns a
+  hidden wall ("why did my factory stop?") into a clear, actionable pressure (it's people, not
+  logistics). Completes the 3 failure modes on the dashboard: starved / backed-up / idle.
+- **FIXED — staffing tedium:** one-shot **J** = staff every idle building from the free pool.
+  No more clicking 100 buildings after a population gain. LIMITED workers stay the real
+  constraint (the J toast tells you to grow population when none are free).
+- **Watch (left as-is, design calls):** (a) **pause does NOT free the worker** — a paused
+  building still holds its labour, so pause isn't a reallocation lever (use −worker for that);
+  making pause release labour would turn it into a clean priority tool (future). (b)
+  `EnforceAssignment` unassigns COLLECTORS before workshops when over-staffed, so a starvation
+  crunch can pull workers off food gathering first and accelerate a death-spiral — protect
+  production collectors first if it bites in play. (c) belt-laying at large scale is still manual
+  (no blueprint/copy-region) — inherent genre friction, deferred.
+
+## System throughput / coherence pass (2026-06-25 #12)
 Audited every core rate against the canonical **1 lane = 60/min** baseline. Good news: the
 baseline is **genuinely coherent at the default 1 worker** (collectors auto-assign 1 on place):
 - Belts: wooden 1.0s = 60/min, conveyor 0.5s = 120/min (clean 2×). ✓
