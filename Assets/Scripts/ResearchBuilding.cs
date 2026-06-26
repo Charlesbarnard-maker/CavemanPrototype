@@ -37,8 +37,9 @@ namespace Caveman
             if (_cells != null) foreach (var c in _cells) WorldGrid.Remove(WorldGrid.Research, c, this);
         }
 
-        /// <summary>True if this item is the one currently being researched (so a belt may deliver it).</summary>
-        public bool Accepts(ItemDefinition i) => i != null && i == Research.CurrentItem;
+        /// <summary>True for ANY research item (so belts can keep feeding the Lodge for building-unlock
+        /// nodes and at the final age — not just the next age's item).</summary>
+        public bool Accepts(ItemDefinition i) => Research.IsResearchItem(i);
 
         public static ResearchBuilding Spawn(BuildingDefinition def, Vector3 pos, Belt.Dir outputSide = Belt.Dir.E)
         {
@@ -84,37 +85,37 @@ namespace Caveman
             return _neighbours;
         }
 
-        // Pull one of the current research item from an adjacent storage / workshop / collector.
-        private bool AdjacentConsume(ItemDefinition item)
+        // Take ONE of any research item from this Lodge's InBuffer (belt-fed), else an adjacent
+        // storage / workshop / collector. Returns the item consumed, or null if none available.
+        private ItemDefinition ConsumeOneResearchItem()
         {
+            ItemDefinition found = null;
+            foreach (var kv in InBuffer.Items)
+                if (kv.Value > 0 && Research.IsResearchItem(kv.Key)) { found = kv.Key; break; }
+            if (found != null) { InBuffer.RemoveUpTo(found, 1); return found; }
+
             foreach (var nc in Neighbours())
             {
-                if (WorldGrid.Storages.TryGetValue(nc, out var s) && s != null && s.accepts == item && s.Store.RemoveUpTo(item, 1) > 0) return true;
-                if (WorldGrid.Workshops.TryGetValue(nc, out var w) && w != null && w.output == item && w.Buffer.RemoveUpTo(item, 1) > 0) return true;
-                if (WorldGrid.Collectors.TryGetValue(nc, out var p) && p != null && p.produces == item && p.Buffer.RemoveUpTo(item, 1) > 0) return true;
+                if (WorldGrid.Storages.TryGetValue(nc, out var s) && s != null && Research.IsResearchItem(s.accepts) && s.Store.RemoveUpTo(s.accepts, 1) > 0) return s.accepts;
+                if (WorldGrid.Workshops.TryGetValue(nc, out var w) && w != null && Research.IsResearchItem(w.output) && w.Buffer.RemoveUpTo(w.output, 1) > 0) return w.output;
+                if (WorldGrid.Collectors.TryGetValue(nc, out var p) && p != null && Research.IsResearchItem(p.produces) && p.Buffer.RemoveUpTo(p.produces, 1) > 0) return p.produces;
             }
-            return false;
+            return null;
         }
 
         void Update()
         {
-            var item = Research.CurrentItem;
-
             _timer += Time.deltaTime;
             if (_timer >= interval)
             {
                 _timer = 0f;
-                if (item != null)
+                var consumed = ConsumeOneResearchItem();
+                if (consumed != null)
                 {
-                    int ppi = Mathf.Max(1, Research.PointsPerItem); // value BEFORE delivering
-                    // Belt-delivered first, then an adjacent storage/machine.
-                    bool got = InBuffer.RemoveUpTo(item, 1) > 0 || AdjacentConsume(item);
-                    if (got)
-                    {
-                        Research.Deliver(item, 1);
-                        _pointsWindow += ppi; // accumulate POINTS for the throughput readout
-                        _flash = 0.3f;
-                    }
+                    int ppi = Research.PointsFor(consumed);
+                    Research.Deliver(consumed, 1);
+                    _pointsWindow += ppi; // accumulate POINTS for the throughput readout
+                    _flash = 0.3f;
                 }
             }
 
@@ -136,7 +137,7 @@ namespace Caveman
         {
             get
             {
-                if (Research.Complete) return Status.Idle;          // nothing left to research
+                if (Research.AllResearched) return Status.Idle;     // every tech bought — truly done
                 if (InBuffer.Total() > 0) return Status.Working;    // has items to convert
                 return Status.Starved;                              // waiting for research items
             }

@@ -68,12 +68,33 @@ namespace Caveman
         }
 
         // --- Delivery (points IN) ---
-        /// <summary>Deliver `count` research items — only the CURRENT tier's item earns points.</summary>
+        /// <summary>Is this an item the Lodge converts to points (ANY tier's item, not just the
+        /// current age's)? Lets you keep earning points for building-unlock nodes and at the final
+        /// age — fixes the soft-lock where only the next age's item was accepted.</summary>
+        public static bool IsResearchItem(ItemDefinition item)
+        {
+            if (item == null) return false;
+            foreach (var t in Tiers) if (t.item == item) return true;
+            return false;
+        }
+
+        /// <summary>Points awarded per unit of this research item (0 if it isn't a research item).</summary>
+        public static int PointsFor(ItemDefinition item)
+        {
+            if (item != null) foreach (var t in Tiers) if (t.item == item) return Mathf.Max(1, t.pointsPerItem);
+            return 0;
+        }
+
+        /// <summary>Every tech node purchased — nothing left to research.</summary>
+        public static bool AllResearched { get { foreach (var n in Tree) if (!n.purchased) return false; return true; } }
+
+        /// <summary>Deliver `count` research items — ANY tier's item earns its point value, so you can
+        /// always fund building-unlock nodes (and keep earning at the final age).</summary>
         public static int Deliver(ItemDefinition item, int count = 1)
         {
-            var t = CurrentTier;
-            if (t == null || item == null || item != t.item || count <= 0) return 0;
-            Points += t.pointsPerItem * count;
+            int ppi = PointsFor(item);
+            if (ppi <= 0 || count <= 0) return 0;
+            Points += ppi * count;
             TotalDelivered += count;
             return count;
         }
