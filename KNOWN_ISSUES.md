@@ -14,9 +14,17 @@ Acting on the deep multi-agent systems audit. **Recompile.**
   DemolishSelected` now dumps a building's Buffer/InBuffer/Store/depot.store into the player's (unlimited)
   carried inventory before Destroy, then refunds half the build cost as before. No more losing a full
   Warehouse/Station/smelter to an accidental X/Delete.
-- **Remaining cleanup batches (queued):** delete the dead legacy layer (ConstructionYard / TransportHub /
-  Transporter / Housing + their enum kinds & wirings; Colony pop/comfort API; maxWorkers; shelved food /
-  liquids / comfort chains), gate the sandbox F-key footer, add a static-registry reset, raise ore searchRadius.
+- **Part 2 (done):** stripped `Colony`'s population/comfort/worker API (Population, FreeWorkers, Comfort,
+  Happiness, UnmetComforts, Capacity, DebugAddPopulation, SetStartingPopulation) + the inert `Productivity`
+  multiplier coupling in ProductionBuilding/WorkshopBuilding.
+- **Part 3 (done):** DELETED the dead worker/population classes — `HousingBuilding`, `ConstructionYard`,
+  `TransportHub`, `Transporter` (4 files) — plus their `BuildingKind` enum values (Housing/Logistics/Build),
+  `BuildingDefinition` fields (houseCapacity/builderSlots/mechanical/logisticsRange), the GameBootstrap
+  helpers + housing defs, and every wiring (SpawnFinished cases, BuildController GetComponents, InventoryHud
+  selected-panel/minimap/hover/Describe/Cats branches). Adversarial compile-check PASS, 0 dangling refs.
+- **Remaining cleanup (queued):** shelved food/liquids/comfort chains (items + makers + `Economy.FoodPoints`
+  + Pipe/WaterPump); the inert `maxWorkers` field (high-touch param threading); gate the sandbox F-key footer;
+  static-registry reset (F42); raise ore searchRadius (F10/F41); F3 debug age-desync (F37).
 
 ## #17 playtest FIXES — fair-share input stall + building reach indicator (2026-06-26)
 First real Unity playtest of #17 surfaced two issues; root-caused by a diagnostic workflow, fixed + 2-lens

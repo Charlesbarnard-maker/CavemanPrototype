@@ -189,15 +189,13 @@ namespace Caveman
             if (Selected == null) return;
             var pb = Selected.GetComponent<ProductionBuilding>();
             var sb = Selected.GetComponent<StorageBuilding>();
-            var hb = Selected.GetComponent<HousingBuilding>();
             var wb = Selected.GetComponent<WorkshopBuilding>();
             var dpo = Selected.GetComponent<Depot>();
             var pp = Selected.GetComponent<PowerPlant>();
-            var cy = Selected.GetComponent<ConstructionYard>();
             var wp = Selected.GetComponent<WaterPump>();
             var rb = Selected.GetComponent<ResearchBuilding>();
-            BuildingDefinition def = pb != null ? pb.def : sb != null ? sb.def : hb != null ? hb.def
-                : wb != null ? wb.def : dpo != null ? dpo.def : pp != null ? pp.def : cy != null ? cy.def
+            BuildingDefinition def = pb != null ? pb.def : sb != null ? sb.def
+                : wb != null ? wb.def : dpo != null ? dpo.def : pp != null ? pp.def
                 : wp != null ? wp.def : rb != null ? rb.def : null;
             if (def == null) return;
             int idx = buildables.IndexOf(def);
@@ -533,11 +531,9 @@ namespace Caveman
             {
                 if (h == null) continue;
                 if (h.GetComponent<ProductionBuilding>() || h.GetComponent<StorageBuilding>()
-                    || h.GetComponent<HousingBuilding>() || h.GetComponent<WorkshopBuilding>()
-                    || h.GetComponent<TransportHub>() || h.GetComponent<Depot>()
-                    || h.GetComponent<PowerPlant>() || h.GetComponent<ConstructionYard>()
-                    || h.GetComponent<WaterPump>() || h.GetComponent<ResearchBuilding>()
-                    || h.GetComponent<ConstructionSite>()) return true;
+                    || h.GetComponent<WorkshopBuilding>() || h.GetComponent<Depot>()
+                    || h.GetComponent<PowerPlant>() || h.GetComponent<WaterPump>()
+                    || h.GetComponent<ResearchBuilding>() || h.GetComponent<ConstructionSite>()) return true;
             }
             return false;
         }
@@ -814,17 +810,14 @@ namespace Caveman
 
             var pb = Selected.GetComponent<ProductionBuilding>();
             var sb = Selected.GetComponent<StorageBuilding>();
-            var hb = Selected.GetComponent<HousingBuilding>();
             var wb = Selected.GetComponent<WorkshopBuilding>();
-            var th = Selected.GetComponent<TransportHub>();
             var dpo = Selected.GetComponent<Depot>();
             var pp = Selected.GetComponent<PowerPlant>();
-            var cy = Selected.GetComponent<ConstructionYard>();
             var wp = Selected.GetComponent<WaterPump>();
             var rsb = Selected.GetComponent<ResearchBuilding>();
-            BuildingDefinition rdef = pb != null ? pb.def : sb != null ? sb.def : hb != null ? hb.def
-                : wb != null ? wb.def : th != null ? th.def : dpo != null ? dpo.def : pp != null ? pp.def
-                : cy != null ? cy.def : wp != null ? wp.def : rsb != null ? rsb.def : null;
+            BuildingDefinition rdef = pb != null ? pb.def : sb != null ? sb.def
+                : wb != null ? wb.def : dpo != null ? dpo.def : pp != null ? pp.def
+                : wp != null ? wp.def : rsb != null ? rsb.def : null;
             if (rdef == null) return;
 
             // Return any stored/buffered goods to the player's hands so demolishing never SILENTLY
@@ -865,12 +858,9 @@ namespace Caveman
             if (hit == null) return null;
             bool isBuilding = hit.GetComponent<ProductionBuilding>() != null
                               || hit.GetComponent<StorageBuilding>() != null
-                              || hit.GetComponent<HousingBuilding>() != null
                               || hit.GetComponent<WorkshopBuilding>() != null
-                              || hit.GetComponent<TransportHub>() != null
                               || hit.GetComponent<Depot>() != null
                               || hit.GetComponent<PowerPlant>() != null
-                              || hit.GetComponent<ConstructionYard>() != null
                               || hit.GetComponent<WaterPump>() != null
                               || hit.GetComponent<ResearchBuilding>() != null
                               || hit.GetComponent<Bridge>() != null

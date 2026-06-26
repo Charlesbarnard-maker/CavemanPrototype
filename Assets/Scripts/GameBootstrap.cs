@@ -162,8 +162,6 @@ namespace Caveman
             var warehouse = MakeStorage("Warehouse", null, 120, new Color(0.55f, 0.52f, 0.45f),
                 new ItemAmount(wood, 10)); warehouse.configurable = true;
             warehouse.footprintW = 2; warehouse.footprintH = 2; // TEST: first multi-cell building
-            var house = MakeHousing("House", 2, new Color(0.72f, 0.62f, 0.45f),
-                new ItemAmount(wood, 8), new ItemAmount(stone, 4), new ItemAmount(planks, 3));
             // (Construction is INSTANT now — no Construction Yard / builders.)
             // Long-distance logistics: depots + caravan routes (replaces the old haulers).
             var depot = ScriptableObject.CreateInstance<BuildingDefinition>();
@@ -194,8 +192,6 @@ namespace Caveman
                 new ItemAmount(wood, 8)); clayStore.unlockAge = 1;
             var smokehouse = MakeStorage("Smokehouse", meat, 100, new Color(0.55f, 0.32f, 0.30f),
                 new ItemAmount(wood, 8), new ItemAmount(stone, 2)); smokehouse.unlockAge = 1;
-            var longhouse = MakeHousing("Longhouse", 5, new Color(0.66f, 0.56f, 0.42f),
-                new ItemAmount(wood, 14), new ItemAmount(planks, 6)); longhouse.unlockAge = 1;
 
             // --- Age 2: Bronze ---
             var kiln = MakeWorkshop("Kiln", bricks, 1, 3.5f, 2, 12, new Color(0.70f, 0.42f, 0.34f),
@@ -216,8 +212,6 @@ namespace Caveman
             var mason = MakeWorkshop("Mason", stoneBlock, 1, 3.0f, 2, 12, new Color(0.58f, 0.60f, 0.66f),
                 new List<ItemAmount> { new ItemAmount(stone, 2) },
                 new ItemAmount(wood, 6), new ItemAmount(stone, 4)); mason.unlockAge = 2;
-            var stoneHouse = MakeHousing("Stone House", 6, new Color(0.62f, 0.64f, 0.70f),
-                new ItemAmount(stoneBlock, 6), new ItemAmount(planks, 4)); stoneHouse.unlockAge = 2;
             // BELT TIER LADDER (each ~2× the last; overlay a faster tier on a slower belt to upgrade
             // in place — no need to delete). Wooden is a deliberately SLOW starter (½ a collector's
             // output) so upgrading belts is an early, meaningful goal: Wooden 30 → Conveyor 60 →
@@ -712,30 +706,6 @@ namespace Caveman
             return def;
         }
 
-        // A construction yard: raises the builder cap by `slots` (scales construction).
-        private static BuildingDefinition MakeBuildYard(string name, int slots, int unlockAge, Color color, params ItemAmount[] cost)
-        {
-            var def = ScriptableObject.CreateInstance<BuildingDefinition>();
-            def.displayName = name;
-            def.kind = BuildingKind.Build;
-            def.builderSlots = slots;
-            def.unlockAge = unlockAge;
-            def.color = color;
-            def.cost = new List<ItemAmount>(cost);
-            return def;
-        }
-
-        private static BuildingDefinition MakeLogistics(string name, int maxWorkers, Color color, params ItemAmount[] cost)
-        {
-            var def = ScriptableObject.CreateInstance<BuildingDefinition>();
-            def.displayName = name;
-            def.kind = BuildingKind.Logistics;
-            def.maxWorkers = maxWorkers;
-            def.color = color;
-            def.cost = new List<ItemAmount>(cost);
-            return def;
-        }
-
         private static BuildingDefinition MakeRoute(string name, int capacity, float speed, int unlockAge, Color color, params ItemAmount[] cost)
         {
             var def = ScriptableObject.CreateInstance<BuildingDefinition>();
@@ -756,17 +726,6 @@ namespace Caveman
             def.displayName = name;
             def.kind = BuildingKind.Research;
             def.unlockAge = unlockAge;
-            def.color = color;
-            def.cost = new List<ItemAmount>(cost);
-            return def;
-        }
-
-        private static BuildingDefinition MakeHousing(string name, int houseCapacity, Color color, params ItemAmount[] cost)
-        {
-            var def = ScriptableObject.CreateInstance<BuildingDefinition>();
-            def.displayName = name;
-            def.kind = BuildingKind.Housing;
-            def.houseCapacity = houseCapacity;
             def.color = color;
             def.cost = new List<ItemAmount>(cost);
             return def;

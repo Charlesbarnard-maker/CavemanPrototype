@@ -147,12 +147,9 @@ namespace Caveman
             switch (def.kind)
             {
                 case BuildingKind.Storage: StorageBuilding.Spawn(def, pos, outDir); break;
-                case BuildingKind.Housing: HousingBuilding.Spawn(def, pos); break;
                 case BuildingKind.Workshop: WorkshopBuilding.Spawn(def, pos, outDir); break;
-                case BuildingKind.Logistics: TransportHub.Spawn(def, pos); break;
                 case BuildingKind.Depot: Depot.Spawn(def, pos); break;
                 case BuildingKind.Power: PowerPlant.Spawn(def, pos); break;
-                case BuildingKind.Build: ConstructionYard.Spawn(def, pos); break;
                 case BuildingKind.Pump: WaterPump.Spawn(def, pos); break;
                 case BuildingKind.Research: ResearchBuilding.Spawn(def, pos, outDir); break;
                 default: ProductionBuilding.Spawn(def, pos, outDir); break;

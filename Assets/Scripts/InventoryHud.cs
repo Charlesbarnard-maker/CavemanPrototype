@@ -63,8 +63,7 @@ namespace Caveman
         {
             ("Production", new[] { BuildingKind.Collector, BuildingKind.Workshop, BuildingKind.Power, BuildingKind.Research }),
             ("Logistics", new[] { BuildingKind.Belt, BuildingKind.Bridge, BuildingKind.Pipe, BuildingKind.Pump, BuildingKind.Depot }),
-            ("Infrastructure", new[] { BuildingKind.Build, BuildingKind.Storage }),
-            ("Settlement", new[] { BuildingKind.Housing }),
+            ("Infrastructure", new[] { BuildingKind.Storage }),
         };
         private static bool InGroup(BuildingKind[] kinds, BuildingKind k) => System.Array.IndexOf(kinds, k) >= 0;
 
@@ -412,7 +411,6 @@ namespace Caveman
             // backed-up (yellow) buildings stand out across a sprawling base.
             foreach (var p in ProductionBuilding.All) if (p != null) Dot(p.transform.position, p.StatusColor, 4f);
             foreach (var wk in WorkshopBuilding.All) if (wk != null) Dot(wk.transform.position, wk.StatusColor, 4f);
-            foreach (var h in HousingBuilding.All) if (h != null) Dot(h.transform.position, new Color(0.62f, 0.5f, 0.72f), 4f);
             if (gatherer != null) Dot(gatherer.transform.position, new Color(0.96f, 0.85f, 0.2f), 6f);
 
             // Legend so the dot colours are self-explanatory.
@@ -535,12 +533,8 @@ namespace Caveman
             if (sb != null) return $"<size=13><b>{NameOf(sb.def)}</b>  <color=#bbb>{(sb.accepts != null ? sb.accepts.displayName : "empty")}</color></size>";
             var dp = hit.GetComponent<Depot>();
             if (dp != null) return $"<size=13><b>{NameOf(dp.def)}</b>  <color=#bbb>{(dp.item != null ? dp.item.displayName : "empty")}</color></size>";
-            var hb = hit.GetComponent<HousingBuilding>();
-            if (hb != null) return $"<size=13><b>{NameOf(hb.def)}</b></size>";
             var pp = hit.GetComponent<PowerPlant>();
             if (pp != null) return "<size=13><b>Power Plant</b></size>";
-            var cy = hit.GetComponent<ConstructionYard>();
-            if (cy != null) return "<size=13><b>Construction Yard</b></size>";
             var wp = hit.GetComponent<WaterPump>();
             if (wp != null) return wp.isBooster
                 ? "<size=13><b>Booster Pump</b>  <color=#bbb>re-pressurises pipes</color></size>"
@@ -732,8 +726,6 @@ namespace Caveman
                     return def.configurable
                         ? $"Warehouse — stores ONE resource you pick (set it in its panel); good for Planks, Charcoal, etc. Holds {def.capacity}.{age}"
                         : $"Stores {Name(def.item)} (up to {def.capacity}). Belt output here; if it fills up, production backs up.{age}";
-                case BuildingKind.Housing:
-                    return $"A structure (no effect in the factory build).{age}";
                 case BuildingKind.Belt:
                     return $"Conveyor — carries items one cell in the way it faces ({(def.interval <= 0.6f ? "fast tier" : "slow tier")}). Click/drag to lay a line, R to rotate. Feeds storage or workshop inputs.{age}";
                 case BuildingKind.Depot:
@@ -760,16 +752,13 @@ namespace Caveman
             GUILayout.BeginArea(new Rect(rect.x + 12, rect.y + 10, rect.width - 24, rect.height - 20));
 
             var sb = sel.GetComponent<StorageBuilding>();
-            var hb = sel.GetComponent<HousingBuilding>();
             var wb = sel.GetComponent<WorkshopBuilding>();
             var cs = sel.GetComponent<ConstructionSite>();
             var dp = sel.GetComponent<Depot>();
             var pbSel = sel.GetComponent<ProductionBuilding>();
             var resB = sel.GetComponent<ResearchBuilding>();
-            var th = sel.GetComponent<TransportHub>();
             string name = wb != null ? wb.def.displayName : pbSel != null ? pbSel.def.displayName
-                : th != null && th.def != null ? th.def.displayName
-                : sb != null ? sb.def.displayName : hb != null ? hb.def.displayName
+                : sb != null ? sb.def.displayName
                 : dp != null ? dp.def.displayName : resB != null ? resB.def.displayName
                 : cs != null ? cs.def.displayName : "Building";
             GUILayout.Label($"<b>{name}</b>", _s);
@@ -805,17 +794,10 @@ namespace Caveman
                     GUILayout.Label($"<size=12><color=#f66>⚠ Waiting for: {miss}</color>  <size=10>(deliver via belt or adjacent storage)</size></size>", _small);
             }
 
-            if (wb != null || pbSel != null || th != null)
+            if (wb != null || pbSel != null)
             {
-                // Buildings run automatically (no workers). Controls = pause + (transport) priority.
-                if (th != null)
-                {
-                    if (th.mechanical) GUILayout.Label("<size=14>Automatic conveyor</size>", _small);
-                    string pn = th.priorityItem != null ? th.priorityItem.displayName : "Any";
-                    if (GUILayout.Button($"<size=12>Haul priority: {pn}</size>", _btn)) th.CyclePriority();
-                }
-
-                // Pause toggle — halt this machine to free a shared input for another (priorities).
+                // Buildings run automatically (no workers). Pause toggle — halt this machine to free
+                // a shared input for another (priorities).
                 if (wb != null || pbSel != null)
                 {
                     bool isPaused = wb != null ? wb.Paused : pbSel.Paused;
@@ -922,10 +904,6 @@ namespace Caveman
                     GUILayout.Label("<size=11><color=#bbb>Belt the research item here (or place it beside a stock). Spend points in the tree (T).</color></size>", _small);
                 }
                 else GUILayout.Label("<size=13><color=#9f9>✔ All research complete</color></size>", _small);
-            }
-            else if (hb != null)
-            {
-                GUILayout.Label("<size=14>Structure</size>", _small);
             }
             else if (cs != null)
             {
@@ -1243,8 +1221,6 @@ namespace Caveman
                 if (s.accepts != null && s.accepts.id == itemId) return true;
             return false;
         }
-
-        private static int HousingCount() => HousingBuilding.All.Count;
 
         private static string Name(ItemDefinition item) => item != null ? item.displayName : "?";
 

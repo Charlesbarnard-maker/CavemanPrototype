@@ -20,16 +20,13 @@ namespace Caveman
 
     public enum BuildingKind
     {
-        Collector, // auto-harvests a nearby resource patch (needs workers assigned)
+        Collector, // auto-harvests a nearby resource patch (fully automatic — no workers)
         Storage,   // holds a large amount of one resource type
-        Housing,   // raises the population cap
         Workshop,  // converts input resources into an output (a recipe)
-        Logistics, // (legacy) houses transporters that carry goods between buildings
         Belt,      // a directional conveyor segment placed on the grid
         Depot,     // a long-distance transfer station (route endpoint)
         Route,     // a tool: link two depots with a caravan vehicle
         Power,     // a generator: burns fuel to supply electrical power (Industrial age)
-        Build,     // a construction yard: raises the builder cap (scales construction)
         Bridge,    // a plank tile placed on water to make it passable (feet + belts)
         Pipe,      // a liquid-network segment (continuous flow, not items)
         Pump,      // draws water from adjacent water terrain into the pipe network
@@ -54,14 +51,6 @@ namespace Caveman
         public int maxWorkers = 2;
         [Tooltip("Workshop only: input resources consumed per cycle to make `item`.")]
         public List<ItemAmount> inputs = new();
-
-        [Header("Housing")]
-        [Tooltip("How many people this houses (adds to population cap).")]
-        public int houseCapacity = 0;
-
-        [Header("Construction")]
-        [Tooltip("Construction Yard: extra builders this adds to the cap (needs spare population to fill).")]
-        public int builderSlots = 0;
 
         [Header("Footprint")]
         [Tooltip("Building width in grid cells (1 = a single cell).")]
@@ -102,10 +91,6 @@ namespace Caveman
         public int powerOutput = 0;
 
         [Header("Logistics")]
-        [Tooltip("Transport that runs WITHOUT a worker (a conveyor / wooden roller).")]
-        public bool mechanical = false;
-        [Tooltip("How far a transport hub's carriers will travel to serve a source.")]
-        public float logisticsRange = 14f;
         [Tooltip("Route vehicles only: travel speed (cart < caravan < train < drone).")]
         public float vehicleSpeed = 3.5f;
 
