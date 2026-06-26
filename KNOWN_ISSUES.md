@@ -3,7 +3,30 @@
 A running record so progress/problems don't get lost. Newest first. Move items to
 **Fixed** when done. Maintained alongside the code — see DESIGN.md for the roadmap.
 
-## Multi-input deadlock FIX + early-flow ease (2026-06-25 #10) — most recent
+## Full logic & flow sweep + research soft-lock FIX (2026-06-25 #11) — most recent
+A correctness audit of all systems (crafting, economy, logistics, liquids, power, terrain,
+research, colony, construction). Most systems verified **correct** — no item loss/dup, no
+divide-by-zero, no claim leaks, no infinite loops. Findings:
+- **FIXED — Research soft-lock.** The Research Lodge only accepted/credited the NEXT age's
+  research item (`CurrentItem`). At the final age `CurrentItem` is null → no more points could
+  be earned → any building-unlock node (Splitters/Conveyors/Pipes) not bought by then was
+  permanently unaffordable; and items belt-fed right after an age advance were consumed for 0
+  points (wasted). Now the Lodge accepts/credits **any** research item at its tier's value
+  (`Research.IsResearchItem`/`PointsFor`; `Deliver` reworked; `ResearchBuilding.Accepts`/consume
+  widened; status uses `AllResearched`). `CurrentItem` still drives the "craft this next" hint.
+- **Multi-input crafting/storage CONFIRMED OK.** Shared InBuffer (24) fair-shares per input
+  (`24/#inputs`); every recipe fits (widest is the 4-input Monument → 6 each ≥ needed). Belts
+  deliver each input on any non-output side; `CanMake`/`ConsumeInputs` source InBuffer→adjacent.
+- **Investigated, NOT bugs:** (a) Pump booster beyond range — by design a booster must be within
+  the pump's pressure range to relay; resetting cells with no incoming pressure would be
+  water-from-nowhere. (b) Configurable warehouse capacity edge only matters if `def.capacity==0`,
+  which never happens (all storages set positive capacity). (c) Splitter even-ness skews under
+  one-sided blockage — intended fallback, no item loss.
+- **Watchpoints (tuning, not bugs):** solid collector output is only usable once a belt drains it
+  to storage (manual gather bootstraps the start) — intended "stored, not summoned", but a steep
+  early requirement; and a mid-size colony can hover just under the growth food threshold.
+
+## Multi-input deadlock FIX + early-flow ease (2026-06-25 #10)
 - **BUG FIXED: Idea Bench (any multi-input workshop) stuck "waiting for stone".** The shared
   `InBuffer` (24 total across all types) could be entirely filled by the faster/first-arriving
   input, leaving no room for the other → permanent starve while the missing item backed up on its
