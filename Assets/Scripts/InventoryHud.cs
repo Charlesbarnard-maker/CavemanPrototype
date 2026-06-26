@@ -127,7 +127,7 @@ namespace Caveman
                     if (p != null && p.StatusColor == Status.BackedUp)
                     {
                         _collectorTipShown = true;
-                        Toast.Show("<color=#ffd24d>💡 Tip:</color> a collector's output piles up and stops until you BELT it out — drag a belt from its green output arrow into a Storage so your colony can actually use what it gathers.");
+                        Toast.Show("<color=#ffd24d>💡 Tip:</color> a collector's output piles up until something USES it. Easiest: place a workshop right NEXT TO it — machines pull from their neighbours, no belt needed. To stock a Storage (for building/survival), belt it in from the green output arrow.");
                         break;
                     }
             }
