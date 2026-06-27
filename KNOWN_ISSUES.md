@@ -3,7 +3,49 @@
 A running record so progress/problems don't get lost. Newest first. Move items to
 **Fixed** when done. Maintained alongside the code — see DESIGN.md for the roadmap.
 
-## #22 Splitter is now 1→3 (was 1→2) (2026-06-27) — most recent
+## #23 SYSTEMS REDESIGN (energy/storage/resources/transport) — plan + SR-P0/P1 (2026-06-27) — most recent
+Big logistics-first redesign (multi-agent analysis → cohesive plan; user signed off the decisions). Goal:
+turn "place a machine, it just works anywhere" into "plan a central, powered, zoned hub fed by routed
+supply lines." **NOT yet Unity-compiled.**
+
+**Locked design decisions (user):** energy out-of-range = **hard-stop, processors-only**; **revive liquids +
+real steam fluid** (pipes→Boiler(water+coal→steam)→Steam Engine); **add coal as a mined raw** fuel; carts =
+**reserve+block first, path-following next**. Defaults adopted: reuse Depot/RouteVehicle; keep Inventory
+single total-capacity; down-scope (not delete) universal warehouse to solid-goods; keep background biomes.
+
+**Keystone architecture:** ONE energy seam `WorkshopBuilding.EffectivePowerFactor()` that radius(now)→
+steam(mid)→electricity(late, existing Power.cs, DEFERRED) all flow through — energy evolves with zero
+machine-code churn. ONE `WorldGrid.IsReserved(cell)` that every placement gate routes through so roads/rail
+block belts/buildings uniformly. Existing Power.cs/PowerPlant.cs stay the inert Industrial target.
+
+**Phase plan (each shippable + verifiable):**
+- **SR-P0 (DONE here):** seam refactor, zero gameplay change. `EffectivePowerFactor` extracted (behaviour-
+  identical: Industrial brownout else full speed). `WorldGrid.Roads/Rails` (MonoBehaviour dicts) + `IsReserved`
+  (empty → false for now). Belt-independent.
+- **SR-P1 (DONE here):** resource concentration. DELETED the map-wide `SpawnClustersInBiome` smear (+ its
+  helper). Replaced the 3-corridor Region block with a data-driven `Zone()` table: **5 FEW/LARGE/DISTINCT
+  single-resource zones** on their own corridors + biomes, far out (Clay 46/Copper 60/Wood 72/Stone 86/Iron
+  100), disc radius ~30-34. Starter wood+stone basin kept; basin stays clear; SpawnNode still ClearAround per
+  node. Coal deferred to SR-P3 (lands with the hearth that burns it). Belt-independent.
+- **SR-P2 (next):** specialised storage — `StorageClass{Liquid,SolidGood,RawResource}` on ItemDefinition
+  (`isLiquid` kept as shim), `accepts` on BuildingDefinition; Tank(pipe-only)/Warehouse/Silo presets; class-
+  aware belt+pump guards; down-scope universal warehouse. (Touches Belt.cs I/O guards → after belt confirm.)
+- **SR-P3:** Stone-age radius hearth power + COAL (item + Coal Mine + zone + fuel use). `heatRadius`/
+  `requiresPower` on BuildingDefinition; new HeatField + Hearth (reuse PowerPlant burn loop + DrawRing);
+  EffectivePowerFactor's pre-Industrial branch consults HeatField; processors hard-stop outside range.
+- **SR-P4:** roads (RoadTile + WorldGrid.Roads) that reserve+block (IsReserved wired into all gates), carts
+  straight-line first (P4a) then RouteVehicle waypoint-follow laid tiles (P4b). (Touches Belt placement guard.)
+- **SR-P5:** liquids revival (re-add pipe/pump/booster to buildables) + steam (Boiler/Steam Engine, steam =
+  isLiquid fluid via the fluid-generic WaterPump BFS); retune pump flow (#12).
+- **SR-P6:** rail (RailTile + WorldGrid.Rails) high-capacity, RouteVehicle requiresTrack, Depot stations.
+- **SR-P7 (DEFERRED, do NOT build):** electricity switch-on — flip EffectivePowerFactor to Power.Factor at
+  Age 4 + re-add Coal Generator. Seam pre-laid; proves the radius layer evolves into Power.cs.
+
+**Recompile check for SR-P0+P1:** game runs unchanged (no power/behaviour difference — Power.Active still
+gates brownout); new map shows ~5 LARGE distinct single-resource regions far from spawn (not sprinkled
+everywhere), corridors reach each, nodes on cleared land, basin open + starter wood/stone present.
+
+## #22 Splitter is now 1→3 (was 1→2) (2026-06-27)
 Request: splitters should split 3 ways. Extended the splitter from 2 outputs to 3 — forward (`dir`),
 right (`RotateCW`), and **left (new `RotateCCW`)**; input stays the back edge. **NOT yet Unity-compiled.**
 - Distribution: `_splitToggle` (bool) → `_splitNext` (round-robin index 0/1/2). On handoff it tries the

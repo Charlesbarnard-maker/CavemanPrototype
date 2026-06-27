@@ -534,37 +534,31 @@ namespace Caveman
             SpawnClusters("Rock", stone, new Color(0.55f, 0.55f, 0.6f), PlaceholderArt.Hexagon(),
                 new Vector2(-24f, 4f), 13f, 3, 3, 5, 2.2f, new Vector2(1.0f, 1.5f), 30, 1, baseClear);
 
-            // --- GUARANTEED EXPANSION REGIONS: 3 meandering corridors out of spawn, each leading
-            //     to a distinct, reachable region — so exploration is intentional (follow a path →
-            //     find something) and Iron can NEVER soft-lock for want of findable ore. Each region
-            //     is seeded with DENSE clusters — a clear density upgrade over the starter basin. ---
-            TerrainGrid.CarveCorridors(3, 95f, 1);
-            void Region(int k, float dist, Terrain biome, System.Action<Vector2> place)
+            // --- RESOURCE ZONES (logistics-first redesign): FEW, LARGE, DISTINCT, SINGLE-resource
+            //     regions — each on its own corridor + biome, pushed FAR from spawn. One resource per
+            //     zone at a different angle/distance means a multi-input recipe (e.g. Steel = Iron +
+            //     fuel) can NEVER be co-located with all its inputs → you must haul each raw to a
+            //     CENTRAL processing hub. (Replaces the old 3-corridor + map-wide biome-scatter, which
+            //     smeared every resource everywhere so a micro-base could self-supply anywhere.)
+            //     Data-driven: one Zone() call per row; SpawnNode clears water per node so nothing
+            //     strands. Coal (a mined fuel) is added with the hearth that burns it in a later phase. ---
+            const int ZoneCount = 5;
+            TerrainGrid.CarveCorridors(ZoneCount, 130f, 1);
+            void Zone(int k, float dist, Terrain biome, string name, ItemDefinition item, Color color, Sprite sprite,
+                      float discR, int clusters, int minN, int maxN, float clusterR, Vector2 size, int cap, int regen)
             {
-                float a = TerrainGrid.CorridorAngle(k, 3);
+                float a = TerrainGrid.CorridorAngle(k, ZoneCount);
                 var center = new Vector2(Mathf.Cos(a) * dist, Mathf.Sin(a) * dist);
-                TerrainGrid.Paint(new Vector3(center.x, center.y, 0f), 16f, biome);
-                place(center);
+                TerrainGrid.Paint(new Vector3(center.x, center.y, 0f), discR, biome); // theme the region
+                // Spread clusters across the disc (~0.6×radius) so the zone reads as ONE rich field.
+                SpawnClusters(name, item, color, sprite, center, discR * 0.6f, clusters, minN, maxN, clusterR, size, cap, regen, 0f);
             }
-            // Corridor 0 — nearest: a PLAINS region with CLAY + COPPER — the first expansion (Bronze chain).
-            Region(0, 46f, Terrain.Plains, c => {
-                SpawnClusters("Clay", clay, new Color(0.68f, 0.46f, 0.36f), PlaceholderArt.Hexagon(),
-                    c, 7f, 3, 4, 6, 2.4f, new Vector2(1.0f, 1.5f), 40, 1, 0f);
-                SpawnClusters("Copper Deposit", copperOre, new Color(0.80f, 0.52f, 0.30f), PlaceholderArt.Hexagon(),
-                    c, 8f, 2, 3, 5, 2.6f, new Vector2(1.0f, 1.5f), 60, 0, 0f); // finite — the Bronze-age metal
-            });
-            // Corridor 1 — a FOREST region: DENSE lumber groves so Wood scales by expanding.
-            Region(1, 72f, Terrain.Forest, c => {
-                SpawnClusters("Tree", wood, new Color(0.27f, 0.55f, 0.22f), PlaceholderArt.Triangle(),
-                    c, 11f, 3, 6, 9, 3.2f, new Vector2(1.0f, 1.6f), 35, 1, 0f);
-            });
-            // Corridor 2 — a HILLS region: DENSE stone outcrops + the guaranteed reachable ORE (Iron unlock).
-            Region(2, 86f, Terrain.Hills, c => {
-                SpawnClusters("Rock", stone, new Color(0.55f, 0.55f, 0.6f), PlaceholderArt.Hexagon(),
-                    c, 11f, 3, 5, 8, 3.0f, new Vector2(1.0f, 1.6f), 35, 1, 0f);
-                SpawnClusters("Iron Ore Vein", ore, new Color(0.62f, 0.58f, 0.42f), PlaceholderArt.Hexagon(),
-                    c, 11f, 2, 4, 6, 2.8f, new Vector2(1.1f, 1.6f), 80, 0, 0f); // finite
-            });
+            //   k  dist  biome           name             item       colour                         sprite                      discR clusters minN maxN clustR  size                     cap regen
+            Zone(0, 46f, Terrain.Plains, "Clay Pit",       clay,      new Color(0.68f,0.46f,0.36f), PlaceholderArt.Hexagon(),  30f, 5, 5, 8, 3.0f, new Vector2(1.0f,1.5f),  60, 1); // nearest — Bronze chain start
+            Zone(1, 60f, Terrain.Hills,  "Copper Deposit", copperOre, new Color(0.80f,0.52f,0.30f), PlaceholderArt.Hexagon(),  30f, 5, 4, 7, 3.0f, new Vector2(1.0f,1.6f), 180, 0); // finite — Bronze metal
+            Zone(2, 72f, Terrain.Forest, "Forest",         wood,      new Color(0.27f,0.55f,0.22f), PlaceholderArt.Triangle(), 34f, 6, 6, 9, 3.4f, new Vector2(1.0f,1.6f),  40, 1); // lumber at scale
+            Zone(3, 86f, Terrain.Hills,  "Stone Outcrop",  stone,     new Color(0.55f,0.55f,0.60f), PlaceholderArt.Hexagon(),  32f, 6, 5, 8, 3.2f, new Vector2(1.0f,1.6f),  50, 1); // stone at scale
+            Zone(4,100f, Terrain.Hills,  "Iron Ore Field", ore,       new Color(0.62f,0.58f,0.42f), PlaceholderArt.Hexagon(),  32f, 5, 4, 7, 3.0f, new Vector2(1.1f,1.6f), 220, 0); // finite — Iron age
 
             // --- Welcome / starter guidance (fades after a few seconds) ---
             // Keep the opening minimal (Factorio focus): just WELCOME → SURVIVAL → one compact
@@ -574,20 +568,9 @@ namespace Caveman
             Toast.Show("<size=14><color=#9f9>Build your first factory:</color> a <b>Wood Hut</b> + <b>Woodpile</b>, then a <b>Sawmill</b> to turn Wood into Planks. Machines run on their own — feed them by placing them side by side, or with belts.</size>");
             Toast.Show("<size=13><b>B</b> build · <b>T</b> research · <b>G</b> guide · <b>H</b> help.  Craft research items → deliver to a <b>Research Lodge</b> → advance the Age.  Goal: build the Monument.</size>");
 
-            // --- BIOME FRONTIER (factory economy): each biome is a resource-rich region worth
-            //     routing home. FORESTS = lumber; HILLS = stone + finite ore; PLAINS = clay.
-            //     Finite ore out here is the late-game supply line (mine → route → smelt).
-            SpawnClustersInBiome("Tree", wood, new Color(0.27f, 0.55f, 0.22f), PlaceholderArt.Triangle(),
-                Terrain.Forest, 11, 5, 8, 3.2f, 50f, 35, 1, new Vector2(1.0f, 1.6f));
-            SpawnClustersInBiome("Rock", stone, new Color(0.55f, 0.55f, 0.6f), PlaceholderArt.Hexagon(),
-                Terrain.Hills, 10, 5, 7, 3.0f, 50f, 35, 1, new Vector2(1.0f, 1.6f));
-            SpawnClustersInBiome("Iron Ore Vein", ore, new Color(0.62f, 0.58f, 0.42f), PlaceholderArt.Hexagon(),
-                Terrain.Hills, 6, 4, 6, 2.8f, 55f, 80, 0, new Vector2(1.1f, 1.6f)); // finite
-            // Clay + Copper are the FIRST expansion targets — just outside the basin (Bronze chain).
-            SpawnClustersInBiome("Clay", clay, new Color(0.68f, 0.46f, 0.36f), PlaceholderArt.Hexagon(),
-                Terrain.Plains, 6, 3, 4, 2.4f, 26f, 40, 1, new Vector2(1.0f, 1.5f));
-            SpawnClustersInBiome("Copper Deposit", copperOre, new Color(0.80f, 0.52f, 0.30f), PlaceholderArt.Hexagon(),
-                Terrain.Plains, 5, 2, 4, 2.6f, 30f, 60, 0, new Vector2(1.0f, 1.5f)); // finite — Bronze metal
+            // (Removed: the old map-wide SpawnClustersInBiome smear — it scattered every resource
+            //  across all biome cells, which let a micro-base self-supply anywhere and defeated the
+            //  centralisation goal. Resources now live ONLY in the concentrated zones carved above.)
 
             // Bake the biome map into its visual now that resource cells have been cleared.
             TerrainGrid.SpawnRenderer();
@@ -604,20 +587,6 @@ namespace Caveman
             {
                 Vector2 c = areaCenter + Random.insideUnitCircle * areaSpread;
                 if (c.magnitude < minClear) c = c.normalized * minClear; // keep the base clear
-                int n = Random.Range(minNodes, maxNodes + 1);
-                SpawnCluster(name, item, color, sprite, c, n, clusterRadius, sizeRange, capacity, regen);
-            }
-        }
-
-        // Spawn `clusterCount` clusters onto random cells of a BIOME (forest/hills/plains), each a
-        // dense knot — so each biome reads as a resource-rich region worth expanding into.
-        private static void SpawnClustersInBiome(string name, ItemDefinition item, Color color, Sprite sprite,
-            Terrain biome, int clusterCount, int minNodes, int maxNodes, float clusterRadius,
-            float minClear, int capacity, int regen, Vector2 sizeRange)
-        {
-            for (int k = 0; k < clusterCount; k++)
-            {
-                if (!TerrainGrid.TryRandomCellOfBiome(biome, minClear, 50, out var c)) continue;
                 int n = Random.Range(minNodes, maxNodes + 1);
                 SpawnCluster(name, item, color, sprite, c, n, clusterRadius, sizeRange, capacity, regen);
             }

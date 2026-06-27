@@ -16,6 +16,17 @@ namespace Caveman
         public static readonly Dictionary<Vector2Int, Depot> Depots = new();
         public static readonly Dictionary<Vector2Int, ResearchBuilding> Research = new();
 
+        // Transport corridors that RESERVE their tiles (block belts/buildings on top, and vice-versa).
+        // Tiles (RoadTile/RailTile) self-register here when that phase lands; empty until then, so
+        // IsReserved is false everywhere for now (zero gameplay change). Typed as MonoBehaviour so this
+        // plumbing compiles before the tile classes exist.
+        public static readonly Dictionary<Vector2Int, MonoBehaviour> Roads = new();
+        public static readonly Dictionary<Vector2Int, MonoBehaviour> Rails = new();
+
+        /// <summary>Is this cell occupied by a transport corridor (road or rail)? The single check
+        /// every placement gate routes through so reserved tiles block uniformly.</summary>
+        public static bool IsReserved(Vector2Int cell) => Roads.ContainsKey(cell) || Rails.ContainsKey(cell);
+
         public static void Remove<T>(Dictionary<Vector2Int, T> map, Vector2Int cell, T who) where T : class
         {
             if (map.TryGetValue(cell, out var cur) && ReferenceEquals(cur, who)) map.Remove(cell);

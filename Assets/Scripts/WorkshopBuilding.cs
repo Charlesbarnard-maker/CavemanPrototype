@@ -228,6 +228,16 @@ namespace Caveman
             }
         }
 
+        // THE single energy seam — every era (Stone-age hearth radius, mid steam, late electricity)
+        // returns its speed factor through here, so machine code never changes as energy evolves.
+        // P0: behaviour-identical to the old inline logic (Industrial brownout, else full speed). A
+        // later phase makes the pre-Industrial branch consult the hearth/steam heat field.
+        private float EffectivePowerFactor()
+        {
+            if (Power.Active) return PowerDraw > 0 ? Power.Factor : 1f; // Industrial electricity (unchanged)
+            return 1f;                                                  // pre-Industrial: heat radius plugs in here later
+        }
+
         void Update()
         {
             Power.EnsureFresh();
@@ -236,8 +246,8 @@ namespace Caveman
 
             if (!Paused && output != null && Buffer.Total() < Buffer.capacity)
             {
-                float pw = Power.Active && PowerDraw > 0 ? Power.Factor : 1f; // brownouts slow machines
-                _timer += Time.deltaTime * pw; // fixed rate (no workers); powered machines slow under brownout
+                float pw = EffectivePowerFactor();
+                _timer += Time.deltaTime * pw; // fixed rate (no workers); slowed/stopped by the energy seam
                 if (_timer >= processTime)
                 {
                     if (CanMake(carried))
