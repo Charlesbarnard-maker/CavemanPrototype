@@ -3,22 +3,43 @@ using UnityEngine;
 
 namespace Caveman
 {
+    /// <summary>One item riding a belt: its type, its continuous progress p∈[0,1] along the
+    /// CURRENT cell's lane (0 = entry edge, 1 = exit edge), and the edge it entered from (so a
+    /// corner cell animates its arc correctly). Items are plain data moved between cells by BeltSim.</summary>
+    public class BeltItem
+    {
+        public ItemDefinition def;
+        public float p;
+        public Belt.Dir entryEdge;
+        public BeltItem(ItemDefinition def, float p, Belt.Dir entryEdge) { this.def = def; this.p = p; this.entryEdge = entryEdge; }
+    }
+
     /// <summary>
-    /// A directional conveyor segment on a 1-unit grid. Each tick it pushes its
-    /// carried item one cell forward (to the next belt, or into a storage in front)
-    /// and pulls a new item from an adjacent collector/workshop's buffer. You lay
-    /// belts out and orient them (R to rotate) to physically route goods — the
-    /// spatial logistics puzzle. All I/O lives here, so no other building changes.
+    /// A directional conveyor segment on a 1-unit grid. Each cell carries a list of items at
+    /// CONTINUOUS sub-tile positions; the central <see cref="BeltSim"/> advances them at
+    /// speed = 1/interval cells/sec, holding a deterministic minimum gap so items never overlap
+    /// and never leave gaps when compressed. Items flow smoothly across cell boundaries (a cell's
+    /// exit edge is the next cell's entry edge in world space, so a hand-off is visually seamless).
+    /// All building I/O (deposit into storage/workshop/depot/research, pull from a feeder) lives
+    /// here, so no other building changes.
     /// </summary>
     public class Belt : MonoBehaviour
     {
         public enum Dir { N, E, S, W }
         public Dir dir;
-        public int capacity = 4;
         public float interval = 0.5f;
 
-        public ItemDefinition item;
-        public int count;
+        // --- Spacing / density knob -------------------------------------------------------------
+        // MinGap is the minimum spacing between successive items, measured in CELLS along the lane.
+        // It is the SINGLE control over belt density AND throughput, because for a saturated belt:
+        //     sustained throughput (items/sec) = speed / MinGap = (1/interval) / MinGap
+        // MinGap = 1.0 → exactly one item per cell → throughput = 1/interval, i.e. the historic
+        // 30/60/120/240-per-min caps and the current visual speed are PRESERVED (the conservative
+        // default). Lowering MinGap packs items denser (Factorio look) but multiplies every belt's
+        // throughput by 1/MinGap (e.g. 0.26 ≈ 4×) and would need an economy re-tune. One constant.
+        public const float MinGap = 1.0f;
+        // Hard safety cap on items per cell (spacing is the real limiter; this just bounds the list).
+        public static int CellCapacity => Mathf.Max(2, Mathf.FloorToInt(1f / MinGap) + 1);
 
         // Splitter: a 1→2 belt that sends items EVENLY to two outputs — its facing `dir` (forward)
         // and the cell to its right (RotateCW(dir)). `_splitToggle` flips the preferred output each
@@ -31,17 +52,25 @@ namespace Caveman
         // a belt onto a line — you must place a Merger; see AcceptsHandoffFrom).
         public bool isMerger;
 
-        private float _timer;
         private SpriteRenderer _sr;
-        private readonly List<SpriteRenderer> _dots = new();      // items sliding along the belt (packed nose-to-tail when backed up)
+        private readonly List<BeltItem> _items = new();           // lead-first: _items[0] has the highest p
+        private readonly List<SpriteRenderer> _dots = new();      // one sprite per carried item
         private readonly List<GameObject> _portMarkers = new();   // in/out arrows on a splitter/merger
-        private Color _baseColor = new Color(0.58f, 0.50f, 0.34f); // tier tint (overwritten each frame by flow-state colour)
+        private Color _baseColor = new Color(0.58f, 0.50f, 0.34f); // tier tint (overlaid by flow-state colour)
         private Vector2Int _cell;
-        private Dir _inDir; // edge the current item arrived from (so corners animate right)
+
+        private bool _connected;    // snapshot: goods on this belt can ultimately reach a real sink
+        private bool _blocked;      // the lead reached the exit edge but could not hand off
 
         private static readonly Dictionary<Vector2Int, Belt> Grid = new();
 
         public static int Count => Grid.Count;
+        public Vector2Int Cell => _cell;
+        public int ItemCount => _items.Count;
+        // Compatibility shims for the old (item, count) bucket model — read-only views over the list.
+        public ItemDefinition item => _items.Count > 0 ? _items[0].def : null; // lead item TYPE
+        public int count => _items.Count;
+
         public static Vector2Int CellOf(Vector3 p) => new Vector2Int(Mathf.RoundToInt(p.x), Mathf.RoundToInt(p.y));
         public static Belt At(Vector2Int c) => Grid.TryGetValue(c, out var b) ? b : null;
         public static Dir RotateCW(Dir d) => (Dir)(((int)d + 1) % 4);
@@ -73,7 +102,6 @@ namespace Caveman
             b.dir = dir;
             b.isSplitter = isSplitter;
             b.isMerger = isMerger;
-            b._inDir = Opposite(dir); // default: item enters from directly behind
             b.interval = Mathf.Max(0.05f, interval);
             b._sr = sr;
             if (baseColor.HasValue) b._baseColor = baseColor.Value; // per-tier tint (else the default brown)
@@ -82,31 +110,35 @@ namespace Caveman
             return b;
         }
 
-        void OnEnable() { _cell = CellOf(transform.position); Grid[_cell] = this; }
+        void OnEnable() { _cell = CellOf(transform.position); Grid[_cell] = this; BeltSim.Register(this); }
         void OnDisable()
         {
+            BeltSim.Unregister(this);
             if (Grid.TryGetValue(_cell, out var b) && b == this) Grid.Remove(_cell);
             foreach (var d in _dots) if (d != null) Destroy(d.gameObject);
             _dots.Clear();
             // _portMarkers are children of this GameObject → destroyed with it automatically.
         }
 
-        public bool CanAccept(ItemDefinition i) => count < capacity && (item == null || item == i);
-        public void Receive(ItemDefinition i, Dir fromEdge) => GainFrom(i, fromEdge);
+        // ---- Compatibility surface (used by belt-to-belt hand-off + building pulls) -------------
+        private float TailP => _items.Count > 0 ? _items[_items.Count - 1].p : 1f;
+        private bool TailRoom() => _items.Count < CellCapacity && (_items.Count == 0 || _items[_items.Count - 1].p >= MinGap);
+        public bool CanAccept(ItemDefinition i) => TailRoom() && (item == null || item == i);
 
-        // Take in one item (from a feeder belt OR a pulled-from building). We (re)start the dwell
-        // timer + entry edge ONLY when the cell was EMPTY — i.e. this is a fresh LEAD item, so it
-        // animates from the entry edge and dwells a full interval before moving on. Piling a 2nd+
-        // item behind the lead must NOT reset the lead's dwell: otherwise an upstream belt that
-        // happens to Update() before us each frame keeps zeroing our clock, the lead never matures,
-        // and the cell throttles to ~half rate with items stacked nose-to-tail (the "stuck on the
-        // conveyor" pile). Keeping the lead's dwell on a pile makes throughput Update-order-independent.
-        private void GainFrom(ItemDefinition i, Dir fromEdge)
+        // Take in one item at the tail (entry edge). startP is the desired entry progress (0 for a
+        // fresh pull; a small carry-over for a belt→belt hand-off). Clamped so it never overlaps the
+        // current tail. Returns false if there is no room. The list stays lead-first (descending p).
+        public bool ReceiveItem(ItemDefinition def, Dir fromEdge, float startP)
         {
-            bool wasEmpty = count == 0;
-            item = i; count++;
-            if (wasEmpty) { _inDir = fromEdge; _timer = 0f; }
+            if (!TailRoom() || (item != null && item != def)) return false;
+            float p = startP;
+            if (_items.Count > 0) p = Mathf.Min(p, _items[_items.Count - 1].p - MinGap);
+            p = Mathf.Clamp01(p);
+            _items.Add(new BeltItem(def, p, fromEdge));
+            return true;
         }
+        // Legacy entry point (no external callers today; kept for safety).
+        public void Receive(ItemDefinition i, Dir fromEdge) => ReceiveItem(i, fromEdge, 0f);
 
         // Whether this belt accepts a hand-off pushed by belt `from`. A MERGER accepts any feeder.
         // A normal belt accepts only ONE upstream: the belt directly behind it (a straight run), or
@@ -146,7 +178,7 @@ namespace Caveman
         }
 
         /// <summary>Upgrade this belt to a faster tier in place (new interval + colour) without
-        /// rebuilding — keeps its direction and any carried items. Mirrors RouteVehicle.SetTier.</summary>
+        /// rebuilding — keeps its direction and any carried items.</summary>
         public void SetTier(float newInterval, Color newColor)
         {
             interval = Mathf.Max(0.05f, newInterval);
@@ -154,8 +186,7 @@ namespace Caveman
         }
 
         /// <summary>Overlay-convert a plain belt into a splitter or merger in place (keeps its
-        /// direction + any carried items). Lets the player drop a Merger/Splitter straight onto an
-        /// existing conveyor without deleting it first.</summary>
+        /// direction + any carried items).</summary>
         public void ConvertTo(bool splitter, bool merger)
         {
             isSplitter = splitter;
@@ -192,43 +223,289 @@ namespace Caveman
         public static bool IsSourceCell(Vector2Int c) =>
             WorldGrid.Collectors.ContainsKey(c) || WorldGrid.Workshops.ContainsKey(c);
 
-        private bool _connected;
-        private bool _blocked; // had an item but couldn't move it forward (dead end / backed up)
+        // =======================================================================================
+        //  CENTRAL SIMULATION — called by BeltSim each fixed step, in a stable cell-sorted order.
+        // =======================================================================================
 
-        void Update()
+        // PASS 1: refresh sink-reachability (gates pulls + drives the colour state). Items are then
+        // advanced (PASS 2) reading the LIVE downstream tail; BeltSim processes belts DOWNSTREAM-FIRST
+        // (nearest-to-sink first, see DistToSink), so an upstream cell reads its downstream's already-
+        // advanced position this step → exact throughput. No-overlap holds in ANY order, because the
+        // lead is capped at the downstream tail (which only moves forward), so ordering affects only
+        // throughput, never safety.
+        public void SimSnapshot()
         {
-            // Connectivity (a chain-walk up to 256 cells) is only needed when we actually move
-            // an item — recompute it on the interval tick and cache, not every frame.
-            _timer += Time.deltaTime;
-            if (_timer >= interval)
+            _connected = HasForwardTarget();
+        }
+
+        // PASS 2: advance every item along this cell's lane. The lead is capped at the exit edge
+        // (p = 1) AND held a MinGap behind the next cell's tail (cross-tile spacing); followers are
+        // held a MinGap behind the item ahead. Pure intra-cell writes + neighbour SNAPSHOT reads.
+        public void SimAdvance(float h)
+        {
+            if (_items.Count == 0) return;
+            float adv = (1f / Mathf.Max(0.05f, interval)) * h; // speed (cells/sec) × dt
+            var lead = _items[0];
+            float limit = Mathf.Min(1f, LeadHeadLimit());
+            float np = lead.p + adv;
+            lead.p = np < limit ? np : (limit > lead.p ? limit : lead.p); // never moves backward
+            for (int i = 1; i < _items.Count; i++)
             {
-                _timer -= interval;
-                _connected = HasForwardTarget();
-                int before = count;
-                PushForward();
-                _blocked = count > 0 && count == before; // item present and it didn't leave
-                if (_connected) PullFromNeighbour(); // don't pull goods onto a belt that leads nowhere
+                float maxP = _items[i - 1].p - MinGap;
+                float cand = _items[i].p + adv;
+                _items[i].p = cand < maxP ? cand : (maxP > _items[i].p ? maxP : _items[i].p);
+                if (_items[i].p < 0f) _items[i].p = 0f;
+            }
+        }
+
+        // The furthest p (in THIS cell's coordinates) the lead may reach this step. A downstream
+        // belt that can take our item lets the lead reach 1+tail−MinGap (so it trails the next
+        // cell's tail by MinGap across the shared boundary); a sink/dead-end lets it reach the exit
+        // edge (1) and either deposit or pin there. A splitter takes the better of its two outputs.
+        private float LeadHeadLimit()
+        {
+            if (isSplitter) return Mathf.Max(HeadLimitDir(dir), HeadLimitDir(RotateCW(dir)));
+            return HeadLimitDir(dir);
+        }
+        private float HeadLimitDir(Dir d)
+        {
+            var ahead = _cell + Step(d);
+            var nb = At(ahead);
+            if (nb != null)
+            {
+                bool typeOk = item == null || nb.item == null || nb.item == item;
+                if (typeOk && nb.AcceptsHandoffFrom(this))
+                    // Empty downstream → roll to the exit edge. Occupied → trail its LIVE tail by
+                    // MinGap across the shared boundary (1 + tail − MinGap), so no two items ever
+                    // share a world point. Live read + downstream-first order ⇒ exact + overlap-free.
+                    return nb.ItemCount == 0 ? 1f : 1f + nb.TailP - MinGap;
+                return 1f; // can't hand off here → roll to the exit edge and pin (blocked)
+            }
+            return 1f; // building sink or dead-end → roll to the exit edge
+        }
+
+        // PASS 3: a matured lead (at the exit edge) is pushed into the next belt cell or a building.
+        public void SimHandoff()
+        {
+            _blocked = false;
+            if (_items.Count == 0) return;
+            var lead = _items[0];
+            if (lead.p < 1f - 1e-4f) return; // not at the exit edge yet
+
+            bool moved;
+            if (isSplitter)
+            {
+                // 1→2 even split: alternate the PREFERRED output; fall back to the other so a full
+                // lane never stalls the splitter.
+                Dir a = _splitToggle ? RotateCW(dir) : dir;
+                Dir b = _splitToggle ? dir : RotateCW(dir);
+                moved = TryDepositTo(a, lead.def);
+                if (moved) _splitToggle = !_splitToggle;
+                else moved = TryDepositTo(b, lead.def);
+            }
+            else
+            {
+                moved = TryDepositTo(dir, lead.def);
             }
 
+            if (moved) _items.RemoveAt(0);
+            else _blocked = true; // downstream full / dead-end → lead holds at the exit edge
+        }
+
+        // PASS 4: pull a new item from an adjacent feeder building into a cleared entry. Gated by
+        // connectivity (don't pull onto a belt that leads nowhere) and tail room (deterministic
+        // spacing at the entry). One item per step, mirroring the old PullFromNeighbour scan/rules.
+        public void SimPull()
+        {
+            if (!_connected || !TailRoom()) return;
+            for (int di = 0; di < 4; di++)
+            {
+                var c = _cell + Step((Dir)di);
+
+                // Output ports: a belt only pulls a building's output from its OUTPUT side (the
+                // building's output must face this belt — Opposite of our scan dir). Liquids never
+                // ride belts — they move via pipes / carrying.
+                if (WorldGrid.Collectors.TryGetValue(c, out var p) && p != null && p.produces != null && !p.produces.isLiquid
+                    && p.OutputSide == Opposite((Dir)di)
+                    && (item == null || item == p.produces) && p.Buffer.Count(p.produces) > 0)
+                {
+                    if (p.Buffer.RemoveUpTo(p.produces, 1) > 0) { ReceiveItem(p.produces, (Dir)di, 0f); return; }
+                }
+
+                if (WorldGrid.Workshops.TryGetValue(c, out var w) && w != null && w.output != null && !w.output.isLiquid
+                    && w.OutputSide == Opposite((Dir)di)
+                    && (item == null || item == w.output) && w.Buffer.Count(w.output) > 0)
+                {
+                    if (w.Buffer.RemoveUpTo(w.output, 1) > 0) { ReceiveItem(w.output, (Dir)di, 0f); return; }
+                }
+
+                // Storages have an OUTPUT side too — a belt on it pulls the stored item, so you can
+                // belt FROM a warehouse to a workshop (e.g. warehouse → sawmill).
+                if (WorldGrid.Storages.TryGetValue(c, out var st) && st != null && st.accepts != null && !st.accepts.isLiquid
+                    && st.OutputSide == Opposite((Dir)di)
+                    && (item == null || item == st.accepts) && st.Store.Count(st.accepts) > 0)
+                {
+                    if (st.Store.RemoveUpTo(st.accepts, 1) > 0) { ReceiveItem(st.accepts, (Dir)di, 0f); return; }
+                }
+
+                if (WorldGrid.Depots.TryGetValue(c, out var dp) && dp != null && dp.item != null && !dp.item.isLiquid
+                    && (item == null || item == dp.item) && dp.store.Count(dp.item) > 0)
+                {
+                    if (dp.store.RemoveUpTo(dp.item, 1) > 0) { ReceiveItem(dp.item, (Dir)di, 0f); return; }
+                }
+            }
+        }
+
+        // Move ONE item out in direction d — into a belt (carry-over hand-off), or a building sink
+        // on its input side. Returns true if it left. Shared by belts AND splitters.
+        private bool TryDepositTo(Dir d, ItemDefinition def)
+        {
+            var ahead = _cell + Step(d);
+            var nb = At(ahead);
+            if (nb != null)
+            {
+                // The item enters the next belt from the edge facing us (Opposite our dir). p=1 on
+                // this cell == p=0 on the next in world space, so entry at ~0 is seamless. A normal
+                // belt only accepts ONE feeder (straight or a single corner); a Merger accepts any.
+                if (nb.CanAccept(def) && nb.AcceptsHandoffFrom(this)) return nb.ReceiveItem(def, Opposite(d), 0f);
+                return false;
+            }
+            return TryDepositToBuilding(d, def);
+        }
+
+        // Deposit the item into a storage / workshop / depot / research sink directly ahead, on a
+        // valid input side. Returns true if accepted. (Lifted verbatim from the old TryDepositTo so
+        // every sink/side/auto-register rule is preserved.)
+        private bool TryDepositToBuilding(Dir d, ItemDefinition def)
+        {
+            var ahead = _cell + Step(d);
+
+            // Storage, on its INPUT side (d == OutputSide). A configurable warehouse with no type yet
+            // AUTO-REGISTERS the first item belted in (so goods aren't lost into an "unset" store).
+            if (WorldGrid.Storages.TryGetValue(ahead, out var s) && s != null && d == s.OutputSide
+                && (s.accepts == def || (s.accepts == null && s.configurable)))
+            {
+                if (s.def != null && s.Store.Total() >= s.def.capacity) return false;
+                if (s.accepts == null) s.accepts = def; // adopt the first delivered item's type
+                s.Store.Add(def, 1); return true;
+            }
+
+            // Workshop input buffer, on a valid input side, if it can take this item
+            // (fair-share per input → no mixed-buffer deadlock; see CanAcceptBeltInput).
+            if (WorkshopAt(ahead) is WorkshopBuilding w && AcceptsInputSide(w, d) && w.CanAcceptBeltInput(def))
+            {
+                w.InBuffer.Add(def, 1); return true;
+            }
+
+            // Depot that handles this item (route endpoint).
+            if (WorldGrid.Depots.TryGetValue(ahead, out var dp) && dp != null && dp.item == def)
+            {
+                if (dp.def != null && dp.store.Total() >= dp.def.capacity) return false;
+                dp.store.Add(def, 1); return true;
+            }
+
+            // Research Lodge, on its INPUT side, if it's a research item.
+            if (WorldGrid.Research.TryGetValue(ahead, out var rb) && rb != null && d == rb.OutputSide && rb.Accepts(def))
+            {
+                if (rb.InBuffer.Total() >= rb.InBuffer.capacity) return false;
+                rb.InBuffer.Add(def, 1); return true;
+            }
+            return false;
+        }
+
+        private static WorkshopBuilding WorkshopAt(Vector2Int c)
+            => WorldGrid.Workshops.TryGetValue(c, out var w) ? w : null;
+
+        // A belt at this cell moving `d` sits on the workshop's `Opposite(d)` side. Multi-input
+        // workshops accept inputs on ANY non-output side; single-input workshops keep the one input
+        // side (opposite the output).
+        private static bool AcceptsInputSide(WorkshopBuilding w, Dir d)
+            => (w.inputs != null && w.inputs.Count > 1) ? Opposite(d) != w.OutputSide : d == w.OutputSide;
+
+        // ---- Connectivity (gates pulls + drives the colour state). Unchanged from before; the
+        //      event-driven replacement of this per-step walk is a later phase. ----
+
+        // Connected only if goods can actually LEAVE: a sink directly ahead, or a belt chain ahead
+        // that ultimately reaches a sink. Stops belts conveying into nothing.
+        private bool HasForwardTarget()
+        {
+            if (isSplitter) return OutputConnected(dir) || OutputConnected(RotateCW(dir));
+            return OutputConnected(dir);
+        }
+
+        private bool OutputConnected(Dir d)
+        {
+            var ahead = _cell + Step(d);
+            if (WorldGrid.Storages.TryGetValue(ahead, out var s) && s != null && d == s.OutputSide
+                && (item == null || s.accepts == item || (s.accepts == null && s.configurable))) return true;
+            if (WorldGrid.Workshops.TryGetValue(ahead, out var w) && w != null && AcceptsInputSide(w, d)
+                && (item == null || w.WantsInput(item))) return true;
+            if (WorldGrid.Depots.TryGetValue(ahead, out var dp) && dp != null
+                && (item == null || dp.item == null || dp.item == item)) return true; // depots omnidirectional
+            if (WorldGrid.Research.TryGetValue(ahead, out var rb) && rb != null && d == rb.OutputSide
+                && (item == null || rb.Accepts(item))) return true;
+            if (At(ahead) != null) return LeadsToSink(_cell, d);
+            return false;
+        }
+
+        // Steps forward to the nearest sink, for BeltSim's downstream-first ordering (lower = nearer
+        // a sink = processed earlier, so an upstream cell reads its downstream's fresh position this
+        // step → exact throughput). Dead-ends/loops return a large value (processed last; harmless —
+        // ordering never affects correctness, only throughput). A splitter follows its primary output.
+        public int DistToSink()
+        {
+            var cell = _cell; var d = dir;
+            for (int i = 0; i < 300; i++)
+            {
+                var ahead = cell + Step(d);
+                if (WorldGrid.Storages.ContainsKey(ahead) || WorldGrid.Workshops.ContainsKey(ahead)
+                    || WorldGrid.Depots.ContainsKey(ahead) || WorldGrid.Research.ContainsKey(ahead)) return i;
+                var nb = At(ahead);
+                if (nb == null) return 1_000_000;
+                cell = ahead; d = nb.dir;
+            }
+            return 1_000_000;
+        }
+
+        // Walk the belt chain forward; true if it reaches any storage/workshop/depot/research.
+        // Bounded (no visited set) so a closed loop simply returns false after the cap.
+        private static bool LeadsToSink(Vector2Int cell, Dir dir)
+        {
+            for (int i = 0; i < 256; i++)
+            {
+                var ahead = cell + Step(dir);
+                if (WorldGrid.Storages.ContainsKey(ahead) || WorldGrid.Workshops.ContainsKey(ahead)
+                    || WorldGrid.Depots.ContainsKey(ahead) || WorldGrid.Research.ContainsKey(ahead)) return true;
+                var nb = At(ahead);
+                if (nb == null) return false;
+                cell = ahead; dir = nb.dir;
+            }
+            return false;
+        }
+
+        // =======================================================================================
+        //  RENDERING — runs every frame for smoothness (the sim is fixed-step; the view is not).
+        // =======================================================================================
+        void Update()
+        {
             // Belt colour reads the bottleneck at a glance:
-            //   red    = dead end (goes nowhere — no sink ahead),
-            //   yellow = backed up (connected but item can't move → DOWNSTREAM is full/blocked),
-            //   base   = flowing or empty (an empty connected belt = an UPSTREAM/supply issue).
+            //   red    = dead end (no sink ahead), yellow = backed up (lead can't move on),
+            //   base   = flowing or empty (an empty connected belt = an upstream/supply issue).
             if (_sr != null)
                 _sr.color = !_connected ? new Color(0.62f, 0.24f, 0.24f)      // red — dead end
                           : _blocked   ? new Color(0.85f, 0.66f, 0.18f)        // yellow — backed up downstream
-                          : _baseColor;                                         // brown — ok (empty = supply issue)
+                          : _baseColor;                                         // brown — ok
 
             UpdateDots();
         }
 
-        // Render the carried items sliding along the belt. A belt cell can hold up to `capacity`
-        // items (they accumulate when the line ahead is blocked); we draw one dot per held item,
-        // PACKED nose-to-tail from the exit edge when backed up — so a blockage visibly piles goods
-        // instead of showing a single frozen dot. A lone flowing item animates across the cell.
+        // Draw one sprite per carried item at its own continuous position along the lane. The path
+        // is a quadratic Bézier with its control point at the cell centre → a straight line on a
+        // straight belt and a smooth ARC through a corner (entryEdge is per-item, so each item arcs
+        // correctly). 0.5 offsets make one belt's exit == the next's entry (seamless hand-off).
         private void UpdateDots()
         {
-            int n = (item != null) ? Mathf.Clamp(count, 0, capacity) : 0;
+            int n = _items.Count;
             while (_dots.Count < n)
             {
                 var go = new GameObject("BeltItem");
@@ -244,27 +521,12 @@ namespace Caveman
                 bool on = i < n;
                 d.enabled = on;
                 if (!on) continue;
-                d.sprite = item.icon != null ? item.icon : PlaceholderArt.Circle(); // per-item look
-                d.color = item.color;
-            }
-            if (n == 0) return;
-
-            // 0.5 offsets make one belt's exit == the next's entry (seamless hand-off). The path is
-            // a quadratic Bézier with its control point at the cell centre → a straight line on a
-            // straight belt and a smooth ARC through a corner (so items take "nice turns").
-            Vector3 inE = new Vector3(Step(_inDir).x, Step(_inDir).y, 0f) * 0.5f;
-            Vector3 outE = new Vector3(Step(dir).x, Step(dir).y, 0f) * 0.5f;
-
-            // The LEAD item (index 0) rides the cell by its dwell timer; when blocked it holds at
-            // the exit edge. Any followers (a backed-up pile) pack nose-to-tail behind the lead.
-            // One unified path so a follower catching up to the lead doesn't make the lead pop to
-            // the exit — it just slides in behind whatever progress the lead has made.
-            float head = (!_blocked && interval > 0f) ? Mathf.Clamp01(_timer / interval) : 1f;
-            const float gap = 0.26f; // item spacing along the belt when queued
-            for (int i = 0; i < n; i++)
-            {
-                float t = Mathf.Clamp01(head - i * gap);
-                _dots[i].transform.position = transform.position + PathPoint(t, inE, outE);
+                var it = _items[i];
+                d.sprite = it.def.icon != null ? it.def.icon : PlaceholderArt.Circle();
+                d.color = it.def.color;
+                Vector3 inE = new Vector3(Step(it.entryEdge).x, Step(it.entryEdge).y, 0f) * 0.5f;
+                Vector3 outE = new Vector3(Step(dir).x, Step(dir).y, 0f) * 0.5f;
+                d.transform.position = transform.position + PathPoint(it.p, inE, outE);
             }
         }
 
@@ -272,170 +534,5 @@ namespace Caveman
         // inE == -outE (a straight belt), a smooth quarter-arc when inE ⟂ outE (a corner).
         private static Vector3 PathPoint(float t, Vector3 inE, Vector3 outE)
             => (1f - t) * (1f - t) * inE + t * t * outE;
-
-        // Connected only if goods can actually LEAVE: a sink directly ahead, or a belt
-        // chain ahead that ultimately reaches a sink. A belt ahead is NOT enough on its
-        // own — otherwise we'd pump goods into a chain that dead-ends in empty space and
-        // lose them from circulation. This is what stops belts "conveying into nothing".
-        private bool HasForwardTarget()
-        {
-            // A splitter is connected if EITHER of its two outputs can take goods.
-            if (isSplitter) return OutputConnected(dir) || OutputConnected(RotateCW(dir));
-            return OutputConnected(dir);
-        }
-
-        // Can goods LEAVE via direction d? A sink directly there, or a belt chain that reaches one.
-        private bool OutputConnected(Dir d)
-        {
-            var ahead = _cell + Step(d);
-            // Input ports: a belt may only DELIVER into a building's INPUT side (opposite its
-            // output). Geometrically that means the belt must travel in the building's output
-            // direction (d == OutputSide) to enter the input face.
-            if (WorldGrid.Storages.TryGetValue(ahead, out var s) && s != null && d == s.OutputSide
-                && (item == null || s.accepts == item || (s.accepts == null && s.configurable))) return true;
-            if (WorldGrid.Workshops.TryGetValue(ahead, out var w) && w != null && AcceptsInputSide(w, d)
-                && (item == null || w.WantsInput(item))) return true;
-            if (WorldGrid.Depots.TryGetValue(ahead, out var dp) && dp != null
-                && (item == null || dp.item == null || dp.item == item)) return true; // depots omnidirectional
-            if (WorldGrid.Research.TryGetValue(ahead, out var rb) && rb != null && d == rb.OutputSide
-                && (item == null || rb.Accepts(item))) return true; // research sink — input side only
-            if (At(ahead) != null) return LeadsToSink(_cell, d); // follow the chain
-            return false;
-        }
-
-        // Walk the belt chain forward; true if it reaches any storage/workshop/depot.
-        // Bounded (no visited set) so a closed loop simply returns false after the cap.
-        private static bool LeadsToSink(Vector2Int cell, Dir dir)
-        {
-            for (int i = 0; i < 256; i++)
-            {
-                var ahead = cell + Step(dir);
-                if (WorldGrid.Storages.ContainsKey(ahead) || WorldGrid.Workshops.ContainsKey(ahead)
-                    || WorldGrid.Depots.ContainsKey(ahead) || WorldGrid.Research.ContainsKey(ahead)) return true;
-                var nb = At(ahead);
-                if (nb == null) return false; // chain ends in empty space → dead end
-                cell = ahead; dir = nb.dir;
-            }
-            return false;
-        }
-
-        private void PushForward()
-        {
-            if (count <= 0 || item == null) return;
-
-            if (isSplitter)
-            {
-                // 1→2 even split: alternate the PREFERRED output each successful item; if that side
-                // is blocked, fall back to the other so a full lane never stalls the splitter.
-                Dir a = _splitToggle ? RotateCW(dir) : dir;
-                Dir b = _splitToggle ? dir : RotateCW(dir);
-                if (TryDepositTo(a)) { _splitToggle = !_splitToggle; return; }
-                TryDepositTo(b);
-                return;
-            }
-
-            TryDepositTo(dir);
-        }
-
-        // Move ONE item out in direction d — into a belt, or a building sink (storage/workshop/depot/
-        // research) on its input side. Returns true if an item left. Shared by belts AND splitters.
-        private bool TryDepositTo(Dir d)
-        {
-            if (count <= 0 || item == null) return false;
-            var ahead = _cell + Step(d);
-
-            var nb = At(ahead);
-            if (nb != null)
-            {
-                // The item enters the next belt from the edge facing us (Opposite our dir). A normal
-                // belt only accepts ONE feeder (straight or a single corner) — a 2nd feeder is rejected
-                // (it backs up) so you must place a MERGER to combine two lines.
-                if (nb.CanAccept(item) && nb.AcceptsHandoffFrom(this)) { nb.Receive(item, Opposite(d)); count--; if (count <= 0) item = null; return true; }
-                return false;
-            }
-
-            // No belt ahead — drop into a storage, but only on its INPUT side (d == OutputSide).
-            // A configurable warehouse with no type yet AUTO-REGISTERS the first item belted in
-            // (so goods aren't lost into an "unset" store) — it then only accepts that type.
-            if (WorldGrid.Storages.TryGetValue(ahead, out var s) && s != null && d == s.OutputSide
-                && (s.accepts == item || (s.accepts == null && s.configurable)))
-            {
-                if (s.def != null && s.Store.Total() >= s.def.capacity) return false;
-                if (s.accepts == null) s.accepts = item; // adopt the first delivered item's type
-                s.Store.Add(item, 1); count--; if (count <= 0) item = null; return true;
-            }
-
-            // ...or into a workshop's input buffer, on a valid input side, if it can take this item
-            // (fair-share per input → no mixed-buffer deadlock; see CanAcceptBeltInput).
-            if (WorkshopAt(ahead) is WorkshopBuilding w && AcceptsInputSide(w, d) && w.CanAcceptBeltInput(item))
-            {
-                w.InBuffer.Add(item, 1); count--; if (count <= 0) item = null; return true;
-            }
-
-            // ...or into a depot that handles this item (route endpoint).
-            if (WorldGrid.Depots.TryGetValue(ahead, out var dp) && dp != null && dp.item == item)
-            {
-                if (dp.def != null && dp.store.Total() >= dp.def.capacity) return false;
-                dp.store.Add(item, 1); count--; if (count <= 0) item = null; return true;
-            }
-
-            // ...or into a Research Lodge, on its INPUT side, if it's a research item.
-            if (WorldGrid.Research.TryGetValue(ahead, out var rb) && rb != null && d == rb.OutputSide && rb.Accepts(item))
-            {
-                if (rb.InBuffer.Total() >= rb.InBuffer.capacity) return false;
-                rb.InBuffer.Add(item, 1); count--; if (count <= 0) item = null; return true;
-            }
-            return false;
-        }
-
-        private static WorkshopBuilding WorkshopAt(Vector2Int c)
-            => WorldGrid.Workshops.TryGetValue(c, out var w) ? w : null;
-
-        // A belt at this cell moving `d` sits on the workshop's `Opposite(d)` side. Multi-input
-        // workshops accept inputs on ANY non-output side (so each of their different items can come
-        // on its own belt); single-input workshops keep just the one input side (opposite the output).
-        private static bool AcceptsInputSide(WorkshopBuilding w, Dir d)
-            => (w.inputs != null && w.inputs.Count > 1) ? Opposite(d) != w.OutputSide : d == w.OutputSide;
-
-        private void PullFromNeighbour()
-        {
-            if (count >= capacity) return;
-            for (int di = 0; di < 4; di++)
-            {
-                var c = _cell + Step((Dir)di);
-
-                // Output ports: a belt only pulls a building's output from its OUTPUT side
-                // (the building's output must face this belt — Opposite of our scan dir).
-                // Liquids never ride belts — they move via pipes / carrying.
-                if (WorldGrid.Collectors.TryGetValue(c, out var p) && p != null && p.produces != null && !p.produces.isLiquid
-                    && p.OutputSide == Opposite((Dir)di)
-                    && (item == null || item == p.produces) && p.Buffer.Count(p.produces) > 0)
-                {
-                    if (p.Buffer.RemoveUpTo(p.produces, 1) > 0) { GainFrom(p.produces, (Dir)di); return; }
-                }
-
-                if (WorldGrid.Workshops.TryGetValue(c, out var w) && w != null && w.output != null && !w.output.isLiquid
-                    && w.OutputSide == Opposite((Dir)di)
-                    && (item == null || item == w.output) && w.Buffer.Count(w.output) > 0)
-                {
-                    if (w.Buffer.RemoveUpTo(w.output, 1) > 0) { GainFrom(w.output, (Dir)di); return; }
-                }
-
-                // Storages have an OUTPUT side too — a belt on it pulls the stored item, so you
-                // can belt FROM a warehouse to a workshop (e.g. warehouse → sawmill).
-                if (WorldGrid.Storages.TryGetValue(c, out var st) && st != null && st.accepts != null && !st.accepts.isLiquid
-                    && st.OutputSide == Opposite((Dir)di)
-                    && (item == null || item == st.accepts) && st.Store.Count(st.accepts) > 0)
-                {
-                    if (st.Store.RemoveUpTo(st.accepts, 1) > 0) { GainFrom(st.accepts, (Dir)di); return; }
-                }
-
-                if (WorldGrid.Depots.TryGetValue(c, out var dp) && dp != null && dp.item != null && !dp.item.isLiquid
-                    && (item == null || item == dp.item) && dp.store.Count(dp.item) > 0)
-                {
-                    if (dp.store.RemoveUpTo(dp.item, 1) > 0) { GainFrom(dp.item, (Dir)di); return; }
-                }
-            }
-        }
     }
 }

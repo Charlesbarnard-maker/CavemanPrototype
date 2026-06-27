@@ -449,6 +449,9 @@ namespace Caveman
             var fog = new GameObject("FogOfWar").AddComponent<FogOfWar>();
             fog.target = player.transform; // size/res come from FogOfWar defaults (set for the big world)
 
+            // --- Belt simulation (central, deterministic, fixed-timestep — drives ALL belts) ---
+            BeltSim.Ensure();
+
             // --- Colony (now just age + automation-score holder; no survival loop) ---
             var colony = new GameObject("Colony").AddComponent<Colony>();
             colony.carried = gatherer.Inventory;

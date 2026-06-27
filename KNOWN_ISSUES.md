@@ -3,7 +3,38 @@
 A running record so progress/problems don't get lost. Newest first. Move items to
 **Fixed** when done. Maintained alongside the code — see DESIGN.md for the roadmap.
 
-## #19 playtest batch — belt-stall ROOT CAUSE + map screen + gather popup + minimap legend (2026-06-27) — most recent
+## #20 BELT REDESIGN — P0+P1: central deterministic sim + continuous flow (2026-06-27) — most recent
+Production-grade belt redesign (multi-agent analysis → phased plan; user signed off: ship-hundreds-now,
+single-lane, add a 5th hover tier). This is the ENGINE increment. **NOT yet Unity-compiled** (blind build).
+- **NEW `BeltSim.cs`** — one central, fixed-timestep (1/60), deterministic simulation drives ALL belts;
+  replaces every belt's individual `Update()` tick. Motion is now provably independent of GameObject
+  update order (kills the historic "items stuck / throttle to half-rate" class of bug at the source).
+  Created in GameBootstrap (`BeltSim.Ensure()`). Catch-up cap 12 steps (covers 4× speed at ~20fps).
+- **`Belt.cs` rewritten** from a per-cell `(item, count)` BUCKET into CONTINUOUS per-item positions:
+  each cell holds `List<BeltItem>{def, p∈[0,1], entryEdge}`; items advance at `speed = 1/interval`
+  cells/sec, the lead capped a `MinGap` behind the LIVE downstream tail → **deterministic spacing, no
+  overlaps, smooth cross-tile motion, correct fast↔slow backpressure.** Step passes: snapshot(connectivity)
+  → advance → handoff → pull. Belts processed **downstream-first** (`Belt.DistToSink`, cached on belt-set
+  change) so throughput stays **exact**.
+- **Throughput + visual speed PRESERVED EXACTLY**: `MinGap = 1.0` (one item per cell) ⇒ throughput =
+  (1/interval)/MinGap = 1/interval, i.e. the existing 30/60/120/240 per-min caps are unchanged. MinGap is
+  the SINGLE density/throughput knob — lowering it packs denser (Factorio look) but multiplies throughput
+  by 1/MinGap and needs an economy re-tune. Documented one-liner; deferred.
+- **Verified before commit (multi-agent + a Python sim):** compile-correctness / I-O semantics (byte-identical
+  deposit+pull rules) / integration (all callers compile) all PASS. The reviewers caught a throughput
+  shortfall (snapshot was stale-by-one-step → ~3–6%, worse on fast/long belts); FIXED by switching the
+  forward read to LIVE + downstream-first ordering. A faithful Python sim confirms: exact throughput
+  (≤0.5% drift) across all tiers AND min-gap = 1.000 (no overlap) in flow, backpressure, and wrong-order
+  cases. Splitter/merger, all building I/O, connectivity, liquid exclusion carried over verbatim.
+- **Compatibility shims** kept (`item` = lead type, `count` = item count, `CanAccept`, `Receive`) so no
+  external caller changed. Old `_timer`/`_inDir`/mutable `item`/`count`/`capacity` removed.
+- **NEXT (queued, all verifiable increments):** P2 event-driven connectivity (kills the per-step 256-cell
+  walk + makes the downstream-first order refresh on sink edits) · P3 procedural auto-tiling corner/T/cross
+  sprites · P4 multi-cell drag preview + commit-on-release + snapping · P5 data-driven tier table + the new
+  5th hover/glow tier (use a 60-divisible interval, e.g. 450/min) + multi-age visuals + animation · P6 debug
+  overlay. P7/P8 (segment compression, instanced rendering for thousands, two-lane belts) deferred per user.
+
+## #19 playtest batch — belt-stall ROOT CAUSE + map screen + gather popup + minimap legend (2026-06-27)
 Second Unity playtest (after the #18 cleanup, which compiled & ran). Four items. **NOT yet Unity-compiled** (blind build — recompile + retest).
 - **Belts STILL jammed — found the real root cause (the fair-share fix #17 was a different layer).** `Belt.Receive`
   (and all 4 `PullFromNeighbour` blocks) reset `_timer = 0f` on EVERY item arrival, even when piling. On a
