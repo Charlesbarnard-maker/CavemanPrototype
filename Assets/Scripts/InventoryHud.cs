@@ -936,6 +936,15 @@ namespace Caveman
                     GUILayout.Label($"<size=12>Holds: {pbSel.produces.displayName} {pbSel.Buffer.Count(pbSel.produces)}/{pbSel.Buffer.capacity}   ·   Rate: {pbSel.RatePerMin:0.#}/min</size>", _small);
                 else if (wb != null && wb.output != null)
                     GUILayout.Label($"<size=12>Holds: {wb.output.displayName} {wb.Buffer.Count(wb.output)}/{wb.Buffer.capacity}</size>", _small);
+
+                // Configurable smelter (Basic/Advanced): show the current recipe + a switch button.
+                if (wb != null && wb.HasRecipeChoice)
+                {
+                    var ins = new List<string>();
+                    if (wb.inputs != null) foreach (var c in wb.inputs) if (c != null && c.item != null) ins.Add(c.item.displayName);
+                    GUILayout.Label($"<size=12>Making: <b>{(wb.output != null ? wb.output.displayName : "?")}</b> <color=#888>from {string.Join(" + ", ins)}</color></size>", _small);
+                    if (GUILayout.Button("<size=12>↻ Change recipe</size>", _btn)) wb.CycleRecipe();
+                }
             }
             else if (sb != null)
             {

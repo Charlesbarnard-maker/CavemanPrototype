@@ -18,6 +18,13 @@ namespace Caveman
         public List<ItemAmount> inputs = new();
         public Belt.Dir OutputSide = Belt.Dir.E; // belts pull output only from this side
 
+        // Configurable multi-recipe machines (Basic/Advanced Smelter): when set, the SELECTED recipe
+        // drives output/outputPerCycle/processTime/inputs above. Null/empty = a fixed single recipe.
+        public List<Recipe> recipes;
+        private int _recipeIndex = -1;
+        public bool HasRecipeChoice => recipes != null && recipes.Count > 1;
+        public Recipe ActiveRecipe => (recipes != null && _recipeIndex >= 0 && _recipeIndex < recipes.Count) ? recipes[_recipeIndex] : null;
+
         public Inventory Buffer { get; private set; }      // finished output
         public Inventory InBuffer { get; private set; }     // inputs delivered by belts
         public bool Paused { get; private set; }            // player can halt it to free shared inputs
@@ -68,6 +75,13 @@ namespace Caveman
             w.outputPerCycle = def.outputPerCycle;
             w.processTime = Mathf.Max(0.2f, def.interval);
             w.inputs = def.inputs;
+            // Configurable smelter etc.: adopt the recipe list + select the first age-unlocked recipe,
+            // which overrides output/inputs/processTime above. Plain workshops leave recipes null.
+            if (def.recipes != null && def.recipes.Count > 0)
+            {
+                w.recipes = def.recipes;
+                w.ApplyRecipe(w.FirstUnlockedRecipe());
+            }
             w.Buffer = new Inventory { capacity = Mathf.Max(1, def.capacity) };
             w.InBuffer = new Inventory { capacity = 32 }; // shared input buffer (fair-shared across inputs)
             w.OutputSide = outputSide;
@@ -83,6 +97,56 @@ namespace Caveman
         {
             _sr = GetComponent<SpriteRenderer>();
             if (_sr != null) _baseColor = _sr.color;
+        }
+
+        // ---- Configurable recipe selection (Basic/Advanced Smelter) ----------------------------
+        // Point this machine at recipe i: that recipe now drives output/inputs/processTime so all the
+        // rest of the workshop logic (CanMake, ConsumeInputs, WantsInput, ports) works unchanged.
+        public void ApplyRecipe(int i)
+        {
+            if (recipes == null || i < 0 || i >= recipes.Count) return;
+            _recipeIndex = i;
+            var r = recipes[i];
+            output = r.output;
+            outputPerCycle = r.outputPerCycle;
+            processTime = Mathf.Max(0.2f, r.processTime);
+            inputs = r.inputs;
+            _timer = 0f; _starved = false;
+        }
+
+        private int FirstUnlockedRecipe()
+        {
+            int age = Colony.Instance != null ? Colony.Instance.Age : 0;
+            for (int i = 0; i < recipes.Count; i++) if (recipes[i].unlockAge <= age) return i;
+            return 0; // nothing unlocked yet (shouldn't happen — first recipe is age 0) → default to first
+        }
+
+        /// <summary>Switch to the next age-unlocked recipe (player clicks "change recipe" in the panel).
+        /// Dumps any belt-fed inputs back to hand first so the old recipe's items don't strand here.</summary>
+        public void CycleRecipe()
+        {
+            if (recipes == null || recipes.Count <= 1) return;
+            int age = Colony.Instance != null ? Colony.Instance.Age : 0;
+            for (int step = 1; step <= recipes.Count; step++)
+            {
+                int i = (_recipeIndex + step) % recipes.Count;
+                if (recipes[i].unlockAge <= age) { DumpInBuffer(); ApplyRecipe(i); return; }
+            }
+        }
+
+        // Move everything currently in the input buffer back to the player's hand (so a recipe switch
+        // never leaves the now-wrong inputs clogging InBuffer). Mirrors the demolish dump.
+        private void DumpInBuffer()
+        {
+            if (InBuffer == null) return;
+            var carried = Colony.Instance != null ? Colony.Instance.carried : null;
+            var snapshot = new List<KeyValuePair<ItemDefinition, int>>(InBuffer.Items);
+            foreach (var kv in snapshot)
+            {
+                if (kv.Key == null || kv.Value <= 0) continue;
+                if (carried != null) carried.Add(kv.Key, kv.Value);
+                InBuffer.RemoveUpTo(kv.Key, kv.Value);
+            }
         }
 
         /// <summary>Which recipe inputs are currently short (for the "waiting for X" panel hint).</summary>

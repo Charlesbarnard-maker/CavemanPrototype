@@ -18,6 +18,29 @@ namespace Caveman
         }
     }
 
+    /// <summary>One selectable workshop recipe — for a CONFIGURABLE multi-recipe machine (e.g. the
+    /// Basic Smelter: Copper or Iron; the Advanced Smelter: Bronze or Steel). When a BuildingDefinition
+    /// lists recipes, the placed workshop picks one (cycled in its panel) and that recipe drives its
+    /// output/inputs/processTime; a plain single-recipe workshop leaves `recipes` empty and uses the
+    /// def's item/inputs/interval directly. A recipe is only selectable once the colony reaches its
+    /// `unlockAge` (so e.g. the Steel recipe stays Iron-age-gated inside the Advanced Smelter).</summary>
+    [System.Serializable]
+    public class Recipe
+    {
+        public ItemDefinition output;
+        public int outputPerCycle = 1;
+        public float processTime = 3f;
+        public List<ItemAmount> inputs = new();
+        public int unlockAge = 0;
+
+        public Recipe() { }
+        public Recipe(ItemDefinition output, int outputPerCycle, float processTime, int unlockAge, params ItemAmount[] inputs)
+        {
+            this.output = output; this.outputPerCycle = outputPerCycle; this.processTime = processTime;
+            this.unlockAge = unlockAge; this.inputs = new List<ItemAmount>(inputs);
+        }
+    }
+
     public enum BuildingKind
     {
         Collector, // auto-harvests a nearby resource patch (fully automatic — no workers)
@@ -51,6 +74,8 @@ namespace Caveman
         public int maxWorkers = 2;
         [Tooltip("Workshop only: input resources consumed per cycle to make `item`.")]
         public List<ItemAmount> inputs = new();
+        [Tooltip("Workshop only: optional SELECTABLE recipes (a configurable multi-recipe machine, e.g. Basic/Advanced Smelter). Empty = a single fixed recipe from item/inputs/interval above.")]
+        public List<Recipe> recipes = new();
 
         [Header("Footprint")]
         [Tooltip("Building width in grid cells (1 = a single cell).")]

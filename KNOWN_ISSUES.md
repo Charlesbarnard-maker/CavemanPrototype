@@ -3,7 +3,29 @@
 A running record so progress/problems don't get lost. Newest first. Move items to
 **Fixed** when done. Maintained alongside the code — see DESIGN.md for the roadmap.
 
-## #23 SYSTEMS REDESIGN (energy/storage/resources/transport) — plan + SR-P0/P1 (2026-06-27) — most recent
+## #24 Smelters: Basic + Advanced (configurable multi-recipe), replacing 4 fixed buildings (2026-06-27) — most recent
+Request: drop separate Copper/Iron smelters → a **Basic Smelter** (ore→bar, like the old ones) + an
+**Advanced Smelter** (combine materials → alloy bars). User chose: **configurable** recipe (select in panel,
+like the warehouse) + **keep Bronze/Steel** consolidated (no new alloys). **NOT yet Unity-compiled.**
+- **NEW: configurable multi-recipe workshops.** `Recipe{output,outputPerCycle,processTime,inputs,unlockAge}`
+  + `BuildingDefinition.recipes` (empty = legacy single recipe). `WorkshopBuilding` gains `recipes`/
+  `ApplyRecipe`/`FirstUnlockedRecipe`/`CycleRecipe`/`DumpInBuffer`; the SELECTED recipe drives
+  output/inputs/processTime so all existing logic (CanMake/ConsumeInputs/WantsInput/ports) works unchanged.
+  Spawn picks the first age-unlocked recipe; switching dumps belt-fed inputs back to hand (no stranded items).
+- **Basic Smelter** (unlockAge 1): recipes = Copper Ore+Charcoal→Copper · Iron Ore+Charcoal→Iron (both age 1).
+  Replaces Copper Smelter + Iron Smelter.
+- **Advanced Smelter** (unlockAge 2): recipes = Copper+Bricks→Bronze Plate (age 2) · Iron+Charcoal→Steel
+  (age 3 — Steel stays Iron-age-gated via per-recipe unlockAge). Replaces Bronzeworks + Steel Foundry.
+- **Rewired:** research age-gates now require Basic Smelter (Bronze) / Advanced Smelter (Iron + Industrial) —
+  the delivered gate item (Study Scroll→copper, Schematic→bronze, Blueprint→steel) still enforces the real
+  chain. Buildables list, objectives, item + maker descriptions all updated. Toolmaker/ore mines unchanged.
+- **UI:** the workshop panel shows "Making: X from A + B" + a "↻ Change recipe" button when a smelter has a
+  choice (cycles to the next age-unlocked recipe). Belt-independent change.
+- **Recompile check:** build a Basic Smelter → it defaults to Copper, "↻ Change recipe" flips it to Iron
+  (and dumps any loaded ore to hand); Advanced Smelter defaults to Bronze, offers Steel only at Iron age;
+  age-gates still advance (build smelter + deliver the gate item).
+
+## #23 SYSTEMS REDESIGN (energy/storage/resources/transport) — plan + SR-P0/P1 (2026-06-27)
 Big logistics-first redesign (multi-agent analysis → cohesive plan; user signed off the decisions). Goal:
 turn "place a machine, it just works anywhere" into "plan a central, powered, zoned hub fed by routed
 supply lines." **NOT yet Unity-compiled.**
