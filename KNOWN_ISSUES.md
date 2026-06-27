@@ -3,7 +3,19 @@
 A running record so progress/problems don't get lost. Newest first. Move items to
 **Fixed** when done. Maintained alongside the code — see DESIGN.md for the roadmap.
 
-## #21 Collector "machine working" animation (cosmetic) (2026-06-27) — most recent
+## #22 Splitter is now 1→3 (was 1→2) (2026-06-27) — most recent
+Request: splitters should split 3 ways. Extended the splitter from 2 outputs to 3 — forward (`dir`),
+right (`RotateCW`), and **left (new `RotateCCW`)**; input stays the back edge. **NOT yet Unity-compiled.**
+- Distribution: `_splitToggle` (bool) → `_splitNext` (round-robin index 0/1/2). On handoff it tries the
+  preferred output then falls through to the next available ones (never stalls), advancing the preference
+  on each successful send for an even 3-way split. New `SplitDir(i)` maps 0=fwd/1=right/2=left.
+- `LeadHeadLimit` (max over 3 outputs) + `HasForwardTarget` (OR over 3) + `AddPortMarkers` (3 output arrows
+  N/E/W + 1 input notch S) all updated. `DistToSink` still follows the primary output (`dir`) for ordering
+  (heuristic only — correctness-neutral).
+- Wording synced everywhere (1→2 → 1→3): GameBootstrap splitter def + research desc, BuildingDefinition
+  tooltip. Merger unchanged (N→1). Feed THREE machines from one supply line now.
+
+## #21 Collector "machine working" animation (cosmetic) (2026-06-27)
 Request: "resource buildings should show their workers gathering as a UI feature." This collides with the
 canon ("fully automated machines, no workers" — the Harvester NPC was deliberately removed in #18), so it
 was surfaced + clarified. User chose the **no-humans, machine-working** option, so the canon is UNCHANGED.

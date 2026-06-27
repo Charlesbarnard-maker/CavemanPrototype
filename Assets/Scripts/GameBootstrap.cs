@@ -240,14 +240,14 @@ namespace Caveman
             steelBelt.color = new Color(0.62f, 0.66f, 0.72f);
             steelBelt.cost = new List<ItemAmount> { new ItemAmount(metal, 2), new ItemAmount(planks, 2) };
             steelBelt.description = "Steel Belt — 240/min, the fastest tier (4× a Conveyor). Overlay to upgrade. For the densest late-game lines (Iron).";
-            // Splitter: a 1→2 belt that distributes items EVENLY between two outputs. Lets one
-            // supply line feed two machines. (Belt kind, flagged splitter — placed like a belt.)
+            // Splitter: a 1→3 belt that distributes items EVENLY between three outputs. Lets one
+            // supply line feed three machines. (Belt kind, flagged splitter — placed like a belt.)
             var splitter = ScriptableObject.CreateInstance<BuildingDefinition>();
             splitter.displayName = "Splitter"; splitter.kind = BuildingKind.Belt; splitter.splitter = true; splitter.unlockAge = 0;
             splitter.interval = 0.25f; // runs at the TOP belt rate (240/min) so it never throttles any tier
             splitter.color = new Color(0.45f, 0.62f, 0.72f);
             splitter.cost = new List<ItemAmount> { new ItemAmount(wood, 2) };
-            splitter.description = "1→2 SPLITTER: pulls from behind and sends items EVENLY to two outputs — forward and to its right (R rotates). If one output backs up it sends to the other, so it never stalls. Feed two machines from one supply line. (Smart/filtered splitters come later.)";
+            splitter.description = "1→3 SPLITTER: pulls from behind and sends items EVENLY to three outputs — forward, left and right (R rotates). If one output backs up it sends to the others, so it never stalls. Feed three machines from one supply line. (Smart/filtered splitters come later.)";
             // Merger: the reverse of a splitter — COMBINES two belt lines into one. Needed because a
             // plain belt now refuses a 2nd feeder (no silent merging by pointing a belt onto a line).
             var merger = ScriptableObject.CreateInstance<BuildingDefinition>();
@@ -382,7 +382,7 @@ namespace Caveman
                 new Research.Tech { id = "bronze",     name = "Bronze Age",     cost = 60,  advanceToAge = 2, prereq = "tribal", requiredBuildings = new List<BuildingDefinition>{ copperSmelter }, gateItem = studyScroll, gateItemCount = 8, desc = "Advance to the Bronze Age — but first BUILD a Copper Smelter and deliver Study Scrolls (now made from Copper + Planks)." },
                 new Research.Tech { id = "iron",       name = "Iron Age",       cost = 160, advanceToAge = 3, prereq = "bronze", requiredBuildings = new List<BuildingDefinition>{ bronzeworks },   gateItem = schematic,   gateItemCount = 6, desc = "Advance to the Iron Age — but first BUILD a Bronzeworks and deliver Schematics (now made from Bronze Plate + Pottery)." },
                 new Research.Tech { id = "industrial", name = "Industrial Age", cost = 360, advanceToAge = 4, prereq = "iron",   requiredBuildings = new List<BuildingDefinition>{ steelFoundry },  gateItem = blueprint,   gateItemCount = 5, desc = "Advance to the Industrial Age — but first BUILD a Steel Foundry and deliver Blueprints (now made from Steel + Tools)." },
-                new Research.Tech { id = "splitters",   name = "Splitters",     cost = 15,  prereq = "tribal", unlocks = new List<BuildingDefinition>{ splitter },   desc = "Unlocks the 1→2 Splitter — feed two machines from one supply line." },
+                new Research.Tech { id = "splitters",   name = "Splitters",     cost = 15,  prereq = "tribal", unlocks = new List<BuildingDefinition>{ splitter },   desc = "Unlocks the 1→3 Splitter — feed three machines from one supply line." },
                 // The belt-upgrade ladder: a cheap EARLY first rung (the wooden belt is deliberately
                 // slow), then deeper tiers gated by age so faster belts pace your factory's growth.
                 new Research.Tech { id = "conveyors",   name = "Conveyor Belts", cost = 10, prereq = null,     unlocks = new List<BuildingDefinition>{ fastBelt },   desc = "Your first belt upgrade: the Conveyor (60/min — 2× the slow wooden belt). Overlay it on wooden belts to upgrade in place." },

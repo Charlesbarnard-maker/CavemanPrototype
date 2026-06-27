@@ -41,11 +41,12 @@ namespace Caveman
         // Hard safety cap on items per cell (spacing is the real limiter; this just bounds the list).
         public static int CellCapacity => Mathf.Max(2, Mathf.FloorToInt(1f / MinGap) + 1);
 
-        // Splitter: a 1→2 belt that sends items EVENLY to two outputs — its facing `dir` (forward)
-        // and the cell to its right (RotateCW(dir)). `_splitToggle` flips the preferred output each
-        // item; a full output falls back to the other so it never stalls.
+        // Splitter: a 1→3 belt that sends items EVENLY to its three non-input outputs — forward
+        // (`dir`), right (RotateCW(dir)) and left (RotateCCW(dir)); the input is the back edge.
+        // `_splitNext` round-robins the preferred output each item; a full/blocked output falls
+        // through to the next available one so the splitter never stalls.
         public bool isSplitter;
-        private bool _splitToggle;
+        private int _splitNext;
 
         // Merger: an N→1 belt that ACCEPTS hand-offs from any feeder (used to deliberately combine
         // two belt lines). Normal belts reject a 2nd feeder (so you can't silently merge by pointing
@@ -74,6 +75,9 @@ namespace Caveman
         public static Vector2Int CellOf(Vector3 p) => new Vector2Int(Mathf.RoundToInt(p.x), Mathf.RoundToInt(p.y));
         public static Belt At(Vector2Int c) => Grid.TryGetValue(c, out var b) ? b : null;
         public static Dir RotateCW(Dir d) => (Dir)(((int)d + 1) % 4);
+        public static Dir RotateCCW(Dir d) => (Dir)(((int)d + 3) % 4);
+        // The splitter's three output directions, indexed for round-robin: 0=forward, 1=right, 2=left.
+        private Dir SplitDir(int i) => i == 1 ? RotateCW(dir) : i == 2 ? RotateCCW(dir) : dir;
 
         public static Vector2Int Step(Dir d) => d switch
         {
@@ -208,6 +212,7 @@ namespace Caveman
             {
                 _portMarkers.Add(Ports.MakeOutputArrow(transform, Dir.N).gameObject); // forward out
                 _portMarkers.Add(Ports.MakeOutputArrow(transform, Dir.E).gameObject); // right out
+                _portMarkers.Add(Ports.MakeOutputArrow(transform, Dir.W).gameObject); // left out
                 _portMarkers.Add(Ports.MakeInputNotch(transform, Dir.S).gameObject);  // back in
             }
             else if (isMerger)
@@ -261,10 +266,10 @@ namespace Caveman
         // The furthest p (in THIS cell's coordinates) the lead may reach this step. A downstream
         // belt that can take our item lets the lead reach 1+tail−MinGap (so it trails the next
         // cell's tail by MinGap across the shared boundary); a sink/dead-end lets it reach the exit
-        // edge (1) and either deposit or pin there. A splitter takes the better of its two outputs.
+        // edge (1) and either deposit or pin there. A splitter takes the best of its three outputs.
         private float LeadHeadLimit()
         {
-            if (isSplitter) return Mathf.Max(HeadLimitDir(dir), HeadLimitDir(RotateCW(dir)));
+            if (isSplitter) return Mathf.Max(HeadLimitDir(dir), Mathf.Max(HeadLimitDir(RotateCW(dir)), HeadLimitDir(RotateCCW(dir))));
             return HeadLimitDir(dir);
         }
         private float HeadLimitDir(Dir d)
@@ -292,16 +297,17 @@ namespace Caveman
             var lead = _items[0];
             if (lead.p < 1f - 1e-4f) return; // not at the exit edge yet
 
-            bool moved;
+            bool moved = false;
             if (isSplitter)
             {
-                // 1→2 even split: alternate the PREFERRED output; fall back to the other so a full
-                // lane never stalls the splitter.
-                Dir a = _splitToggle ? RotateCW(dir) : dir;
-                Dir b = _splitToggle ? dir : RotateCW(dir);
-                moved = TryDepositTo(a, lead.def);
-                if (moved) _splitToggle = !_splitToggle;
-                else moved = TryDepositTo(b, lead.def);
+                // 1→3 even split: try the round-robin PREFERRED output first, then fall through to
+                // the next outputs in order so a full/blocked lane never stalls the splitter. On a
+                // successful send, advance the preference to the NEXT output for even distribution.
+                for (int k = 0; k < 3 && !moved; k++)
+                {
+                    int idx = (_splitNext + k) % 3;
+                    if (TryDepositTo(SplitDir(idx), lead.def)) { moved = true; _splitNext = (idx + 1) % 3; }
+                }
             }
             else
             {
@@ -429,7 +435,7 @@ namespace Caveman
         // that ultimately reaches a sink. Stops belts conveying into nothing.
         private bool HasForwardTarget()
         {
-            if (isSplitter) return OutputConnected(dir) || OutputConnected(RotateCW(dir));
+            if (isSplitter) return OutputConnected(dir) || OutputConnected(RotateCW(dir)) || OutputConnected(RotateCCW(dir));
             return OutputConnected(dir);
         }
 
