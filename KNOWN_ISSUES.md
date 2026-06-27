@@ -3,7 +3,23 @@
 A running record so progress/problems don't get lost. Newest first. Move items to
 **Fixed** when done. Maintained alongside the code — see DESIGN.md for the roadmap.
 
-## #20 BELT REDESIGN — P0+P1: central deterministic sim + continuous flow (2026-06-27) — most recent
+## #21 Collector "machine working" animation (cosmetic) (2026-06-27) — most recent
+Request: "resource buildings should show their workers gathering as a UI feature." This collides with the
+canon ("fully automated machines, no workers" — the Harvester NPC was deliberately removed in #18), so it
+was surfaced + clarified. User chose the **no-humans, machine-working** option, so the canon is UNCHANGED.
+- **NEW `MachineWorkFX.cs`** — a purely cosmetic component: a pumping mechanical **arm/drill** aimed at the
+  resource node the collector taps, plus **dust puffs** kicked out on each gather cycle. Procedural sprites,
+  no assets. Standalone GameObject at the building position (not parented — the building transform is
+  non-uniformly footprint-scaled, which would skew children); the collector Destroys it in OnDisable.
+- **Zero logic / zero balance impact** — driven entirely by `ProductionBuilding`'s existing gather loop:
+  `SetWorking(working)` + `SetTarget(node)` each frame, `Strike()` on each `Pulse()` (gather tick). The
+  arm hides when the collector isn't actually extracting (paused/starved/backed-up). No workers, no pathing,
+  no NPC agents — keeps the auto-machine design. Existing white gather-flash + status dot retained.
+- Scope: collectors (the buildings that "gather resources"). Reusable on workshops later if wanted.
+- **NOT yet Unity-compiled** (blind build) — recompile + eyeball that collectors show a pumping arm + dust
+  while working, nothing while idle, and that demolish cleans up the FX (no leftover arm).
+
+## #20 BELT REDESIGN — P0+P1: central deterministic sim + continuous flow (2026-06-27)
 Production-grade belt redesign (multi-agent analysis → phased plan; user signed off: ship-hundreds-now,
 single-lane, add a 5th hover tier). This is the ENGINE increment. **NOT yet Unity-compiled** (blind build).
 - **NEW `BeltSim.cs`** — one central, fixed-timestep (1/60), deterministic simulation drives ALL belts;

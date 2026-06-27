@@ -34,6 +34,7 @@ namespace Caveman
         {
             All.Remove(this);
             if (_cells != null) foreach (var c in _cells) WorldGrid.Remove(WorldGrid.Collectors, c, this);
+            if (_fx != null) Destroy(_fx.gameObject); // FX is a standalone object → clean it up on demolish
         }
 
         // Rolling gather-rate estimate (units/min).
@@ -48,6 +49,7 @@ namespace Caveman
         private SpriteRenderer _sr;
         private Color _baseColor;
         private SpriteRenderer _statusDot;
+        private MachineWorkFX _fx; // cosmetic "machine working" arm + dust (no workers, no logic)
 
         public static ProductionBuilding Spawn(BuildingDefinition def, Vector3 pos, Belt.Dir outputSide = Belt.Dir.E)
         {
@@ -74,6 +76,7 @@ namespace Caveman
             foreach (var c in pb._cells) WorldGrid.Collectors[c] = pb;
             Ports.PlacePorts(go.transform, def.FootW, def.FootH, outputSide, false, true);
             pb.Bind();
+            pb._fx = MachineWorkFX.Attach(go.transform.position); // cosmetic working animation
             return pb;
         }
 
@@ -146,7 +149,7 @@ namespace Caveman
             if (_source == null || !_source.HasResource) Bind(searchRadius);
         }
 
-        public void Pulse() => _flash = 0.25f;
+        public void Pulse() { _flash = 0.25f; if (_fx != null) _fx.Strike(); } // flash + a dust/arm work pulse
 
         void Update()
         {
@@ -182,6 +185,13 @@ namespace Caveman
 
             UpdateVisual(working);
             UpdateStatus();
+
+            // Drive the cosmetic "machine working" animation (arm aimed at the tapped node + dust).
+            if (_fx != null)
+            {
+                _fx.SetWorking(working);
+                if (_source != null) _fx.SetTarget(_source.transform.position);
+            }
         }
 
         /// <summary>Live status colour (green working / yellow backed-up / red starved /
