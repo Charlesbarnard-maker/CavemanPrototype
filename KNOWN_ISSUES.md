@@ -3,7 +3,30 @@
 A running record so progress/problems don't get lost. Newest first. Move items to
 **Fixed** when done. Maintained alongside the code — see DESIGN.md for the roadmap.
 
-## #18 Audit cleanup — part 1: remove the Harvester NPC + stop silent demolish loss (2026-06-26) — most recent
+## #19 playtest batch — belt-stall ROOT CAUSE + map screen + gather popup + minimap legend (2026-06-27) — most recent
+Second Unity playtest (after the #18 cleanup, which compiled & ran). Four items. **NOT yet Unity-compiled** (blind build — recompile + retest).
+- **Belts STILL jammed — found the real root cause (the fair-share fix #17 was a different layer).** `Belt.Receive`
+  (and all 4 `PullFromNeighbour` blocks) reset `_timer = 0f` on EVERY item arrival, even when piling. On a
+  continuously-fed straight run, whichever belt `Update()`s first each frame keeps zeroing the *downstream*
+  belt's dwell timer, so the lead never matures → the cell throttles to ~½ rate and items stack to capacity
+  (4). The `4984d8a` piling renderer made that long-standing pile *visible* (1 dot → up to 4 nose-to-tail), so
+  it newly read as "stuck since the conveyor change" — but the flow logic was unchanged; the bug predates it.
+  **Fix:** new `Belt.GainFrom` only (re)starts the dwell timer + entry edge when the cell was EMPTY (a fresh
+  lead item); piling a follower keeps the lead's dwell → throughput is now Update-order-independent, full rate.
+  Also unified `UpdateDots` so the lead animates by its timer and followers pack behind it (no pop, holds at
+  exit when blocked). Pure timer/render change; push gating (1 item / interval) untouched.
+- **Map (M) reworked from "zoom camera all the way out" → a real pan/zoom MAP SCREEN.** Removed the overview-zoom
+  from `CameraFollow` (now wheel-zoom only). `M` (owned by `InventoryHud`, a modal Panel) opens a full square
+  view of the explored fog with live building/resource/player dots; **drag to pan, wheel to zoom toward the
+  cursor (1–8×), M/Esc to close.** Reuses the minimap's fog tex + dot logic. World camera untouched (HUD overlay).
+- **Hand-gather "+1" popup.** New `GatherPopup` (sibling of `Toast`): a small bold world-anchored "+1 <item>"
+  in the item's colour floats up from the node and fades (~0.85s) on each manual harvest; also added the chop
+  `Nudge()` recoil to manual hits. `PlayerGatherer` fires it; `InventoryHud.DrawGatherPopups` renders it.
+- **Minimap legend was illegible + clipped.** Was `<size=10>` left-aligned in a map-width rect hugging the
+  screen's right edge → clipped. Now `<size=13>`, right-aligned in a wider rect that extends LEFT, sat higher
+  above the map. Footer/help wording updated: **M = world map · N = minimap on/off**.
+
+## #18 Audit cleanup — part 1: remove the Harvester NPC + stop silent demolish loss (2026-06-26)
 Acting on the deep multi-agent systems audit. **Recompile.**
 - **CRITICAL fix — Harvester worker-NPC removed (audit C1).** Deleted `Harvester.cs` and the per-collector
   `_cutter` spawn/destroy in `ProductionBuilding` — the one LIVE worker/agent (a man-like NPC that walked out

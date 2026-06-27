@@ -6,7 +6,7 @@ namespace Caveman
     /// A discoverable fog of war: the whole map starts dark and is permanently
     /// revealed in a radius around the player as they move. Encourages exploration;
     /// the more you walk, the more of the map you uncover (and can see on the M
-    /// overview). Implemented as one big world-space sprite whose texture is painted
+    /// world map + the minimap). Implemented as one big world-space sprite whose texture is painted
     /// transparent where explored.
     /// </summary>
     public class FogOfWar : MonoBehaviour

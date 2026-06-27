@@ -34,6 +34,11 @@ namespace Caveman
         private readonly HashSet<int> _pinned = new(); // pinned (favourite) buildable indices
         private string _activeCat = "Production"; // build-menu accordion: only this group is open
         private bool _showMinimap = true;
+        private bool _showMap;            // full-screen pan/zoom world map (M)
+        private float _mapZoom = 1f;      // 1 = whole world fits the map area; higher = zoomed in
+        private Vector2 _mapPan;          // map content offset (pixels) within the map area
+        private bool _mapDragging;
+        private Vector2 _mapDragLast;
         private bool _showGuide;
         private Vector2 _guideScroll;
         private Rect _guideRect;
@@ -51,6 +56,8 @@ namespace Caveman
         private Rect _topRect, _miniRect, _objRect;
         private readonly List<(string label, int value, string detail, Color color)> _chips = new();
         private GUIStyle _toast;
+        private GUIStyle _gatherStyle; // bold "+N" floating hand-gather popup
+        private GUIStyle _legend;      // right-aligned minimap legend (so it never clips at the screen edge)
         private int _lastAge = -1;
         // "What just changed" card shown on an age advance. It now PERSISTS until the player
         // dismisses it (click-to-close), so the new-buildings tips are never missed.
@@ -71,14 +78,15 @@ namespace Caveman
         // Opening any of Build / Research / Guide / Help closes the others, so the player
         // focuses on a single system. The minimap is a world overlay, not a context panel,
         // so it's exempt. ---
-        private enum Panel { Build, Research, Guide, Help }
-        private void CloseAllPanels() { _showBuild = _showResearch = _showGuide = _showHelp = false; }
+        private enum Panel { Build, Research, Guide, Help, Map }
+        private void CloseAllPanels() { _showBuild = _showResearch = _showGuide = _showHelp = _showMap = false; }
         private void TogglePanel(Panel p)
         {
             bool wasOpen = p == Panel.Build ? _showBuild
                          : p == Panel.Research ? _showResearch
                          : p == Panel.Guide ? _showGuide
-                         : _showHelp;
+                         : p == Panel.Help ? _showHelp
+                         : _showMap;
             CloseAllPanels();
             if (wasOpen) return; // it was open → we just closed it
             switch (p)
@@ -87,10 +95,11 @@ namespace Caveman
                 case Panel.Research: _showResearch = true; break;
                 case Panel.Guide: _showGuide = true; break;
                 case Panel.Help: _showHelp = true; break;
+                case Panel.Map: _showMap = true; _mapZoom = 1f; _mapPan = Vector2.zero; break; // open fitting the whole world
             }
         }
         // A full-screen "mode" panel is up — used to dim the world and hide competing widgets.
-        private bool ModalOpen => _showResearch || _showGuide || _showHelp;
+        private bool ModalOpen => _showResearch || _showGuide || _showHelp || _showMap;
 
         void Update()
         {
@@ -104,6 +113,8 @@ namespace Caveman
             if (kb.hKey.wasPressedThisFrame) TogglePanel(Panel.Help);
             if (kb.bKey.wasPressedThisFrame) TogglePanel(Panel.Build);
             if (kb.nKey.wasPressedThisFrame) _showMinimap = !_showMinimap;
+            if (kb.mKey.wasPressedThisFrame) TogglePanel(Panel.Map);   // full-screen pan/zoom world map
+            if (_showMap && kb.escapeKey.wasPressedThisFrame) _showMap = false;
             if (kb.gKey.wasPressedThisFrame) TogglePanel(Panel.Guide);
             if (kb.tKey.wasPressedThisFrame) TogglePanel(Panel.Research);
 
@@ -133,6 +144,9 @@ namespace Caveman
             // Toasts fade out.
             for (int i = 0; i < Toast.Items.Count; i++) Toast.Items[i].t -= Time.unscaledDeltaTime;
             Toast.Items.RemoveAll(t => t.t <= 0f);
+            // "+N" hand-gather popups rise + fade (unscaled, so they read even while paused).
+            for (int i = 0; i < GatherPopup.Items.Count; i++) GatherPopup.Items[i].t -= Time.unscaledDeltaTime;
+            GatherPopup.Items.RemoveAll(g => g.t <= 0f);
             // The age-advance card no longer auto-dismisses — it stays up until the player clicks
             // "Got it" / the card (see DrawAgeCard), so there's always time to read the new tips.
 
@@ -263,6 +277,7 @@ namespace Caveman
 
             DrawHoverInfo();
             DrawToasts();
+            DrawGatherPopups();
             if (!modal) DrawAgeCard(); // temporary "what changed" moment; yields if a mode panel is open
             if (Objectives.Instance != null && Objectives.Instance.Won) DrawWin();
 
@@ -271,6 +286,7 @@ namespace Caveman
             if (_showHelp) DrawHelp();
             if (_showGuide) DrawGuide();
             if (_showResearch) DrawResearchPanel();
+            if (_showMap) DrawMapScreen();
             if (_paused) GUI.Label(new Rect(0, 60, Screen.width, 60), "<b>PAUSED</b>  <size=18>(space)</size>", _big);
 
             // Block world clicks when the cursor is over an interactive panel. A modal mode
@@ -413,9 +429,119 @@ namespace Caveman
             foreach (var wk in WorkshopBuilding.All) if (wk != null) Dot(wk.transform.position, wk.StatusColor, 4f);
             if (gatherer != null) Dot(gatherer.transform.position, new Color(0.96f, 0.85f, 0.2f), 6f);
 
-            // Legend so the dot colours are self-explanatory.
-            GUI.Label(new Rect(r.x, r.y - 17f, r.width, 16f),
-                "<size=10><color=#6c6>●</color> ok  <color=#f66>●</color> starved  <color=#fd4>●</color> full</size>", _small);
+            // Legend so the dot colours are self-explanatory. Right-aligned in a rect that extends
+            // LEFT of the map (which hugs the screen's right edge), so a legible-size label can't be
+            // clipped off-screen. A bit higher + bigger than before (was an illegible size-10).
+            _legend ??= new GUIStyle(_small) { alignment = TextAnchor.LowerRight };
+            GUI.Label(new Rect(r.x - 90f, r.y - 25f, r.width + 90f, 20f),
+                "<size=13><color=#6c6>●</color> ok   <color=#f66>●</color> starved   <color=#fd4>●</color> full</size>", _legend);
+        }
+
+        // ---- Full world map screen (M): pan + zoom the discovered world ----
+        // A proper map "mode" (replaces the old M = zoom-camera-all-the-way): a large square view
+        // of the explored fog with live building/resource/player dots. Drag to pan, wheel to zoom
+        // (toward the cursor); M or Esc closes. Modal, so the game world is dimmed + click-blocked
+        // underneath (handled by ModalOpen) — this is purely a HUD overlay, the game camera is untouched.
+        private void DrawMapScreen()
+        {
+            var fog = FogOfWar.Instance;
+            float W = fog != null ? fog.WorldSize : 240f;
+
+            // Square map area, centred, leaving headroom for the title + legend.
+            float side = Mathf.Min(Screen.width - 120f, Screen.height - 150f);
+            var area = new Rect((Screen.width - side) / 2f, (Screen.height - side) / 2f + 6f, side, side);
+
+            GUI.Label(new Rect(area.x, area.y - 38f, area.width, 30f),
+                "<b><color=#e8e0c8>World Map</color></b>   <size=13><color=#aaa>drag to pan · wheel to zoom · M or Esc to close</color></size>", _s);
+
+            // Pan + zoom from events over the area — handled BEFORE BeginGroup so coords are screen-space.
+            var e = Event.current;
+            if (e != null && area.Contains(e.mousePosition))
+            {
+                if (e.type == EventType.ScrollWheel)
+                {
+                    float old = _mapZoom;
+                    _mapZoom = Mathf.Clamp(_mapZoom * (e.delta.y > 0f ? 0.9f : 1.1f), 1f, 8f); // wheel up = zoom in
+                    Vector2 rel = e.mousePosition - new Vector2(area.x, area.y);               // keep the point under the cursor fixed
+                    _mapPan = (_mapPan - rel) * (_mapZoom / old) + rel;
+                    e.Use();
+                }
+                else if (e.type == EventType.MouseDown && e.button == 0) { _mapDragging = true; _mapDragLast = e.mousePosition; e.Use(); }
+            }
+            if (_mapDragging && e != null)
+            {
+                if (e.type == EventType.MouseDrag) { _mapPan += e.mousePosition - _mapDragLast; _mapDragLast = e.mousePosition; e.Use(); }
+                else if (e.type == EventType.MouseUp) { _mapDragging = false; e.Use(); }
+            }
+
+            float content = side * _mapZoom;
+            _mapPan.x = Mathf.Clamp(_mapPan.x, side - content, 0f); // content always covers the area (no empty gaps)
+            _mapPan.y = Mathf.Clamp(_mapPan.y, side - content, 0f);
+
+            GUI.BeginGroup(area); // clips everything below to the map area
+            var cr = new Rect(_mapPan.x, _mapPan.y, content, content);
+
+            GUI.color = new Color(0.22f, 0.31f, 0.19f);
+            GUI.DrawTexture(cr, Texture2D.whiteTexture);
+            GUI.color = Color.white;
+            if (fog != null && fog.Tex != null) GUI.DrawTexture(cr, fog.Tex); // explored = transparent → ground shows
+
+            void Dot(Vector3 wp, Color col, float s)
+            {
+                float u = (wp.x + W / 2f) / W, v = (wp.y + W / 2f) / W;
+                if (u < 0f || u > 1f || v < 0f || v > 1f) return;
+                GUI.color = col;
+                GUI.DrawTexture(new Rect(cr.x + u * content - s / 2f, cr.y + (1f - v) * content - s / 2f, s, s), Texture2D.whiteTexture);
+                GUI.color = Color.white;
+            }
+
+            float ds = Mathf.Clamp(4f * Mathf.Sqrt(_mapZoom), 4f, 14f); // dots grow a bit as you zoom in
+            foreach (var rn in ResourceNode.All)
+            {
+                if (rn == null || rn.yields == null) continue;
+                if (fog != null && !fog.IsExplored(rn.transform.position)) continue; // only show explored patches
+                var rc = rn.yields.color;
+                Dot(rn.transform.position, new Color(rc.r, rc.g, rc.b, 0.9f), ds * 0.7f);
+            }
+            foreach (var st in StorageBuilding.All)
+            {
+                if (st == null) continue;
+                float fill = (st.def != null && st.def.capacity > 0) ? (float)st.Store.Total() / st.def.capacity : 0f;
+                Color sc = fill >= 0.99f ? new Color(0.95f, 0.55f, 0.2f)
+                         : Color.Lerp(new Color(0.5f, 0.5f, 0.62f), new Color(0.9f, 0.8f, 0.3f), fill);
+                Dot(st.transform.position, sc, ds);
+            }
+            foreach (var dp in Depot.All) if (dp != null) Dot(dp.transform.position, new Color(0.5f, 0.8f, 0.9f), ds);
+            foreach (var p in ProductionBuilding.All) if (p != null) Dot(p.transform.position, p.StatusColor, ds);
+            foreach (var wk in WorkshopBuilding.All) if (wk != null) Dot(wk.transform.position, wk.StatusColor, ds);
+            if (gatherer != null) Dot(gatherer.transform.position, new Color(0.96f, 0.85f, 0.2f), ds * 1.7f); // you
+
+            GUI.EndGroup();
+            GUI.Box(area, GUIContent.none); // frame
+
+            GUI.Label(new Rect(area.x, area.yMax + 4f, area.width, 22f),
+                "<size=13><color=#fd2>●</color> you   <color=#6c6>●</color> ok   <color=#f66>●</color> starved   <color=#fd4>●</color> full   <color=#8cf>●</color> resource patch</size>", _small);
+        }
+
+        // ---- "+N" hand-gather popups: small bold numbers that float up from the node and fade ----
+        private void DrawGatherPopups()
+        {
+            if (GatherPopup.Items.Count == 0) return;
+            var cam = Camera.main;
+            if (cam == null) return;
+            _gatherStyle ??= new GUIStyle(GUI.skin.label) { richText = true, fontSize = 17, alignment = TextAnchor.MiddleCenter, fontStyle = FontStyle.Bold };
+            foreach (var g in GatherPopup.Items)
+            {
+                float life = Mathf.Clamp01(g.t / GatherPopup.Life); // 1 at spawn → 0 at expiry
+                Vector3 sp = cam.WorldToScreenPoint(g.world);
+                if (sp.z < 0f) continue; // behind the camera (shouldn't occur in 2D)
+                float x = sp.x, y = Screen.height - sp.y - (1f - life) * 42f; // GUI y is top-down; rise as it ages
+                string hex = ColorUtility.ToHtmlStringRGB(g.color);
+                var prev = GUI.color;
+                GUI.color = new Color(1f, 1f, 1f, Mathf.Clamp01(life * 1.5f)); // hold, then fade near the end
+                GUI.Label(new Rect(x - 60f, y - 38f, 120f, 22f), $"<color=#{hex}>{g.text}</color>", _gatherStyle);
+                GUI.color = prev;
+            }
         }
 
         // ---- Status (top bar) ----
@@ -1032,7 +1158,7 @@ namespace Caveman
             if (builder != null && builder.PendingIndex >= 0) return;
             float w = Mathf.Min(760f, Screen.width - 24f);
             GUILayout.BeginArea(new Rect(Screen.width / 2f - w / 2f, Screen.height - 40f, w, 38f));
-            GUILayout.Label($"<size=13><color=#bbb>B build · <color=#9cf>T research</color> · G guide · H help · M overview · N map {(_showMinimap ? "on" : "off")} · Space pause</color></size>", _small);
+            GUILayout.Label($"<size=13><color=#bbb>B build · <color=#9cf>T research</color> · G guide · H help · M map · N minimap {(_showMinimap ? "on" : "off")} · Space pause</color></size>", _small);
             string sandbox = Economy.FreeBuild ? "<color=#9f9>SANDBOX</color> · " : "";
             string mode = Economy.LocalProduction ? "<color=#fc8>Local logistics</color>" : "<color=#8cf>Global pool</color>";
             GUILayout.Label($"<size=11><color=#999>{sandbox}Speed x{_speed:0} · {mode} (F7) · F1–F5 sandbox</color></size>", _small);
@@ -1196,7 +1322,7 @@ namespace Caveman
                 "\n<b>Sandbox:</b> F1 +resources · F3 advance age · F4 free build · " +
                 "F5 game speed · F8 reveal map.\n" +
                 "</size>", _small);
-            GUILayout.Label("<size=15>Press <b>H</b> to close  ·  Press <b>G</b> for the full Guide (mechanics + every resource)  ·  <b>N</b> hides the map.</size>", _small);
+            GUILayout.Label("<size=15>Press <b>H</b> to close  ·  Press <b>G</b> for the full Guide (mechanics + every resource)  ·  <b>M</b> opens the world map  ·  <b>N</b> hides the minimap.</size>", _small);
             GUILayout.EndArea();
         }
 

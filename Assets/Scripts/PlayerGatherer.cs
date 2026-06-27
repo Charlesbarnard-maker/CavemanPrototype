@@ -52,8 +52,13 @@ namespace Caveman
                 if (_highlighted != null) _highlighted.SetHighlighted(true);
             }
 
-            if (inReach && mouse.leftButton.wasPressedThisFrame)
-                node.Harvest(Inventory);
+            if (inReach && mouse.leftButton.wasPressedThisFrame && node.Harvest(Inventory))
+            {
+                node.Nudge(); // chop recoil wobble — makes the manual hit feel responsive
+                // Floating "+1 <item>" so what you gathered (and how much) is clear at a glance.
+                if (node.yields != null)
+                    GatherPopup.Show(node.transform.position, $"+1 {node.yields.displayName}", node.yields.color);
+            }
         }
     }
 }

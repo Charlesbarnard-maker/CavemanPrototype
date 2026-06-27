@@ -77,4 +77,15 @@ namespace Caveman
         public static readonly List<Item> Items = new();
         public static void Show(string msg) => Items.Add(new Item { msg = msg, t = 4.5f });
     }
+
+    /// <summary>Tiny world-anchored "+N" popups for hand-gathering — they float up from the node
+    /// and fade out so each manual harvest reads clearly. Drawn by InventoryHud.DrawGatherPopups.</summary>
+    public static class GatherPopup
+    {
+        public const float Life = 0.85f; // seconds on screen
+        public class Item { public Vector3 world; public string text; public Color color; public float t; }
+        public static readonly List<Item> Items = new();
+        public static void Show(Vector3 world, string text, Color color)
+            => Items.Add(new Item { world = world, text = text, color = color, t = Life });
+    }
 }

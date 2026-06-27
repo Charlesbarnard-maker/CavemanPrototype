@@ -92,9 +92,21 @@ namespace Caveman
         }
 
         public bool CanAccept(ItemDefinition i) => count < capacity && (item == null || item == i);
-        // Reset the move timer on receive so the item dwells a full interval here and the
-        // dot animates from the entry edge — no popping to a free-running clock's position.
-        public void Receive(ItemDefinition i, Dir fromEdge) { item = i; count++; _inDir = fromEdge; _timer = 0f; }
+        public void Receive(ItemDefinition i, Dir fromEdge) => GainFrom(i, fromEdge);
+
+        // Take in one item (from a feeder belt OR a pulled-from building). We (re)start the dwell
+        // timer + entry edge ONLY when the cell was EMPTY — i.e. this is a fresh LEAD item, so it
+        // animates from the entry edge and dwells a full interval before moving on. Piling a 2nd+
+        // item behind the lead must NOT reset the lead's dwell: otherwise an upstream belt that
+        // happens to Update() before us each frame keeps zeroing our clock, the lead never matures,
+        // and the cell throttles to ~half rate with items stacked nose-to-tail (the "stuck on the
+        // conveyor" pile). Keeping the lead's dwell on a pile makes throughput Update-order-independent.
+        private void GainFrom(ItemDefinition i, Dir fromEdge)
+        {
+            bool wasEmpty = count == 0;
+            item = i; count++;
+            if (wasEmpty) { _inDir = fromEdge; _timer = 0f; }
+        }
 
         // Whether this belt accepts a hand-off pushed by belt `from`. A MERGER accepts any feeder.
         // A normal belt accepts only ONE upstream: the belt directly behind it (a straight run), or
@@ -243,20 +255,16 @@ namespace Caveman
             Vector3 inE = new Vector3(Step(_inDir).x, Step(_inDir).y, 0f) * 0.5f;
             Vector3 outE = new Vector3(Step(dir).x, Step(dir).y, 0f) * 0.5f;
 
-            if (n == 1 && !_blocked)
+            // The LEAD item (index 0) rides the cell by its dwell timer; when blocked it holds at
+            // the exit edge. Any followers (a backed-up pile) pack nose-to-tail behind the lead.
+            // One unified path so a follower catching up to the lead doesn't make the lead pop to
+            // the exit — it just slides in behind whatever progress the lead has made.
+            float head = (!_blocked && interval > 0f) ? Mathf.Clamp01(_timer / interval) : 1f;
+            const float gap = 0.26f; // item spacing along the belt when queued
+            for (int i = 0; i < n; i++)
             {
-                float p = interval > 0f ? Mathf.Clamp01(_timer / interval) : 0f;
-                _dots[0].transform.position = transform.position + PathPoint(p, inE, outE);
-            }
-            else
-            {
-                // Backed up / multiple held: pack from the exit edge backward (nose-to-tail).
-                const float gap = 0.26f; // item spacing along the belt when queued
-                for (int i = 0; i < n; i++)
-                {
-                    float t = Mathf.Clamp01(1f - i * gap);
-                    _dots[i].transform.position = transform.position + PathPoint(t, inE, outE);
-                }
+                float t = Mathf.Clamp01(head - i * gap);
+                _dots[i].transform.position = transform.position + PathPoint(t, inE, outE);
             }
         }
 
@@ -403,14 +411,14 @@ namespace Caveman
                     && p.OutputSide == Opposite((Dir)di)
                     && (item == null || item == p.produces) && p.Buffer.Count(p.produces) > 0)
                 {
-                    if (p.Buffer.RemoveUpTo(p.produces, 1) > 0) { item = p.produces; count++; _inDir = (Dir)di; _timer = 0f; return; }
+                    if (p.Buffer.RemoveUpTo(p.produces, 1) > 0) { GainFrom(p.produces, (Dir)di); return; }
                 }
 
                 if (WorldGrid.Workshops.TryGetValue(c, out var w) && w != null && w.output != null && !w.output.isLiquid
                     && w.OutputSide == Opposite((Dir)di)
                     && (item == null || item == w.output) && w.Buffer.Count(w.output) > 0)
                 {
-                    if (w.Buffer.RemoveUpTo(w.output, 1) > 0) { item = w.output; count++; _inDir = (Dir)di; _timer = 0f; return; }
+                    if (w.Buffer.RemoveUpTo(w.output, 1) > 0) { GainFrom(w.output, (Dir)di); return; }
                 }
 
                 // Storages have an OUTPUT side too — a belt on it pulls the stored item, so you
@@ -419,13 +427,13 @@ namespace Caveman
                     && st.OutputSide == Opposite((Dir)di)
                     && (item == null || item == st.accepts) && st.Store.Count(st.accepts) > 0)
                 {
-                    if (st.Store.RemoveUpTo(st.accepts, 1) > 0) { item = st.accepts; count++; _inDir = (Dir)di; _timer = 0f; return; }
+                    if (st.Store.RemoveUpTo(st.accepts, 1) > 0) { GainFrom(st.accepts, (Dir)di); return; }
                 }
 
                 if (WorldGrid.Depots.TryGetValue(c, out var dp) && dp != null && dp.item != null && !dp.item.isLiquid
                     && (item == null || item == dp.item) && dp.store.Count(dp.item) > 0)
                 {
-                    if (dp.store.RemoveUpTo(dp.item, 1) > 0) { item = dp.item; count++; _inDir = (Dir)di; _timer = 0f; return; }
+                    if (dp.store.RemoveUpTo(dp.item, 1) > 0) { GainFrom(dp.item, (Dir)di); return; }
                 }
             }
         }
