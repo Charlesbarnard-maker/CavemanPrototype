@@ -20,7 +20,7 @@ namespace Caveman
             go.transform.localScale = Vector3.one;
 
             var sr = go.AddComponent<SpriteRenderer>();
-            sr.sprite = PlaceholderArt.Square();
+            sr.sprite = SpriteDatabase.ForBuilding(def);
             sr.color = def != null ? def.color : new Color(0.62f, 0.47f, 0.28f);
             sr.sortingOrder = -80; // above terrain (-90), below belts (1) and buildings (5)
 

@@ -390,7 +390,7 @@ namespace Caveman
             world.z = 0f;
             _ghost.transform.position = world;
             _ghost.transform.rotation = Quaternion.identity;
-            _ghostSr.sprite = PlaceholderArt.Square();
+            _ghostSr.sprite = SpriteDatabase.ForBuilding(def); // ghost matches the building's resolved sprite
             float gb = def.kind == BuildingKind.Collector ? 0.9f : 1.0f;
             _ghost.transform.localScale = new Vector3(def.FootW * gb, def.FootH * gb, 1f);
             UpdateGhostPorts(world, def);
@@ -559,7 +559,7 @@ namespace Caveman
             _ghost.transform.position = new Vector3(cell.x, cell.y, 0f);
             _ghost.transform.rotation = Quaternion.Euler(0f, 0f, Belt.Angle(dir));
             _ghost.transform.localScale = Vector3.one * 0.8f;
-            _ghostSr.sprite = def.splitter || def.merger ? PlaceholderArt.Hexagon() : PlaceholderArt.Conveyor(); // splitter/merger = hex; belt = conveyor tile
+            _ghostSr.sprite = SpriteDatabase.ForBelt(def.displayName, def.splitter, def.merger); // ghost matches the belt's resolved sprite
 
             bool isJunction = def.splitter || def.merger; // a Splitter/Merger is placed one at a time
             var existing = Belt.At(cell);

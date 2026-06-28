@@ -98,7 +98,7 @@ namespace Caveman
             go.transform.rotation = Quaternion.Euler(0f, 0f, Angle(dir));
 
             var sr = go.AddComponent<SpriteRenderer>();
-            sr.sprite = isSplitter || isMerger ? PlaceholderArt.Hexagon() : PlaceholderArt.Conveyor(); // splitter/merger = hex; belt = conveyor tile
+            sr.sprite = SpriteDatabase.ForBelt(isSplitter ? "Splitter" : isMerger ? "Merger" : displayName, isSplitter, isMerger); // routed via SpriteDatabase (fallback: conveyor / hex junction)
             sr.sortingOrder = 1;
 
             go.AddComponent<BoxCollider2D>(); // clickable to demolish
@@ -198,9 +198,9 @@ namespace Caveman
         {
             isSplitter = splitter;
             isMerger = merger;
-            if (_sr != null) _sr.sprite = (splitter || merger) ? PlaceholderArt.Hexagon() : PlaceholderArt.Conveyor();
             DisplayName = splitter ? "Splitter" : merger ? "Merger" : DisplayName;
             gameObject.name = DisplayName;
+            if (_sr != null) _sr.sprite = SpriteDatabase.ForBelt(DisplayName, splitter, merger);
             AddPortMarkers();
         }
 
@@ -532,7 +532,7 @@ namespace Caveman
                 d.enabled = on;
                 if (!on) continue;
                 var it = _items[i];
-                d.sprite = it.def.icon != null ? it.def.icon : PlaceholderArt.Circle();
+                d.sprite = SpriteDatabase.ForItem(it.def); // routed via SpriteDatabase (fallback Circle)
                 d.color = it.def.color;
                 Vector3 inE = new Vector3(Step(it.entryEdge).x, Step(it.entryEdge).y, 0f) * 0.5f;
                 Vector3 outE = new Vector3(Step(dir).x, Step(dir).y, 0f) * 0.5f;

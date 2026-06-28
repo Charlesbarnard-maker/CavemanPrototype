@@ -20,8 +20,10 @@ namespace Caveman
         public int foodValue = 0;
         [Tooltip("Liquid (e.g. water): moves only via pipes / carrying, NEVER on belts.")]
         public bool isLiquid = false;
-        [Tooltip("Icon shown on belts (and later in UI). Placeholder shape now; real art drops in here later.")]
+        [Tooltip("Icon shown on belts (and later in UI). Resolved from `sprite` via SpriteDatabase — do not set directly.")]
         public Sprite icon = null;
+        [Tooltip("Visual reference resolved via SpriteDatabase — external sprite if one exists, else the procedural fallback shape.")]
+        public SpriteDefinition sprite = new SpriteDefinition("", PlaceholderShape.Circle);
         [TextArea]
         [Tooltip("Short blurb for the in-game Guide: what it is, where it comes from, what it's for.")]
         public string description = "";

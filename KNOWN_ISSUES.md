@@ -3,7 +3,28 @@
 A running record so progress/problems don't get lost. Newest first. Move items to
 **Fixed** when done. Maintained alongside the code — see DESIGN.md for the roadmap.
 
-## #27 Playtest feedback batch: belt names, power@Bronze, costs, research 10x, UI fixes (2026-06-28) — most recent
+## #28 SPRITE VISUAL LAYER — central SpriteDatabase abstraction (no assets yet) (2026-06-28) — most recent
+Refactor: route ALL entity rendering through a central sprite layer so a future pack drops in with no other
+code change. **No external assets added; visuals are identical** (every Resolve falls back to today's
+procedural shape). No gameplay logic changed. **NOT yet Unity-compiled by Claude** (Editor open) — static-checked.
+- **NEW `SpriteDefinition`** (`name` + `PlaceholderShape` fallback) — every building & item carries one
+  (`BuildingDefinition.sprite`, `ItemDefinition.sprite`). **NEW `SpriteDatabase`** (static): `Resolve()` =
+  external sprite from `Resources/art/<name>` if present, ELSE the procedural fallback (cached). Central
+  type→name maps: **Building** (displayName→name), **Resource** (item id→name), **Belt** (type→name);
+  `Seed()` pre-fills them with the expected filename = sanitised type name (e.g. "Basic Smelter" → `basic_smelter`).
+  Helpers `ForBuilding/ForBelt/ForResource/ForItem`.
+- **Routed through the DB:** every building Spawn (Production/Workshop/Storage/Depot/Research/PowerPlant/
+  PowerPole/WaterPump/Bridge/Pipe/ConstructionSite → `ForBuilding(def)`), Belt (Spawn/ConvertTo → `ForBelt`),
+  belt item dots + item icons (`ForItem`), resource-node spawns (`ForResource`), and the build ghost
+  (building + belt) so the preview matches. Item icons now resolved via the DB (set each item's fallback shape).
+- **Deliberately left procedural** (functional/scene visuals a pack doesn't replace, documented): I/O port
+  arrows (Ports), status dots (Status), the machine work-FX (MachineWorkFX), route vehicles (RouteVehicle),
+  player + world ground, and translucent preview ghosts for bridge/pipe + the ghost initial frame.
+- **To skin the game later:** drop sprites into `Assets/Resources/art/` named per the seeded map (or set names
+  in `SpriteDatabase.Building/Resource/Belt`), call `SpriteDatabase.ClearCache()` — everything re-skins.
+- **Recompile check:** game looks identical to before (all fallbacks = current shapes); no errors.
+
+## #27 Playtest feedback batch: belt names, power@Bronze, costs, research 10x, UI fixes (2026-06-28)
 Acting on a playtest feedback list. **NOT yet Unity-compiled by Claude** (Editor open, log stale) — static-checked.
 1. **Belt names** — placed belts hovered as "Building". Belt now carries `DisplayName` (Wooden/Conveyor/Geared/
    Steel Belt, Splitter, Merger), threaded through Spawn/SetTier/ConvertTo + def.displayName; HoverText shows it.

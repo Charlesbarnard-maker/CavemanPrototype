@@ -94,11 +94,14 @@ namespace Caveman
 
             // --- Belt icons (placeholder shapes by material family, so items are distinguishable
             //     on conveyors; real per-item art drops into ItemDefinition.icon later). ---
-            var triangle = PlaceholderArt.Triangle(); var hexagon = PlaceholderArt.Hexagon(); var square = PlaceholderArt.Square();
-            wood.icon = planks.icon = triangle;                                              // woody
-            stone.icon = ore.icon = clay.icon = bricks.icon = stoneBlock.icon = gems.icon = charcoal.icon = hexagon; // mineral
-            metal.icon = tools.icon = monument.icon = cloth.icon = clothes.icon = pot.icon = jewelry.icon = square;   // manufactured
-            ideaTablet.icon = studyScroll.icon = schematic.icon = blueprint.icon = square; // research items (manufactured look)
+            // Item visuals route through SpriteDatabase: set each item's fallback SHAPE by material family,
+            // then resolve its icon (external sprite if one exists, else the procedural shape — identical
+            // look for now). Real per-item art drops in by adding Resources/art/<id> sprites later.
+            foreach (var it in new[] { wood, planks }) it.sprite = SpriteDefinition.Of(PlaceholderShape.Triangle);              // woody
+            foreach (var it in new[] { stone, ore, clay, bricks, stoneBlock, gems, charcoal }) it.sprite = SpriteDefinition.Of(PlaceholderShape.Hexagon); // mineral
+            foreach (var it in new[] { metal, tools, monument, cloth, clothes, pot, jewelry, ideaTablet, studyScroll, schematic, blueprint }) it.sprite = SpriteDefinition.Of(PlaceholderShape.Square); // manufactured
+            foreach (var it in new[] { wood, planks, stone, ore, clay, bricks, stoneBlock, gems, charcoal, metal, tools, monument, cloth, clothes, pot, jewelry, ideaTablet, studyScroll, schematic, blueprint })
+                it.icon = SpriteDatabase.ForItem(it);
             // food / cooked / meat / grain / flour / bread / fiber keep the default round dot.
 
             // --- Buildings ---
@@ -460,6 +463,10 @@ namespace Caveman
               woodStore, clayStore, brickStore, warehouse,
               // Infrastructure / power / endgame — Wood Generator + Power Poles (early), Coal Generator (late)
               woodGen, pole, generator, monumentBldg };
+
+            // Central sprite-name table: pre-fill the building/belt/resource maps with expected names
+            // (filename = sanitised type name) so a future pack drops straight in via SpriteDatabase.
+            SpriteDatabase.Seed(builder.buildables, new[] { wood, stone, clay, copperOre, ore });
             // BUILD-COST SCALE: bump every building's build cost so placing things is a real resource
             // decision (more reason to plan + collect, not spam). One knob — tune CostScale. (Recipe
             // INPUT costs are untouched; this is the one-time placement cost only.)
@@ -560,9 +567,9 @@ namespace Caveman
             const float baseClear = 11f;
             // STARTER BASIN — small Wood + Stone clusters: enough to bootstrap your first factory,
             // NOT to scale on (you outgrow them and must push out to the biome regions).
-            SpawnClusters("Tree", wood, new Color(0.27f, 0.55f, 0.22f), PlaceholderArt.Triangle(),
+            SpawnClusters("Tree", wood, new Color(0.27f, 0.55f, 0.22f), SpriteDatabase.ForResource(wood, PlaceholderShape.Triangle),
                 new Vector2(24f, 4f), 13f, 3, 3, 5, 2.2f, new Vector2(1.0f, 1.5f), 30, 1, baseClear);
-            SpawnClusters("Rock", stone, new Color(0.55f, 0.55f, 0.6f), PlaceholderArt.Hexagon(),
+            SpawnClusters("Rock", stone, new Color(0.55f, 0.55f, 0.6f), SpriteDatabase.ForResource(stone, PlaceholderShape.Hexagon),
                 new Vector2(-24f, 4f), 13f, 3, 3, 5, 2.2f, new Vector2(1.0f, 1.5f), 30, 1, baseClear);
 
             // --- RESOURCE ZONES (logistics-first redesign): FEW, LARGE, DISTINCT, SINGLE-resource
@@ -585,11 +592,11 @@ namespace Caveman
                 SpawnClusters(name, item, color, sprite, center, discR * 0.6f, clusters, minN, maxN, clusterR, size, cap, regen, 0f);
             }
             //   k  dist  biome           name             item       colour                         sprite                      discR clusters minN maxN clustR  size                     cap regen
-            Zone(0, 46f, Terrain.Plains, "Clay Pit",       clay,      new Color(0.68f,0.46f,0.36f), PlaceholderArt.Hexagon(),  30f, 5, 5, 8, 3.0f, new Vector2(1.0f,1.5f),  60, 1); // nearest — Bronze chain start
-            Zone(1, 60f, Terrain.Hills,  "Copper Deposit", copperOre, new Color(0.80f,0.52f,0.30f), PlaceholderArt.Hexagon(),  30f, 5, 4, 7, 3.0f, new Vector2(1.0f,1.6f), 180, 0); // finite — Bronze metal
-            Zone(2, 72f, Terrain.Forest, "Forest",         wood,      new Color(0.27f,0.55f,0.22f), PlaceholderArt.Triangle(), 34f, 6, 6, 9, 3.4f, new Vector2(1.0f,1.6f),  40, 1); // lumber at scale
-            Zone(3, 86f, Terrain.Hills,  "Stone Outcrop",  stone,     new Color(0.55f,0.55f,0.60f), PlaceholderArt.Hexagon(),  32f, 6, 5, 8, 3.2f, new Vector2(1.0f,1.6f),  50, 1); // stone at scale
-            Zone(4,100f, Terrain.Hills,  "Iron Ore Field", ore,       new Color(0.62f,0.58f,0.42f), PlaceholderArt.Hexagon(),  32f, 5, 4, 7, 3.0f, new Vector2(1.1f,1.6f), 220, 0); // finite — Iron age
+            Zone(0, 46f, Terrain.Plains, "Clay Pit",       clay,      new Color(0.68f,0.46f,0.36f), SpriteDatabase.ForResource(clay, PlaceholderShape.Hexagon),  30f, 5, 5, 8, 3.0f, new Vector2(1.0f,1.5f),  60, 1); // nearest — Bronze chain start
+            Zone(1, 60f, Terrain.Hills,  "Copper Deposit", copperOre, new Color(0.80f,0.52f,0.30f), SpriteDatabase.ForResource(copperOre, PlaceholderShape.Hexagon),  30f, 5, 4, 7, 3.0f, new Vector2(1.0f,1.6f), 180, 0); // finite — Bronze metal
+            Zone(2, 72f, Terrain.Forest, "Forest",         wood,      new Color(0.27f,0.55f,0.22f), SpriteDatabase.ForResource(wood, PlaceholderShape.Triangle), 34f, 6, 6, 9, 3.4f, new Vector2(1.0f,1.6f),  40, 1); // lumber at scale
+            Zone(3, 86f, Terrain.Hills,  "Stone Outcrop",  stone,     new Color(0.55f,0.55f,0.60f), SpriteDatabase.ForResource(stone, PlaceholderShape.Hexagon),  32f, 6, 5, 8, 3.2f, new Vector2(1.0f,1.6f),  50, 1); // stone at scale
+            Zone(4,100f, Terrain.Hills,  "Iron Ore Field", ore,       new Color(0.62f,0.58f,0.42f), SpriteDatabase.ForResource(ore, PlaceholderShape.Hexagon),  32f, 5, 4, 7, 3.0f, new Vector2(1.1f,1.6f), 220, 0); // finite — Iron age
 
             // --- Welcome / starter guidance (fades after a few seconds) ---
             // Keep the opening minimal (Factorio focus): just WELCOME → SURVIVAL → one compact

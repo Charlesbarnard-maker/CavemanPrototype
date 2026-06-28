@@ -130,6 +130,8 @@ namespace Caveman
 
         [Header("Visuals / cost")]
         public Color color = Color.white;
+        [Tooltip("Visual reference resolved via SpriteDatabase — external sprite if one exists, else the procedural fallback shape.")]
+        public SpriteDefinition sprite = new SpriteDefinition("", PlaceholderShape.Square);
         public List<ItemAmount> cost = new();
 
         [Header("Help")]

@@ -62,7 +62,7 @@ namespace Caveman
             go.transform.localScale = new Vector3(def.FootW, def.FootH, 1f);
 
             var sr = go.AddComponent<SpriteRenderer>();
-            sr.sprite = PlaceholderArt.Square();
+            sr.sprite = SpriteDatabase.ForBuilding(def);
             sr.color = def.color;
             sr.sortingOrder = 5;
 
