@@ -68,7 +68,7 @@ namespace Caveman
         // Meta-groups keep the menu to a handful of headers (not one per building kind).
         private static readonly (string label, BuildingKind[] kinds)[] Cats =
         {
-            ("Production", new[] { BuildingKind.Collector, BuildingKind.Workshop, BuildingKind.Power, BuildingKind.Research, BuildingKind.Hearth }),
+            ("Production", new[] { BuildingKind.Collector, BuildingKind.Workshop, BuildingKind.Power, BuildingKind.Research, BuildingKind.Pole }),
             ("Logistics", new[] { BuildingKind.Belt, BuildingKind.Bridge, BuildingKind.Pipe, BuildingKind.Pump, BuildingKind.Depot }),
             ("Infrastructure", new[] { BuildingKind.Storage }),
         };
@@ -575,14 +575,14 @@ namespace Caveman
                     if (hasMon || mb > 0) monu = $"   <color=#ffe08a>Monument {Mathf.Min(mb, 10)}/10</color>";
                 }
 
-                // Power (Industrial age): supply / demand, red while browning out.
+                // Power network: total generation / demand across all networks, red while oversubscribed.
                 string power = "";
-                Power.EnsureFresh();
-                if (Power.Active || Power.Generation > 0 || Power.Demand > 0)
+                PowerNet.EnsureFresh();
+                if (PowerNet.TotalGen > 0 || PowerNet.TotalDemand > 0)
                 {
-                    bool brown = Power.Demand > Power.Generation + 0.01f;
+                    bool brown = PowerNet.TotalDemand > PowerNet.TotalGen + 0.01f;
                     string pc = brown ? "#f99" : "#9f9";
-                    power = $"   <color={pc}>⚡ {Mathf.RoundToInt(Power.Generation)}/{Mathf.RoundToInt(Power.Demand)}{(brown ? " BROWNOUT" : "")}</color>";
+                    power = $"   <color={pc}>⚡ {Mathf.RoundToInt(PowerNet.TotalGen)}/{Mathf.RoundToInt(PowerNet.TotalDemand)}{(brown ? " OVERLOADED" : "")}</color>";
                 }
 
                 string research = $"   <color=#9cf>🔬 {Research.Points} pts <size=11>(T)</size></color>";
@@ -945,9 +945,9 @@ namespace Caveman
                     GUILayout.Label($"<size=12>Making: <b>{(wb.output != null ? wb.output.displayName : "?")}</b> <color=#888>from {string.Join(" + ", ins)}</color></size>", _small);
                     if (GUILayout.Button("<size=12>↻ Change recipe</size>", _btn)) wb.CycleRecipe();
                 }
-                // Heat-requiring machine outside any lit Hearth → tell the player why it's stalled.
+                // Powered machine not connected to a powered network → tell the player why it's stalled.
                 if (wb != null && wb.NoPower)
-                    GUILayout.Label("<size=12><color=#6cf>⚡ No heat — place a Hearth so this sits inside its ring</color></size>", _small);
+                    GUILayout.Label("<size=12><color=#6cf>⚡ No power — connect a Generator (or a Power Pole) within range</color></size>", _small);
             }
             else if (sb != null)
             {

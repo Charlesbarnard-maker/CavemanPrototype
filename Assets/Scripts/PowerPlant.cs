@@ -16,6 +16,10 @@ namespace Caveman
         public int fuelPerCycle = 1;
         public float interval = 3f;
         public int output = 60;
+        // Power-network node: how far it links to poles/generators, and how far it supplies consumers
+        // directly (so a generator next to a machine powers it with no pole needed). See PowerNet.
+        public float ConnectRange = 6f;
+        public float SupplyRange = 5f;
 
         public static readonly List<PowerPlant> All = new();
         void OnEnable() => All.Add(this);
@@ -50,6 +54,8 @@ namespace Caveman
             bool hasFuel = def.inputs != null && def.inputs.Count > 0 && def.inputs[0] != null;
             p.fuel = hasFuel ? def.inputs[0].item : null;
             p.fuelPerCycle = hasFuel ? Mathf.Max(1, def.inputs[0].amount) : 1;
+            p.ConnectRange = def.connectRange > 0f ? def.connectRange : 6f;
+            p.SupplyRange = def.supplyRange > 0f ? def.supplyRange : 5f;
             p._sr = sr;
             p._baseColor = def.color;
             return p;

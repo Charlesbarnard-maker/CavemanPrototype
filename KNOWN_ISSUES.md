@@ -3,7 +3,34 @@
 A running record so progress/problems don't get lost. Newest first. Move items to
 **Fixed** when done. Maintained alongside the code — see DESIGN.md for the roadmap.
 
-## #25 SR-P3: Stone-age hearth RADIUS energy + headless compile-check tool (2026-06-28) — most recent
+## #26 ENERGY REDESIGN: power NETWORK (generators + poles) replaces the radius hearth (2026-06-28) — most recent
+User scrapped the radius-hearth model: buildings are now powered by a **connected network of generators +
+power poles** (early game onward), not proximity heat. **NOT yet Unity-compiled by Claude** (Editor open holds
+the project lock) but fully static-checked (no dangling refs, braces balanced).
+- **DELETED** `Hearth.cs`, `HeatField.cs`, and the old global `Power.cs` (its global Industrial-brownout role
+  is superseded by the spatial network).
+- **NEW `PowerNet.cs`** — spatial solver: generators + poles are nodes, linked within range (union-find →
+  connected networks). Each network shares its generation among the consumers it supplies. A `requiresPower`
+  machine: factor 1 if connected with enough gen, brownout `gen/demand` (floor 0.35) if oversubscribed, **0 if
+  not connected** (hard-stop). Frame-guarded rebuild. Exposes `FactorOf(w)` + `TotalGen/TotalDemand`.
+- **NEW `PowerPole.cs`** (BuildingKind.Pole) — relay node: `ConnectRange` (links poles/generators) +
+  `SupplyRange` (powers nearby consumers); faint world-space supply ring. Single-click placement.
+- **`PowerPlant` is now a network node** (ConnectRange 6 / SupplyRange 5) — a generator alone powers nearby
+  machines; poles extend reach. Added a **Wood Generator** (burns Wood, output 40, age 0 — the early source)
+  alongside the existing **Coal Generator** (60, age 3).
+- **Seam unchanged in shape:** `WorkshopBuilding.EffectivePowerFactor` → `PowerNet.FactorOf` for
+  `requiresPower` machines (Basic/Advanced Smelter, Kiln, Potter). `NoPower` + blue status + panel hint
+  ("⚡ No power — connect a Generator/Pole") updated. Removed `DrawsPower`/`Power.EnsureFresh`.
+- **Wiring:** BuildingKind Hearth→Pole; BuildingDefinition heatRadius → connectRange/supplyRange (requiresPower
+  kept); ConstructionSite spawn case; InventoryHud Production category + power readout (PowerNet totals,
+  "OVERLOADED"); buildables (woodGen + pole added, hearth removed); quest text. Belt-independent.
+- **Tunables (balance, verify in play):** wood gen 40 / coal 60; workshop draw 10; pole connect 7 / supply 4;
+  gen connect 6 / supply 5; brownout floor 0.35. Coal still deferred to SR-P5 (Boiler/steam).
+- **Recompile check:** Build → Production shows Wood Generator + Power Pole; place a Wood Gen by a smelter →
+  smelter runs (its supply ring covers it); move the smelter out of range → blue "no power" + stall; chain
+  Power Poles from the gen to a distant smelter → it runs; let the gen run out of Wood → connected machines stop.
+
+## #25 SR-P3: Stone-age hearth RADIUS energy (SUPERSEDED by #26) + headless compile-check tool (2026-06-28)
 Energy phase 3 of the systems redesign + a way for Claude to self-verify compilation.
 - **NEW `Hearth.cs`** (BuildingKind.Hearth): burns Wood (PowerPlant-style auto loop, no workers) and
   projects a **heat radius** (default 7) with a faint coverage ring. **NEW `HeatField.cs`**: static

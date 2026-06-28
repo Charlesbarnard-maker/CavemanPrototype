@@ -30,10 +30,9 @@ namespace Caveman
         public bool Paused { get; private set; }            // player can halt it to free shared inputs
         public void TogglePause() => Paused = !Paused;
 
-        // Power (Industrial age): a running machine draws power; the grid's supply/demand
-        // ratio scales its speed (brownouts) via Power.Factor.
+        // Power network: a requiresPower machine draws PowerDraw and runs only while connected to a
+        // powered network (see PowerNet); the network's supply/demand factor scales its speed.
         public int PowerDraw => def != null ? def.powerDraw : 0;
-        public bool DrawsPower => Power.Active && PowerDraw > 0 && !Paused; // runs automatically once built
 
         public static readonly List<WorkshopBuilding> All = new();
         private List<Vector2Int> _cells; // every grid cell this building occupies
@@ -297,18 +296,17 @@ namespace Caveman
         // P0: behaviour-identical to the old inline logic (Industrial brownout, else full speed). A
         // later phase makes the pre-Industrial branch consult the hearth/steam heat field.
         public bool RequiresPower => def != null && def.requiresPower;
+        // The single energy seam: a powered machine runs at its NETWORK's supply factor — 1 when
+        // connected with enough generation, &lt;1 if the network is oversubscribed (brownout), 0 if it
+        // isn't connected to any powered network. Unpowered machines always run. Better generators /
+        // poles in later ages flow through this same accessor (no machine-code change).
         private float EffectivePowerFactor()
         {
-            if (Power.Active) return PowerDraw > 0 ? Power.Factor : 1f; // Industrial electricity (unchanged)
-            // Pre-Industrial: a heat-requiring machine (smelter/kiln) runs ONLY inside a lit Hearth's
-            // radius — hard-stop (0) outside, so processing must cluster around a fuelled hearth.
-            if (RequiresPower) return HeatField.FactorAt(transform.position);
-            return 1f;
+            return RequiresPower ? PowerNet.FactorOf(this) : 1f;
         }
 
         void Update()
         {
-            Power.EnsureFresh();
             var carried = Colony.Instance != null ? Colony.Instance.carried : null;
             bool produced = false;
 
@@ -358,14 +356,14 @@ namespace Caveman
 
         /// <summary>Live status colour (green working / yellow output-full / red missing-input /
         /// grey paused) — also drives minimap dots.</summary>
-        // Pre-Industrial heat-requiring machine sitting outside any lit Hearth → it can't run.
-        public bool NoPower => RequiresPower && !Power.Active && !HeatField.Covered(transform.position);
+        // A powered machine not connected to a powered network → it can't run (surfaced to the player).
+        public bool NoPower => RequiresPower && PowerNet.FactorOf(this) <= 0f;
         public Color StatusColor
         {
             get
             {
                 if (Paused) return Status.Idle;
-                if (NoPower) return new Color(0.40f, 0.62f, 1f); // blue — needs heat (no Hearth in range)
+                if (NoPower) return new Color(0.40f, 0.62f, 1f); // blue — not connected to power
                 if (Buffer.Total() >= Buffer.capacity) return Status.BackedUp;
                 if (_starved) return Status.Starved;
                 return Status.Working;

@@ -286,19 +286,10 @@ namespace Caveman
                 new Recipe(steel,       1, 4.0f, 3, new ItemAmount(metal, 1),  new ItemAmount(charcoal, 1)),
             };
             advancedSmelter.description = "ADVANCED SMELTER — combines materials into alloy bars; select its recipe: Copper + Bricks → Bronze Plate, or Iron + Charcoal → Steel (Steel unlocks in the Iron Age). One furnace for both alloys (click it to switch).";
-            // Both smelters need HEAT — they only run inside a lit Hearth's radius (the Stone-age energy constraint).
+            // Smelters need POWER — they run only while connected to a powered network (a Generator,
+            // extended by Power Poles). See the Wood Generator + Power Pole defs below.
             basicSmelter.requiresPower = true;
             advancedSmelter.requiresPower = true;
-            // HEARTH — Stone-age RADIUS energy. Burns Wood; heat machines (smelters/kiln/potter) must sit
-            // in its ring to run. No grid/wires — proximity only. The first energy tier (steam, then
-            // electricity, evolve from this via the same EffectivePowerFactor seam).
-            var hearth = ScriptableObject.CreateInstance<BuildingDefinition>();
-            hearth.displayName = "Hearth"; hearth.kind = BuildingKind.Hearth; hearth.unlockAge = 0;
-            hearth.inputs = new List<ItemAmount> { new ItemAmount(wood, 1) };
-            hearth.interval = 2.5f; hearth.heatRadius = 7f;
-            hearth.color = new Color(0.88f, 0.45f, 0.20f);
-            hearth.cost = new List<ItemAmount> { new ItemAmount(stone, 6), new ItemAmount(wood, 4) };
-            hearth.description = "HEARTH — burns Wood to project a HEAT RADIUS (the warm ring). Smelters, Kilns and Potters must sit INSIDE a lit Hearth to run (they hard-stop outside it), so cluster your processing around a fuelled Hearth. No grid or wires — just keep it fed Wood.";
             // Toolmaker: Metal + Planks -> Tools (an Iron-age comfort good).
             var toolmaker = MakeWorkshop("Toolmaker", tools, 1, 4.0f, 2, 12, new Color(0.50f, 0.55f, 0.60f),
                 new List<ItemAmount> { new ItemAmount(metal, 1), new ItemAmount(planks, 1) },
@@ -314,7 +305,20 @@ namespace Caveman
             // brown out and slow down). Unlocks in Iron so you can prepare before it bites.
             var generator = MakePower("Coal Generator", 60, charcoal, 1, 3f, 3, new Color(0.30f, 0.30f, 0.34f),
                 new ItemAmount(bricks, 12), new ItemAmount(metal, 6));
-            generator.description = "Burns Charcoal to supply electrical Power. From the Industrial age, machines need power — too little and the whole grid browns out, slowing every machine. Keep charcoal flowing to it.";
+            generator.connectRange = 6f; generator.supplyRange = 5f;
+            generator.description = "Burns Charcoal to supply Power to the network — a bigger, steadier source than the Wood Generator for a large powered base. Too little generation and connected machines brown out (slow down).";
+            // EARLY POWER: a Wood Generator (age 0) feeds the network from the start, plus Power Poles
+            // to relay power across distance. requiresPower machines connect to a powered network to run.
+            var woodGen = MakePower("Wood Generator", 40, wood, 1, 2.5f, 0, new Color(0.55f, 0.40f, 0.25f),
+                new ItemAmount(wood, 6), new ItemAmount(stone, 4));
+            woodGen.connectRange = 6f; woodGen.supplyRange = 5f;
+            woodGen.description = "WOOD GENERATOR — burns Wood to supply POWER to the network. Place it by your machines (its supply ring powers them) or wire it out with Power Poles. Connected machines run; disconnected ones stop. Powers ~4 machines.";
+            var pole = ScriptableObject.CreateInstance<BuildingDefinition>();
+            pole.displayName = "Power Pole"; pole.kind = BuildingKind.Pole; pole.unlockAge = 0;
+            pole.connectRange = 7f; pole.supplyRange = 4f;
+            pole.color = new Color(0.55f, 0.42f, 0.28f);
+            pole.cost = new List<ItemAmount> { new ItemAmount(wood, 2) };
+            pole.description = "POWER POLE — relays power across distance. Poles link to nearby Poles + Generators to form one network, and supply power to buildings inside their ring. Chain Poles from a Generator out to far machines.";
             // Endgame: the Monument (Industrial age). A long resource sink you pour the
             // top of every production chain into — completing it (10 blocks) is the win.
             var monumentBldg = MakeWorkshop("Monument", monument, 1, 6.0f, 3, 12, new Color(0.88f, 0.84f, 0.62f),
@@ -445,7 +449,7 @@ namespace Caveman
             { // Gather
               woodHut, stonePit, clayPit, copperMine, mine,
               // Process — incl. the deeper metal chain (copper → bronze → steel) that gates each age
-              sawmill, charcoalBurner, kiln, potter, basicSmelter, advancedSmelter, toolmaker, hearth,
+              sawmill, charcoalBurner, kiln, potter, basicSmelter, advancedSmelter, toolmaker,
               // Research
               ideaBench, scrollMaker, draftingTable, engineeringLab, researchLodge,
               // Logistics — belt tier ladder (wooden→conveyor→geared→steel) + junctions + transport
@@ -453,8 +457,8 @@ namespace Caveman
               // Storage — Woodpile for the starter resource + one configurable Warehouse for
               // everything else (stone/ore/planks/…), so storage doesn't eat menu slots.
               woodStore, clayStore, brickStore, warehouse,
-              // Infrastructure / power / endgame
-              generator, monumentBldg };
+              // Infrastructure / power / endgame — Wood Generator + Power Poles (early), Coal Generator (late)
+              woodGen, pole, generator, monumentBldg };
             // Transport vehicles are NOT in the build menu — they're created from a Station's panel.
             builder.routeTiers = new List<BuildingDefinition> { caravan, oxCart, wagonTrain, cargoDrone };
 
@@ -527,7 +531,7 @@ namespace Caveman
                 new Quest { title = "Smelt 20 Iron (Basic Smelter set to Iron: Iron Ore + Charcoal)",  done = () => Have(metal) >= 20,       reward = () => carriedInv.Add(planks, 20), rewardText = "+20 Planks" },
                 new Quest { title = "Craft 10 Tools (Iron + Planks → Toolmaker)",     done = () => Have(tools) >= 10,       reward = () => carriedInv.Add(planks, 30), rewardText = "+30 Planks" },
                 new Quest { title = "Research the Industrial Age",                    done = () => AgeNow() >= 4,           reward = () => carriedInv.Add(planks, 50), rewardText = "+50 Planks" },
-                new Quest { title = "Power up: build a Coal Generator",               done = () => PowerPlant.All.Count >= 1, reward = () => carriedInv.Add(metal, 10), rewardText = "+10 Metal" },
+                new Quest { title = "Power up: build a Generator + connect a smelter",  done = () => PowerPlant.All.Count >= 1, reward = () => carriedInv.Add(metal, 10), rewardText = "+10 Metal" },
                 new Quest { title = "Reach 600 Industry (automation score)",          done = () => Colony.Instance != null && Colony.Instance.PeakProsperity >= 600, reward = () => carriedInv.Add(tools, 10), rewardText = "+10 Tools" },
                 new Quest { title = "Begin your legacy: build the Monument",          done = () => HasWorkshopOf(monument), reward = () => carriedInv.Add(planks, 40), rewardText = "+40 Planks" },
                 new Quest { title = "🏆 Complete the Monument — 10 Blocks. YOU WIN!", done = () => Have(monument) >= 10, isWin = true },
