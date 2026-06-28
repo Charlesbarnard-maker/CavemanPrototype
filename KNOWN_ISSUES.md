@@ -3,7 +3,35 @@
 A running record so progress/problems don't get lost. Newest first. Move items to
 **Fixed** when done. Maintained alongside the code — see DESIGN.md for the roadmap.
 
-## #28 SPRITE VISUAL LAYER — central SpriteDatabase abstraction (no assets yet) (2026-06-28) — most recent
+---
+## 📌 NEW-THREAD HANDOFF — current state (2026-06-28, HEAD `7db38f2`)
+Pinned pointer so a fresh thread can continue. Detailed per-change log is in #28→#23 below.
+
+- **Build:** Unity `6000.5.0f1`, 2D/URP. Open `Assets/UnitySave.unity` → Play. All built in code at runtime
+  by `GameBootstrap.cs` (no prefabs/Inspector wiring). `main` @ `7db38f2`, pushed (== origin), tree clean
+  (untracked: `Assets/Roguelike/` pack + a couple `.cs.meta`). Commit as `Caveman Dev <caveman@local>`, NO AI trailer.
+- **⭐ Claude CAN verify compiles now** (blind-build loop broken):
+  (1) Editor open → user Alt-Tabs → read `Logs/Editor.log`, grep `error CS` (check log LastWriteTime > newest
+  `.cs` edit for freshness); (2) Editor closed → run `Tools/compile-check.ps1` (headless batch compile).
+  **Everything through `7db38f2` is CONFIRMED compiling clean.**
+- **⚠️ OWED: a real PLAYTEST** (feel/balance, not compile): belt continuous-flow; power network @ Bronze
+  (Wood Generator + Power Poles; smelters/kiln/potter need a connection from Bronze, free before); smelter
+  recipe-switch (Basic Copper/Iron, Advanced Bronze/Steel); 5 large distant resource zones; build costs ×2.5
+  & research ×10 (Bronze 600/Iron 1600/Industrial 3600); sprite layer should look IDENTICAL (procedural fallback).
+- **🎨 NEXT BIG TASK — wire the Kenney "Roguelike" pack** (`Assets/Roguelike/`, a Spritesheet) into the new
+  `SpriteDatabase`. Catch: SpriteDatabase loads `Resources.Load<Sprite>("art/<name>")`, pack is a sheet outside
+  `Resources/`. Bridge: slice + copy chosen sprites into `Assets/Resources/art/` named per the **seeded keys**
+  (building displayName→`basic_smelter`, resource item.id→`wood`, belt→`conveyor_belt`) then `SpriteDatabase.ClearCache()`
+  — OR put the sliced sheet under Resources/ + `Resources.LoadAll` + map sub-sprite names. Tune scale/sorting to the 1-cell grid.
+- **Queued after that (KNOWN_ISSUES #23 systems redesign):** SR-P2 specialised storage (`StorageClass`) ·
+  SR-P5 liquids revival + steam (revive Pipe/WaterPump, Boiler `water+coal→steam`, Steam Engine on the power
+  net — **coal arrives here**) · SR-P4 roads (reserve+block via `WorldGrid.IsReserved`, then cart pathing) ·
+  SR-P6 rail. *(SR-P2/P4 touch belt code → playtest the belt engine first.)*
+- **Canon:** GAME_DESIGN.md (its population/worker text is SUPERSEDED by the factory-first "no workers" pivot —
+  carts/vehicles are automated). Keep KNOWN_ISSUES newest-first + current. CavemanPrototype stays OUT of global memory.
+---
+
+## #28 SPRITE VISUAL LAYER — central SpriteDatabase abstraction (no assets yet) (2026-06-28)
 Refactor: route ALL entity rendering through a central sprite layer so a future pack drops in with no other
 code change. **No external assets added; visuals are identical** (every Resolve falls back to today's
 procedural shape). No gameplay logic changed. **NOT yet Unity-compiled by Claude** (Editor open) — static-checked.
