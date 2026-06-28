@@ -16,6 +16,11 @@ namespace Caveman
     public static class PowerNet
     {
         public const float BrownoutFloor = 0.35f; // most a network slows an oversubscribed machine
+        public const int BronzeAge = 2; // electricity is introduced in the Bronze age — before it, machines run free
+
+        /// <summary>Is the power requirement in effect yet? Power is a Bronze-age mechanic; in the
+        /// Stone/Tribal ages requiresPower machines run normally (no generator/pole needed).</summary>
+        public static bool Active => Colony.Instance != null && Colony.Instance.Age >= BronzeAge;
 
         private static int _frame = -1;
         private static readonly Dictionary<WorkshopBuilding, float> _factor = new();

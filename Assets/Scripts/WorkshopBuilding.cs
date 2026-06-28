@@ -302,7 +302,8 @@ namespace Caveman
         // poles in later ages flow through this same accessor (no machine-code change).
         private float EffectivePowerFactor()
         {
-            return RequiresPower ? PowerNet.FactorOf(this) : 1f;
+            // Power is a Bronze-age mechanic: before then, machines run free even if requiresPower.
+            return (RequiresPower && PowerNet.Active) ? PowerNet.FactorOf(this) : 1f;
         }
 
         void Update()
@@ -357,7 +358,7 @@ namespace Caveman
         /// <summary>Live status colour (green working / yellow output-full / red missing-input /
         /// grey paused) — also drives minimap dots.</summary>
         // A powered machine not connected to a powered network → it can't run (surfaced to the player).
-        public bool NoPower => RequiresPower && PowerNet.FactorOf(this) <= 0f;
+        public bool NoPower => RequiresPower && PowerNet.Active && PowerNet.FactorOf(this) <= 0f;
         public Color StatusColor
         {
             get

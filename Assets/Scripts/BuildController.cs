@@ -645,7 +645,7 @@ namespace Caveman
                     if (Economy.CanAfford(def.cost, Carried))
                     {
                         Economy.Spend(def.cost, Carried);
-                        existing.SetTier(def.interval, def.color);
+                        existing.SetTier(def.interval, def.color, def.displayName);
                     }
                     return; // upgraded in place — keep direction + carried items
                 }
@@ -656,7 +656,7 @@ namespace Caveman
             if (SolidBuildingAt(new Vector3(cell.x, cell.y, 0f))) return; // never lay a belt on a building
             if (!Economy.CanAfford(def.cost, Carried)) return;
             Economy.Spend(def.cost, Carried);
-            Belt.Spawn(cell, d, def.interval, def.splitter, def.merger, def.color);
+            Belt.Spawn(cell, d, def.interval, def.splitter, def.merger, def.color, def.displayName);
             BuildingsPlaced++;
         }
 

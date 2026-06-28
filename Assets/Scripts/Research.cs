@@ -173,6 +173,26 @@ namespace Caveman
             return true;
         }
 
+        /// <summary>TESTING: force-unlock every tech reachable by `age` (age techs whose target age is
+        /// ≤ age, plus any building-unlock techs whose prereq chain is satisfied) — so the F-key age
+        /// skip also grants that age's technology to test it. Bypasses points/gate-items by design.</summary>
+        public static void DebugUnlockTo(int age)
+        {
+            bool changed = true;
+            while (changed)
+            {
+                changed = false;
+                foreach (var n in Tree)
+                {
+                    if (n.purchased) continue;
+                    if (n.advanceToAge >= 0 && n.advanceToAge > age) continue;       // future-age tech: skip
+                    if (!string.IsNullOrEmpty(n.prereq) && !IsPurchased(n.prereq)) continue; // wait for prereq
+                    n.purchased = true;
+                    changed = true;
+                }
+            }
+        }
+
         /// <summary>Reset on a new game (statics persist across Play sessions in the editor).</summary>
         public static void Reset()
         {

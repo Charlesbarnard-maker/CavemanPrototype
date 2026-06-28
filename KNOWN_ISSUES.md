@@ -3,7 +3,25 @@
 A running record so progress/problems don't get lost. Newest first. Move items to
 **Fixed** when done. Maintained alongside the code — see DESIGN.md for the roadmap.
 
-## #26 ENERGY REDESIGN: power NETWORK (generators + poles) replaces the radius hearth (2026-06-28) — most recent
+## #27 Playtest feedback batch: belt names, power@Bronze, costs, research 10x, UI fixes (2026-06-28) — most recent
+Acting on a playtest feedback list. **NOT yet Unity-compiled by Claude** (Editor open, log stale) — static-checked.
+1. **Belt names** — placed belts hovered as "Building". Belt now carries `DisplayName` (Wooden/Conveyor/Geared/
+   Steel Belt, Splitter, Merger), threaded through Spawn/SetTier/ConvertTo + def.displayName; HoverText shows it.
+   Also fixed generic "Power Plant" → real generator name, + Power Pole hover.
+2. **Selected panel cut off** (smelter ⚠ warning hidden) — panel is now taller, bottom-anchored (still clears
+   minimap), and the info is in a SCROLL VIEW with Demolish/Close pinned below → nothing clips.
+8/7. **Electricity introduced in BRONZE age** (was age 0) — `PowerNet.Active` = Colony.Age ≥ 2; pre-Bronze
+   requiresPower machines run FREE. Wood Generator + Power Pole unlockAge → 2. This also fixes "copper smelting
+   didn't work": a Tribal smelter no longer needs power/heat (the recipe path itself is correct — verified).
+3. **F-key age skip also unlocks tech** — `Research.DebugUnlockTo(age)` force-purchases every tech reachable by
+   the new age (cascading prereqs); F3 now advances age AND unlocks its tech so it's testable.
+4. **Research costs ×10** — Bronze 60→600, Iron 160→1600, Industrial 360→3600 (Tribal 12 kept as the quick opening).
+5. **Build costs ↑** — one `CostScale = 2.5` loop bumps every buildable's build cost (recipe inputs untouched);
+   starter kit raised to 32 wood / 26 stone so the opening still works. (Both tunable.)
+6. **Top tips cut off by build menu** — build menu top 100→118 so it sits below the status + objective/tips bars.
+- Tooling: confirmed (via the live Editor log) the prior power-network commit compiled clean before this batch.
+
+## #26 ENERGY REDESIGN: power NETWORK (generators + poles) replaces the radius hearth (2026-06-28)
 User scrapped the radius-hearth model: buildings are now powered by a **connected network of generators +
 power poles** (early game onward), not proximity heat. **NOT yet Unity-compiled by Claude** (Editor open holds
 the project lock) but fully static-checked (no dangling refs, braces balanced).

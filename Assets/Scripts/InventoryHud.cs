@@ -29,6 +29,7 @@ namespace Caveman
         private Vector2 _buildScroll;
         private Rect _buildRect, _selRect;
         private bool _buildShown, _selShown;
+        private Vector2 _selScroll; // selected-panel scroll so long content (warnings + buttons) never clips
         private bool _showBuild;
         private readonly List<int> _recent = new(); // recently-placed buildable indices
         private readonly HashSet<int> _pinned = new(); // pinned (favourite) buildable indices
@@ -127,7 +128,11 @@ namespace Caveman
             // --- Sandbox / debug hotkeys ---
             if (kb.f1Key.wasPressedThisFrame && debugItems != null)
                 foreach (var it in debugItems) if (it != null) gatherer.Inventory.Add(it, 500);
-            if (kb.f3Key.wasPressedThisFrame && Colony.Instance != null) Colony.Instance.DebugAdvanceAge();
+            if (kb.f3Key.wasPressedThisFrame && Colony.Instance != null)
+            {
+                Colony.Instance.DebugAdvanceAge();
+                Research.DebugUnlockTo(Colony.Instance.Age); // also unlock that age's tech so it's testable
+            }
             if (kb.f4Key.wasPressedThisFrame) Economy.FreeBuild = !Economy.FreeBuild;
             if (kb.f7Key.wasPressedThisFrame) Economy.LocalProduction = !Economy.LocalProduction;
             if (kb.f8Key.wasPressedThisFrame && FogOfWar.Instance != null) FogOfWar.Instance.RevealAll();
@@ -660,7 +665,11 @@ namespace Caveman
             var dp = hit.GetComponent<Depot>();
             if (dp != null) return $"<size=13><b>{NameOf(dp.def)}</b>  <color=#bbb>{(dp.item != null ? dp.item.displayName : "empty")}</color></size>";
             var pp = hit.GetComponent<PowerPlant>();
-            if (pp != null) return "<size=13><b>Power Plant</b></size>";
+            if (pp != null) return $"<size=13><b>{NameOf(pp.def)}</b>  <color=#bbb>generator</color></size>";
+            var pole = hit.GetComponent<PowerPole>();
+            if (pole != null) return $"<size=13><b>{NameOf(pole.def)}</b>  <color=#bbb>power network</color></size>";
+            var blt = hit.GetComponent<Belt>();
+            if (blt != null) return $"<size=13><b>{blt.DisplayName}</b>  <color=#bbb>{(blt.item != null ? blt.item.displayName : "")}</color></size>";
             var wp = hit.GetComponent<WaterPump>();
             if (wp != null) return wp.isBooster
                 ? "<size=13><b>Booster Pump</b>  <color=#bbb>re-pressurises pipes</color></size>"
@@ -713,7 +722,7 @@ namespace Caveman
                 return;
             }
 
-            const float top = 100f;
+            const float top = 118f; // sit below the top status + objective/tips bars (which end ~112) so it doesn't cover them
             float height = Mathf.Min(Screen.height - top - 16f, 470f);
             _buildRect = new Rect(12, top, 268, height);
             _buildShown = true;
@@ -867,15 +876,17 @@ namespace Caveman
             var sel = builder != null ? builder.Selected : null;
             if (sel == null) { _selShown = false; return; }
 
-            // Sit above the minimap when it's shown, so the two never overlap. Taller now so the
-            // Station's route buttons don't crowd out the Demolish/Close row (kept bottom-anchored).
-            float panelY = _showMinimap ? Screen.height - 406 : Screen.height - 222;
-            var rect = new Rect(Screen.width - 290, panelY, 278, 210);
+            // Bottom-anchored so it clears the minimap when shown; taller + scrollable so a smelter's
+            // full readout (recipe + needs + ⚠ warnings + buttons) never gets clipped off the bottom.
+            float bottom = _showMinimap ? Screen.height - 196f : Screen.height - 12f;
+            float top = Mathf.Max(120f, bottom - 330f);
+            var rect = new Rect(Screen.width - 290, top, 278, bottom - top);
             _selRect = rect;
             _selShown = true;
 
             PanelBg(rect);
             GUILayout.BeginArea(new Rect(rect.x + 12, rect.y + 10, rect.width - 24, rect.height - 20));
+            _selScroll = GUILayout.BeginScrollView(_selScroll, GUILayout.Height(rect.height - 58)); // leave room for the button row
 
             var sb = sel.GetComponent<StorageBuilding>();
             var wb = sel.GetComponent<WorkshopBuilding>();
@@ -1051,7 +1062,7 @@ namespace Caveman
                     GUILayout.Label($"<size=15>Building… {(int)(cs.BuildFraction * 100)}%</size>", _small);
             }
 
-            GUILayout.FlexibleSpace();
+            GUILayout.EndScrollView(); // scrollable info above; Demolish/Close stay pinned + always visible below
             GUILayout.BeginHorizontal();
             demo = GUILayout.Button("Demolish", GUILayout.Height(28));
             close = GUILayout.Button("Close", GUILayout.Height(28));

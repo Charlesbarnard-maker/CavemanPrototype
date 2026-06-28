@@ -307,14 +307,15 @@ namespace Caveman
                 new ItemAmount(bricks, 12), new ItemAmount(metal, 6));
             generator.connectRange = 6f; generator.supplyRange = 5f;
             generator.description = "Burns Charcoal to supply Power to the network — a bigger, steadier source than the Wood Generator for a large powered base. Too little generation and connected machines brown out (slow down).";
-            // EARLY POWER: a Wood Generator (age 0) feeds the network from the start, plus Power Poles
-            // to relay power across distance. requiresPower machines connect to a powered network to run.
-            var woodGen = MakePower("Wood Generator", 40, wood, 1, 2.5f, 0, new Color(0.55f, 0.40f, 0.25f),
+            // BRONZE-AGE POWER: electricity is introduced in the Bronze age. A Wood Generator feeds the
+            // network, Power Poles relay it across distance; from Bronze, requiresPower machines must be
+            // connected to a powered network to run (before Bronze they run free).
+            var woodGen = MakePower("Wood Generator", 40, wood, 1, 2.5f, 2, new Color(0.55f, 0.40f, 0.25f),
                 new ItemAmount(wood, 6), new ItemAmount(stone, 4));
             woodGen.connectRange = 6f; woodGen.supplyRange = 5f;
-            woodGen.description = "WOOD GENERATOR — burns Wood to supply POWER to the network. Place it by your machines (its supply ring powers them) or wire it out with Power Poles. Connected machines run; disconnected ones stop. Powers ~4 machines.";
+            woodGen.description = "WOOD GENERATOR — burns Wood to supply POWER to the network (introduced in the Bronze age). Place it by your machines (its supply ring powers them) or wire it out with Power Poles. Connected machines run; disconnected ones stop. Powers ~4 machines.";
             var pole = ScriptableObject.CreateInstance<BuildingDefinition>();
-            pole.displayName = "Power Pole"; pole.kind = BuildingKind.Pole; pole.unlockAge = 0;
+            pole.displayName = "Power Pole"; pole.kind = BuildingKind.Pole; pole.unlockAge = 2;
             pole.connectRange = 7f; pole.supplyRange = 4f;
             pole.color = new Color(0.55f, 0.42f, 0.28f);
             pole.cost = new List<ItemAmount> { new ItemAmount(wood, 2) };
@@ -400,9 +401,9 @@ namespace Caveman
             Research.Tree = new List<Research.Tech>
             {
                 new Research.Tech { id = "tribal",     name = "Tribal Age",     cost = 12,  advanceToAge = 1, prereq = null,     desc = "Advance to the Tribal Age — Charcoal & Clay open up deeper production." },
-                new Research.Tech { id = "bronze",     name = "Bronze Age",     cost = 60,  advanceToAge = 2, prereq = "tribal", requiredBuildings = new List<BuildingDefinition>{ basicSmelter },    gateItem = studyScroll, gateItemCount = 8, desc = "Advance to the Bronze Age — but first BUILD a Basic Smelter (set it to Copper) and deliver Study Scrolls (Copper + Planks)." },
-                new Research.Tech { id = "iron",       name = "Iron Age",       cost = 160, advanceToAge = 3, prereq = "bronze", requiredBuildings = new List<BuildingDefinition>{ advancedSmelter }, gateItem = schematic,   gateItemCount = 6, desc = "Advance to the Iron Age — but first BUILD an Advanced Smelter (set it to Bronze) and deliver Schematics (Bronze Plate + Pottery)." },
-                new Research.Tech { id = "industrial", name = "Industrial Age", cost = 360, advanceToAge = 4, prereq = "iron",   requiredBuildings = new List<BuildingDefinition>{ advancedSmelter }, gateItem = blueprint,   gateItemCount = 5, desc = "Advance to the Industrial Age — but first set the Advanced Smelter to Steel and deliver Blueprints (Steel + Tools)." },
+                new Research.Tech { id = "bronze",     name = "Bronze Age",     cost = 600,  advanceToAge = 2, prereq = "tribal", requiredBuildings = new List<BuildingDefinition>{ basicSmelter },    gateItem = studyScroll, gateItemCount = 8, desc = "Advance to the Bronze Age — but first BUILD a Basic Smelter (set it to Copper) and deliver Study Scrolls (Copper + Planks)." },
+                new Research.Tech { id = "iron",       name = "Iron Age",       cost = 1600, advanceToAge = 3, prereq = "bronze", requiredBuildings = new List<BuildingDefinition>{ advancedSmelter }, gateItem = schematic,   gateItemCount = 6, desc = "Advance to the Iron Age — but first BUILD an Advanced Smelter (set it to Bronze) and deliver Schematics (Bronze Plate + Pottery)." },
+                new Research.Tech { id = "industrial", name = "Industrial Age", cost = 3600, advanceToAge = 4, prereq = "iron",   requiredBuildings = new List<BuildingDefinition>{ advancedSmelter }, gateItem = blueprint,   gateItemCount = 5, desc = "Advance to the Industrial Age — but first set the Advanced Smelter to Steel and deliver Blueprints (Steel + Tools)." },
                 new Research.Tech { id = "splitters",   name = "Splitters",     cost = 15,  prereq = "tribal", unlocks = new List<BuildingDefinition>{ splitter },   desc = "Unlocks the 1→3 Splitter — feed three machines from one supply line." },
                 // The belt-upgrade ladder: a cheap EARLY first rung (the wooden belt is deliberately
                 // slow), then deeper tiers gated by age so faster belts pace your factory's growth.
@@ -459,6 +460,15 @@ namespace Caveman
               woodStore, clayStore, brickStore, warehouse,
               // Infrastructure / power / endgame — Wood Generator + Power Poles (early), Coal Generator (late)
               woodGen, pole, generator, monumentBldg };
+            // BUILD-COST SCALE: bump every building's build cost so placing things is a real resource
+            // decision (more reason to plan + collect, not spam). One knob — tune CostScale. (Recipe
+            // INPUT costs are untouched; this is the one-time placement cost only.)
+            const float CostScale = 2.5f;
+            foreach (var bd in builder.buildables)
+                if (bd != null && bd.cost != null)
+                    foreach (var c in bd.cost)
+                        if (c != null) c.amount = Mathf.Max(1, Mathf.CeilToInt(c.amount * CostScale));
+
             // Transport vehicles are NOT in the build menu — they're created from a Station's panel.
             builder.routeTiers = new List<BuildingDefinition> { caravan, oxCart, wagonTrain, cargoDrone };
 
@@ -478,8 +488,8 @@ namespace Caveman
             colony.carried = gatherer.Inventory;
             // FACTORY-FIRST: no food/water consumption, so no larder is needed. A small starter
             // kit of Wood + Stone lets you place your first hut/storage without a long gather grind.
-            gatherer.Inventory.Add(wood, 12);
-            gatherer.Inventory.Add(stone, 10);
+            gatherer.Inventory.Add(wood, 32);  // starter kit scaled with the higher build costs (CostScale)
+            gatherer.Inventory.Add(stone, 26);
             // Age advancement is driven entirely by RESEARCH (craft research items → deliver to a
             // Research Lodge → spend points). No comfort/happiness demand sink any more.
 

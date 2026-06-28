@@ -27,6 +27,7 @@ namespace Caveman
     {
         public enum Dir { N, E, S, W }
         public Dir dir;
+        public string DisplayName = "Belt"; // tier name (Wooden Belt / Conveyor / …) for hover + selection
         public float interval = 0.5f;
 
         // --- Spacing / density knob -------------------------------------------------------------
@@ -89,9 +90,9 @@ namespace Caveman
 
         public static float Angle(Dir d) => d switch { Dir.N => 0f, Dir.E => -90f, Dir.S => 180f, _ => 90f };
 
-        public static Belt Spawn(Vector2Int cell, Dir dir, float interval = 0.5f, bool isSplitter = false, bool isMerger = false, Color? baseColor = null)
+        public static Belt Spawn(Vector2Int cell, Dir dir, float interval = 0.5f, bool isSplitter = false, bool isMerger = false, Color? baseColor = null, string displayName = "Belt")
         {
-            var go = new GameObject(isSplitter ? "Splitter" : isMerger ? "Merger" : "Belt");
+            var go = new GameObject(isSplitter ? "Splitter" : isMerger ? "Merger" : displayName);
             go.transform.position = new Vector3(cell.x, cell.y, 0f);
             go.transform.localScale = Vector3.one * 0.8f;
             go.transform.rotation = Quaternion.Euler(0f, 0f, Angle(dir));
@@ -106,6 +107,7 @@ namespace Caveman
             b.dir = dir;
             b.isSplitter = isSplitter;
             b.isMerger = isMerger;
+            b.DisplayName = isSplitter ? "Splitter" : isMerger ? "Merger" : displayName;
             b.interval = Mathf.Max(0.05f, interval);
             b._sr = sr;
             if (baseColor.HasValue) b._baseColor = baseColor.Value; // per-tier tint (else the default brown)
@@ -183,10 +185,11 @@ namespace Caveman
 
         /// <summary>Upgrade this belt to a faster tier in place (new interval + colour) without
         /// rebuilding — keeps its direction and any carried items.</summary>
-        public void SetTier(float newInterval, Color newColor)
+        public void SetTier(float newInterval, Color newColor, string displayName = null)
         {
             interval = Mathf.Max(0.05f, newInterval);
             _baseColor = newColor; // the per-frame flow-state colouring in Update uses this as the base
+            if (displayName != null && !isSplitter && !isMerger) { DisplayName = displayName; gameObject.name = displayName; }
         }
 
         /// <summary>Overlay-convert a plain belt into a splitter or merger in place (keeps its
@@ -196,7 +199,8 @@ namespace Caveman
             isSplitter = splitter;
             isMerger = merger;
             if (_sr != null) _sr.sprite = (splitter || merger) ? PlaceholderArt.Hexagon() : PlaceholderArt.Conveyor();
-            gameObject.name = splitter ? "Splitter" : merger ? "Merger" : "Belt";
+            DisplayName = splitter ? "Splitter" : merger ? "Merger" : DisplayName;
+            gameObject.name = DisplayName;
             AddPortMarkers();
         }
 
