@@ -4,32 +4,332 @@ A running record so progress/problems don't get lost. Newest first. Move items t
 **Fixed** when done. Maintained alongside the code — see DESIGN.md for the roadmap.
 
 ---
-## 📌 NEW-THREAD HANDOFF — current state (2026-06-28, HEAD `7db38f2`)
-Pinned pointer so a fresh thread can continue. Detailed per-change log is in #28→#23 below.
+## 📌 NEW-THREAD HANDOFF — current state (2026-06-28, all prior work + the ART session committed & pushed)
+Pinned pointer so a fresh thread (incl. on a DIFFERENT PC) can continue. Everything below was committed and
+pushed to `origin/main` at the end of the "bespoke art for all ages" session — so a clean clone has the whole
+game. Open the project, Play, and continue from "LIKELY NEXT".
 
-- **Build:** Unity `6000.5.0f1`, 2D/URP. Open `Assets/UnitySave.unity` → Play. All built in code at runtime
-  by `GameBootstrap.cs` (no prefabs/Inspector wiring). `main` @ `7db38f2`, pushed (== origin), tree clean
-  (untracked: `Assets/Roguelike/` pack + a couple `.cs.meta`). Commit as `Caveman Dev <caveman@local>`, NO AI trailer.
-- **⭐ Claude CAN verify compiles now** (blind-build loop broken):
-  (1) Editor open → user Alt-Tabs → read `Logs/Editor.log`, grep `error CS` (check log LastWriteTime > newest
-  `.cs` edit for freshness); (2) Editor closed → run `Tools/compile-check.ps1` (headless batch compile).
-  **Everything through `7db38f2` is CONFIRMED compiling clean.**
-- **⚠️ OWED: a real PLAYTEST** (feel/balance, not compile): belt continuous-flow; power network @ Bronze
-  (Wood Generator + Power Poles; smelters/kiln/potter need a connection from Bronze, free before); smelter
-  recipe-switch (Basic Copper/Iron, Advanced Bronze/Steel); 5 large distant resource zones; build costs ×2.5
-  & research ×10 (Bronze 600/Iron 1600/Industrial 3600); sprite layer should look IDENTICAL (procedural fallback).
-- **🎨 NEXT BIG TASK — wire the Kenney "Roguelike" pack** (`Assets/Roguelike/`, a Spritesheet) into the new
-  `SpriteDatabase`. Catch: SpriteDatabase loads `Resources.Load<Sprite>("art/<name>")`, pack is a sheet outside
-  `Resources/`. Bridge: slice + copy chosen sprites into `Assets/Resources/art/` named per the **seeded keys**
-  (building displayName→`basic_smelter`, resource item.id→`wood`, belt→`conveyor_belt`) then `SpriteDatabase.ClearCache()`
-  — OR put the sliced sheet under Resources/ + `Resources.LoadAll` + map sub-sprite names. Tune scale/sorting to the 1-cell grid.
-- **Queued after that (KNOWN_ISSUES #23 systems redesign):** SR-P2 specialised storage (`StorageClass`) ·
-  SR-P5 liquids revival + steam (revive Pipe/WaterPump, Boiler `water+coal→steam`, Steam Engine on the power
-  net — **coal arrives here**) · SR-P4 roads (reserve+block via `WorldGrid.IsReserved`, then cart pathing) ·
-  SR-P6 rail. *(SR-P2/P4 touch belt code → playtest the belt engine first.)*
-- **Canon:** GAME_DESIGN.md (its population/worker text is SUPERSEDED by the factory-first "no workers" pivot —
-  carts/vehicles are automated). Keep KNOWN_ISSUES newest-first + current. CavemanPrototype stays OUT of global memory.
+**⚠️ FIRST THING IN A NEW THREAD: verify the full Unity compile.** All code is static- + standalone-compile-checked
+(see below), but the authoritative check is Unity's own recompile of the whole `Assembly-CSharp`. On the new PC:
+open the project in Unity `6000.5.0f1` → it imports + recompiles → read `Logs/Editor.log`, grep `error CS` after
+the LAST "Requested script compilation" (ignore stale errors ~line 1200). Editor closed → `Tools/compile-check.ps1`.
+
+- **Build:** Unity `6000.5.0f1`, 2D/URP. Open `Assets/UnitySave.unity` → Play. ALL built in code at runtime by
+  `GameBootstrap.cs` (no prefabs/Inspector wiring — script `.meta` GUIDs don't matter, regenerated on import).
+  Commit as `Caveman Dev <caveman@local>`, NO AI trailer (only when asked).
+- **NEW THIS SESSION — bespoke art for EVERY buildable structure (28 buildings, ages 0–4).** See entry below.
+  Each lives in its own partial-class file under `Assets/Scripts/Bespoke/PlaceholderArt.<Name>.cs`; all dispatched
+  from `PlaceholderArt.BespokeBuilding(displayName)` (called FIRST by `SpriteDatabase.ForBuilding`, so it wins over
+  the Roguelike pack + the generic archetype). VERIFIED to compile via a standalone `dotnet build` of the 28 files
+  against `UnityEngine.CoreModule.dll` (0 errors) — but NOT yet eyeballed in Unity (visual review owed).
+- **⚠️ OWED: (1) a Unity recompile + VISUAL eyeball of the new building art** (it's blind procedural art — Play
+  through the ages, age-skip with F3, and check each building reads well / tints right; tweak the offending
+  `PlaceholderArt.<Name>.cs` method). **(2) a full PLAYTEST** of the whole accumulated game.
+
+**PRIOR SESSION CONTENT (factory-first caveman game; all now committed):** belts (per-tier, seamless, corners,
+splitters/mergers) · rail with one/two-way signals + multi-stop train lines · boats (shore harbours, cargo-ship
+lines, boat island, buyable personal boat) · LIQUIDS (Oil Well→pipes→Refinery→Oil Generator; Water Pump) · power
+(belt-fed generators, poles, batteries) · timed construction · manual paid age-upgrades · visible caveman workers
++ a per-age player avatar (3-frame walk) · flyout build menu · per-resource top bar · 2×2 buildings (Monument 3×3)
+with single I/O ports · stone-age bespoke art (Wood Hut/Stone Pit/Sawmill/Idea Bench/Research Lodge/Woodpile +
+Tree/Rock/Caveman). New files across the whole arc: `WorkerUnit.cs`, `PlayerAvatar.cs`, `Battery.cs`, `PowerNode.cs`,
+`RailTile.cs`, `Signal.cs`, the `Assets/Scripts/Bespoke/` art folder, and the `Assets/Roguelike/` + `Assets/Resources/`
+sprite packs.
+
+- **🔜 LIKELY NEXT (user's open threads, roughly priority order):**
+  1. **Unity recompile + visual pass on the 28 new building sprites** (the immediate owed item — iterate any that
+     look off; they're procedural + un-eyeballed).
+  2. **Player VEHICLE/MOUNT visuals per age** (deferred — was about to start when paused). `PlayerController` already
+     names the tiers (On Foot→Horseback→Ox Cart→Wagon→Motorbike); give each a sprite shown by `PlayerAvatar`. The
+     fuller version is a buyable mount + a limited GARAGE to park them.
+  3. **Make the WHOLE map feel hand-designed** (only the island was reshaped so far) — `TerrainGrid` / resource zones.
+  4. **Tighten 2×2 single-port belt I/O to ONE cell** (belts still functionally connect anywhere along a side though
+     only one port marker shows — see `Ports.singlePort` + `Belt.cs` deposit/pull).
+  5. **#35 deferred audit items** (PERF: `DrawTopBar`/minimap OnGUI caching, `PowerNet.Rebuild` per-frame allocs,
+     `SolidBuildingAt` allocs; BUGS: rail head-on deadlock, signal false-green lamp at a junction; dead survival-era
+     wiring to delete) — see the #35 entry for the full list.
+  6. Fuller UI/tutorial polish; bespoke ITEM icons (currently shape-by-family).
+- **Canon:** GAME_DESIGN.md is partly SUPERSEDED (factory-first, but workers are back as a COSMETIC layer).
+  Keep KNOWN_ISSUES newest-first. CavemanPrototype stays OUT of global memory.
 ---
+
+## #38 BESPOKE ART for every buildable structure — all ages 0–4 (2026-06-28)
+Extended the stone-age bespoke-art treatment to EVERY remaining building the player can place (28 structures),
+so nothing falls back to the generic tinted-archetype box any more. Generated via a fan-out workflow (one focused
+artist per building: draft → refine → write), each method hand-following the established house style.
+- **What's new (28 buildings):**
+  - Age 0: Station (timber platform), Harbour (plank dock over water), Warehouse (gabled storehouse), Water Barrel.
+  - Age 1: Clay Pit, Copper Mine, Iron Mine, Charcoal Burner (turf clamp), Basic Smelter (stone bloomery), Scroll
+    Maker, Clay Pile.
+  - Age 2: Kiln (brick dome), Potter (wheel), Advanced Smelter, Refinery (still), Drafting Table, Brick Yard, Oil
+    Tank, Wood Generator, Battery, Water Pump, Booster Pump, Oil Well (derrick).
+  - Age 3: Toolmaker (forge/anvil), Engineering Lab, Coal Generator, Oil Generator.
+  - Age 4: Monument (tiered gold-capped ziggurat).
+- **Structure:** `PlaceholderArt` is now `partial`; each sprite is its own file `Assets/Scripts/Bespoke/
+  PlaceholderArt.<Method>.cs` (e.g. `BronzeKiln`, `IronToolmaker`, `IndustrialMonument`). All wired into
+  `PlaceholderArt.BespokeBuilding(displayName)` (grouped by age). Style = 64×64, `fy=0` bottom, white structural
+  body (tinted by `def.color`) + baked 3-shade detail lit upper-left + a dark silhouette outline pass.
+- **One wiring fix:** `Depot.cs` now renders its deck via `SpriteDatabase.ForBuilding(def)` (was a plain `Square()`),
+  so the Harbour shows its full dock and the Station shows a plank platform under its rails.
+- **Compile VERIFIED (not just static):** a standalone `dotnet build` of all 28 files against Unity's
+  `UnityEngine.CoreModule.dll` (via Unity's bundled .NET SDK) with a 5-method shim → **0 errors, 0 warnings**.
+  Also brace/paren-balanced, no helper/field/method-name collisions, signatures match the dispatch. **Still NOT
+  eyeballed in Unity** — the art is procedural + blind, so a Unity recompile + visual pass is owed (iterate any
+  sprite that reads poorly by editing its `PlaceholderArt.<Name>.cs` method).
+- **Belts/track/pipes/poles/signals** keep their existing dedicated procedural tile art (already per-tier/neighbour
+  aware) — `BespokeBuilding` returns null for them so they fall through.
+
+## #37 Conveyor look: per-tier sprites + neighbour-aware corners (2026-06-28)
+Conveyor visuals. **NOT yet Unity-compiled by Claude** (Editor open; #36 also still awaiting recompile) —
+static-checked, brace-balanced, grep-verified.
+- **Per-AGE belt look** (point 1): NEW `PlaceholderArt.BeltSprite(tier, shape)` — 4 tier looks × 3 shapes,
+  cached (12). Tier from the belt's name: Wooden = **rollers** (horizontal lines), Conveyor = **chevrons**,
+  Geared = **chevrons + side gear teeth**, Steel = **bold arrows + bright rails**. Drawn white+dark so the
+  per-tier `_baseColor` tint still shows + the flow-state colour (red/yellow) still works.
+- **Corners actually connect** (point 2): `Belt.UpdateBeltShape()` (called each frame for plain belts) picks
+  STRAIGHT vs a curved CORNER from neighbours — `BeltShape()`/`FeedsInto()` detect whether the feeder is
+  behind (straight) or to the left/right (corner). The corner sprite is a quarter-turn belt band whose width
+  matches the straight body at the shared edge, so bends join up instead of two straights meeting at a gap.
+  Sprite re-picked only when tier/shape changes (cheap). Splitters/mergers keep their junction sprite.
+- **All tiers interconnect** (point 3): already true — the sim (`AcceptsHandoffFrom`/`ReceiveItem`) and the
+  new shape detection never check belt tier, so Wooden↔Geared↔Steel mix freely (mechanically + visually).
+- **In/out of buildings**: a belt fed from a building (behind) or feeding one shows STRAIGHT chevrons pointing
+  the right way; the building's green-out/cyan-in port markers sit on the shared edge. **PARTIAL** — a belt
+  fed by a building from a perpendicular SIDE still draws straight (corner detection only inspects belts), and
+  the BUILD GHOST still shows the generic Conveyor sprite (placed belt is per-tier). Both noted for follow-up.
+- **Recompile check (intended):** lay a Wooden run (rollers) then upgrade to Steel (arrows) — looks change per
+  tier; turn a belt — the corner curves and connects; mix tiers in one line — they connect and items flow.
+
+## #36 Straight-line conveyor drag + neighbour-shaped track (corners/junctions) (2026-06-28)
+Two placement/visual asks. **NOT yet Unity-compiled by Claude** (Editor open) — static-checked, brace-balanced,
+grep-verified. (#29–#35 CONFIRMED compiling + playtested.)
+- **Conveyors lay as STRAIGHT lines** (point 1): a belt drag now plans a single straight run along the
+  DOMINANT axis (no auto-corner) — easier to pull a clean line; to turn, do a second drag. New `ReplanStraight`
+  (rebuilds the plan from the stroke start each move) replaces the L-path `PlanPath` (removed). Belts flow in
+  the drag direction. Rail keeps its L-path drag (so you can corner) — the corner now LOOKS right (below).
+- **Track corners curve + junctions meet** (point 2): NEW `PlaceholderArt.RailMask(mask)` — a track sprite
+  shaped to the tile's NEIGHBOURS (N=1/E=2/S=4/W=8, cached per of 16). A perpendicular pair → a CURVED quarter
+  corner (rails meet the edge centres so they line up with straights); opposite pair → straight; 3 → T; 4 →
+  cross; isolated → straight. `RailTile.Update` computes its mask (station lanes count via `RailNet.IsRail`)
+  and sets the sprite only when the mask changes (cheaper than the old per-frame rotate). So bends look like
+  bends and where tracks meet they visibly join. (Station through-lanes still draw a straight E–W rail.)
+- **Recompile check (intended):** drag a belt — it lays a straight line in the drag direction; drag again to
+  turn. Lay a track L / cross / T → the bend shows a curve, the crossing/T shows rails meeting; track meeting
+  a station platform joins cleanly.
+
+## #35 Audit pass: leak fixes, perf, cleanup (+ a held-off bit) (2026-06-28)
+Autonomous top-to-bottom review (4 parallel reviewer agents) + fixes. **NOT yet Unity-compiled by Claude**
+(Editor open) — static-checked, brace-balanced, grep-verified. (#29–#34 CONFIRMED compiling; user playtested
+through #34.) **Fixed:**
+- **Material LEAK (4 sites):** every `LineRenderer` did `new Material(Shader.Find(...))` (wires, route lines,
+  reach ring, line preview) — Unity never GCs those. Now one shared `PlaceholderArt.LineMaterial()` (they
+  colour via the renderer's start/endColor, so sharing is safe). Was a per-wire / per-vehicle leak.
+- **Phantom rail occupancy across Play sessions:** `RailGraph.Occ` / `RailNet.StationLane` are static and
+  survive when domain-reload-on-play is off → stale "cell occupied" → deadlocked trains / stuck-red signals.
+  Added `RailGraph.Reset()` + `StationLane.Clear()` at `GameBootstrap.Start`, and `RailGraph.Clear(cell)` in
+  `RailTile.OnDisable` / `Depot.OnDisable` (demolishing track/station under a train frees the cell).
+- **PERF — Signal lamp:** each signal walked up to 512 cells EVERY frame for its red/green lamp; now throttled
+  to ~5×/sec (cosmetic).
+- **PERF — blueprint ghosts:** belt/rail plan-ghost rebuilds (a `Physics2D.OverlapPointAll` per planned cell)
+  ran every frame even when idle; now gated behind a dirty flag (rebuild only when the plan changes).
+- **PERF — HUD (2 hot panels):** `DrawStatus` (starved/backed/monument scan of `*.All` ×2-3) and
+  `DrawResourceFinder` (`ResourceNode.All` × materials + collector scan + string alloc) recomputed EVERY
+  OnGUI pass (2–4×/frame); both now cache once per frame in `Update` (like `_totals`) — OnGUI just draws.
+- **Held-off bit added — platform hold:** a train now KEEPS its platform cell while loading (releases on
+  departure), so a second line's train can't pass through an occupied platform. (Build a passing loop.)
+- **Cleanup:** removed dead `RouteVehicle._railPts` (built each leg, never read) + dead `DragBeltPath`;
+  null-guarded `InventoryHud.HasStorage`; fixed the stale research-cost comment (data is 12→600→1600→3600).
+
+### ⚠️ DEFERRED ISSUES (found in the audit, NOT yet fixed — verify/fix when the Editor can recompile)
+- **PERF (HUD, remaining):** `DrawTopBar` still builds chip strings + `CalcSize` every OnGUI pass, and the
+  minimap/map redraw all `*.All` dot loops every pass — both cacheable but lower-priority than the two done.
+- **PERF (power):** `PowerNet.Rebuild` allocates `new float[nComp]`×2 + `new List<Battery>[nComp]` every frame
+  (it runs every frame). Reuse cached arrays sized to a high-water mark.
+- **PERF:** `BuildController.SolidBuildingAt` uses `Physics2D.OverlapPointAll` (allocs) + up to 9 `GetComponent`
+  per hit. Convert to a NonAlloc overload + a reused buffer (left alone — Unity 6 overlap-API choice needs a
+  compile to confirm).
+- **BUG (rail):** two trains head-on on a single bidirectional track DEADLOCK with no detection/timeout (amber
+  forever). Intended mitigation is signals/one-way loops — but consider a wait-timeout re-path or a warning.
+- **BUG (signal):** `Signal.BlockAheadOccupied` follows ONE branch via `NextAlong` — at a junction it can miss
+  a train on the other branch (false-green LAMP only; the train's own gating is correct). Fine on non-branching
+  track. Document or walk all branches.
+- **NIT:** merger fed by BUILDINGS on multiple sides isn't round-robin-fair (belt inputs are); `Battery`
+  discharge is greedy (battery[0] does all the work — uneven Flow display); `RouteVehicle.b` property unused;
+  `Colony.foodItem/waterItem` + `Economy.FoodPoints/SpendFoodPoints/FoodPointsIn` + `InventoryHud.food/water/
+  meatItem` look like dead survival-era wiring (verify with a usage search, then delete).
+- **NIT:** `PlaceholderArt.Ground(baseCol)` caches and ignores `baseCol` on later calls (only called once now,
+  but a latent trap).
+
+## #34 RAIL polish: one-way signal routing + live block lamps, track blueprint, through-stations, track art (2026-06-28)
+Four rail refinements. **NOT yet Unity-compiled by Claude** (Editor open) — static-checked, brace-balanced,
+grep-verified. (#29–#33 CONFIRMED compiling + playtested.)
+- **Signals make the train take the legal route** (point 1a): `RailNet.FindPath` is now SIGNAL-AWARE — it
+  won't enter a signal cell against its facing direction. So on a one-way loop the path runs the legal way
+  round (the train keeps flowing, doesn't double back); the runtime one-way check in `RouteVehicle` is now a
+  belt-and-braces backstop. *(Caveat: a one-way signal on a non-loop makes the reverse leg unroutable → it
+  falls back to a straight line; build a LOOP for one-way running.)*
+- **Live block lamps** (point 1b): a `Signal` now drives its own lamp every frame — it walks the track ahead
+  (following turns) to the next signal and shows **RED while any train occupies that block**, GREEN once the
+  train clears the next signal. New `RailGraph.AnyTrainAt`. (Removed the train-driven `SetClear`.)
+- **Track blueprint placement** (point 2): rail is laid like belts now — **drag to plan** (cyan ghosts, no
+  cost), **click to build**, right-click cancel — and only **90° L-paths** (no diagonals), so track stays
+  tidy. New `_railPlan` + `PlanRailPath`/`BuildRailPlan`/`RebuildRailPlanGhosts`; `RailCellFree` helper.
+- **Through-stations** (point 3): the Station is now a **3×1 platform with a TRACK LANE running straight
+  through it** (east–west). Its footprint cells register in new `RailNet.StationLane` (counted as rail by
+  `IsRail`/`FindPath`/`RailNear`), so trains route THROUGH or stop. Visible track is drawn over the platform
+  deck; belt IN = south, OUT = north. Root transform kept uniform (collider sized explicitly) so port markers
+  aren't distorted. *(Lane is fixed E–W — no rotation yet; a train stopped at a platform briefly frees its
+  cell during loading, so two lines sharing one platform could overlap — build a passing loop.)*
+- **Track ART** (point 4): NEW `PlaceholderArt.Rail()` — two steel rails over wooden sleepers on a ballast
+  bed (was a grey "broken rock" block). `RailTile` + station lanes use it; rails orient to neighbours
+  (incl. station lanes via `RailNet.IsRail`). Dropped the roguelike Station/Track skins (drawn procedurally now).
+- **Recompile check (intended):** make a one-way loop (track circle + signals all facing the flow) with 2+
+  stations on it → the train circulates the loop instead of reversing; a signal goes RED while a train is in
+  its block, GREEN after. Lay track by drag-plan-then-click (90° only). A station shows a platform with rails
+  running through it; a train stops on it or passes straight through. Track looks like track.
+
+## #33 Multi-stop train LINES (pass-through) + strict station I/O gating (2026-06-28)
+Follow-ups the user OK'd after #32. **NOT yet Unity-compiled by Claude** (Editor open) — static-checked +
+grep-verified. (#29–#32 are CONFIRMED compiling clean + were playtested.)
+- **Multi-stop LINES** (`RouteVehicle` reworked from a/b → `List<Depot> stops`). A vehicle visits the stops
+  in a loop. Travel between stops is the #32 track-gated movement, so it **passes stations not on its line**
+  (and passes line-stations that aren't its current target) — real pass-through. **Load/unload model:** stop 0
+  is the PICKUP (loads its commodity up to capacity); every other stop is a DROP-OFF (receives what fits, the
+  rest rides on). Predictable, no ping-pong, and a 2-stop line == the old A↔B shuttle. One commodity per line.
+- **Line-building UI:** "+ Add line" → click each stop in order → click the FIRST station (or right-click) to
+  close the loop. An **amber preview** traces the stops + cursor while building (`UpdateLinkPreview`). Station
+  panel now lists the LINES serving it (N stops · commodity) + "✕ Remove a line". `a`/`b` kept as
+  first/last-stop properties + `Serves(d)`/`StopCount` so existing reads still work; `Depot.Role` → "On a line".
+- **Strict 2-in / 2-out station gating** (the markers are now ENFORCED): belts deliver IN only on the station's
+  SOUTH edge (moving north into a bottom-row cell) and take OUT only on the NORTH edge (a belt north of a
+  top-row cell). New `Depot.IsInputDeposit`/`IsOutputPull` (computed from the footprint's min/max row); wired
+  into `Belt.cs` deposit + pull + connectivity (depots are no longer omnidirectional). Track still connects on
+  the EAST ▮ marker. So a station reads as: track east, belt-in south, belt-out north.
+- **Known partial / next:** true **through-platform track** (rail running THROUGH the 2×2 footprint, vs the
+  train pulling up adjacent) isn't done — the train stops adjacent and passes adjacent. Per-stop load/unload
+  CONFIG (so any stop can be a pickup, not just stop 0) is a future nicety.
+- **Recompile check (intended):** build 3 Stations, lay track linking them, set the first's item + belt goods
+  into its SOUTH edge; '+ Add line' → click stops 2,3 → click the first to close. The vehicle loads at stop 1,
+  delivers along 2→3, loops; belts only connect on south(in)/north(out). It passes a 4th station that's not on
+  the line. Belt into the wrong side → no connection (by design).
+
+## #32 RAIL system overhaul: signals (one-way + blocks), no-crossing, gap-fix, bigger stations (2026-06-28)
+Deep pass on trains, modelled on Workers-&-Resources. **NOT yet Unity-compiled by Claude** (Editor open) —
+static-checked + grep-verified.
+- **Long-route "goes straight" bug FIXED** (point 2). Root cause: rail was placed one tile per cursor cell,
+  so a fast/diagonal drag skipped cells → the 4-neighbour BFS saw a broken track → fell back to straight
+  line. Rail drag now fills a continuous ORTHOGONAL L-path (`LayRail`/`LayRailPath`), so the track is always
+  4-connected and the path search succeeds. Also bumped `RailNear` radius 2.6→3.2 (for the bigger station).
+- **Trains no longer cross over** (point 1a): NEW `RailGraph` occupancy (cell → train). A vehicle CLAIMS the
+  cell it's entering (holds 1–2) and releases behind it, so two trains never share a cell — junction crossings
+  are mutually-excluded automatically, no signals needed. Releases on demolish (OnDisable).
+- **SIGNALS** (point 1b) — NEW `Signal.cs` + a "Signal" tool (place on a track cell, R aims it; green=clear,
+  red=block occupied). Enforced in `RouteVehicle`: a train may pass a signal only when **travelling its way**
+  (one-way → two opposing signals on parallel tracks = a one-way loop) AND only when the **block ahead** (path
+  cells up to the next signal) is **clear of other trains**. So you plan one-way routes + one-train-per-block.
+  A waiting train tints **amber**. (Faithful W&R caveat: a one-way signal blocks the return trip on a single
+  bidirectional track — build a loop. Documented in the tooltip.)
+- **`RouteVehicle` rewritten** to cell-gated track following (`TravelTo`/`CanEnter`/`TravelDirAt`/
+  `BlockAheadClear`/`BuildRailRoute`/`ReleaseHeld`); ALL tiers (incl. Cargo Drone) follow track now; straight-
+  line fallback kept for un-tracked routes.
+- **Bigger stations** (point 3): Station is now **2×2** with **2 belt-IN markers (cyan, south)** + **2 belt-OUT
+  (green, north)** + a **▮ track marker (east)** showing where to run rail. Cost bumped (wood 12/stone 8).
+  **PARTIAL:** I/O is still accepted on ANY side (markers are guidance, not yet strict gating), and trains
+  STOP at their route endpoints — true **pass-through stations need multi-stop line routing (a follow-up)**.
+- **Wiring:** BuildingKind +Signal; BuildController +rail-path-fill +`UpdateSignalPlacement` +signal in
+  under-cursor (prefers the signal over the rail it sits on) / demolish; GameBootstrap +Signal buildable
+  (stone 1) + enlarged Station; InventoryHud +Signal menu category + rail/signal banners.
+- **Recompile check (intended):** lay a long, turning track between two Stations → the train follows ALL of
+  it (no more straight-line shortcut). Two routes sharing a junction → one train waits (amber) while the other
+  crosses. Place a Signal facing the travel way → train passes when the block's clear, holds (red) when a
+  train's in the block ahead. Place opposing signals on a two-track loop → one-way running. Station shows
+  2 cyan-in / 2 green-out / 1 track marker.
+
+## #31 Playtest batch: merger fix + ports, belt BLUEPRINT placement, RAIL track + trains follow it (2026-06-28)
+Four playtest asks (belts/mergers/conveyors/trains) + a crash fix. **NOT yet Unity-compiled by Claude**
+(Editor open) — static-checked + grep-verified (no dangling refs).
+- **Merger now WORKS (pull, round-robin).** Root cause: feeders PUSHED into the merger in fixed cell order,
+  so the same input always won its single slot and the others starved ("items don't go in the sides").
+  Now the merger PULLS its three input sides (back/right/left) round-robin (`MergerPullFromBelts`,
+  `_mergeNext`); `TryDepositTo` no longer pushes into mergers; a feeder only counts if it POINTS INTO the
+  merger (a belt that doesn't is never touched → fixes "stops an adjacent belt"). `_blocked` is merger-aware
+  (no false yellow while waiting to be pulled).
+- **Merger/splitter ghost shows IN/OUT** (point 1): the placement ghost now draws the junction's ports
+  (green ▸ out, cyan in) via `ShowGhostJunctionPorts` (parented to the rotated ghost, follows R), so you can
+  orient it before placing. Banner updated ("green=out, cyan=in").
+- **Belt BLUEPRINT placement** (point 3): plain belts are no longer instant. **Drag = sketch a plan** (cyan
+  ghosts, no cost), **click = build it**, **right-click = cancel**. New `_beltPlan` (cell→dir dict) +
+  `_planGhosts`; `PlanPath`/`PlanCell`/`BuildBeltPlan`/`ClearBeltPlan`/`RebuildPlanGhosts`. Splitters/Mergers
+  stay one-click. (Single belt = drag a short run, or tap to plan 1 tile then tap to build.)
+- **RAIL TRACK + trains follow it** (point 4): NEW `RailTile.cs` (drag-laid like pipes; reserves its cell via
+  `WorldGrid.Rails`; auto-orients H/V) + `RailNet` (BFS path + `RailNear` station hook-up). `RouteVehicle`
+  now PATHS along the laid track between stations (`BuildRailPath`/`TravelTo`/`NearestRailIdx`), drawing the
+  polyline; **falls back to a straight line when no track connects** (old routes unaffected). New "Track"
+  buildable (BuildingKind.Rail, stone 1, Logistics menu). **Signals are the stated next step — NOT built yet.**
+- **Reserve-block wired** (SR-P4 groundwork): `WorldGrid.IsReserved` now actually blocks — belts (`EnsureBelt`
+  + ghost) and buildings (`FootprintBlocked`) can't sit on rail, and rail can't sit on them.
+- **Crash fix:** the build menu's "Recent" row threw `Collection was modified` every OnGUI once you clicked a
+  recent entry (it placed a building → mutated `_recent` mid-foreach). Now iterates a snapshot.
+- **Menu-category fix:** **Battery** (from #30) and **Track** weren't in any build-menu category, so they
+  never appeared — Battery was un-buildable in the last playtest. Added Battery→Production, Rail→Logistics.
+- **Tunables (verify in play):** wire length 8 (#30); merger still 1-cell (round-robins, doesn't widen
+  throughput — that's by design); rail cost stone 1×2.5; train speed unchanged (cart→train tiers). 
+- **Recompile check (intended):** place a Merger → its 3 in-sides + out show on the ghost; feed it from two
+  belts → both lines now flow through evenly; a parallel belt beside it is untouched. Drag a belt run → cyan
+  blueprint → click → it builds; right-click cancels. Lay Track between two Stations → the route vehicle
+  follows the rails (polyline drawn); remove the track → it reverts to straight. Battery + Track now appear
+  in the build menu.
+
+## #30 ENERGY REDESIGN #2: WIRED power grid (player-drawn cables) + batteries + smart draw (2026-06-28)
+User scrapped the proximity-radius supply model: power now flows along **wires the player draws** between
+nodes. **NOT yet Unity-compiled by Claude** (Editor open) — static-checked; no dangling refs (grep-verified).
+- **NEW `PowerNode.cs`** — a component on every power participant (Generator/Pole/Battery/Consumer) with a
+  `maxConnections` cap (poles/gens/batteries **4**, a machine **1**) + an adjacency `links` list. Plus
+  **`PowerWire`** (a LineRenderer per cable; cyan = live, grey = no source; auto-created/destroyed with the
+  link). A node drives `PowerNet.EnsureFresh()` each frame so batteries integrate even when nothing queries.
+- **NEW `Battery.cs`** (BuildingKind.Battery, Bronze) — a wired store: `Absorb` surplus / `Draw` on deficit
+  (capacity 200, rate 30; tints by charge). Smooths brownouts so a small generator covers a peaky base.
+- **`PowerNet.cs` REWRITTEN** — wire-graph solver (BFS components over `PowerNode.links`, no more spatial
+  union-find / ranges). Per network: gen (+battery discharge) vs demand → factor (1 / brownout floor 0.35 /
+  **0 if no source or unwired**); surplus charges batteries. New `MaxWireLength = 8` (a single cable's reach
+  → chain poles to span). Kept the public API (`Active`/`FactorOf`/`TotalGen`/`TotalDemand`/`EnsureFresh`)
+  + added `TotalStored`/`TotalCapacity`. **Bronze-gated** still (Active = Age ≥ 2; pre-Bronze runs free).
+- **Smart draw** (`WorkshopBuilding.CurrentDraw`): **full** `powerDraw` while actively processing, a **10%
+  trickle** while stalled (starved / output-full), **0 when switched OFF** (the existing Pause toggle now
+  cuts power to zero — the "turn a machine off" the user asked for). Feeds PowerNet demand (no flat draw).
+- **Wiring UX** (mirrors Station route-linking): select a power building → **🔌 Connect wire** in its panel
+  → click the target. Validated (cap + range + dup) with a Toast on failure; Esc/right-click cancels. New
+  selected-panel block shows wires `n/max`, battery charge ▲/▼, **Connect** + **✂ Disconnect** for ANY node.
+  Top power readout gained a 🔋 stored/capacity figure. NoPower hint reworded to "wire to a Generator/Pole/Battery".
+- **Wiring/plumbing:** `PowerPlant`/`PowerPole` lost their ConnectRange/SupplyRange + the pole's supply ring
+  (radius gone), gained a PowerNode. `BuildingDefinition` +Battery kind +batteryCapacity/Rate (connectRange/
+  supplyRange kept as inert legacy). ConstructionSite +Battery case. BuildController: wire-link mode +
+  Battery/Pole added to under-cursor/solid/copy/demolish/selectedDef (**poles are now demolishable** — they
+  fell through the rdef chain before). GameBootstrap: Battery buildable (copper 6 + bricks 4) + descriptions.
+- **Tunables (verify in play):** wire length 8; pole/gen/battery cap 4, machine cap 1; battery 200 cap / 30
+  rate; idle draw 10%; brownout floor 0.35. **Coal still deferred** (SR-P5 Boiler/steam).
+- **Recompile check (intended):** Bronze+, place a Wood Gen + a smelter → smelter shows "⚡ No power" until
+  you select the gen → Connect wire → click the smelter (cable appears, smelter runs). Chain poles past 8
+  cells. Place a Battery, wire it in → it charges on surplus (▲), discharges to cover a stalled gen (▼).
+  Switch a machine OFF (Pause) → its draw drops to 0 (grid demand falls). Demolish a pole → its wires vanish.
+
+## #29 ROGUELIKE sprite pack wired into SpriteDatabase (2026-06-28) — CONFIRMED COMPILING
+Wired the Kenney **Roguelike** pack (`Assets/Roguelike/`) into the #28 sprite layer. **Claude-verified clean
+compile** (Editor recompiled 11:40, `error CS` count 0; the sheet imported via TextureImporter). In-game look
+not yet eyeballed by the user.
+- **Sheet → Resources:** copied `roguelikeSheet_transparent.png` (+meta) to `Assets/Resources/Roguelike/`
+  (original pack untouched). Meta edited on the COPY: fresh GUID (no dup), **PPU 100→16** (a 16px tile = 1
+  grid cell, matching the procedural 1-unit sprites), **filterMode→Point** (crisp), pivots→center. It's a
+  sliced multi-sprite (57-wide grid, sub-sprites `roguelikeSheet_transparent_<row*57+col>`).
+- **`SpriteDatabase` extended:** `LoadExternal` now tries the pack sheet first (lazy `Resources.LoadAll`,
+  indexed by sub-sprite name) then `Resources/art/<name>`; unmatched → procedural fallback (so nothing breaks
+  if the sheet's absent). Added an `Item` icon map, an `RL(col,row)` helper, and `ApplyRoguelikeSkin()` (the
+  hand-picked tile table), called right after `Seed()` in GameBootstrap (+ re-resolve of skinned item icons).
+- **Skinned (verified against the art):** Kiln/Campfire/Toolmaker/Potter/Basic+Advanced Smelter/Coal Gen
+  (forges/anvil/furnaces), Warehouse/Granary (chest/sack), Research Lodge (bookshelf), Station (minecart);
+  the 5 resource nodes (tree/boulders/clay/copper-ore); a few item icons (ingots, scroll/books). **Belts kept
+  procedural** (the conveyor rotates correctly; the pack's arrows point the wrong way). Everything else =
+  procedural fallback. To extend: add `RL(col,row)` entries in `ApplyRoguelikeSkin()` (read col/row off the sheet).
 
 ## #28 SPRITE VISUAL LAYER — central SpriteDatabase abstraction (no assets yet) (2026-06-28)
 Refactor: route ALL entity rendering through a central sprite layer so a future pack drops in with no other

@@ -75,6 +75,18 @@ namespace Caveman
         private static int cellX(Vector3 p) => Mathf.RoundToInt(p.x);
         private static int cellY(Vector3 p) => Mathf.RoundToInt(p.y);
 
+        // An adjacent resource node yielding our liquid (the Oil Well's Oil deposit), or null.
+        private ResourceNode FindSourceNode(Vector2Int me)
+        {
+            foreach (var n in ResourceNode.All)
+            {
+                if (n == null || n.yields != water || !n.HasResource) continue;
+                int nx = Mathf.RoundToInt(n.transform.position.x), ny = Mathf.RoundToInt(n.transform.position.y);
+                if (Mathf.Abs(nx - me.x) <= 2 && Mathf.Abs(ny - me.y) <= 2) return n;
+            }
+            return null;
+        }
+
         void Update()
         {
             if (isBooster) return; // passive relay — only marks BoostCells
@@ -94,9 +106,12 @@ namespace Caveman
             if (water == null) return false;
             var me = new Vector2Int(Mathf.RoundToInt(transform.position.x), Mathf.RoundToInt(transform.position.y));
 
+            // Source the liquid: WATER from adjacent water terrain (infinite), or — for an Oil Well — from an
+            // adjacent OIL deposit (finite, extracted). The rest of the flood (pressure → sinks) is identical.
             bool atWater = false;
             foreach (var d in _dirs) if (TerrainGrid.IsWater(me + Belt.Step(d))) { atWater = true; break; }
-            if (!atWater) return false;
+            ResourceNode node = atWater ? null : FindSourceNode(me);
+            if (!atWater && node == null) return false;
 
             _q.Clear(); _dist.Clear();
             foreach (var d in _dirs)
@@ -104,8 +119,10 @@ namespace Caveman
                 var s = me + Belt.Step(d);
                 if (PipeNet.At(s) != null && !_dist.ContainsKey(s)) { _dist[s] = 1; _q.Enqueue(s); }
             }
+            if (_q.Count == 0) return false; // no connected pipe → nothing to pump (and don't waste finite oil)
 
             int budget = flowPerTick;
+            if (node != null) { budget = node.Extract(flowPerTick); if (budget <= 0) return false; } // finite deposit
             bool delivered = false;
             int guard = 0;
             while (_q.Count > 0 && guard++ < 4096)
@@ -126,10 +143,13 @@ namespace Caveman
                             int room = st.def.capacity - st.Store.Total();
                             if (room > 0) { int add = Mathf.Min(budget, room); st.Store.Add(water, add); budget -= add; delivered = true; }
                         }
-                        // Sink 2: a water-using workshop — fed directly into its input buffer.
+                        // Sink 2: a liquid-using workshop (Refinery, Campfire…) — fed into its input buffer,
+                        // capped at a fair share per liquid so one liquid can't fill the buffer and starve another.
                         if (budget > 0 && WorldGrid.Workshops.TryGetValue(nb, out var wk) && wk != null && wk.WantsInput(water))
                         {
-                            int room = wk.InBuffer.capacity - wk.InBuffer.Total();
+                            int inputs = wk.inputs != null ? Mathf.Max(1, wk.inputs.Count) : 1;
+                            int perCap = wk.InBuffer.capacity / inputs;
+                            int room = Mathf.Min(wk.InBuffer.capacity - wk.InBuffer.Total(), perCap - wk.InBuffer.Count(water));
                             if (room > 0) { int add = Mathf.Min(budget, room); wk.InBuffer.Add(water, add); budget -= add; delivered = true; }
                         }
                     }

@@ -27,11 +27,13 @@ namespace Caveman
         private bool _paused;
         private bool _showHelp;
         private Vector2 _buildScroll;
-        private Rect _buildRect, _selRect;
-        private bool _buildShown, _selShown;
+        private Vector2 _flyoutScroll;     // scroll for the category flyout panel (right of the build menu)
+        private Rect _buildRect, _selRect, _flyoutRect;
+        private bool _buildShown, _selShown, _flyoutShown;
         private Vector2 _selScroll; // selected-panel scroll so long content (warnings + buttons) never clips
         private bool _showBuild;
         private readonly List<int> _recent = new(); // recently-placed buildable indices
+        private readonly List<int> _recentSnapshot = new(); // reused copy for safe iteration in OnGUI
         private readonly HashSet<int> _pinned = new(); // pinned (favourite) buildable indices
         private string _activeCat = "Production"; // build-menu accordion: only this group is open
         private bool _showMinimap = true;
@@ -51,7 +53,11 @@ namespace Caveman
         private bool _localTipShown; // one-time hint when a workshop first starves
         private bool _collectorTipShown; // one-time hint when a collector first backs up
         private Texture2D _panelTex; // dark panel background for readability
+        private Texture2D _accentTex, _btnTex, _btnHoverTex; // top accent bar + flat button skins
+        private static Texture2D Solid(Color c) { var t = new Texture2D(1, 1); t.SetPixel(0, 0, c); t.Apply(); return t; }
         private Dictionary<ItemDefinition, int> _totals;
+        private int _starvedCount, _backedCount; // bottleneck counts, cached once/frame in Update
+        private bool _hasMonument;
         private readonly Dictionary<string, int> _trendSnap = new(); // chip values ~3s ago (for ▲/▼)
         private float _lastSnap = -999f;
         private Rect _topRect, _miniRect, _objRect;
@@ -66,14 +72,22 @@ namespace Caveman
         private string _ageCardTitle, _ageCardBody;
         private Rect _ageCardRect;           // cached each draw for the click-to-dismiss hit-test
 
-        // Meta-groups keep the menu to a handful of headers (not one per building kind).
+        // Build-menu categories. Belts get their own tab; rail/stations/signals live under Transport
+        // (long-distance); storage is its own tab (was the confusing "Infrastructure").
         private static readonly (string label, BuildingKind[] kinds)[] Cats =
         {
-            ("Production", new[] { BuildingKind.Collector, BuildingKind.Workshop, BuildingKind.Power, BuildingKind.Research, BuildingKind.Pole }),
-            ("Logistics", new[] { BuildingKind.Belt, BuildingKind.Bridge, BuildingKind.Pipe, BuildingKind.Pump, BuildingKind.Depot }),
-            ("Infrastructure", new[] { BuildingKind.Storage }),
+            ("Production", new[] { BuildingKind.Collector, BuildingKind.Workshop, BuildingKind.Power, BuildingKind.Research, BuildingKind.Pole, BuildingKind.Battery }),
+            ("Belts",      new[] { BuildingKind.Belt, BuildingKind.Bridge }),
+            ("Liquids",    new[] { BuildingKind.Pipe, BuildingKind.Pump }),
+            ("Trains",     new[] { BuildingKind.Depot, BuildingKind.Rail, BuildingKind.Signal }),
+            ("Boats",      new BuildingKind[0]),  // tag-only (Harbour sets menuCategory="Boats")
+            ("Planes",     new BuildingKind[0]),  // reserved — appears once it has a buildable
+            ("Storage",    new[] { BuildingKind.Storage }),
         };
         private static bool InGroup(BuildingKind[] kinds, BuildingKind k) => System.Array.IndexOf(kinds, k) >= 0;
+        // A building belongs to a category by its menuCategory tag when set (e.g. a Harbour → "Boats"), else by kind.
+        private static bool Belongs(BuildingDefinition d, (string label, BuildingKind[] kinds) cat)
+            => d != null && (!string.IsNullOrEmpty(d.menuCategory) ? d.menuCategory == cat.label : InGroup(cat.kinds, d.kind));
 
         // --- Context-panel layering (Priority 1): only ONE large panel is open at a time.
         // Opening any of Build / Research / Guide / Help closes the others, so the player
@@ -145,6 +159,18 @@ namespace Caveman
 
             // Cache the resource totals once per frame (OnGUI runs twice/frame).
             if (gatherer != null) _totals = Economy.Totals(gatherer.Inventory);
+
+            // Cache the bottleneck/monument scan once per frame too (DrawStatus runs every OnGUI pass).
+            _starvedCount = 0; _backedCount = 0; _hasMonument = false;
+            foreach (var pb in ProductionBuilding.All)
+            { if (pb == null) continue; var sc = pb.StatusColor; if (sc == Status.Starved) _starvedCount++; else if (sc == Status.BackedUp) _backedCount++; }
+            foreach (var wkb in WorkshopBuilding.All)
+            {
+                if (wkb == null) continue;
+                var sc = wkb.StatusColor; if (sc == Status.Starved) _starvedCount++; else if (sc == Status.BackedUp) _backedCount++;
+                if (monumentItem != null && wkb.output == monumentItem) _hasMonument = true;
+            }
+            ComputeFinderLines(); // scans nodes/collectors — cache once/frame; OnGUI just draws the result
 
             // Toasts fade out.
             for (int i = 0; i < Toast.Items.Count; i++) Toast.Items[i].t -= Time.unscaledDeltaTime;
@@ -256,9 +282,17 @@ namespace Caveman
             _toast ??= new GUIStyle(GUI.skin.label) { richText = true, fontSize = 20, alignment = TextAnchor.UpperCenter, wordWrap = true };
             if (_panelTex == null)
             {
-                _panelTex = new Texture2D(1, 1);
-                _panelTex.SetPixel(0, 0, new Color(0.07f, 0.08f, 0.10f, 0.93f));
-                _panelTex.Apply();
+                _panelTex = Solid(new Color(0.09f, 0.11f, 0.14f, 0.95f));        // deep blue-grey panel
+                _accentTex = Solid(new Color(1f, 0.82f, 0.30f, 0.9f));           // amber top accent
+                _btnTex = Solid(new Color(0.16f, 0.18f, 0.23f, 0.96f));          // flat button
+                _btnHoverTex = Solid(new Color(0.25f, 0.30f, 0.38f, 0.98f));     // lighter on hover
+                // Flat, modern buttons (replaces the default grey 3D skin) — reads cleaner across the UI.
+                _btn.normal.background = _btnTex; _btn.normal.textColor = new Color(0.92f, 0.93f, 0.96f);
+                _btn.hover.background = _btnHoverTex; _btn.hover.textColor = Color.white;
+                _btn.active.background = _btnHoverTex; _btn.active.textColor = Color.white;
+                _btn.border = new RectOffset(0, 0, 0, 0);
+                _btn.padding = new RectOffset(9, 9, 6, 6);
+                _btn.margin = new RectOffset(2, 2, 3, 3);
             }
 
             bool modal = ModalOpen;
@@ -301,6 +335,7 @@ namespace Caveman
                 var m = Event.current.mousePosition;
                 PointerOverUI = modal
                                 || (_buildShown && _buildRect.Contains(m)) || (_selShown && _selRect.Contains(m))
+                                || (_flyoutShown && _flyoutRect.Contains(m))
                                 || _topRect.Contains(m) || _miniRect.Contains(m) || _objRect.Contains(m)
                                 || _finderRect.Contains(m)
                                 || (_ageCardT > 0f && _ageCardRect.Contains(m));
@@ -321,37 +356,55 @@ namespace Caveman
         private void PanelBg(Rect r)
         {
             if (_panelTex != null) GUI.DrawTexture(r, _panelTex);
+            if (_accentTex != null) GUI.DrawTexture(new Rect(r.x, r.y, r.width, 3f), _accentTex); // amber top accent bar
             GUI.Box(r, GUIContent.none);
         }
 
         // ---- Top resource bar: grouped, k-formatted, single line, hover for detail ----
         private void DrawTopBar()
         {
-            GUI.Box(new Rect(0, 0, Screen.width, 30), GUIContent.none);
             var totals = _totals ?? Economy.Totals(gatherer.Inventory);
             int Get(ItemDefinition i) { if (i == null) return 0; totals.TryGetValue(i, out int v); return v; }
 
             _chips.Clear();
-            _chips.Add(("Wood", Get(woodItem), null, ColorOf(woodItem)));
-            _chips.Add(("Stone", Get(stoneItem), null, ColorOf(stoneItem)));
-
-            // Everything else the factory makes, summed into "Goods" (hover for the breakdown).
-            int matSum = 0; var matDetail = new List<string>();
+            // Each resource is its OWN chip now (no more grouped "Goods") — Wood/Stone always shown, and
+            // every other tracked resource appears once you have some, so the bar fills out as you progress.
+            _chips.Add((woodItem != null ? woodItem.displayName : "Wood", Get(woodItem), null, ColorOf(woodItem)));
+            _chips.Add((stoneItem != null ? stoneItem.displayName : "Stone", Get(stoneItem), null, ColorOf(stoneItem)));
             if (debugItems != null)
                 foreach (var it in debugItems)
                 {
                     if (it == null || it == woodItem || it == stoneItem) continue;
                     int v = Get(it);
-                    matSum += v; if (v > 0) matDetail.Add($"{it.displayName}: {K(v)}");
+                    if (v > 0) _chips.Add((it.displayName, v, null, ColorOf(it)));
                 }
-            _chips.Add(("Goods", matSum, matDetail.Count > 0 ? string.Join("\n", matDetail) : null, new Color(0.72f, 0.7f, 0.55f)));
 
             var mp = Event.current.mousePosition;
-            float x = 12f;
-            int hover = -1; Rect hoverRect = default;
             bool snap = Time.unscaledTime - _lastSnap >= 3f; // refresh the trend baseline every ~3s
+            float maxX = Screen.width - 8f;
+
+            // Pre-measure so the bar can WRAP onto extra rows (many individual resources won't fit one line)
+            // and the background box can size to however many rows we end up using.
+            var widths = new float[_chips.Count];
+            float mx = 12f; int rows = 1;
             for (int i = 0; i < _chips.Count; i++)
             {
+                var c = _chips[i];
+                string hex = ColorUtility.ToHtmlStringRGB(c.color);
+                float w = _small.CalcSize(new GUIContent($"<color=#{hex}>■</color> <b>{c.label}</b> {K(c.value)} ▲")).x + 16f;
+                widths[i] = w;
+                if (mx + w > maxX) { mx = 12f; rows++; }
+                mx += w;
+            }
+            float barH = rows * 24f + 6f;
+            GUI.Box(new Rect(0, 0, Screen.width, barH), GUIContent.none);
+            _topRect = new Rect(0, 0, Screen.width, barH);
+
+            float x = 12f, y = 5f;
+            int hover = -1; Rect hoverRect = default;
+            for (int i = 0; i < _chips.Count; i++)
+            {
+                if (x + widths[i] > maxX) { x = 12f; y += 24f; } // wrap to the next row
                 var c = _chips[i];
                 string hex = ColorUtility.ToHtmlStringRGB(c.color);
                 // Trend vs the last snapshot: ▲ growing, ▼ shrinking (deficit warning).
@@ -359,20 +412,17 @@ namespace Caveman
                 if (_trendSnap.TryGetValue(c.label, out int prev))
                     arrow = c.value > prev ? " <color=#7d7>▲</color>" : c.value < prev ? " <color=#e96>▼</color>" : "";
                 if (snap) _trendSnap[c.label] = c.value;
-                string text = $"<color=#{hex}>■</color> <b>{c.label}</b> {K(c.value)}{arrow}";
-                float w = _small.CalcSize(new GUIContent(text)).x + 18f;
-                var r = new Rect(x, 5f, w, 22f);
-                GUI.Label(r, text, _small);
+                var r = new Rect(x, y, widths[i], 22f);
+                GUI.Label(r, $"<color=#{hex}>■</color> <b>{c.label}</b> {K(c.value)}{arrow}", _small);
                 if (r.Contains(mp)) { hover = i; hoverRect = r; }
-                x += w;
+                x += widths[i];
             }
             if (snap) _lastSnap = Time.unscaledTime;
-            _topRect = new Rect(0, 0, Screen.width, 30);
 
             if (hover >= 0 && _chips[hover].detail != null)
             {
                 int lines = _chips[hover].detail.Split('\n').Length;
-                var dr = new Rect(hoverRect.x, 31f, 190f, 10f + lines * 18f);
+                var dr = new Rect(hoverRect.x, hoverRect.yMax + 2f, 190f, 10f + lines * 18f);
                 GUI.Box(dr, GUIContent.none);
                 GUI.Label(new Rect(dr.x + 8, dr.y + 5, dr.width - 16, dr.height - 10), $"<size=13>{_chips[hover].detail}</size>", _small);
             }
@@ -556,13 +606,9 @@ namespace Caveman
             var c = Colony.Instance;
             if (c != null)
             {
-                // Bottleneck summary — count starved / backed-up machines. This is THE core factory
-                // alert; it pairs with the minimap dots so you can find & fix the problem.
-                int starved = 0, backed = 0;
-                foreach (var pb in ProductionBuilding.All)
-                { if (pb == null) continue; var sc = pb.StatusColor; if (sc == Status.Starved) starved++; else if (sc == Status.BackedUp) backed++; }
-                foreach (var wkb in WorkshopBuilding.All)
-                { if (wkb == null) continue; var sc = wkb.StatusColor; if (sc == Status.Starved) starved++; else if (sc == Status.BackedUp) backed++; }
+                // Bottleneck summary — starved / backed-up machine counts (cached once/frame in Update;
+                // this pairs with the minimap dots so you can find & fix the problem).
+                int starved = _starvedCount, backed = _backedCount;
                 // Stay quiet early (Factorio focus): only show production FAILURE (starved) until the
                 // base is actually going; non-critical states appear once established.
                 bool established = c.Age >= 1 || c.PeakProsperity >= 100;
@@ -575,19 +621,20 @@ namespace Caveman
                 if (monumentItem != null)
                 {
                     int mb = 0; if (_totals != null) _totals.TryGetValue(monumentItem, out mb);
-                    bool hasMon = false;
-                    foreach (var w in WorkshopBuilding.All) if (w != null && w.output == monumentItem) { hasMon = true; break; }
-                    if (hasMon || mb > 0) monu = $"   <color=#ffe08a>Monument {Mathf.Min(mb, 10)}/10</color>";
+                    if (_hasMonument || mb > 0) monu = $"   <color=#ffe08a>Monument {Mathf.Min(mb, 10)}/10</color>";
                 }
 
-                // Power network: total generation / demand across all networks, red while oversubscribed.
+                // Power network: total generation / demand across all networks, red while oversubscribed,
+                // plus battery charge across the grid.
                 string power = "";
                 PowerNet.EnsureFresh();
-                if (PowerNet.TotalGen > 0 || PowerNet.TotalDemand > 0)
+                if (PowerNet.TotalGen > 0 || PowerNet.TotalDemand > 0 || PowerNet.TotalCapacity > 0)
                 {
                     bool brown = PowerNet.TotalDemand > PowerNet.TotalGen + 0.01f;
                     string pc = brown ? "#f99" : "#9f9";
-                    power = $"   <color={pc}>⚡ {Mathf.RoundToInt(PowerNet.TotalGen)}/{Mathf.RoundToInt(PowerNet.TotalDemand)}{(brown ? " OVERLOADED" : "")}</color>";
+                    string batt = PowerNet.TotalCapacity > 0
+                        ? $" <color=#8df>🔋 {Mathf.RoundToInt(PowerNet.TotalStored)}/{Mathf.RoundToInt(PowerNet.TotalCapacity)}</color>" : "";
+                    power = $"   <color={pc}>⚡ {Mathf.RoundToInt(PowerNet.TotalGen)}/{Mathf.RoundToInt(PowerNet.TotalDemand)}{(brown ? " OVERLOADED" : "")}</color>{batt}";
                 }
 
                 string research = $"   <color=#9cf>🔬 {Research.Points} pts <size=11>(T)</size></color>";
@@ -690,13 +737,33 @@ namespace Caveman
         {
             if (builder.PendingIndex >= 0)
             {
-                _buildShown = false;
+                _buildShown = false; _flyoutShown = false;
                 var def = builder.buildables[builder.PendingIndex];
                 GUILayout.BeginArea(new Rect(12, Screen.height - 58, 520, 50));
-                if (def.kind == BuildingKind.Belt)
+                if (def.kind == BuildingKind.Belt && (def.splitter || def.merger))
                 {
-                    GUILayout.Label($"<b>Laying Belt</b> — facing <color=#9cf>{builder.BeltDir}</color>  <size=14>(R to rotate)</size>", _s);
-                    GUILayout.Label("<size=14>click or drag to lay · right-click to finish</size>", _small);
+                    GUILayout.Label($"<b>Placing {def.displayName}</b> — <color=#9cf>{builder.BeltDir}</color>  <size=14>(R to rotate)</size>", _s);
+                    GUILayout.Label("<size=14><color=#9f9>green ▸ = out</color> · <color=#6cf>cyan = in</color> · click to place · right-click to finish</size>", _small);
+                }
+                else if (def.kind == BuildingKind.Belt)
+                {
+                    GUILayout.Label("<b>Belt blueprint</b> — <color=#9cf>drag to plan</color>, <color=#9f9>click to build</color>  <size=14>(R rotates)</size>", _s);
+                    GUILayout.Label("<size=14>plan a run, then click to build it · right-click to cancel</size>", _small);
+                }
+                else if (def.kind == BuildingKind.Rail)
+                {
+                    GUILayout.Label("<b>Track blueprint</b> — <color=#9cf>drag to plan</color> (90°), <color=#9f9>click to build</color>", _s);
+                    GUILayout.Label("<size=14>plan a run between two Stations, then click to build · right-click to cancel</size>", _small);
+                }
+                else if (def.kind == BuildingKind.Signal && def.bothWaySignal)
+                {
+                    GUILayout.Label($"<b>Placing Two-Way Signal</b> — axis <color=#9cf>{builder.BeltDir}</color>  <size=14>(R rotates)</size>", _s);
+                    GUILayout.Label("<size=14>click a track cell · trains pass EITHER way, one train per block · right-click to finish</size>", _small);
+                }
+                else if (def.kind == BuildingKind.Signal)
+                {
+                    GUILayout.Label($"<b>Placing Signal</b> — pass way <color=#9cf>{builder.BeltDir}</color>  <size=14>(R rotates)</size>", _s);
+                    GUILayout.Label("<size=14>click a track cell · trains pass only this way + when the block ahead is clear · right-click to finish</size>", _small);
                 }
                 else
                 {
@@ -706,7 +773,10 @@ namespace Caveman
                     GUILayout.Label($"<b>Placing {def.displayName}</b> — {ok}", _s);
                     string hint = isColl ? $"<color=#cda>Must sit next to a {Name(def.item)} source — the {Name(def.item)} patches are glowing.</color>  " : "";
                     bool hasPorts = def.kind == BuildingKind.Collector || def.kind == BuildingKind.Workshop;
-                    string rot = hasPorts ? $"<color=#6f6>R rotates output ▸ {builder.BuildDir}</color> (belts pull from there) · " : "";
+                    string rot = hasPorts ? $"<color=#6f6>R rotates output ▸ {builder.BuildDir}</color> (belts pull from there) · "
+                               : def.kind == BuildingKind.Depot ? "<color=#6f6>R rotates the platform + track lane</color> · "
+                               : def.kind == BuildingKind.Power ? $"<color=#6f6>R aims the fuel input ▸ {builder.BuildDir}</color> · "
+                               : "";
                     GUILayout.Label($"<size=14>{hint}{rot}right-click / Esc to cancel</size>", _small);
                 }
                 GUILayout.EndArea();
@@ -715,7 +785,7 @@ namespace Caveman
 
             if (!_showBuild)
             {
-                _buildShown = false;
+                _buildShown = false; _flyoutShown = false;
                 GUILayout.BeginArea(new Rect(12, Screen.height - 34, 320, 28));
                 GUILayout.Label("<size=15>Press <b>B</b> to open the build menu</size>", _small);
                 GUILayout.EndArea();
@@ -726,6 +796,7 @@ namespace Caveman
             float height = Mathf.Min(Screen.height - top - 16f, 470f);
             _buildRect = new Rect(12, top, 268, height);
             _buildShown = true;
+            _flyoutShown = false; // set true below if a category flyout is open
             PanelBg(_buildRect);
 
             GUILayout.BeginArea(new Rect(_buildRect.x + 8, _buildRect.y + 8, _buildRect.width - 16, _buildRect.height - 16));
@@ -751,14 +822,13 @@ namespace Caveman
                 if (GUILayout.Button("<size=12>🔬 Research Tree  <color=#bbb>(T)</color></size>", _btn)) TogglePanel(Panel.Research);
             }
             GUILayout.Space(4);
-            GUILayout.Label("<b>Build</b>  <size=11>(click, then click the map · headers collapse)</size>", _small);
+            GUILayout.Label("<b>Build</b>  <size=11>(open a category ▸ pick · then click the map)</size>", _small);
 
             int curAge = col != null ? col.Age : 0;
-            _buildScroll = GUILayout.BeginScrollView(_buildScroll);
 
             // Draws one build entry: a pin star + the build button. Locked → greyed label.
             // Obsolete (unlocked ≥2 ages ago) is dimmed but still usable. Local fn so the
-            // pinned/recent/category lists all render identically.
+            // pinned/recent/flyout lists all render identically.
             void Entry(int i)
             {
                 var def = builder.buildables[i];
@@ -788,56 +858,81 @@ namespace Caveman
                 GUILayout.EndHorizontal();
             }
 
-            // Pinned favourites — always one click away regardless of category/age.
+            // Does this category have at least one unlocked buildable right now? (progressive disclosure)
+            bool CatHasAny((string label, BuildingKind[] kinds) cat)
+            {
+                for (int i = 0; i < builder.buildables.Count; i++)
+                {
+                    var d = builder.buildables[i];
+                    if (d != null && Belongs(d, cat) && builder.IsUnlocked(d)) return true;
+                }
+                return false;
+            }
+
+            // ---- LEFT panel: Pinned + Recent shortcuts, then the category list. Clicking a category
+            //      OPENS it as a flyout to the RIGHT (one category at a time); click it again to close. ----
+            _buildScroll = GUILayout.BeginScrollView(_buildScroll);
+
             if (_pinned.Count > 0)
             {
                 GUILayout.Label("<b><color=#ffd24d>★ Pinned</color></b>", _small);
                 foreach (int i in _pinned)
                     if (i >= 0 && i < builder.buildables.Count && builder.IsUnlocked(builder.buildables[i])) Entry(i);
+                GUILayout.Space(4);
             }
 
-            // Recently-placed shortcut row — fast re-access of what you're actively using.
             if (_recent.Count > 0)
             {
                 GUILayout.Label("<b><color=#d8c8a0>Recent</color></b>", _small);
-                foreach (int i in _recent)
+                // Snapshot: Entry() can place a building, which mutates _recent — iterating the live
+                // list then throws "Collection was modified" mid-OnGUI.
+                _recentSnapshot.Clear();
+                _recentSnapshot.AddRange(_recent);
+                foreach (int i in _recentSnapshot)
                     if (i >= 0 && i < builder.buildables.Count && builder.IsUnlocked(builder.buildables[i])) Entry(i);
+                GUILayout.Space(4);
             }
 
-            // Accordion categories — every header is always visible (compact), but only the
-            // one you click is OPEN, so you see one category's items at a time instead of
-            // scrolling the whole list. Empty/all-future categories are skipped.
+            GUILayout.Label("<b><color=#cda>Categories</color></b>  <size=11>(click to open ▸)</size>", _small);
             foreach (var cat in Cats)
             {
-                bool hasAny = false;
-                for (int i = 0; i < builder.buildables.Count; i++)
-                {
-                    var d = builder.buildables[i];
-                    if (d != null && InGroup(cat.kinds, d.kind) && builder.IsUnlocked(d)) { hasAny = true; break; }
-                }
-                if (!hasAny) continue; // progressive disclosure: a category appears only once it has a buildable
-
+                if (!CatHasAny(cat)) continue; // a category appears only once it has a buildable
                 bool active = _activeCat == cat.label;
-                if (GUILayout.Button($"<size=12><b><color=#d8c8a0>{(active ? "▼" : "▶")} {cat.label}</color></b></size>", _btn))
+                string arrow = active ? "<color=#ffd24d>▸</color> " : "";
+                if (GUILayout.Button($"<size=12><b><color=#d8c8a0>{arrow}{cat.label}</color></b></size>", _btn))
                     _activeCat = active ? "" : cat.label; // open this one (closes the rest); click again to close
-                if (!active) continue;
-
-                for (int i = 0; i < builder.buildables.Count; i++)
-                {
-                    var def = builder.buildables[i];
-                    if (def == null || !InGroup(cat.kinds, def.kind)) continue;
-                    if (!builder.IsUnlocked(def)) continue; // hide locked/age-gated until relevant (new unlocks are announced by the age-up toast + Research panel)
-                    Entry(i);
-                }
             }
 
             GUILayout.EndScrollView();
             GUILayout.EndArea();
 
-            // Tooltip describing the hovered build entry.
+            // ---- RIGHT flyout: the active category's items pop out beside the menu. ----
+            Rect tipAnchor = _buildRect;
+            var activeCat = System.Array.Find(Cats, c => c.label == _activeCat);
+            if (activeCat.label != null && CatHasAny(activeCat))
+            {
+                var fr = new Rect(_buildRect.xMax + 6, _buildRect.y, 232, _buildRect.height);
+                _flyoutRect = fr; _flyoutShown = true; tipAnchor = fr;
+                PanelBg(fr);
+                GUILayout.BeginArea(new Rect(fr.x + 8, fr.y + 8, fr.width - 16, fr.height - 16));
+                GUILayout.Label($"<b><color=#d8c8a0>{activeCat.label}</color></b>  <size=11>(click, then click the map)</size>", _small);
+                GUILayout.Space(2);
+                _flyoutScroll = GUILayout.BeginScrollView(_flyoutScroll);
+                for (int i = 0; i < builder.buildables.Count; i++)
+                {
+                    var def = builder.buildables[i];
+                    if (def == null || !Belongs(def, activeCat)) continue;
+                    if (!builder.IsUnlocked(def)) continue; // hide locked/age-gated until relevant
+                    Entry(i);
+                }
+                GUILayout.EndScrollView();
+                GUILayout.EndArea();
+            }
+
+            // Tooltip describing the hovered build entry — to the right of whichever panel is rightmost.
             if (!string.IsNullOrEmpty(GUI.tooltip))
             {
-                var tr = new Rect(_buildRect.xMax + 6, _buildRect.y, 280, 172);
+                var tr = new Rect(tipAnchor.xMax + 6, tipAnchor.y, 280, 172);
                 PanelBg(tr);
                 GUI.Label(new Rect(tr.x + 9, tr.y + 7, tr.width - 18, tr.height - 14), $"<size=13>{GUI.tooltip}</size>", _small);
             }
@@ -871,6 +966,15 @@ namespace Caveman
         }
 
         // ---- Selected building manage panel (bottom-right) ----
+        // Format a resource cost list, e.g. "6 Planks, 3 Copper" (for the upgrade button).
+        private static string AmountsText(List<ItemAmount> cost)
+        {
+            if (cost == null || cost.Count == 0) return "free";
+            var parts = new List<string>();
+            foreach (var c in cost) if (c != null && c.item != null) parts.Add($"{c.amount} {c.item.displayName}");
+            return string.Join(", ", parts);
+        }
+
         private void DrawSelectedPanel()
         {
             var sel = builder != null ? builder.Selected : null;
@@ -894,9 +998,15 @@ namespace Caveman
             var dp = sel.GetComponent<Depot>();
             var pbSel = sel.GetComponent<ProductionBuilding>();
             var resB = sel.GetComponent<ResearchBuilding>();
+            var pwr = sel.GetComponent<PowerPlant>();
+            var pole = sel.GetComponent<PowerPole>();
+            var bat = sel.GetComponent<Battery>();
+            var pnode = sel.GetComponent<PowerNode>();
             string name = wb != null ? wb.def.displayName : pbSel != null ? pbSel.def.displayName
                 : sb != null ? sb.def.displayName
                 : dp != null ? dp.def.displayName : resB != null ? resB.def.displayName
+                : pwr != null ? pwr.def.displayName : pole != null ? pole.def.displayName
+                : bat != null ? bat.def.displayName
                 : cs != null ? cs.def.displayName : "Building";
             GUILayout.Label($"<b>{name}</b>", _s);
 
@@ -942,6 +1052,33 @@ namespace Caveman
                     { if (wb != null) wb.TogglePause(); if (pbSel != null) pbSel.TogglePause(); }
                 }
 
+                // Manual paid AGE UPGRADE — buy the next tier to speed this building up + change its look.
+                {
+                    var upTier = wb != null ? wb.PendingUpgrade : pbSel.PendingUpgrade;
+                    int curTier = wb != null ? wb.Tier : pbSel.Tier;
+                    if (upTier != null)
+                    {
+                        bool unlocked = wb != null ? wb.UpgradeUnlocked : pbSel.UpgradeUnlocked;
+                        if (!unlocked)
+                        {
+                            string ageNm = upTier.unlockAge < Colony.AgeNames.Length ? Colony.AgeNames[upTier.unlockAge] : "a later age";
+                            GUILayout.Label($"<size=11><color=#888>⬆ Next: <b>{upTier.name}</b> — unlocks in {ageNm}</color></size>", _small);
+                        }
+                        else
+                        {
+                            var carriedU = gatherer != null ? gatherer.Inventory : null;
+                            string col = Economy.CanAfford(upTier.cost, carriedU) ? "#9f9" : "#f99";
+                            if (GUILayout.Button($"<size=12>⬆ Upgrade: <b>{upTier.name}</b> <color=#9cf>(×{upTier.speedMult:0.0} rate)</color>  <color={col}>{AmountsText(upTier.cost)}</color></size>", _btn))
+                            {
+                                bool ok = wb != null ? wb.TryUpgrade() : pbSel.TryUpgrade();
+                                Toast.Show(ok ? $"<color=#9f9>Upgraded to {upTier.name}.</color>" : "<color=#f99>Can't afford that upgrade.</color>");
+                            }
+                        }
+                    }
+                    else if (curTier > 0)
+                        GUILayout.Label("<size=11><color=#9f9>✔ Fully upgraded</color></size>", _small);
+                }
+
                 // What this collector/workshop currently holds in its buffer.
                 if (pbSel != null && pbSel.produces != null)
                     GUILayout.Label($"<size=12>Holds: {pbSel.produces.displayName} {pbSel.Buffer.Count(pbSel.produces)}/{pbSel.Buffer.capacity}   ·   Rate: {pbSel.RatePerMin:0.#}/min</size>", _small);
@@ -956,9 +1093,9 @@ namespace Caveman
                     GUILayout.Label($"<size=12>Making: <b>{(wb.output != null ? wb.output.displayName : "?")}</b> <color=#888>from {string.Join(" + ", ins)}</color></size>", _small);
                     if (GUILayout.Button("<size=12>↻ Change recipe</size>", _btn)) wb.CycleRecipe();
                 }
-                // Powered machine not connected to a powered network → tell the player why it's stalled.
+                // Powered machine not wired to a powered network → tell the player why it's stalled.
                 if (wb != null && wb.NoPower)
-                    GUILayout.Label("<size=12><color=#6cf>⚡ No power — connect a Generator (or a Power Pole) within range</color></size>", _small);
+                    GUILayout.Label("<size=12><color=#6cf>⚡ No power — wire this machine to a Generator, Pole or Battery (select it, then 'Connect wire')</color></size>", _small);
             }
             else if (sb != null)
             {
@@ -995,50 +1132,70 @@ namespace Caveman
                 if (!string.IsNullOrEmpty(issue))
                     GUILayout.Label($"<size=11><color=#f99>⚠ {issue}</color></size>", _small);
 
+                // Personal BOAT — bought at a harbour so you can sail over water (WASD) and reach islands.
+                if (dp.def != null && dp.def.isHarbour)
+                {
+                    if (PlayerController.HasBoat)
+                        GUILayout.Label("<size=11><color=#6cf>⛵ Boat owned — walk onto the sea (WASD) to sail across to islands.</color></size>", _small);
+                    else
+                    {
+                        var cb = gatherer != null ? gatherer.Inventory : null;
+                        bool affordB = cb != null && Economy.Available(woodItem, cb) >= 12 && Economy.Available(stoneItem, cb) >= 8;
+                        if (GUILayout.Button($"<size=12>⛵ Buy Boat  <color={(affordB ? "#9f9" : "#f99")}>(12 Wood, 8 Stone)</color></size>", _btn))
+                        {
+                            if (affordB)
+                            {
+                                Economy.SpendUpTo(woodItem, 12, cb); Economy.SpendUpTo(stoneItem, 8, cb);
+                                PlayerController.HasBoat = true;
+                                Toast.Show("<color=#9f9>⛵ Boat bought!</color> Walk onto the water (WASD) to sail — reach the island, then build a Harbour there.");
+                            }
+                            else Toast.Show("<color=#f99>Need 12 Wood + 8 Stone to build a boat.</color>");
+                        }
+                    }
+                }
+
                 if (dp.store.Total() == 0)
                 {
                     if (GUILayout.Button($"<size=12>Handle: {acc} (change)</size>", _btn)) dp.CycleItem();
                 }
                 else GUILayout.Label("<size=11><color=#888>empty it to change type</color></size>", _small);
 
-                // Routes touching this station, each with explicit FROM → TO direction (OUT/IN +
-                // compass arrow + distance + the resource). Capped so the panel never overflows.
-                int rcount = 0, shownR = 0;
+                // Lines serving this station — each listed with its own ✕ so you can delete a SPECIFIC line
+                // (not just "the first"), plus its cargo, stop count and vehicle. The clearer line manager.
+                RouteVehicle toDelete = null;
+                int rcount = 0, idxR = 0;
                 foreach (var rv in RouteVehicle.All)
                 {
-                    if (rv == null || (rv.a != dp && rv.b != dp)) continue;
-                    rcount++;
-                    if (shownR >= 2 || rv.a == null || rv.b == null) continue;
-                    shownR++;
-                    bool outgoing = rv.a == dp;
-                    var other = outgoing ? rv.b : rv.a;
-                    Vector2 d = (Vector2)(other.transform.position - dp.transform.position);
-                    string ritem = rv.a.item != null ? rv.a.item.displayName : "—";
-                    string dirTag = outgoing ? "<color=#9f9>→ OUT</color>" : "<color=#fc8>← IN</color>";
-                    GUILayout.Label($"<size=11>{dirTag} {ArrowFor(d)} {Mathf.RoundToInt(d.magnitude)}m  <color=#bbb>{ritem}</color></size>", _small);
+                    if (rv == null || !rv.Serves(dp)) continue;
+                    rcount++; idxR++;
+                    if (idxR > 5) continue; // cap visible rows
+                    string ritem = (rv.a != null && rv.a.item != null) ? rv.a.item.displayName : "—";
+                    GUILayout.BeginHorizontal();
+                    GUILayout.Label($"<size=11><color=#9cf>● Line {idxR}</color> · {rv.StopCount} stops · cap {rv.capacity} · <color=#bbb>{ritem}</color></size>", _small);
+                    if (GUILayout.Button("<size=11><color=#f99>✕</color></size>", _btn, GUILayout.Width(26))) toDelete = rv;
+                    GUILayout.EndHorizontal();
                 }
-                if (rcount > shownR) GUILayout.Label($"<size=10><color=#888>+{rcount - shownR} more route(s)</color></size>", _small);
-                if (rcount == 0) GUILayout.Label("<size=11><color=#888>No route yet. Build a 2nd Station, belt goods in, then '+ Add route' → click the other Station. A vehicle auto-shuttles — no track to lay.</color></size>", _small);
+                if (rcount > 5) GUILayout.Label($"<size=10><color=#888>+{rcount - 5} more line(s)</color></size>", _small);
+                if (toDelete != null) Destroy(toDelete.gameObject);
+                if (rcount == 0) GUILayout.Label("<size=11><color=#888>No line yet. Lay TRACK to other Stations, then '+ Add line' → click each stop in order → click this station again to close the loop. The vehicle visits the stops, passing any it doesn't stop at.</color></size>", _small);
 
-                if (builder.LinkFrom == dp)
-                    GUILayout.Label("<size=11><color=#ffd24d>▶ Now click the DESTINATION Station… (Esc cancels)</color></size>", _small);
+                if (builder.LinkFrom != null && builder.LineContains(dp))
+                    GUILayout.Label($"<size=11><color=#ffd24d>▶ Building a line ({builder.LineStopCount} stops)… click more Stations, then the FIRST station / right-click to finish.</color></size>", _small);
+                else if (builder.LinkFrom != null)
+                    GUILayout.Label("<size=11><color=#ffd24d>▶ Click this station to add it to the line.</color></size>", _small);
                 else
                 {
-                    var tier = builder.BestRouteTier();
+                    // Harbours run CARGO SHIPS; rail Stations run land vehicles — show the right tier + cost.
+                    var tier = (dp.def != null && dp.def.isHarbour) ? builder.BestShipTier() : builder.BestRouteTier();
                     if (tier != null)
                     {
                         bool afford = builder.CanAfford(tier);
                         string cc = afford ? "#9f9" : "#f99";
-                        if (GUILayout.Button($"<size=12>+ Add route  <color=#bbb>{tier.displayName}</color> <color={cc}>({CostList(tier.cost)})</color></size>", _btn))
+                        string verb = (dp.def != null && dp.def.isHarbour) ? "+ Add ship line" : "+ Add line";
+                        if (GUILayout.Button($"<size=12>{verb}  <color=#bbb>{tier.displayName}</color> <color={cc}>({CostList(tier.cost)})</color></size>", _btn))
                             builder.BeginStationLink(dp);
                     }
                     else GUILayout.Label("<size=11><color=#888>No transport unlocked yet</color></size>", _small);
-                    if (rcount > 0 && GUILayout.Button("<size=12>✕ Remove a route</size>", _btn))
-                        for (int k = RouteVehicle.All.Count - 1; k >= 0; k--)
-                        {
-                            var rv = RouteVehicle.All[k];
-                            if (rv != null && (rv.a == dp || rv.b == dp)) { Destroy(rv.gameObject); break; }
-                        }
                 }
             }
             else if (resB != null)
@@ -1062,6 +1219,10 @@ namespace Caveman
                     GUILayout.Label($"<size=15>Building… {(int)(cs.BuildFraction * 100)}%</size>", _small);
             }
 
+            // Power wiring panel — shown for ANY wired node (generator / pole / battery / machine), so
+            // it's additive to the branches above. Shows wire count + Connect/Disconnect controls.
+            if (pnode != null) DrawWirePanel(pnode);
+
             GUILayout.EndScrollView(); // scrollable info above; Demolish/Close stay pinned + always visible below
             GUILayout.BeginHorizontal();
             demo = GUILayout.Button("Demolish", GUILayout.Height(28));
@@ -1071,6 +1232,31 @@ namespace Caveman
 
             if (demo) builder.DemolishSelected();
             if (close) builder.Deselect();
+        }
+
+        // The wiring controls for a selected power node (generator / pole / battery / machine):
+        // current wire count, battery charge, and Connect / Disconnect buttons.
+        private void DrawWirePanel(PowerNode node)
+        {
+            if (builder == null) return;
+            GUILayout.Label($"<size=12><color=#9cf>🔌 Wires: {node.links.Count}/{node.maxConnections}</color></size>", _small);
+            if (node.battery != null)
+            {
+                float frac = node.battery.Fraction;
+                string fc = frac > 0.66f ? "#9f9" : frac > 0.25f ? "#fd4" : "#f99";
+                string flow = node.battery.Flow > 0.1f ? "  <color=#9f9>▲ charging</color>"
+                            : node.battery.Flow < -0.1f ? "  <color=#fc8>▼ discharging</color>" : "";
+                GUILayout.Label($"<size=12>🔋 <color={fc}>{Mathf.RoundToInt(node.battery.Stored)}/{Mathf.RoundToInt(node.battery.capacity)}</color>{flow}</size>", _small);
+            }
+            if (builder.WireFrom == node)
+                GUILayout.Label("<size=11><color=#ffd24d>▶ Now click the building to wire to… (Esc cancels)</color></size>", _small);
+            else if (node.CanLinkMore)
+            {
+                if (GUILayout.Button("<size=12>🔌 Connect wire</size>", _btn)) builder.BeginWire(node);
+            }
+            else GUILayout.Label("<size=11><color=#888>All wire slots used</color></size>", _small);
+            if (node.links.Count > 0 && GUILayout.Button("<size=12>✂ Disconnect wires</size>", _btn))
+                for (int i = node.links.Count - 1; i >= 0; i--) node.Disconnect(node.links[i]);
         }
 
         // Empty a configurable warehouse so its type can be changed. Contents move into the
@@ -1097,46 +1283,52 @@ namespace Caveman
             return _arrows8[idx];
         }
 
-        private void DrawResourceFinder()
+        // Build the resource-finder lines ONCE per frame (Update) — it scans ResourceNode.All × the target
+        // materials + HasCollector (which scans collector/site lists), which we don't want per OnGUI pass.
+        private readonly List<string> _finderLines = new();
+        private static readonly (int ageMin, string label)[] _finderOrder =
+            { (0, "Wood"), (0, "Stone"), (1, "Clay"), (1, "Ore") };
+        private void ComputeFinderLines()
         {
-            if (gatherer == null) { _finderRect = default; return; }
+            _finderLines.Clear();
+            if (gatherer == null) return;
             Vector2 p = gatherer.transform.position;
-            var keys = new List<(ItemDefinition item, string label)>
-            { (woodItem, "Wood"), (stoneItem, "Stone") };
-            // From the Tribal age, also point toward the expansion materials (clay/ore) so the
-            // player SEES the next supply line before feeling blocked. Each drops once its
-            // collector is built (HasCollector). Subtle — reuses the existing arrows.
             int age = Colony.Instance != null ? Colony.Instance.Age : 0;
-            if (age >= 1)
+            // From the Tribal age, also point toward the expansion materials (clay/ore). Each line drops
+            // once its collector is built (HasCollector). Order matches _finderOrder / the item fields.
+            ItemDefinition[] items = { woodItem, stoneItem, clayItem, oreItem };
+            for (int i = 0; i < items.Length; i++)
             {
-                keys.Add((clayItem, "Clay"));
-                keys.Add((oreItem, "Ore"));
-            }
-
-            var lines = new List<string>();
-            foreach (var k in keys)
-            {
-                if (k.item == null || HasCollector(k.item.id)) continue; // already tapped → drop it
+                if (_finderOrder[i].ageMin > age) continue;
+                var item = items[i];
+                if (item == null || HasCollector(item.id)) continue; // already tapped → drop it
                 ResourceNode best = null; float bestSq = float.MaxValue;
                 foreach (var n in ResourceNode.All)
                 {
-                    if (n == null || n.yields != k.item) continue;
+                    if (n == null || n.yields != item) continue;
                     float sq = ((Vector2)n.transform.position - p).sqrMagnitude;
                     if (sq < bestSq) { bestSq = sq; best = n; }
                 }
                 if (best == null) continue;
                 Vector2 dir = (Vector2)best.transform.position - p;
-                string hex = ColorUtility.ToHtmlStringRGB(k.item.color);
-                lines.Add($"<color=#{hex}>■</color> <b>{k.label}</b>  <size=18>{ArrowFor(dir)}</size> <size=12>{Mathf.RoundToInt(dir.magnitude)}m</size>");
+                string hex = ColorUtility.ToHtmlStringRGB(item.color);
+                _finderLines.Add($"<color=#{hex}>■</color> <b>{_finderOrder[i].label}</b>  <size=18>{ArrowFor(dir)}</size> <size=12>{Mathf.RoundToInt(dir.magnitude)}m</size>");
             }
-            if (lines.Count == 0) { _finderRect = default; return; }
+        }
 
-            var rect = new Rect(Screen.width - 222, 182, 210, 28 + lines.Count * 22);
+        private void DrawResourceFinder()
+        {
+            if (gatherer == null || _finderLines.Count == 0) { _finderRect = default; return; }
+            int n = _finderLines.Count;
+            // Sized to fit the header + every line (was clipping the last row): generous per-line height
+            // and a wider box so the label + arrow + distance never run off the edge.
+            var rect = new Rect(Screen.width - 248, 182, 236, 44 + n * 24);
             _finderRect = rect;
             PanelBg(rect);
-            GUILayout.BeginArea(new Rect(rect.x + 10, rect.y + 6, rect.width - 20, rect.height - 12));
-            GUILayout.Label("<size=12><b>Find + build collectors:</b></size>", _small);
-            foreach (var l in lines) GUILayout.Label($"<size=14>{l}</size>", _small);
+            GUILayout.BeginArea(new Rect(rect.x + 12, rect.y + 9, rect.width - 24, rect.height - 18));
+            GUILayout.Label("<size=12><b><color=#ffd24d>Find + build collectors</color></b></size>", _small);
+            GUILayout.Space(2);
+            foreach (var l in _finderLines) GUILayout.Label($"<size=13>{l}</size>", _small);
             GUILayout.EndArea();
         }
 
@@ -1367,7 +1559,7 @@ namespace Caveman
         private static bool HasStorage(string itemId)
         {
             foreach (var s in StorageBuilding.All)
-                if (s.accepts != null && s.accepts.id == itemId) return true;
+                if (s != null && s.accepts != null && s.accepts.id == itemId) return true;
             return false;
         }
 

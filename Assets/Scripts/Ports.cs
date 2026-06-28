@@ -14,32 +14,36 @@ namespace Caveman
         /// belt grid: one marker per edge cell (a 2×2 warehouse → 2 inputs + 2 outputs), aligned to
         /// each cell's outer face. Output = green arrow on `outputSide`; input = cyan notch opposite.</summary>
         public static void PlacePorts(Transform t, int w, int h, Belt.Dir outputSide, bool hasIn, bool hasOut,
-            bool inputsAllSides = false)
+            bool inputsAllSides = false, bool singlePort = false)
         {
-            if (hasOut) PlaceSide(t, w, h, outputSide, true);
+            if (hasOut) PlaceSide(t, w, h, outputSide, true, singlePort);
             if (hasIn)
             {
                 if (inputsAllSides) // multi-input: accept on EVERY non-output side
                 {
                     for (int i = 0; i < 4; i++)
-                    { var d = (Belt.Dir)i; if (d != outputSide) PlaceSide(t, w, h, d, false); }
+                    { var d = (Belt.Dir)i; if (d != outputSide) PlaceSide(t, w, h, d, false, singlePort); }
                 }
-                else PlaceSide(t, w, h, Belt.Opposite(outputSide), false);
+                else PlaceSide(t, w, h, Belt.Opposite(outputSide), false, singlePort);
             }
         }
 
-        private static void PlaceSide(Transform t, int w, int h, Belt.Dir side, bool isOutput)
+        // `single` = one port marker per side (at the side's centre cell), so a multi-cell building keeps a
+        // SINGLE in/out slot per side like a 1×1 building — not one per edge cell.
+        private static void PlaceSide(Transform t, int w, int h, Belt.Dir side, bool isOutput, bool single = false)
         {
             float ps = Mathf.Max(0.01f, t.localScale.x); // building scale (square footprints → uniform)
             var step = Belt.Step(side);
             Vector3 c = t.position;
             float ax = c.x - (w - 1) * 0.5f, ay = c.y - (h - 1) * 0.5f; // bottom-left cell centre
+            int cm = (w - 1) / 2, cn = (h - 1) / 2;                     // centre edge-cell index (lower for even sizes)
             for (int i = 0; i < w; i++)
                 for (int j = 0; j < h; j++)
                 {
                     bool edge = side == Belt.Dir.E ? i == w - 1 : side == Belt.Dir.W ? i == 0
                               : side == Belt.Dir.N ? j == h - 1 : j == 0;
                     if (!edge) continue;
+                    if (single && ((side == Belt.Dir.E || side == Belt.Dir.W) ? j != cn : i != cm)) continue; // centre cell only
                     var go = new GameObject(isOutput ? "outport" : "inport");
                     go.transform.SetParent(t);
                     go.transform.position = new Vector3(ax + i + step.x * 0.55f, ay + j + step.y * 0.55f, 0f);

@@ -15,6 +15,7 @@ namespace Caveman
         public static readonly Dictionary<Vector2Int, StorageBuilding> Storages = new();
         public static readonly Dictionary<Vector2Int, Depot> Depots = new();
         public static readonly Dictionary<Vector2Int, ResearchBuilding> Research = new();
+        public static readonly Dictionary<Vector2Int, PowerPlant> Generators = new(); // belt-fed fuel intake
 
         // Transport corridors that RESERVE their tiles (block belts/buildings on top, and vice-versa).
         // Tiles (RoadTile/RailTile) self-register here when that phase lands; empty until then, so

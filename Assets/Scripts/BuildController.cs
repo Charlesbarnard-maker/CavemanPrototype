@@ -32,20 +32,42 @@ namespace Caveman
         private SpriteRenderer _ghostSr;
         private bool _dragging;
         private Vector2Int _dragLast;
+
+        // --- Belt BLUEPRINT placement: drag sketches a plan (no cost), then a click builds it. ---
+        private readonly Dictionary<Vector2Int, Belt.Dir> _beltPlan = new(); // planned cell → direction
+        private readonly Dictionary<Vector2Int, Belt.Dir> _committed = new(); // strokes finished before the current one
+        private readonly List<GameObject> _planGhosts = new();               // translucent previews (pooled)
+        private bool _strokeActive, _strokeMoved;                            // current drag stroke state
+        private Vector2Int _strokeStart, _strokeLast;
+        private bool _beltPlanHinted;
+        private bool _beltPlanDirty; // ghosts rebuilt only when the plan changes (not every frame)
+        // --- Rail BLUEPRINT placement (same drag-plan-then-click as belts; 90° L-paths only). ---
+        private readonly List<Vector2Int> _railPlan = new();
+        private readonly List<GameObject> _railPlanGhosts = new();
+        private bool _railPlanHinted;
+        private bool _railPlanDirty;
+        // Ghost in/out port markers for a splitter/merger being placed (so its sides are visible).
+        private readonly List<GameObject> _ghostJunctionPorts = new();
+        private bool _ghostJunctionBuilt, _ghostJunctionSplitter, _ghostJunctionMerger;
         // Transport is now managed FROM a Station: vehicle tiers live here (not the build menu), and
         // a route is created by selecting a Station, pressing "+ Add route", then clicking another.
         public List<BuildingDefinition> routeTiers = new();
+        public List<BuildingDefinition> shipTiers = new(); // cargo-ship tiers for harbour lines (over water)
         public Depot LinkFrom { get; private set; } // the Station we're drawing a route FROM (or null)
         private BuildingDefinition _linkTier;
+        public PowerNode WireFrom { get; private set; } // the power node we're drawing a WIRE from (or null)
 
         /// <summary>Best vehicle tier the player can AFFORD right now (newest/biggest first). Falls
         /// back to the cheapest unlocked tier when nothing is affordable, so the panel still shows a
         /// tier + its cost to gather toward (instead of dead-ending on an unaffordable top tier).</summary>
-        public BuildingDefinition BestRouteTier()
+        public BuildingDefinition BestRouteTier() => BestTier(routeTiers);
+        public BuildingDefinition BestShipTier() => BestTier(shipTiers);
+        private BuildingDefinition BestTier(List<BuildingDefinition> tiers)
         {
             int age = Colony.Instance != null ? Colony.Instance.Age : 0;
             BuildingDefinition bestAfford = null, fallback = null;
-            foreach (var t in routeTiers)
+            if (tiers == null) return null;
+            foreach (var t in tiers)
             {
                 if (t == null || t.unlockAge > age) continue;
                 if (fallback == null || t.unlockAge < fallback.unlockAge) fallback = t; // earliest = cheapest
@@ -56,43 +78,126 @@ namespace Caveman
             return bestAfford ?? fallback;
         }
 
-        /// <summary>Start drawing a route from this Station; the next Station click completes it.</summary>
+        private readonly List<Depot> _lineStops = new(); // stops being collected for a new line
+        public int LineStopCount => _lineStops.Count;
+        public bool LineContains(Depot d) => _lineStops.Contains(d);
+
+        /// <summary>Start building a LINE from this Station — click more stations to add stops, then the
+        /// first station (or right-click) to finish. The vehicle visits the stops in a loop.</summary>
         public void BeginStationLink(Depot from)
         {
             if (from == null) return;
-            _linkTier = BestRouteTier();
+            bool harbour = from.def != null && from.def.isHarbour;
+            _linkTier = harbour ? BestShipTier() : BestRouteTier();
             if (_linkTier == null) { Toast.Show("<color=#f99>No transport vehicle unlocked yet.</color>"); return; }
             CancelPlacement(); // leave any build-placement mode
-            LinkFrom = from;
-            Toast.Show($"<color=#ffd24d>Click the DESTINATION Station.</color> A {_linkTier.displayName} will auto-shuttle goods between them — no track to lay. (Esc cancels.)");
+            CancelWire();
+            _lineStops.Clear();
+            _lineStops.Add(from);
+            LinkFrom = from; // the anchor (first stop)
+            string what = harbour ? "Harbour" : "Station";
+            Toast.Show($"<color=#ffd24d>Building a {_linkTier.displayName} line.</color> Click the next {what} to add a stop; click the FIRST {what} (or right-click) to finish. The vehicle loops the stops, passing any it doesn't stop at. (Esc cancels.)");
         }
 
-        public void CancelLink() { LinkFrom = null; _linkTier = null; }
+        public void CancelLink() { LinkFrom = null; _linkTier = null; _lineStops.Clear(); }
+
+        // Amber preview through the stops collected so far, out to the cursor — so you see the line forming.
+        private void UpdateLinkPreview()
+        {
+            if (LinkFrom == null || _lineStops.Count == 0)
+            {
+                if (_linkPreview != null && _linkPreview.gameObject.activeSelf) _linkPreview.gameObject.SetActive(false);
+                return;
+            }
+            if (_linkPreview == null)
+            {
+                var go = new GameObject("LinePreview");
+                _linkPreview = go.AddComponent<LineRenderer>();
+                _linkPreview.material = PlaceholderArt.LineMaterial(); // shared
+                _linkPreview.widthMultiplier = 0.18f;
+                _linkPreview.useWorldSpace = true;
+                _linkPreview.numCapVertices = 2;
+                _linkPreview.sortingOrder = 12;
+                _linkPreview.startColor = _linkPreview.endColor = new Color(1f, 0.85f, 0.3f, 0.8f);
+            }
+            if (!_linkPreview.gameObject.activeSelf) _linkPreview.gameObject.SetActive(true);
+            Vector3 cursor = (_cam != null && Mouse.current != null)
+                ? _cam.ScreenToWorldPoint(Mouse.current.position.ReadValue())
+                : _lineStops[_lineStops.Count - 1].transform.position;
+            cursor.z = 0f;
+            int n = _lineStops.Count;
+            _linkPreview.positionCount = n + 1;
+            for (int i = 0; i < n; i++)
+                _linkPreview.SetPosition(i, _lineStops[i] != null ? _lineStops[i].transform.position : cursor);
+            _linkPreview.SetPosition(n, cursor);
+        }
+
+        // A click on `dst` while building a line: finish if it's the first stop (loop closed), else add it.
+        private void OnLineClick(Depot dst)
+        {
+            if (LinkFrom == null || _linkTier == null) { CancelLink(); return; }
+            if (dst == null) return; // clicked empty — keep the in-progress line
+            if (dst == _lineStops[0] && _lineStops.Count >= 2) { FinishLine(); return; }
+            if (!_lineStops.Contains(dst))
+            {
+                _lineStops.Add(dst);
+                Toast.Show($"<color=#9cf>Stop {_lineStops.Count} added.</color> Click more, or the first station / right-click to finish.");
+            }
+        }
+
+        private void FinishLine()
+        {
+            if (LinkFrom == null || _linkTier == null || _lineStops.Count < 2) { CancelLink(); return; }
+            if (Economy.CanAfford(_linkTier.cost, Carried))
+            {
+                Economy.Spend(_linkTier.cost, Carried);
+                RouteVehicle.Spawn(new List<Depot>(_lineStops), Mathf.Max(1, _linkTier.capacity),
+                    Mathf.Max(0.5f, _linkTier.vehicleSpeed), _linkTier.color);
+                Toast.Show($"<color=#9f9>Line created: {_linkTier.displayName} · {_lineStops.Count} stops.</color>");
+            }
+            else Toast.Show($"<color=#f99>Can't afford a {_linkTier.displayName}.</color>");
+            CancelLink();
+        }
+
+        // --- Power wiring: draw a cable from one power node to another (mirrors the Station route flow). ---
+        /// <summary>Start drawing a wire from this power node; the next click on another power building
+        /// completes it (if allowed). Esc / right-click cancels.</summary>
+        public void BeginWire(PowerNode from)
+        {
+            if (from == null) return;
+            CancelPlacement();
+            CancelLink();
+            WireFrom = from;
+            Toast.Show("<color=#9cf>Click another power building (Generator, Pole, Battery, or machine) to wire to it.</color>  <size=11>(Esc cancels)</size>");
+        }
+
+        public void CancelWire() => WireFrom = null;
+
+        private void CompleteWire(PowerNode to)
+        {
+            if (WireFrom == null) { CancelWire(); return; }
+            string why = WireFrom.LinkBlockedReason(to);
+            if (why == null) { WireFrom.Connect(to); Toast.Show("<color=#9f9>Wire connected.</color>"); }
+            else Toast.Show($"<color=#f99>Can't wire: {why}.</color>");
+            CancelWire();
+        }
 
         /// <summary>Upgrade EXISTING routes to the newest unlocked vehicle tier in place — the
         /// "Donkey Track → Train" path persists without rebuilding. Called when the age advances.</summary>
         public void UpgradeAllRoutes()
         {
-            var tier = BestRouteTier();
-            if (tier == null) return;
+            var land = BestRouteTier(); var ship = BestShipTier();
             foreach (var rv in RouteVehicle.All)
-                if (rv != null) rv.SetTier(Mathf.Max(1, tier.capacity), Mathf.Max(0.5f, tier.vehicleSpeed), tier.color);
+            {
+                if (rv == null) continue;
+                bool isShip = rv.a != null && rv.a.def != null && rv.a.def.isHarbour;
+                var tier = isShip ? ship : land;
+                if (tier != null) rv.SetTier(Mathf.Max(1, tier.capacity), Mathf.Max(0.5f, tier.vehicleSpeed), tier.color);
+            }
         }
 
-        private void CompleteStationLink(Depot dst)
-        {
-            if (LinkFrom == null || _linkTier == null) { CancelLink(); return; }
-            if (Economy.CanAfford(_linkTier.cost, Carried))
-            {
-                Economy.Spend(_linkTier.cost, Carried);
-                RouteVehicle.Spawn(LinkFrom, dst, Mathf.Max(1, _linkTier.capacity),
-                    Mathf.Max(0.5f, _linkTier.vehicleSpeed), _linkTier.color);
-                Toast.Show($"<color=#9f9>Route created: {_linkTier.displayName}.</color>");
-            }
-            else Toast.Show($"<color=#f99>Can't afford a {_linkTier.displayName}.</color>");
-            CancelLink();
-        }
         private GameObject _highlight; // glow ring around the selected building
+        private LineRenderer _linkPreview; // amber line through the stops being collected (+ cursor)
         public Belt.Dir BuildDir { get; private set; } = Belt.Dir.E; // output side for the building being placed
         // Per-cell I/O markers on the ghost — one per edge cell, so a 2×2 warehouse shows
         // 2 output arrows + 2 input notches (matching the built ports), not a single marker.
@@ -114,6 +219,7 @@ namespace Caveman
         void Update()
         {
             UpdateHighlight();
+            UpdateLinkPreview();
             // Building "reach" indicator: a harvest-radius RING for a collector (selected OR being
             // placed) + a box outline of the input-adjacency cells for any other selected building.
             // Runs BEFORE the placement highlight so that starting a placement cleanly re-lights nodes.
@@ -134,7 +240,8 @@ namespace Caveman
 
             if (kb.escapeKey.wasPressedThisFrame)
             {
-                if (LinkFrom != null) CancelLink();
+                if (WireFrom != null) CancelWire();
+                else if (LinkFrom != null) CancelLink();
                 else if (PendingIndex >= 0) CancelPlacement();
                 else Selected = null;
             }
@@ -155,6 +262,8 @@ namespace Caveman
                 if (pk == BuildingKind.Belt) UpdateBeltPlacement(mouse, kb);
                 else if (pk == BuildingKind.Bridge) UpdateBridgePlacement(mouse);
                 else if (pk == BuildingKind.Pipe) UpdatePipePlacement(mouse);
+                else if (pk == BuildingKind.Rail) UpdateRailPlacement(mouse);
+                else if (pk == BuildingKind.Signal) UpdateSignalPlacement(mouse, kb);
                 else UpdatePlacement(mouse);
                 return;
             }
@@ -162,18 +271,34 @@ namespace Caveman
             // --- Selection mode ---
             bool overUI = InventoryHud.PointerOverUI;
 
-            // Station route linking: after "+ Add route", the next click on another Station creates
-            // the route; clicking empty space (or right-click) cancels. Consumes the click.
+            // Power wiring: after "Connect wire", the next click on another power building draws the
+            // cable; clicking empty space (or right-click) cancels. Consumes the click.
+            if (WireFrom != null)
+            {
+                if (mouse != null && mouse.leftButton.wasPressedThisFrame && !overUI)
+                {
+                    var go = BuildingGOUnderCursor(mouse);
+                    var node = go != null ? go.GetComponent<PowerNode>() : null;
+                    if (node != null && node != WireFrom) CompleteWire(node);
+                    else CancelWire();
+                }
+                if (mouse != null && mouse.rightButton.wasPressedThisFrame) CancelWire();
+                return;
+            }
+
+            // Station LINE building: after "+ Add line", each click on a Station adds a stop; clicking the
+            // FIRST station (or right-click with ≥2 stops) finishes; right-click with <2 cancels. Consumes click.
             if (LinkFrom != null)
             {
                 if (mouse != null && mouse.leftButton.wasPressedThisFrame && !overUI)
                 {
                     var go = BuildingGOUnderCursor(mouse);
-                    var dst = go != null ? go.GetComponent<Depot>() : null;
-                    if (dst != null && dst != LinkFrom) CompleteStationLink(dst);
-                    else CancelLink();
+                    OnLineClick(go != null ? go.GetComponent<Depot>() : null);
                 }
-                if (mouse != null && mouse.rightButton.wasPressedThisFrame) CancelLink();
+                if (mouse != null && mouse.rightButton.wasPressedThisFrame)
+                {
+                    if (_lineStops.Count >= 2) FinishLine(); else CancelLink();
+                }
                 return;
             }
 
@@ -192,10 +317,13 @@ namespace Caveman
             var wb = Selected.GetComponent<WorkshopBuilding>();
             var dpo = Selected.GetComponent<Depot>();
             var pp = Selected.GetComponent<PowerPlant>();
+            var pole = Selected.GetComponent<PowerPole>();
+            var bat = Selected.GetComponent<Battery>();
             var wp = Selected.GetComponent<WaterPump>();
             var rb = Selected.GetComponent<ResearchBuilding>();
             BuildingDefinition def = pb != null ? pb.def : sb != null ? sb.def
                 : wb != null ? wb.def : dpo != null ? dpo.def : pp != null ? pp.def
+                : pole != null ? pole.def : bat != null ? bat.def
                 : wp != null ? wp.def : rb != null ? rb.def : null;
             if (def == null) return;
             int idx = buildables.IndexOf(def);
@@ -294,8 +422,7 @@ namespace Caveman
             {
                 _ringGo = new GameObject("ReachIndicator");
                 _ring = _ringGo.AddComponent<LineRenderer>();
-                var sh = Shader.Find("Sprites/Default");
-                if (sh != null) _ring.material = new Material(sh);
+                _ring.material = PlaceholderArt.LineMaterial(); // shared
                 _ring.widthMultiplier = 0.14f;
                 _ring.loop = true;
                 _ring.useWorldSpace = true;
@@ -340,6 +467,8 @@ namespace Caveman
             var rb = Selected.GetComponent<ResearchBuilding>(); if (rb != null) return rb.def;
             var dp = Selected.GetComponent<Depot>(); if (dp != null) return dp.def;
             var pp = Selected.GetComponent<PowerPlant>(); if (pp != null) return pp.def;
+            var pole = Selected.GetComponent<PowerPole>(); if (pole != null) return pole.def;
+            var bat = Selected.GetComponent<Battery>(); if (bat != null) return bat.def;
             return null;
         }
 
@@ -355,6 +484,11 @@ namespace Caveman
             IsPlacing = true;
             Selected = null;
             CancelLink(); // can't be route-linking and placing at once
+            CancelWire();
+            ClearBeltPlan();          // a leftover plan from a previous belt type shouldn't carry over
+            ClearRailPlan();
+            ClearGhostJunctionPorts();
+            _strokeActive = false;
             EnsureGhost();
         }
 
@@ -377,22 +511,25 @@ namespace Caveman
             var def = buildables[PendingIndex];
             var kb = Keyboard.current;
 
-            // Port buildings have a rotatable facing — R cycles it. Output (green arrow) is
-            // on BuildDir; input (cyan notch) is opposite. Belts pull output only from the
-            // arrow side and deliver inputs only on the notch side.
+            // Rotate placement with R. Port buildings re-aim their output (green arrow on BuildDir, input
+            // notch opposite); RECTANGULAR buildings (the Station) ALSO turn their footprint between a
+            // horizontal and a vertical orientation, so a Station can straddle a north–south track lane.
             bool hasPorts = def.kind == BuildingKind.Collector || def.kind == BuildingKind.Workshop
                             || def.kind == BuildingKind.Storage || def.kind == BuildingKind.Research;
-            if (hasPorts && kb != null && kb.rKey.wasPressedThisFrame) BuildDir = Belt.RotateCW(BuildDir);
+            bool canRotate = hasPorts || def.kind == BuildingKind.Depot || def.kind == BuildingKind.Power;
+            if (canRotate && kb != null && kb.rKey.wasPressedThisFrame) BuildDir = Belt.RotateCW(BuildDir);
+
+            EffFoot(def, BuildDir, out int ew, out int eh); // footprint after rotation (swaps W/H when turned vertical)
 
             Vector3 raw = _cam.ScreenToWorldPoint(mouse.position.ReadValue());
             // Snap to a valid CENTRE for this footprint (half-integer for even sizes).
-            Vector3 world = Footprint.SnapCenter(raw, def.FootW, def.FootH);
+            Vector3 world = Footprint.SnapCenter(raw, ew, eh);
             world.z = 0f;
             _ghost.transform.position = world;
             _ghost.transform.rotation = Quaternion.identity;
             _ghostSr.sprite = SpriteDatabase.ForBuilding(def); // ghost matches the building's resolved sprite
             float gb = def.kind == BuildingKind.Collector ? 0.9f : 1.0f;
-            _ghost.transform.localScale = new Vector3(def.FootW * gb, def.FootH * gb, 1f);
+            _ghost.transform.localScale = new Vector3(ew * gb, eh * gb, 1f);
             UpdateGhostPorts(world, def);
 
             // Water buildings must sit on LAND in a cell ADJACENT to water (not just "nearby"):
@@ -404,9 +541,16 @@ namespace Caveman
                 placeOk = HasMatchingNodeNear(world, def.item, placeNodeRange)
                           || (def.fromWaterTerrain && TerrainGrid.HasWaterNear(world, waterAdj));
             else if (def.kind == BuildingKind.Pump)
-                placeOk = def.booster || TerrainGrid.HasWaterNear(world, waterAdj); // pump needs adjacent water; booster doesn't
+                placeOk = def.booster || TerrainGrid.HasWaterNear(world, waterAdj)            // Water Pump: water terrain
+                          || HasMatchingNodeNear(world, def.item, placeNodeRange);            // Oil Well: an oil deposit
+            else if (def.kind == BuildingKind.Depot && def.isHarbour)
+                placeOk = TerrainGrid.HasWaterNear(world, Mathf.Max(def.FootW, def.FootH) * 0.5f + 1.4f); // a harbour must touch water
             else placeOk = true;
-            bool free = !FootprintBlocked(world, def) && FootprintOnLand(world, def);
+            // A HARBOUR straddles the shore (half on water, half on land) so the ship can dock; everything
+            // else must sit fully on land.
+            bool harbourPlace = def.kind == BuildingKind.Depot && def.isHarbour;
+            bool free = !FootprintBlocked(world, ew, eh)
+                        && (harbourPlace ? FootprintStraddlesShore(world, ew, eh) : FootprintOnLand(world, ew, eh));
             PlacementValid = affordable && placeOk && free;
 
             // Clear green = OK, red = not OK (don't tint by the building's own colour,
@@ -421,11 +565,11 @@ namespace Caveman
             // PointerOverUI guard stops a build-menu click from also dropping a building.
             if (mouse.leftButton.wasPressedThisFrame && PlacementValid && !InventoryHud.PointerOverUI)
             {
-                // INSTANT construction: pay the cost and drop the finished building immediately — no
-                // builder units, no hauling. (Economy.Spend no-ops in sandbox/FreeBuild, so it stays
-                // free there.) The machine starts running by itself.
+                // TIMED construction: pay the cost up front, then drop a construction SITE that assembles
+                // itself over a few seconds (size-scaled) before becoming the finished building — no builder
+                // units, no hauling. (Economy.Spend no-ops in sandbox/FreeBuild.) Cancelling refunds in full.
                 Economy.Spend(def.cost, Carried);
-                ConstructionSite.SpawnFinished(def, world, BuildDir);
+                ConstructionSite.Spawn(def, world, BuildDir);
                 BuildingsPlaced++;
             }
             if (mouse.rightButton.wasPressedThisFrame) CancelPlacement();
@@ -436,6 +580,14 @@ namespace Caveman
         // input notches on the opposite side. Hidden for kinds with no belt I/O.
         private void UpdateGhostPorts(Vector3 center, BuildingDefinition def)
         {
+            // Generator: a single FUEL input notch on the BuildDir edge (R aims it); it has no belt output.
+            if (def.kind == BuildingKind.Power)
+            {
+                _ghostInSides[0] = BuildDir;
+                PlaceGhostSides(_ghostInPorts, def.inputs != null && def.inputs.Count > 0, center, def, _ghostInSides, 1, false);
+                PlaceGhostSides(_ghostOutPorts, false, center, def, _ghostOutSides, 1, true);
+                return;
+            }
             bool hasOut = def.kind == BuildingKind.Collector || def.kind == BuildingKind.Workshop
                           || def.kind == BuildingKind.Storage;
             bool hasIn = def.kind == BuildingKind.Workshop || def.kind == BuildingKind.Storage
@@ -466,12 +618,14 @@ namespace Caveman
                     int w = def.FootW, h = def.FootH;
                     var s = Belt.Step(side);
                     float ax = center.x - (w - 1) * 0.5f, ay = center.y - (h - 1) * 0.5f; // bottom-left cell centre
+                    int cm = (w - 1) / 2, cn = (h - 1) / 2; // centre edge-cell (single port per side, matching the placed building)
                     for (int i = 0; i < w; i++)
                         for (int j = 0; j < h; j++)
                         {
                             bool edge = side == Belt.Dir.E ? i == w - 1 : side == Belt.Dir.W ? i == 0
                                       : side == Belt.Dir.N ? j == h - 1 : j == 0;
                             if (!edge) continue;
+                            if ((side == Belt.Dir.E || side == Belt.Dir.W) ? j != cn : i != cm) continue; // one marker per side
                             var go = GhostMarker(pool, used++, isOutput);
                             go.transform.position = new Vector3(ax + i + s.x * 0.55f, ay + j + s.y * 0.55f, 0f);
                             go.transform.rotation = isOutput ? Quaternion.Euler(0f, 0f, Belt.Angle(side)) : Quaternion.identity;
@@ -503,20 +657,44 @@ namespace Caveman
             foreach (var g in _ghostInPorts) if (g != null && g.activeSelf) g.SetActive(false);
         }
 
-        // True if ANY cell this footprint would cover is already taken.
-        private bool FootprintBlocked(Vector3 center, BuildingDefinition def)
+        // Effective footprint for the building being placed, after R-rotation. Only RECTANGULAR buildings
+        // (today: the Station) swap W/H when turned to a vertical facing (N/S); square footprints are
+        // unaffected, so R just re-aims their output port. The placed building must honour the same swap —
+        // see Depot.Spawn (the only rectangular kind). Add spawn-side support before adding new rectangular kinds.
+        private static void EffFoot(BuildingDefinition def, Belt.Dir face, out int w, out int h)
         {
-            foreach (var c in Footprint.Cells(center, def.FootW, def.FootH))
-                if (CellOccupied(new Vector3(c.x, c.y, 0f))) return true;
+            w = def.FootW; h = def.FootH;
+            bool vertical = face == Belt.Dir.N || face == Belt.Dir.S;
+            if (w != h && vertical) { int t = w; w = h; h = t; }
+        }
+
+        // True if ANY cell this footprint would cover is already taken (a building, or a reserved
+        // road/rail tile — so you can't drop a building on track).
+        private bool FootprintBlocked(Vector3 center, int w, int h)
+        {
+            foreach (var c in Footprint.Cells(center, w, h))
+                if (CellOccupied(new Vector3(c.x, c.y, 0f)) || WorldGrid.IsReserved(c)) return true;
             return false;
         }
 
         // True only if EVERY footprint cell is on buildable terrain (not water).
-        private bool FootprintOnLand(Vector3 center, BuildingDefinition def)
+        private bool FootprintOnLand(Vector3 center, int w, int h)
         {
-            foreach (var c in Footprint.Cells(center, def.FootW, def.FootH))
+            foreach (var c in Footprint.Cells(center, w, h))
                 if (!TerrainGrid.Buildable(c)) return false;
             return true;
+        }
+
+        // True if the footprint covers BOTH land and water cells — a harbour must straddle the shore so the
+        // boat can dock on the water half while belts connect on the land half.
+        private bool FootprintStraddlesShore(Vector3 center, int w, int h)
+        {
+            bool land = false, water = false;
+            foreach (var c in Footprint.Cells(center, w, h))
+            {
+                if (TerrainGrid.IsWater(c)) water = true; else land = true;
+            }
+            return land && water;
         }
 
         private bool CellOccupied(Vector3 world) => SolidBuildingAt(world);
@@ -532,87 +710,202 @@ namespace Caveman
                 if (h == null) continue;
                 if (h.GetComponent<ProductionBuilding>() || h.GetComponent<StorageBuilding>()
                     || h.GetComponent<WorkshopBuilding>() || h.GetComponent<Depot>()
-                    || h.GetComponent<PowerPlant>() || h.GetComponent<WaterPump>()
+                    || h.GetComponent<PowerPlant>() || h.GetComponent<WaterPump>() || h.GetComponent<Battery>()
                     || h.GetComponent<ResearchBuilding>() || h.GetComponent<ConstructionSite>()) return true;
             }
             return false;
         }
 
-        // Belt mode: lay directional conveyor segments. R rotates, left-click places
-        // (stays in mode so you can lay a line), right-click / Esc finishes.
+        // Belt mode. PLAIN belts are PLANNED: drag to sketch a blueprint (no cost), then click to build
+        // it (so you can lay out a run and see it before committing). Splitters/Mergers stay one-per-
+        // click and now show their in/out ports on the ghost so you can orient them.
         private void UpdateBeltPlacement(Mouse mouse, Keyboard kb)
         {
             if (_cam == null || mouse == null || _ghost == null) return;
-            HideGhostPorts(); // belts have no I/O ports
+            HideGhostPorts(); // building-style I/O ports off
             var def = buildables[PendingIndex];
+            bool isJunction = def.splitter || def.merger;
+            bool overUI = InventoryHud.PointerOverUI;
 
             if (kb.rKey.wasPressedThisFrame) BeltDir = Belt.RotateCW(BeltDir);
 
             Vector3 world = _cam.ScreenToWorldPoint(mouse.position.ReadValue());
             Vector2Int cell = Belt.CellOf(world);
 
-            // Auto-direction: along the drag path, else auto-oriented toward a sink / away from a source.
-            Belt.Dir dir = BeltDir;
-            if (_dragging && Adjacent(cell, _dragLast)) dir = Belt.FromTo(_dragLast, cell);
-            else if (!_dragging) dir = AutoBeltDir(cell);
+            // Cursor-cell direction: along the active sketch stroke, else auto-oriented toward a sink.
+            Belt.Dir dir = isJunction ? BeltDir
+                         : (_strokeActive && Adjacent(cell, _strokeLast)) ? Belt.FromTo(_strokeLast, cell)
+                         : AutoBeltDir(cell);
 
             _ghost.transform.position = new Vector3(cell.x, cell.y, 0f);
             _ghost.transform.rotation = Quaternion.Euler(0f, 0f, Belt.Angle(dir));
-            _ghost.transform.localScale = Vector3.one * 0.8f;
-            _ghostSr.sprite = SpriteDatabase.ForBelt(def.displayName, def.splitter, def.merger); // ghost matches the belt's resolved sprite
+            _ghost.transform.localScale = Vector3.one; // match the placed belt (full cell)
+            _ghostSr.sprite = SpriteDatabase.ForBelt(def.displayName, def.splitter, def.merger);
 
-            bool isJunction = def.splitter || def.merger; // a Splitter/Merger is placed one at a time
+            // Point 1: a splitter/merger ghost shows its in (cyan) / out (green) sides.
+            if (isJunction) ShowGhostJunctionPorts(def.splitter, def.merger);
+            else ClearGhostJunctionPorts();
+
             var existing = Belt.At(cell);
             bool affordable = Economy.CanAfford(def.cost, Carried);
-            // Belts can't sit on water (unless bridged) OR on top of a building.
             bool emptyOk = existing == null && TerrainGrid.BeltAllowed(cell)
-                           && !SolidBuildingAt(new Vector3(cell.x, cell.y, 0f));
-            // A Splitter/Merger may be dropped onto an existing PLAIN belt (converts it); a plain belt
-            // may be overlaid on a plain belt (upgrade/re-orient) — both read as a VALID (green) target.
+                           && !SolidBuildingAt(new Vector3(cell.x, cell.y, 0f)) && !WorldGrid.IsReserved(cell);
             bool onPlainBelt = existing != null && !existing.isSplitter && !existing.isMerger;
-            bool placeOk = emptyOk || onPlainBelt;
-            PlacementValid = affordable && placeOk;
-            _ghostSr.color = PlacementValid
-                ? new Color(0.35f, 1f, 0.4f, 0.6f)
-                : new Color(1f, 0.3f, 0.3f, 0.5f);
+            PlacementValid = affordable && (emptyOk || onPlainBelt);
+            _ghostSr.color = PlacementValid ? new Color(0.35f, 1f, 0.4f, 0.6f) : new Color(1f, 0.3f, 0.3f, 0.5f);
 
-            // Splitters/Mergers are single-cell tools: place (or convert a plain belt) ONE per
-            // deliberate click — NEVER drag-laid — so sweeping the cursor can't mass-convert or
-            // over-charge a whole belt line.
+            // --- Splitter / Merger: one deliberate click each (now with visible ports). ---
             if (isJunction)
             {
-                if (mouse.leftButton.wasPressedThisFrame && PlacementValid && !InventoryHud.PointerOverUI)
-                    EnsureBelt(cell, dir, def);
-                else if (mouse.rightButton.wasPressedThisFrame)
-                    CancelPlacement();
+                if (mouse.leftButton.wasPressedThisFrame && PlacementValid && !overUI) EnsureBelt(cell, dir, def);
+                else if (mouse.rightButton.wasPressedThisFrame) CancelPlacement();
                 return;
             }
 
-            if (!mouse.leftButton.isPressed) _dragging = false;
+            // --- Plain belts: blueprint flow (drag = plan a STRAIGHT line, click = build, right-click = cancel). ---
+            if (mouse.leftButton.wasPressedThisFrame && !overUI)
+            {
+                _strokeActive = true; _strokeMoved = false; _strokeStart = cell; _strokeLast = cell;
+                // Snapshot earlier strokes so this drag ADDS a straight segment (compose an L from two drags).
+                _committed.Clear();
+                foreach (var kv in _beltPlan) _committed[kv.Key] = kv.Value;
+            }
+            else if (_strokeActive && mouse.leftButton.isPressed)
+            {
+                // Belts lay as a STRAIGHT run along the dominant drag axis (no auto-corner) — easier to pull
+                // a clean line; turn by doing a second drag. Replanned from the stroke start each move.
+                if (cell != _strokeLast) { _strokeMoved = true; _strokeLast = cell; ReplanStraight(_strokeStart, cell); }
+            }
+            else if (_strokeActive && mouse.leftButton.wasReleasedThisFrame)
+            {
+                _strokeActive = false;
+                if (!_strokeMoved)
+                {
+                    if (_beltPlan.Count > 0) BuildBeltPlan(def);          // tap with a plan pending → build it
+                    else if (!overUI) PlanCell(cell, AutoBeltDir(cell));   // tap on empty → start a 1-tile plan
+                }
+            }
 
-            if (mouse.leftButton.isPressed)
+            if (mouse.rightButton.wasPressedThisFrame)
             {
-                if (!_dragging)
-                {
-                    EnsureBelt(cell, dir, def); // first cell (auto-oriented)
-                    _dragging = true;
-                    _dragLast = cell;
-                    BeltDir = dir;
-                }
-                else if (cell != _dragLast)
-                {
-                    // Fill an L-shaped path from the last cell to here, orienting each
-                    // belt toward the next — snapped corners + full 90° lines in one drag.
-                    DragBeltPath(_dragLast, cell, def);
-                    _dragLast = cell;
-                    var here = Belt.At(cell);
-                    if (here != null) BeltDir = here.dir;
-                }
+                if (_beltPlan.Count > 0) ClearBeltPlan(); // discard the pending plan
+                else CancelPlacement();                    // nothing planned → leave belt mode
             }
-            else if (mouse.rightButton.wasPressedThisFrame)
+
+            RebuildPlanGhosts(def);
+        }
+
+        // ---- Belt blueprint helpers (plan, preview, build) ------------------------------------
+        // Re-plan the run as a single STRAIGHT line from `start` to `end` along the DOMINANT axis (so a
+        // drag always gives a clean straight belt; to turn, do a second drag). Replaces the plan each move.
+        private void ReplanStraight(Vector2Int start, Vector2Int end)
+        {
+            _beltPlan.Clear();
+            foreach (var kv in _committed) _beltPlan[kv.Key] = kv.Value; // keep earlier strokes
+            _beltPlanDirty = true;
+            int dx = end.x - start.x, dy = end.y - start.y;
+            var c = start;
+            if (Mathf.Abs(dx) >= Mathf.Abs(dy))
             {
-                CancelPlacement();
+                Belt.Dir d = dx >= 0 ? Belt.Dir.E : Belt.Dir.W; int sx = dx >= 0 ? 1 : -1;
+                PlanCell(c, d);
+                for (int i = 0; i < Mathf.Abs(dx); i++) { c.x += sx; PlanCell(c, d); }
             }
+            else
+            {
+                Belt.Dir d = dy >= 0 ? Belt.Dir.N : Belt.Dir.S; int sy = dy >= 0 ? 1 : -1;
+                PlanCell(c, d);
+                for (int i = 0; i < Mathf.Abs(dy); i++) { c.y += sy; PlanCell(c, d); }
+            }
+        }
+
+        private void PlanCell(Vector2Int cell, Belt.Dir dir)
+        {
+            _beltPlan[cell] = dir;
+            _beltPlanDirty = true;
+            if (!_beltPlanHinted)
+            {
+                _beltPlanHinted = true;
+                Toast.Show("<color=#9cf>Belt blueprint:</color> drag to extend · <color=#9f9>click to build</color> · right-click to cancel.");
+            }
+        }
+
+        private void BuildBeltPlan(BuildingDefinition def)
+        {
+            foreach (var kv in _beltPlan) EnsureBelt(kv.Key, kv.Value, def); // pays per cell; skips blocked/unaffordable
+            ClearBeltPlan();
+        }
+
+        private void ClearBeltPlan()
+        {
+            _beltPlan.Clear();
+            _committed.Clear();
+            foreach (var g in _planGhosts) if (g != null) Destroy(g);
+            _planGhosts.Clear();
+            _beltPlanHinted = false;
+            _beltPlanDirty = false;
+        }
+
+        // Sync the translucent blueprint previews to the planned cells (cyan = ok, red = blocked).
+        // Only when the plan changed — otherwise this ran a physics overlap per cell every frame.
+        private void RebuildPlanGhosts(BuildingDefinition def)
+        {
+            if (!_beltPlanDirty) return;
+            _beltPlanDirty = false;
+            int n = _beltPlan.Count;
+            while (_planGhosts.Count < n)
+            {
+                var go = new GameObject("BeltPlanGhost");
+                go.AddComponent<SpriteRenderer>().sortingOrder = 19;
+                _planGhosts.Add(go);
+            }
+            int i = 0;
+            foreach (var kv in _beltPlan)
+            {
+                var go = _planGhosts[i++];
+                if (!go.activeSelf) go.SetActive(true);
+                go.transform.position = new Vector3(kv.Key.x, kv.Key.y, 0f);
+                go.transform.rotation = Quaternion.Euler(0f, 0f, Belt.Angle(kv.Value));
+                go.transform.localScale = Vector3.one; // match the placed belt (full cell)
+                var sr = go.GetComponent<SpriteRenderer>();
+                sr.sprite = SpriteDatabase.ForBelt(def.displayName, def.splitter, def.merger);
+                bool ok = Belt.At(kv.Key) == null && TerrainGrid.BeltAllowed(kv.Key)
+                          && !SolidBuildingAt(new Vector3(kv.Key.x, kv.Key.y, 0f)) && !WorldGrid.IsReserved(kv.Key);
+                sr.color = ok ? new Color(0.4f, 0.9f, 1f, 0.45f) : new Color(1f, 0.35f, 0.35f, 0.5f);
+            }
+            for (int k = n; k < _planGhosts.Count; k++) if (_planGhosts[k].activeSelf) _planGhosts[k].SetActive(false);
+        }
+
+        // Splitter/merger in/out ports on the ghost (parented to the rotated ghost, LOCAL dirs — so they
+        // sit on the right world edges and follow R rotation, exactly like the placed junction's ports).
+        private void ShowGhostJunctionPorts(bool splitter, bool merger)
+        {
+            if (_ghostJunctionBuilt && _ghostJunctionSplitter == splitter && _ghostJunctionMerger == merger
+                && _ghostJunctionPorts.Count > 0 && _ghostJunctionPorts[0] != null) return;
+            ClearGhostJunctionPorts();
+            var t = _ghost.transform;
+            if (splitter)
+            {
+                _ghostJunctionPorts.Add(Ports.MakeOutputArrow(t, Belt.Dir.N).gameObject);
+                _ghostJunctionPorts.Add(Ports.MakeOutputArrow(t, Belt.Dir.E).gameObject);
+                _ghostJunctionPorts.Add(Ports.MakeOutputArrow(t, Belt.Dir.W).gameObject);
+                _ghostJunctionPorts.Add(Ports.MakeInputNotch(t, Belt.Dir.S).gameObject);
+            }
+            else if (merger)
+            {
+                _ghostJunctionPorts.Add(Ports.MakeOutputArrow(t, Belt.Dir.N).gameObject);
+                _ghostJunctionPorts.Add(Ports.MakeInputNotch(t, Belt.Dir.S).gameObject);
+                _ghostJunctionPorts.Add(Ports.MakeInputNotch(t, Belt.Dir.E).gameObject);
+                _ghostJunctionPorts.Add(Ports.MakeInputNotch(t, Belt.Dir.W).gameObject);
+            }
+            _ghostJunctionBuilt = true; _ghostJunctionSplitter = splitter; _ghostJunctionMerger = merger;
+        }
+
+        private void ClearGhostJunctionPorts()
+        {
+            foreach (var g in _ghostJunctionPorts) if (g != null) Destroy(g);
+            _ghostJunctionPorts.Clear();
+            _ghostJunctionBuilt = false;
         }
 
         // Place a belt at `cell` pointing `d`, or re-orient the one already there.
@@ -654,38 +947,11 @@ namespace Caveman
             }
             if (!TerrainGrid.BeltAllowed(cell)) return; // water only if bridged
             if (SolidBuildingAt(new Vector3(cell.x, cell.y, 0f))) return; // never lay a belt on a building
+            if (WorldGrid.IsReserved(cell)) return; // never lay a belt on a road/rail tile
             if (!Economy.CanAfford(def.cost, Carried)) return;
             Economy.Spend(def.cost, Carried);
             Belt.Spawn(cell, d, def.interval, def.splitter, def.merger, def.color, def.displayName);
             BuildingsPlaced++;
-        }
-
-        // Lay an L-shaped run from `from` to `to` (longer axis first), placing/orienting a
-        // belt in every cell so each flows into the next — corners snap automatically.
-        private void DragBeltPath(Vector2Int from, Vector2Int to, BuildingDefinition def)
-        {
-            int dx = to.x - from.x, dy = to.y - from.y;
-            int sx = dx > 0 ? 1 : dx < 0 ? -1 : 0;
-            int sy = dy > 0 ? 1 : dy < 0 ? -1 : 0;
-
-            var path = new List<Vector2Int> { from };
-            var c = from;
-            if (Mathf.Abs(dx) >= Mathf.Abs(dy))
-            {
-                for (int i = 0; i < Mathf.Abs(dx); i++) { c.x += sx; path.Add(c); }
-                for (int i = 0; i < Mathf.Abs(dy); i++) { c.y += sy; path.Add(c); }
-            }
-            else
-            {
-                for (int i = 0; i < Mathf.Abs(dy); i++) { c.y += sy; path.Add(c); }
-                for (int i = 0; i < Mathf.Abs(dx); i++) { c.x += sx; path.Add(c); }
-            }
-
-            for (int i = 0; i < path.Count - 1; i++)
-                EnsureBelt(path[i], Belt.FromTo(path[i], path[i + 1]), def);
-            // The final cell continues in the last segment's direction.
-            if (path.Count >= 2)
-                EnsureBelt(path[path.Count - 1], Belt.FromTo(path[path.Count - 2], path[path.Count - 1]), def);
         }
 
         // Bridge mode: lay plank tiles on WATER cells (hold-drag across a river). Bridges
@@ -756,6 +1022,156 @@ namespace Caveman
             if (mouse.rightButton.wasPressedThisFrame) CancelPlacement();
         }
 
+        // Rail mode: BLUEPRINT placement, like belts — drag to plan a continuous 90° run (cyan ghosts, no
+        // cost), click to build it, right-click to cancel. Only orthogonal L-paths (no diagonals) so track
+        // stays tidy. Trains then path along the laid track.
+        private void UpdateRailPlacement(Mouse mouse)
+        {
+            if (_cam == null || mouse == null || _ghost == null) return;
+            HideGhostPorts();
+            ClearGhostJunctionPorts();
+            var def = buildables[PendingIndex];
+            bool overUI = InventoryHud.PointerOverUI;
+
+            Vector3 world = _cam.ScreenToWorldPoint(mouse.position.ReadValue());
+            var cell = new Vector2Int(Mathf.RoundToInt(world.x), Mathf.RoundToInt(world.y));
+            _ghost.transform.position = new Vector3(cell.x, cell.y, 0f);
+            _ghost.transform.rotation = Quaternion.identity;
+            _ghostSr.sprite = PlaceholderArt.Rail();
+            _ghost.transform.localScale = Vector3.one;
+
+            bool ok = RailCellFree(cell) && Economy.CanAfford(def.cost, Carried);
+            PlacementValid = ok;
+            _ghostSr.color = ok ? new Color(0.4f, 0.9f, 1f, 0.6f) : new Color(1f, 0.35f, 0.35f, 0.5f);
+
+            if (mouse.leftButton.wasPressedThisFrame && !overUI)
+            {
+                _strokeActive = true; _strokeMoved = false; _strokeLast = cell;
+            }
+            else if (_strokeActive && mouse.leftButton.isPressed)
+            {
+                if (cell != _strokeLast) { _strokeMoved = true; PlanRailPath(_strokeLast, cell); _strokeLast = cell; }
+            }
+            else if (_strokeActive && mouse.leftButton.wasReleasedThisFrame)
+            {
+                _strokeActive = false;
+                if (!_strokeMoved)
+                {
+                    if (_railPlan.Count > 0) BuildRailPlan(def);   // tap with a plan pending → build it
+                    else if (!overUI) PlanRailCell(cell);           // tap on empty → start a 1-tile plan
+                }
+            }
+
+            if (mouse.rightButton.wasPressedThisFrame)
+            {
+                if (_railPlan.Count > 0) ClearRailPlan(); else CancelPlacement();
+            }
+
+            RebuildRailPlanGhosts();
+        }
+
+        private bool RailCellFree(Vector2Int cell)
+            => RailTile.At(cell) == null && TerrainGrid.Buildable(cell)
+               && !SolidBuildingAt(new Vector3(cell.x, cell.y, 0f)) && Belt.At(cell) == null;
+
+        // Place one rail tile at `cell` (paid) if the cell is clear; no-op otherwise.
+        private void LayRail(Vector2Int cell, BuildingDefinition def)
+        {
+            if (!RailCellFree(cell) || !Economy.CanAfford(def.cost, Carried)) return;
+            Economy.Spend(def.cost, Carried);
+            RailTile.Spawn(def, new Vector3(cell.x, cell.y, 0f));
+            BuildingsPlaced++;
+        }
+
+        // ---- Rail blueprint helpers (90° L-paths only) -----------------------------------------
+        private void PlanRailPath(Vector2Int from, Vector2Int to)
+        {
+            int dx = to.x - from.x, dy = to.y - from.y;
+            int sx = dx > 0 ? 1 : dx < 0 ? -1 : 0, sy = dy > 0 ? 1 : dy < 0 ? -1 : 0;
+            var c = from; PlanRailCell(c);
+            if (Mathf.Abs(dx) >= Mathf.Abs(dy))
+            { for (int i = 0; i < Mathf.Abs(dx); i++) { c.x += sx; PlanRailCell(c); } for (int i = 0; i < Mathf.Abs(dy); i++) { c.y += sy; PlanRailCell(c); } }
+            else
+            { for (int i = 0; i < Mathf.Abs(dy); i++) { c.y += sy; PlanRailCell(c); } for (int i = 0; i < Mathf.Abs(dx); i++) { c.x += sx; PlanRailCell(c); } }
+        }
+
+        private void PlanRailCell(Vector2Int cell)
+        {
+            if (!_railPlan.Contains(cell)) _railPlan.Add(cell);
+            _railPlanDirty = true;
+            if (!_railPlanHinted)
+            {
+                _railPlanHinted = true;
+                Toast.Show("<color=#9cf>Track blueprint:</color> drag to extend (90° only) · <color=#9f9>click to build</color> · right-click to cancel.");
+            }
+        }
+
+        private void BuildRailPlan(BuildingDefinition def)
+        {
+            foreach (var c in _railPlan) LayRail(c, def);
+            ClearRailPlan();
+        }
+
+        private void ClearRailPlan()
+        {
+            _railPlan.Clear();
+            foreach (var g in _railPlanGhosts) if (g != null) Destroy(g);
+            _railPlanGhosts.Clear();
+            _railPlanHinted = false;
+            _railPlanDirty = false;
+        }
+
+        private void RebuildRailPlanGhosts()
+        {
+            if (!_railPlanDirty) return;
+            _railPlanDirty = false;
+            int n = _railPlan.Count;
+            while (_railPlanGhosts.Count < n)
+            {
+                var go = new GameObject("RailPlanGhost");
+                var sr = go.AddComponent<SpriteRenderer>();
+                sr.sprite = PlaceholderArt.Rail();
+                sr.sortingOrder = 19;
+                _railPlanGhosts.Add(go);
+            }
+            for (int i = 0; i < n; i++)
+            {
+                var go = _railPlanGhosts[i];
+                if (!go.activeSelf) go.SetActive(true);
+                var c = _railPlan[i];
+                go.transform.position = new Vector3(c.x, c.y, 0f);
+                go.GetComponent<SpriteRenderer>().color = RailCellFree(c)
+                    ? new Color(0.4f, 0.9f, 1f, 0.5f) : new Color(1f, 0.35f, 0.35f, 0.55f);
+            }
+            for (int k = n; k < _railPlanGhosts.Count; k++) if (_railPlanGhosts[k].activeSelf) _railPlanGhosts[k].SetActive(false);
+        }
+
+        // Signal mode: click a rail cell to drop/aim a signal (R rotates its allowed travel direction).
+        private void UpdateSignalPlacement(Mouse mouse, Keyboard kb)
+        {
+            if (_cam == null || mouse == null || _ghost == null) return;
+            HideGhostPorts();
+            ClearGhostJunctionPorts();
+            var def = buildables[PendingIndex];
+
+            if (kb != null && kb.rKey.wasPressedThisFrame) BeltDir = Belt.RotateCW(BeltDir);
+
+            Vector3 world = _cam.ScreenToWorldPoint(mouse.position.ReadValue());
+            var cell = new Vector2Int(Mathf.RoundToInt(world.x), Mathf.RoundToInt(world.y));
+            _ghost.transform.position = new Vector3(cell.x, cell.y, 0f);
+            _ghost.transform.rotation = Quaternion.Euler(0f, 0f, Belt.Angle(BeltDir));
+            _ghostSr.sprite = PlaceholderArt.Triangle();
+            _ghost.transform.localScale = Vector3.one * 0.5f;
+
+            bool ok = RailTile.At(cell) != null; // signals only sit on track
+            PlacementValid = ok;
+            _ghostSr.color = ok ? new Color(0.35f, 1f, 0.4f, 0.7f) : new Color(1f, 0.3f, 0.3f, 0.5f);
+
+            if (mouse.leftButton.wasPressedThisFrame && ok && !InventoryHud.PointerOverUI)
+                Signal.Place(cell, BeltDir, def.bothWaySignal); // place or re-aim (one-way or two-way per the def)
+            if (mouse.rightButton.wasPressedThisFrame) CancelPlacement();
+        }
+
         private static bool Adjacent(Vector2Int a, Vector2Int b)
         {
             return Mathf.Abs(a.x - b.x) + Mathf.Abs(a.y - b.y) == 1;
@@ -774,6 +1190,10 @@ namespace Caveman
             PlacementValid = false;
             IsPlacing = false;
             _dragging = false;
+            _strokeActive = false;
+            ClearBeltPlan();
+            ClearRailPlan();
+            ClearGhostJunctionPorts();
             if (_ghost != null) _ghost.SetActive(false);
             HideGhostPorts();
         }
@@ -799,9 +1219,10 @@ namespace Caveman
                 return;
             }
 
-            // Belts, bridges, pipes: cheap, removed without refund (unchanged).
+            // Belts, bridges, pipes, rails, signals: cheap, removed without refund (unchanged).
             if (Selected.GetComponent<Belt>() != null
-                || Selected.GetComponent<Bridge>() != null || Selected.GetComponent<Pipe>() != null)
+                || Selected.GetComponent<Bridge>() != null || Selected.GetComponent<Pipe>() != null
+                || Selected.GetComponent<RailTile>() != null || Selected.GetComponent<Signal>() != null)
             {
                 Destroy(Selected);
                 Selected = null;
@@ -813,10 +1234,13 @@ namespace Caveman
             var wb = Selected.GetComponent<WorkshopBuilding>();
             var dpo = Selected.GetComponent<Depot>();
             var pp = Selected.GetComponent<PowerPlant>();
+            var pole = Selected.GetComponent<PowerPole>();
+            var bat = Selected.GetComponent<Battery>();
             var wp = Selected.GetComponent<WaterPump>();
             var rsb = Selected.GetComponent<ResearchBuilding>();
             BuildingDefinition rdef = pb != null ? pb.def : sb != null ? sb.def
                 : wb != null ? wb.def : dpo != null ? dpo.def : pp != null ? pp.def
+                : pole != null ? pole.def : bat != null ? bat.def
                 : wp != null ? wp.def : rsb != null ? rsb.def : null;
             if (rdef == null) return;
 
@@ -854,6 +1278,9 @@ namespace Caveman
         {
             if (_cam == null || mouse == null) return null;
             Vector3 world = _cam.ScreenToWorldPoint(mouse.position.ReadValue());
+            // A signal sits ON a rail tile — prefer it so you can select/remove the signal, not the track.
+            var sig = Signal.At(new Vector2Int(Mathf.RoundToInt(world.x), Mathf.RoundToInt(world.y)));
+            if (sig != null) return sig.gameObject;
             Collider2D hit = Physics2D.OverlapPoint(world);
             if (hit == null) return null;
             bool isBuilding = hit.GetComponent<ProductionBuilding>() != null
@@ -861,11 +1288,15 @@ namespace Caveman
                               || hit.GetComponent<WorkshopBuilding>() != null
                               || hit.GetComponent<Depot>() != null
                               || hit.GetComponent<PowerPlant>() != null
+                              || hit.GetComponent<PowerPole>() != null
+                              || hit.GetComponent<Battery>() != null
                               || hit.GetComponent<WaterPump>() != null
                               || hit.GetComponent<ResearchBuilding>() != null
                               || hit.GetComponent<Bridge>() != null
                               || hit.GetComponent<Pipe>() != null
                               || hit.GetComponent<Belt>() != null
+                              || hit.GetComponent<RailTile>() != null
+                              || hit.GetComponent<Signal>() != null
                               || hit.GetComponent<ConstructionSite>() != null;
             return isBuilding ? hit.gameObject : null;
         }

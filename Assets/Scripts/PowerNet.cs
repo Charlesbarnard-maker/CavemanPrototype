@@ -4,31 +4,33 @@ using UnityEngine;
 namespace Caveman
 {
     /// <summary>
-    /// Spatial POWER NETWORK: generators + power poles are nodes; two nodes link when within range, so
-    /// they form connected networks. Each network's total generation (fuelled generators on it) is
-    /// shared by the consumers it supplies (machines within a node's SupplyRange). A consumer runs at
-    /// full speed if its network has enough generation, browns out proportionally if oversubscribed,
-    /// and STOPS if it isn't connected to any powered network. This is the single energy model across
-    /// ages (better generators/poles later) and is read through WorkshopBuilding.EffectivePowerFactor.
-    ///
-    /// Rebuilt at most once per frame (frame-guard) — cheap union-find over the handful of nodes.
+    /// The WIRED power grid solver. Generators, Power Poles, Batteries and consuming machines are
+    /// <see cref="PowerNode"/>s joined by player-drawn wires. Each connected component of the wire graph
+    /// is one network: its live generation (+ battery discharge) is shared by the machines it feeds.
+    /// A machine runs at full speed when its network can meet demand, browns out proportionally when
+    /// oversubscribed, and STOPS if its network has no power (or it isn't wired to one). Surplus
+    /// generation charges batteries; a deficit is covered by them. Read through
+    /// WorkshopBuilding.EffectivePowerFactor. Rebuilt at most once per frame (frame-guard).
     /// </summary>
     public static class PowerNet
     {
         public const float BrownoutFloor = 0.35f; // most a network slows an oversubscribed machine
-        public const int BronzeAge = 2; // electricity is introduced in the Bronze age — before it, machines run free
+        public const int BronzeAge = 2; // electricity arrives in the Bronze age — before it, machines run free
+        public const float MaxWireLength = 8f; // a single wire's reach; chain Power Poles to go further
 
         /// <summary>Is the power requirement in effect yet? Power is a Bronze-age mechanic; in the
-        /// Stone/Tribal ages requiresPower machines run normally (no generator/pole needed).</summary>
+        /// Stone/Tribal ages requiresPower machines run normally (no wiring needed).</summary>
         public static bool Active => Colony.Instance != null && Colony.Instance.Age >= BronzeAge;
 
         private static int _frame = -1;
         private static readonly Dictionary<WorkshopBuilding, float> _factor = new();
         public static float TotalGen { get; private set; }
         public static float TotalDemand { get; private set; }
+        public static float TotalStored { get; private set; }   // battery charge across the whole grid
+        public static float TotalCapacity { get; private set; } // battery capacity across the whole grid
 
-        /// <summary>Power factor for a consumer: 1 connected+supplied, &lt;1 if its network is
-        /// oversubscribed, 0 if not connected to a powered network. Drives the machine's run speed.</summary>
+        /// <summary>Power factor for a consumer: 1 connected with enough supply, &lt;1 if its network is
+        /// oversubscribed, 0 if it has no power / isn't wired in. Drives the machine's run speed.</summary>
         public static float FactorOf(WorkshopBuilding w)
         {
             EnsureFresh();
@@ -42,90 +44,120 @@ namespace Caveman
             Rebuild();
         }
 
-        // Node arrays (reused each rebuild). Generators first, then poles.
-        private static readonly List<Vector2> _pos = new();
-        private static readonly List<float> _connect = new();
-        private static readonly List<float> _supply = new();
-        private static readonly List<float> _gen = new();
-        private static int[] _parent = System.Array.Empty<int>();
-
-        private static int Find(int x) { while (_parent[x] != x) { _parent[x] = _parent[_parent[x]]; x = _parent[x]; } return x; }
-        private static void Union(int a, int b) { int ra = Find(a), rb = Find(b); if (ra != rb) _parent[ra] = rb; }
+        // Reused scratch (cleared each rebuild) to keep the per-frame allocation small.
+        private static readonly Dictionary<PowerNode, int> _comp = new();          // node → network id
+        private static readonly Dictionary<WorkshopBuilding, int> _consumerComp = new();
+        private static readonly Stack<PowerNode> _stack = new();
 
         private static void Rebuild()
         {
-            _pos.Clear(); _connect.Clear(); _supply.Clear(); _gen.Clear();
+            _factor.Clear(); _comp.Clear(); _consumerComp.Clear();
+            TotalGen = TotalDemand = TotalStored = TotalCapacity = 0f;
+            bool active = Active;
+            float dt = Time.deltaTime;
 
-            // Generators are nodes that ALSO produce power.
-            var gens = PowerPlant.All;
-            for (int i = 0; i < gens.Count; i++)
+            var nodes = PowerNode.All;
+            for (int i = 0; i < Battery.All.Count; i++) if (Battery.All[i] != null) Battery.All[i].ResetFlow();
+
+            // 1. Label connected components (BFS over the wire links).
+            int nComp = 0;
+            for (int i = 0; i < nodes.Count; i++)
             {
-                var p = gens[i]; if (p == null) continue;
-                _pos.Add(p.transform.position); _connect.Add(p.ConnectRange); _supply.Add(p.SupplyRange); _gen.Add(p.CurrentOutput);
-            }
-            // Poles are relay-only nodes.
-            var poles = PowerPole.All;
-            for (int i = 0; i < poles.Count; i++)
-            {
-                var p = poles[i]; if (p == null) continue;
-                _pos.Add(p.transform.position); _connect.Add(p.ConnectRange); _supply.Add(p.SupplyRange); _gen.Add(0f);
-            }
-
-            int n = _pos.Count;
-            _factor.Clear(); TotalGen = 0f; TotalDemand = 0f;
-            if (n == 0) return;
-
-            if (_parent.Length < n) _parent = new int[n];
-            for (int i = 0; i < n; i++) _parent[i] = i;
-            // Link nodes within the smaller of their two connect ranges (both must reach).
-            for (int i = 0; i < n; i++)
-                for (int j = i + 1; j < n; j++)
+                var seed = nodes[i];
+                if (seed == null || _comp.ContainsKey(seed)) continue;
+                int id = nComp++;
+                _comp[seed] = id; _stack.Push(seed);
+                while (_stack.Count > 0)
                 {
-                    float r = Mathf.Min(_connect[i], _connect[j]);
-                    if ((_pos[i] - _pos[j]).sqrMagnitude <= r * r) Union(i, j);
-                }
-
-            // Per-network generation.
-            var compGen = new Dictionary<int, float>();
-            for (int i = 0; i < n; i++) { int r = Find(i); compGen.TryGetValue(r, out var g); compGen[r] = g + _gen[i]; }
-
-            // Assign each powered-machine to the network of the nearest node that can supply it; tally demand.
-            var compDem = new Dictionary<int, float>();
-            var consumerComp = new Dictionary<WorkshopBuilding, int>();
-            var ws = WorkshopBuilding.All;
-            for (int c = 0; c < ws.Count; c++)
-            {
-                var w = ws[c]; if (w == null || !w.RequiresPower) continue;
-                Vector2 wp = w.transform.position;
-                int best = -1; float bestSq = float.MaxValue;
-                for (int i = 0; i < n; i++)
-                {
-                    float s = _supply[i]; float sq = (_pos[i] - wp).sqrMagnitude;
-                    if (sq <= s * s && sq < bestSq) { bestSq = sq; best = i; }
-                }
-                if (best >= 0)
-                {
-                    int r = Find(best);
-                    consumerComp[w] = r;
-                    compDem.TryGetValue(r, out var d); compDem[r] = d + w.PowerDraw;
+                    var n = _stack.Pop();
+                    var links = n.links;
+                    for (int k = 0; k < links.Count; k++)
+                    {
+                        var m = links[k];
+                        if (m != null && !_comp.ContainsKey(m)) { _comp[m] = id; _stack.Push(m); }
+                    }
                 }
             }
+            if (nComp == 0) return;
 
-            foreach (var kv in compGen) TotalGen += kv.Value;
-            foreach (var kv in compDem) TotalDemand += kv.Value;
-
-            for (int c = 0; c < ws.Count; c++)
+            // 2. Aggregate generation / demand / batteries per component.
+            var gen = new float[nComp];
+            var demand = new float[nComp];
+            var batteries = new List<Battery>[nComp];
+            for (int i = 0; i < nodes.Count; i++)
             {
-                var w = ws[c]; if (w == null || !w.RequiresPower) continue;
-                float f = 0f;
-                if (consumerComp.TryGetValue(w, out var r))
+                var n = nodes[i];
+                if (n == null || !_comp.TryGetValue(n, out var c)) continue;
+                switch (n.role)
                 {
-                    compGen.TryGetValue(r, out var g);
-                    compDem.TryGetValue(r, out var d);
-                    f = g <= 0f ? 0f : (d <= g ? 1f : Mathf.Clamp(g / d, BrownoutFloor, 1f));
+                    case PowerNode.Role.Generator:
+                        if (n.generator != null) gen[c] += n.generator.CurrentOutput;
+                        break;
+                    case PowerNode.Role.Battery:
+                        if (n.battery != null)
+                        {
+                            (batteries[c] ??= new List<Battery>()).Add(n.battery);
+                            TotalStored += n.battery.Stored;
+                            TotalCapacity += n.battery.capacity;
+                        }
+                        break;
+                    case PowerNode.Role.Consumer:
+                        if (n.consumer != null && active)
+                        {
+                            demand[c] += n.consumer.CurrentDraw;
+                            _consumerComp[n.consumer] = c;
+                        }
+                        break;
                 }
-                _factor[w] = f;
             }
+
+            // 3. Resolve each network: gen meets demand, surplus charges batteries, deficit is drawn
+            //    from them; derive a supply factor (0 if truly dead, else clamped to the brownout floor).
+            var factorByComp = new float[nComp];
+            for (int c = 0; c < nComp; c++)
+            {
+                float g = gen[c], d = demand[c];
+                float supply = g;
+                var bats = batteries[c];
+                if (d > g + 0.0001f && bats != null)
+                {
+                    float deficit = d - g, got = 0f;
+                    for (int b = 0; b < bats.Count && got < deficit; b++)
+                        got += bats[b].Draw(deficit - got, dt);
+                    supply += got;
+                }
+                else if (g > d + 0.0001f && bats != null)
+                {
+                    float surplus = g - d;
+                    for (int b = 0; b < bats.Count && surplus > 0.0001f; b++)
+                        surplus -= bats[b].Absorb(surplus, dt);
+                }
+
+                factorByComp[c] = d <= 0.0001f ? 1f
+                    : supply <= 0.0001f ? 0f
+                    : Mathf.Clamp(supply / d, BrownoutFloor, 1f);
+
+                TotalGen += g; TotalDemand += d;
+            }
+
+            // 4. Hand each consumer its network factor.
+            foreach (var kv in _consumerComp) _factor[kv.Key] = factorByComp[kv.Value];
+
+            // 5. Tint wires by whether their network has any power source (live or stored).
+            for (int i = 0; i < PowerWire.All.Count; i++)
+            {
+                var w = PowerWire.All[i];
+                if (w == null || w.a == null || !_comp.TryGetValue(w.a, out var c)) continue;
+                bool powered = gen[c] > 0.0001f || (batteries[c] != null && AnyStored(batteries[c]));
+                w.Refresh();
+                w.SetColor(powered ? PowerWire.Powered : PowerWire.Unpowered);
+            }
+        }
+
+        private static bool AnyStored(List<Battery> bats)
+        {
+            for (int i = 0; i < bats.Count; i++) if (bats[i] != null && bats[i].Stored > 0.0001f) return true;
+            return false;
         }
     }
 }

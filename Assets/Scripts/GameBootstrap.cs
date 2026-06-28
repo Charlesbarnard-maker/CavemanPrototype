@@ -13,6 +13,12 @@ namespace Caveman
     {
         void Start()
         {
+            // Wipe runtime rail state so a fresh game can't inherit phantom occupancy / station lanes from
+            // a previous Play session (Unity keeps statics alive when domain-reload-on-play is disabled).
+            RailGraph.Reset();
+            RailNet.StationLane.Clear();
+            PlayerController.HasBoat = false; // fresh game: no boat yet (statics persist with domain-reload-off)
+
             // --- Items ---
             var stone = MakeItem("stone", "Stone", new Color(0.55f, 0.55f, 0.62f));
             var wood = MakeItem("wood", "Wood", new Color(0.52f, 0.34f, 0.16f));
@@ -33,6 +39,11 @@ namespace Caveman
             var ore = MakeItem("ore", "Iron Ore", new Color(0.62f, 0.58f, 0.42f)); // FINITE — far in the hills (Iron age)
             var metal = MakeItem("metal", "Iron", new Color(0.66f, 0.68f, 0.74f)); // smelted from Iron Ore
             var tools = MakeItem("tools", "Tools", new Color(0.55f, 0.60f, 0.68f));
+            // LIQUIDS: Oil (pumped from deposits, moved by pipes) + Fuel (refined from Oil + Water).
+            var oil = MakeItem("oil", "Oil", new Color(0.22f, 0.18f, 0.26f)); oil.isLiquid = true;
+            var fuel = MakeItem("fuel", "Fuel", new Color(0.88f, 0.66f, 0.26f));
+            oil.description = "OIL — a LIQUID pumped from deposits by an Oil Well and moved through PIPES (never belts). Refined with Water into Fuel.";
+            fuel.description = "FUEL — refined from Oil + Water at a Refinery. Belt it to an Oil Generator to burn for lots of Power.";
             // ORE SPLIT (deeper material tree): metals now branch — Copper (nearer, Bronze age), Iron
             // (far, Iron age), Steel (refined Iron, Industrial). Each age needs its own metal chain.
             var copperOre = MakeItem("copper_ore", "Copper Ore", new Color(0.80f, 0.52f, 0.30f));
@@ -170,8 +181,40 @@ namespace Caveman
             var depot = ScriptableObject.CreateInstance<BuildingDefinition>();
             depot.displayName = "Station"; depot.kind = BuildingKind.Depot; depot.unlockAge = 0;
             depot.item = null; depot.capacity = 80; depot.color = new Color(0.50f, 0.45f, 0.55f);
-            depot.cost = new List<ItemAmount> { new ItemAmount(wood, 10), new ItemAmount(stone, 6) };
-            depot.description = "Transport Station — the early <b>Donkey Track</b> network (it auto-upgrades to carts → wagons → trains as you advance; routes PERSIST, no rebuild). A station that a route LOADS from is a SOURCE (belt goods IN); the other end is the SINK (delivers OUT). Select it → '+ Add route' → click another station; the panel shows each route's FROM → TO direction and warns if a station has nothing to send or is full.";
+            depot.footprintW = 3; depot.footprintH = 1; // a platform straddling an east–west TRACK LANE
+            depot.cost = new List<ItemAmount> { new ItemAmount(wood, 12), new ItemAmount(stone, 8) };
+            depot.description = "Transport Station — a 3×1 platform with a TRACK LANE running straight through it (east–west). Lay rail up to either end and trains run through OR stop here. Belt goods IN only on the SOUTH edge (cyan), OUT only on the NORTH edge (green). Build a line: select a station → '+ Add line' → click each stop in order → click the FIRST one to close the loop. The vehicle LOADS at the first stop (the pickup) and DELIVERS at the rest, passing any stations not on its line — and auto-upgrades Donkey Cart → wagon → train.";
+            // Harbour: a dock placed on the SHORE (next to water). Belt goods in/out like a Station, but it
+            // runs CARGO SHIPS over the water between harbours instead of trains on rail — the way to reach
+            // (and haul back from) resources across the sea. Lives under the Boats build tab.
+            var harbour = ScriptableObject.CreateInstance<BuildingDefinition>();
+            harbour.displayName = "Harbour"; harbour.kind = BuildingKind.Depot; harbour.unlockAge = 0;
+            harbour.isHarbour = true; harbour.menuCategory = "Boats";
+            harbour.item = null; harbour.capacity = 80; harbour.color = new Color(0.40f, 0.52f, 0.62f);
+            harbour.footprintW = 3; harbour.footprintH = 1; // a dock straddling the shore
+            harbour.cost = new List<ItemAmount> { new ItemAmount(wood, 14), new ItemAmount(stone, 6) };
+            harbour.description = "HARBOUR — build it on the SHORE (next to water). Belt goods IN on the SOUTH edge / OUT on the NORTH, like a Station — but instead of rail it runs CARGO SHIPS over the water. Select a harbour → '+ Add line' → click another harbour to ship goods across the sea (the ship sails straight over water). The way to reach island resources no road can.";
+            // Track: drag-laid rail tiles. Route vehicles (donkey cart → … → train) path ALONG the
+            // track between stations instead of cutting straight across — so you plan the line.
+            var rail = ScriptableObject.CreateInstance<BuildingDefinition>();
+            rail.displayName = "Track"; rail.kind = BuildingKind.Rail; rail.unlockAge = 0;
+            rail.color = new Color(0.42f, 0.40f, 0.36f);
+            rail.cost = new List<ItemAmount> { new ItemAmount(stone, 1) };
+            rail.description = "TRACK — drag to lay rail. A route vehicle (the Station's donkey cart → wagon → train) follows a continuous track between two Stations rather than cutting straight across; lay the line you want it to run. Where there's no connecting track it still travels straight. Reserves its cell (no belts/buildings on top).";
+            // Signal: one-way + block control for trains (place on a track cell). Trains can't cross.
+            var signal = ScriptableObject.CreateInstance<BuildingDefinition>();
+            signal.displayName = "Signal"; signal.kind = BuildingKind.Signal; signal.unlockAge = 0;
+            signal.color = new Color(0.88f, 0.82f, 0.32f);
+            signal.cost = new List<ItemAmount> { new ItemAmount(stone, 1) };
+            signal.description = "RAIL SIGNAL — place ON a track cell, facing a direction (R rotates). A train may pass a signal only when travelling its way — so two opposing signals on parallel tracks make a ONE-WAY loop — AND only when the BLOCK AHEAD (track up to the next signal) is clear of other trains. Use them to stop trains crossing and to plan one-way routes. Green = clear, red = occupied. (A single bidirectional track with no passing loop will deadlock two trains — build a loop, like a real railway, or use Two-Way Signals to share a stretch.)";
+            // Two-way signal: a BLOCK signal that permits travel in EITHER direction (no one-way restriction)
+            // while still enforcing one-train-per-block — for sharing a bidirectional stretch safely.
+            var twoWaySignal = ScriptableObject.CreateInstance<BuildingDefinition>();
+            twoWaySignal.displayName = "Two-Way Signal"; twoWaySignal.kind = BuildingKind.Signal; twoWaySignal.unlockAge = 0;
+            twoWaySignal.bothWaySignal = true;
+            twoWaySignal.color = new Color(0.55f, 0.78f, 0.95f);
+            twoWaySignal.cost = new List<ItemAmount> { new ItemAmount(stone, 1) };
+            twoWaySignal.description = "TWO-WAY RAIL SIGNAL — like a Signal, but trains may pass in EITHER direction along the track (R aims its axis). It still enforces ONE train per block (green = clear, red = occupied), so it protects a shared bidirectional stretch without forcing a one-way route. Pair with passing loops so opposing trains don't deadlock head-on.";
             // Route vehicle tiers — each links two depots; bigger/faster as ages advance (the
             // donkey → train upgrade path). Existing routes upgrade in place on age-up.
             var caravan = MakeRoute("Donkey Cart", 12, 3.5f, 0, new Color(0.62f, 0.48f, 0.34f),
@@ -182,6 +225,12 @@ namespace Caveman
                 new ItemAmount(planks, 10), new ItemAmount(metal, 8));
             var cargoDrone = MakeRoute("Cargo Drone", 24, 12f, 4, new Color(0.50f, 0.70f, 0.85f),
                 new ItemAmount(metal, 10), new ItemAmount(tools, 4));
+            // Cargo SHIP tiers — run on HARBOUR lines (over water). Available from the start so boats are an
+            // early option for crossing rivers/lakes; a bigger steam ship arrives in the Iron age.
+            var cargoShip = MakeRoute("Cargo Ship", 40, 5.0f, 0, new Color(0.40f, 0.60f, 0.85f),
+                new ItemAmount(wood, 12), new ItemAmount(planks, 4));
+            var steamShip = MakeRoute("Steam Ship", 80, 7.5f, 3, new Color(0.45f, 0.55f, 0.70f),
+                new ItemAmount(metal, 12), new ItemAmount(planks, 8));
 
             // --- Age 1: Tribal ---
             var hunter = MakeCollector("Hunter's Hut", meat, 1, 2.0f, 2, 12, new Color(0.66f, 0.34f, 0.34f),
@@ -308,26 +357,32 @@ namespace Caveman
             // brown out and slow down). Unlocks in Iron so you can prepare before it bites.
             var generator = MakePower("Coal Generator", 60, charcoal, 1, 3f, 3, new Color(0.30f, 0.30f, 0.34f),
                 new ItemAmount(bricks, 12), new ItemAmount(metal, 6));
-            generator.connectRange = 6f; generator.supplyRange = 5f;
-            generator.description = "Burns Charcoal to supply Power to the network — a bigger, steadier source than the Wood Generator for a large powered base. Too little generation and connected machines brown out (slow down).";
+            generator.description = "Burns Charcoal to supply Power to the grid — a bigger, steadier source than the Wood Generator for a large powered base. BELT Charcoal into its cyan fuel edge (R aims it) to automate it, or it sips from your carried pile. Wire it (up to 4 cables) to poles, batteries or machines. Too little generation and wired machines brown out (slow down).";
             // BRONZE-AGE POWER: electricity is introduced in the Bronze age. A Wood Generator feeds the
-            // network, Power Poles relay it across distance; from Bronze, requiresPower machines must be
-            // connected to a powered network to run (before Bronze they run free).
+            // grid; you draw WIRES from it to Poles/Batteries/machines (no radius). From Bronze,
+            // requiresPower machines must be WIRED to a powered network to run (before Bronze they run free).
             var woodGen = MakePower("Wood Generator", 40, wood, 1, 2.5f, 2, new Color(0.55f, 0.40f, 0.25f),
                 new ItemAmount(wood, 6), new ItemAmount(stone, 4));
-            woodGen.connectRange = 6f; woodGen.supplyRange = 5f;
-            woodGen.description = "WOOD GENERATOR — burns Wood to supply POWER to the network (introduced in the Bronze age). Place it by your machines (its supply ring powers them) or wire it out with Power Poles. Connected machines run; disconnected ones stop. Powers ~4 machines.";
+            woodGen.description = "WOOD GENERATOR — burns Wood to supply POWER (introduced in the Bronze age). BELT Wood into its cyan fuel edge (R aims it) to automate it, or it sips from your carried pile. Select it and 'Connect wire' to a machine, Battery or Power Pole (up to 4 wires). Wired machines run; unwired ones stop. Powers ~4 machines.";
             var pole = ScriptableObject.CreateInstance<BuildingDefinition>();
             pole.displayName = "Power Pole"; pole.kind = BuildingKind.Pole; pole.unlockAge = 2;
-            pole.connectRange = 7f; pole.supplyRange = 4f;
             pole.color = new Color(0.55f, 0.42f, 0.28f);
             pole.cost = new List<ItemAmount> { new ItemAmount(wood, 2) };
-            pole.description = "POWER POLE — relays power across distance. Poles link to nearby Poles + Generators to form one network, and supply power to buildings inside their ring. Chain Poles from a Generator out to far machines.";
+            pole.description = "POWER POLE — relays power across distance. Draw WIRES (up to 4 per pole) to Generators, Batteries, machines or other poles. Each wire reaches a limited distance, so chain poles to span big gaps.";
+            // Battery (Bronze): a wired store that soaks surplus generation and covers demand spikes /
+            // generation dips — smooths brownouts so a small generator can cover a peaky base.
+            var battery = ScriptableObject.CreateInstance<BuildingDefinition>();
+            battery.displayName = "Battery"; battery.kind = BuildingKind.Battery; battery.unlockAge = 2;
+            battery.batteryCapacity = 200f; battery.batteryRate = 30f;
+            battery.color = new Color(0.32f, 0.62f, 0.50f);
+            battery.cost = new List<ItemAmount> { new ItemAmount(copper, 6), new ItemAmount(bricks, 4) };
+            battery.description = "BATTERY — stores surplus power and releases it when the grid runs short (a demand spike or a generator running dry). Wire it in like a pole (up to 4 wires). Charges when generation > demand, discharges when it's less.";
             // Endgame: the Monument (Industrial age). A long resource sink you pour the
             // top of every production chain into — completing it (10 blocks) is the win.
             var monumentBldg = MakeWorkshop("Monument", monument, 1, 6.0f, 3, 12, new Color(0.88f, 0.84f, 0.62f),
                 new List<ItemAmount> { new ItemAmount(metal, 2), new ItemAmount(tools, 1), new ItemAmount(bricks, 2), new ItemAmount(planks, 2) },
                 new ItemAmount(bricks, 20), new ItemAmount(metal, 15), new ItemAmount(tools, 8)); monumentBldg.unlockAge = 4;
+            monumentBldg.footprintW = 3; monumentBldg.footprintH = 3; // the endgame monument is the biggest structure
 
             // --- Textiles & pottery chains (comfort goods) ---
             // Pottery (Bronze): Clay -> Pottery. Reuses the clay you already mine.
@@ -369,7 +424,7 @@ namespace Caveman
             //     Research Lodge, which converts items → research points. Gathering earns nothing;
             //     you must build (and scale) production chains. Maker workshops are age-gated so the
             //     NEXT tier's item is craftable only once you reach its age (no circular locks). ---
-            var researchLodge = MakeResearch("Research Lodge", 0, new Color(0.62f, 0.55f, 0.78f),
+            var researchLodge = MakeResearch("Research Lodge", 0, new Color(0.60f, 0.48f, 0.34f),
                 new ItemAmount(wood, 10), new ItemAmount(stone, 8));
             researchLodge.description = "Delivers research: belt (or place beside) the current RESEARCH ITEM here and it converts each into research points. Reaching the point cost advances the Age. No workers — the limit is how fast your factory makes research items. Open the Build panel (top) to see the current target + progress.";
             var ideaBench = MakeWorkshop("Idea Bench", ideaTablet, 1, 2.0f, 2, 12, new Color(0.80f, 0.74f, 0.46f),
@@ -400,7 +455,7 @@ namespace Caveman
                 new Research.Tier { targetAge = 4, item = blueprint,   pointsPerItem = 8 },  // craft at Iron
             };
             // The spendable research TREE (press T to open). Age spine (each needs the prior) + a few
-            // building-unlock branches you CHOOSE to spend points on. Age costs scale 12→60→160→360.
+            // building-unlock branches you CHOOSE to spend points on. Age costs: 12 → 600 → 1600 → 3600 (#27).
             Research.Tree = new List<Research.Tech>
             {
                 new Research.Tech { id = "tribal",     name = "Tribal Age",     cost = 12,  advanceToAge = 1, prereq = null,     desc = "Advance to the Tribal Age — Charcoal & Clay open up deeper production." },
@@ -439,12 +494,34 @@ namespace Caveman
             TerrainGrid.Generate(200, Random.value * 1000f, 22f); // big world (~400 across); open start basin
 
             // --- Player ---
-            var player = MakeSprite("Player", new Color(0.92f, 0.82f, 0.25f), Vector2.zero, 0.7f, 10, PlaceholderArt.Circle());
+            var player = MakeSprite("Player", Color.white, Vector2.zero, 0.85f, 10, PlaceholderArt.Caveman(0));
             player.AddComponent<PlayerController>();
+            player.AddComponent<PlayerAvatar>(); // the caveman re-skins as ages advance
             var gatherer = player.AddComponent<PlayerGatherer>();
             var builder = player.AddComponent<BuildController>();
             builder.gatherer = gatherer;
             builder.placeNodeRange = 6f;
+
+            // --- LIQUIDS chain: an Oil Well pumps Oil into PIPES → an Oil Tank / a Refinery (Oil + Water →
+            //     Fuel) → Fuel belts → an Oil Generator (lots of Power). The Water Pump + Booster + Pipe
+            //     (defined earlier) revive the water side; the Refinery needs Water too, so both matter. ---
+            var oilWell = ScriptableObject.CreateInstance<BuildingDefinition>();
+            oilWell.displayName = "Oil Well"; oilWell.kind = BuildingKind.Pump; oilWell.item = oil; oilWell.unlockAge = 2;
+            oilWell.footprintW = 2; oilWell.footprintH = 2;
+            oilWell.color = new Color(0.26f, 0.22f, 0.28f);
+            oilWell.cost = new List<ItemAmount> { new ItemAmount(planks, 6), new ItemAmount(metal, 4) };
+            oilWell.description = "OIL WELL — place ON/next to an Oil deposit; pumps Oil into connected PIPES (on to Oil Tanks / a Refinery). Oil is FINITE — wells run dry, so keep exploring.";
+            var oilTank = MakeStorage("Oil Tank", oil, 200, new Color(0.30f, 0.28f, 0.34f), new ItemAmount(metal, 6), new ItemAmount(planks, 4));
+            oilTank.unlockAge = 2;
+            oilTank.description = "OIL TANK — liquid storage for Oil. Run a PIPE from the Oil Well to it (belts can't carry liquids).";
+            var refinery = MakeWorkshop("Refinery", fuel, 1, 3.0f, 2, 14, new Color(0.42f, 0.37f, 0.30f),
+                new List<ItemAmount> { new ItemAmount(oil, 2), new ItemAmount(water, 1) },
+                new ItemAmount(metal, 8), new ItemAmount(bricks, 6)); refinery.unlockAge = 2;
+            refinery.requiresPower = false;
+            refinery.description = "REFINERY — Oil + Water → Fuel. Both inputs arrive by PIPE (run pipes from an Oil Well AND a Water Pump up to it); the Fuel output leaves on a BELT. Feeds the Oil Generator.";
+            var oilGen = MakePower("Oil Generator", 120, fuel, 1, 2.5f, 3, new Color(0.30f, 0.26f, 0.22f),
+                new ItemAmount(metal, 12), new ItemAmount(bricks, 8));
+            oilGen.description = "OIL GENERATOR — burns FUEL (refined from Oil) for LOTS of Power, far more than a Coal Generator. Belt Fuel into its cyan intake — the payoff of the whole oil chain.";
             // FACTORY-FIRST build menu: gathering → processing → research → logistics → storage →
             // power/endgame. Survival/comfort buildings (forager, water hole, granary, campfire,
             // farm/mill/bakery, hunter, housing, pipes, textiles, jewelry, masonry) are intentionally
@@ -452,21 +529,46 @@ namespace Caveman
             builder.buildables = new List<BuildingDefinition>
             { // Gather
               woodHut, stonePit, clayPit, copperMine, mine,
-              // Process — incl. the deeper metal chain (copper → bronze → steel) that gates each age
-              sawmill, charcoalBurner, kiln, potter, basicSmelter, advancedSmelter, toolmaker,
+              // Process — incl. the deeper metal chain (copper → bronze → steel) that gates each age + the oil Refinery
+              sawmill, charcoalBurner, kiln, potter, basicSmelter, advancedSmelter, toolmaker, refinery,
               // Research
               ideaBench, scrollMaker, draftingTable, engineeringLab, researchLodge,
               // Logistics — belt tier ladder (wooden→conveyor→geared→steel) + junctions + transport
-              woodBelt, fastBelt, gearedBelt, steelBelt, splitter, merger, depot, bridge,
-              // Storage — Woodpile for the starter resource + one configurable Warehouse for
-              // everything else (stone/ore/planks/…), so storage doesn't eat menu slots.
-              woodStore, clayStore, brickStore, warehouse,
-              // Infrastructure / power / endgame — Wood Generator + Power Poles (early), Coal Generator (late)
-              woodGen, pole, generator, monumentBldg };
+              woodBelt, fastBelt, gearedBelt, steelBelt, splitter, merger, depot, rail, signal, twoWaySignal, bridge, harbour,
+              // Liquids — pipes carry oil/water (never belts); Oil Well pumps oil, Water Pump pumps water, Booster relays pressure
+              pipe, pump, booster, oilWell,
+              // Storage — Woodpile + configurable Warehouse + liquid tanks (Oil Tank / Water Barrel)
+              woodStore, clayStore, brickStore, warehouse, oilTank, waterStore,
+              // Infrastructure / power / endgame — Wood/Coal/Oil Generators + Power Poles + Battery
+              woodGen, pole, battery, generator, oilGen, monumentBldg };
+
+            // --- Manual paid AGE-UPGRADES (stone tools → metal → machines): each production building can be
+            //     upgraded from its panel once you reach the tier's age, spending resources for a faster rate
+            //     + a look change. Collectors get a "tools" ladder; workshops an "automation" ladder. ---
+            void AddUpgrades(BuildingDefinition d, string n1, string n2, string n3)
+            {
+                d.upgrades = new List<UpgradeTier>
+                {
+                    new UpgradeTier(n1, 2, 1.5f, new Color(0.80f, 0.55f, 0.35f), new ItemAmount(planks, 6), new ItemAmount(copper, 3)),
+                    new UpgradeTier(n2, 3, 2.2f, new Color(0.70f, 0.74f, 0.80f), new ItemAmount(metal, 5),  new ItemAmount(planks, 6)),
+                    new UpgradeTier(n3, 4, 3.5f, new Color(0.55f, 0.80f, 0.95f), new ItemAmount(steel, 4),  new ItemAmount(tools, 3)),
+                };
+            }
+            foreach (var c in new[] { woodHut, stonePit, clayPit, copperMine, mine })
+                AddUpgrades(c, "Bronze Tools", "Iron Tools", "Powered Machine");
+            foreach (var wbDef in new[] { sawmill, charcoalBurner, kiln, potter, basicSmelter, advancedSmelter, toolmaker })
+                AddUpgrades(wbDef, "Geared Parts", "Reinforced Frame", "Automation");
 
             // Central sprite-name table: pre-fill the building/belt/resource maps with expected names
             // (filename = sanitised type name) so a future pack drops straight in via SpriteDatabase.
             SpriteDatabase.Seed(builder.buildables, new[] { wood, stone, clay, copperOre, ore });
+            // Then overlay the imported Kenney Roguelike pack on the entities it can dress (machines,
+            // resource nodes, storage, research, a few item icons). Buildings + nodes resolve their
+            // sprite at spawn (all after this), so they pick it up automatically; the item icons below
+            // were already resolved at creation, so re-resolve the skinned ones.
+            SpriteDatabase.ApplyRoguelikeSkin();
+            foreach (var it in new[] { copper, metal, steel, bronzePlate, studyScroll, schematic, blueprint })
+                it.icon = SpriteDatabase.ForItem(it);
             // BUILD-COST SCALE: bump every building's build cost so placing things is a real resource
             // decision (more reason to plan + collect, not spam). One knob — tune CostScale. (Recipe
             // INPUT costs are untouched; this is the one-time placement cost only.)
@@ -478,6 +580,7 @@ namespace Caveman
 
             // Transport vehicles are NOT in the build menu — they're created from a Station's panel.
             builder.routeTiers = new List<BuildingDefinition> { caravan, oxCart, wagonTrain, cargoDrone };
+            builder.shipTiers = new List<BuildingDefinition> { cargoShip, steamShip }; // harbour (boat) lines
 
             var follow = cam.GetComponent<CameraFollow>();
             if (follow == null) follow = cam.gameObject.AddComponent<CameraFollow>();
@@ -516,7 +619,7 @@ namespace Caveman
             hud.monumentItem = monument;
             // Factory-relevant items only (shown in the Guide reference + the "Goods" chip + F1 dump).
             hud.debugItems = new List<ItemDefinition>
-            { wood, stone, planks, charcoal, clay, bricks, pot, copperOre, copper, bronzePlate, ore, metal, steel, tools, monument };
+            { wood, stone, planks, charcoal, clay, bricks, pot, copperOre, copper, bronzePlate, ore, metal, steel, tools, oil, fuel, monument };
 
             // --- Guided objectives ladder (the "what next / why advance" hook) ---
             var carriedInv = gatherer.Inventory;
@@ -567,9 +670,9 @@ namespace Caveman
             const float baseClear = 11f;
             // STARTER BASIN — small Wood + Stone clusters: enough to bootstrap your first factory,
             // NOT to scale on (you outgrow them and must push out to the biome regions).
-            SpawnClusters("Tree", wood, new Color(0.27f, 0.55f, 0.22f), SpriteDatabase.ForResource(wood, PlaceholderShape.Triangle),
+            SpawnClusters("Tree", wood, Color.white, PlaceholderArt.Tree(),
                 new Vector2(24f, 4f), 13f, 3, 3, 5, 2.2f, new Vector2(1.0f, 1.5f), 30, 1, baseClear);
-            SpawnClusters("Rock", stone, new Color(0.55f, 0.55f, 0.6f), SpriteDatabase.ForResource(stone, PlaceholderShape.Hexagon),
+            SpawnClusters("Rock", stone, Color.white, PlaceholderArt.Rock(),
                 new Vector2(-24f, 4f), 13f, 3, 3, 5, 2.2f, new Vector2(1.0f, 1.5f), 30, 1, baseClear);
 
             // --- RESOURCE ZONES (logistics-first redesign): FEW, LARGE, DISTINCT, SINGLE-resource
@@ -592,11 +695,36 @@ namespace Caveman
                 SpawnClusters(name, item, color, sprite, center, discR * 0.6f, clusters, minN, maxN, clusterR, size, cap, regen, 0f);
             }
             //   k  dist  biome           name             item       colour                         sprite                      discR clusters minN maxN clustR  size                     cap regen
-            Zone(0, 46f, Terrain.Plains, "Clay Pit",       clay,      new Color(0.68f,0.46f,0.36f), SpriteDatabase.ForResource(clay, PlaceholderShape.Hexagon),  30f, 5, 5, 8, 3.0f, new Vector2(1.0f,1.5f),  60, 1); // nearest — Bronze chain start
-            Zone(1, 60f, Terrain.Hills,  "Copper Deposit", copperOre, new Color(0.80f,0.52f,0.30f), SpriteDatabase.ForResource(copperOre, PlaceholderShape.Hexagon),  30f, 5, 4, 7, 3.0f, new Vector2(1.0f,1.6f), 180, 0); // finite — Bronze metal
-            Zone(2, 72f, Terrain.Forest, "Forest",         wood,      new Color(0.27f,0.55f,0.22f), SpriteDatabase.ForResource(wood, PlaceholderShape.Triangle), 34f, 6, 6, 9, 3.4f, new Vector2(1.0f,1.6f),  40, 1); // lumber at scale
-            Zone(3, 86f, Terrain.Hills,  "Stone Outcrop",  stone,     new Color(0.55f,0.55f,0.60f), SpriteDatabase.ForResource(stone, PlaceholderShape.Hexagon),  32f, 6, 5, 8, 3.2f, new Vector2(1.0f,1.6f),  50, 1); // stone at scale
-            Zone(4,100f, Terrain.Hills,  "Iron Ore Field", ore,       new Color(0.62f,0.58f,0.42f), SpriteDatabase.ForResource(ore, PlaceholderShape.Hexagon),  32f, 5, 4, 7, 3.0f, new Vector2(1.1f,1.6f), 220, 0); // finite — Iron age
+            Zone(0, 46f, Terrain.Plains, "Clay Pit",       clay,      Color.white, PlaceholderArt.ClayMound(),  30f, 5, 5, 8, 3.0f, new Vector2(1.0f,1.5f),  60, 1); // nearest — Bronze chain start
+            Zone(1, 60f, Terrain.Hills,  "Copper Deposit", copperOre, Color.white, PlaceholderArt.OreCopper(),  30f, 5, 4, 7, 3.0f, new Vector2(1.0f,1.6f), 180, 0); // finite — Bronze metal
+            Zone(2, 72f, Terrain.Forest, "Forest",         wood,      Color.white, PlaceholderArt.Tree(), 34f, 6, 6, 9, 3.4f, new Vector2(1.0f,1.6f),  40, 1); // lumber at scale
+            Zone(3, 86f, Terrain.Hills,  "Stone Outcrop",  stone,     Color.white, PlaceholderArt.Rock(),  32f, 6, 5, 8, 3.2f, new Vector2(1.0f,1.6f),  50, 1); // stone at scale
+            Zone(4,100f, Terrain.Hills,  "Iron Ore Field", ore,       Color.white, PlaceholderArt.OreIron(),  32f, 5, 4, 7, 3.0f, new Vector2(1.1f,1.6f), 220, 0); // finite — Iron age
+
+            // Oil field — a Bronze-age LIQUID resource on the plains, out along the clay corridor. Finite.
+            {
+                float oa = TerrainGrid.CorridorAngle(0, ZoneCount);
+                var oc = new Vector2(Mathf.Cos(oa) * 58f, Mathf.Sin(oa) * 58f);
+                TerrainGrid.Paint(new Vector3(oc.x, oc.y, 0f), 14f, Terrain.Plains);
+                SpawnClusters("Oil Field", oil, Color.white, PlaceholderArt.OilPatch(), oc, 8f, 4, 4, 6, 3.0f, new Vector2(1.2f, 1.8f), 200, 0, 0f);
+            }
+
+            // --- BOAT-ONLY ISLAND: a generous resource across the sea, reachable only with a Harbour + Cargo
+            //     Ship. A wide ring of water isolates it from the mainland (off the carved land corridors),
+            //     so the only way to bring the goods home is by boat. ---
+            {
+                float ia = TerrainGrid.CorridorAngle(2, ZoneCount) + 0.9f; // between the carved land corridors
+                var ic = new Vector2(Mathf.Cos(ia) * 120f, Mathf.Sin(ia) * 120f);
+                TerrainGrid.CarveWater(new Vector3(ic.x, ic.y, 0f), 34f); // a wide sea around the island
+                // Irregular, hand-shaped coastline: several overlapping land blobs instead of one perfect disc
+                // (so the island reads as a designed landmass, not a procedural circle).
+                Vector2[] blobs = { new Vector2(0f, 0f), new Vector2(7f, 3f), new Vector2(-6f, 5f), new Vector2(4f, -7f), new Vector2(-5f, -5f) };
+                float[] radii = { 9f, 6f, 6.5f, 5.5f, 5f };
+                for (int b = 0; b < blobs.Length; b++)
+                    TerrainGrid.Paint(new Vector3(ic.x + blobs[b].x, ic.y + blobs[b].y, 0f), radii[b], Terrain.Hills);
+                SpawnClusters("Stone Outcrop", stone, Color.white, PlaceholderArt.Rock(),
+                    ic, 7f, 4, 5, 8, 3.0f, new Vector2(1.0f, 1.6f), 150, 1, 0f);
+            }
 
             // --- Welcome / starter guidance (fades after a few seconds) ---
             // Keep the opening minimal (Factorio focus): just WELCOME → SURVIVAL → one compact
@@ -665,6 +793,7 @@ namespace Caveman
             def.maxWorkers = maxWorkers;
             def.capacity = capacity;
             def.color = color;
+            def.footprintW = 2; def.footprintH = 2; // buildings are 2×2 — clearly bigger than 1-cell belts
             def.cost = new List<ItemAmount>(cost);
             return def;
         }
@@ -678,6 +807,7 @@ namespace Caveman
             def.item = item;
             def.capacity = capacity;
             def.color = color;
+            def.footprintW = 2; def.footprintH = 2;
             def.cost = new List<ItemAmount>(cost);
             return def;
         }
@@ -695,6 +825,7 @@ namespace Caveman
             def.capacity = capacity;
             def.color = color;
             def.inputs = inputs;
+            def.footprintW = 2; def.footprintH = 2;
             def.powerDraw = 10; // machines draw power once the Industrial age arrives
             def.cost = new List<ItemAmount>(cost);
             return def;
@@ -712,6 +843,7 @@ namespace Caveman
             def.unlockAge = unlockAge;
             def.inputs = fuel != null ? new List<ItemAmount> { new ItemAmount(fuel, fuelPerCycle) } : new List<ItemAmount>();
             def.color = color;
+            def.footprintW = 2; def.footprintH = 2;
             def.cost = new List<ItemAmount>(cost);
             return def;
         }
@@ -737,6 +869,7 @@ namespace Caveman
             def.kind = BuildingKind.Research;
             def.unlockAge = unlockAge;
             def.color = color;
+            def.footprintW = 2; def.footprintH = 2;
             def.cost = new List<ItemAmount>(cost);
             return def;
         }

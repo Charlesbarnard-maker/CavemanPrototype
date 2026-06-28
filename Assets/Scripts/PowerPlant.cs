@@ -16,14 +16,20 @@ namespace Caveman
         public int fuelPerCycle = 1;
         public float interval = 3f;
         public int output = 60;
-        // Power-network node: how far it links to poles/generators, and how far it supplies consumers
-        // directly (so a generator next to a machine powers it with no pole needed). See PowerNet.
-        public float ConnectRange = 6f;
-        public float SupplyRange = 5f;
+        public Belt.Dir InputSide = Belt.Dir.S; // the edge belts deliver FUEL on (R aims it); cyan notch sits here
+
+        // Belt-fed FUEL buffer: conveyors deposit fuel here (charcoal/wood), and the generator burns from it
+        // first — so you can automate a generator instead of hand-feeding from your carried pile.
+        public Inventory Buffer { get; private set; }
 
         public static readonly List<PowerPlant> All = new();
+        private List<Vector2Int> _cells;
         void OnEnable() => All.Add(this);
-        void OnDisable() => All.Remove(this);
+        void OnDisable()
+        {
+            All.Remove(this);
+            if (_cells != null) foreach (var c in _cells) WorldGrid.Remove(WorldGrid.Generators, c, this);
+        }
 
         private float _timer;
         private bool _fueled;
@@ -33,8 +39,10 @@ namespace Caveman
         /// <summary>Power supplied right now (0 when out of fuel).</summary>
         public float CurrentOutput => _fueled ? output : 0f;
         public bool Fueled => _fueled;
+        /// <summary>Fuel currently buffered (belt-fed), for the panel readout.</summary>
+        public int FuelStored => fuel != null && Buffer != null ? Buffer.Count(fuel) : 0;
 
-        public static PowerPlant Spawn(BuildingDefinition def, Vector3 pos)
+        public static PowerPlant Spawn(BuildingDefinition def, Vector3 pos, Belt.Dir inputSide = Belt.Dir.S)
         {
             var go = new GameObject(def.displayName);
             go.transform.position = new Vector3(pos.x, pos.y, 0f);
@@ -54,10 +62,22 @@ namespace Caveman
             bool hasFuel = def.inputs != null && def.inputs.Count > 0 && def.inputs[0] != null;
             p.fuel = hasFuel ? def.inputs[0].item : null;
             p.fuelPerCycle = hasFuel ? Mathf.Max(1, def.inputs[0].amount) : 1;
-            p.ConnectRange = def.connectRange > 0f ? def.connectRange : 6f;
-            p.SupplyRange = def.supplyRange > 0f ? def.supplyRange : 5f;
+            p.InputSide = inputSide;
+            p.Buffer = new Inventory { capacity = 20 };
             p._sr = sr;
             p._baseColor = def.color;
+
+            // Register the footprint so belts can deposit fuel on the input edge, and show the cyan notch.
+            p._cells = Footprint.Cells(go.transform.position, def.FootW, def.FootH);
+            foreach (var c in p._cells) WorldGrid.Generators[c] = p;
+            if (p.fuel != null) Ports.MakeInputNotch(go.transform, inputSide); // belts feed fuel here
+
+            // Wired-grid node: a generator links to up to 4 poles/batteries/machines (no radius — the
+            // player draws the wires). See PowerNode / PowerNet.
+            var node = go.AddComponent<PowerNode>();
+            node.role = PowerNode.Role.Generator;
+            node.maxConnections = 4;
+            node.generator = p;
             return p;
         }
 
@@ -68,8 +88,11 @@ namespace Caveman
             if (_timer >= interval)
             {
                 _timer -= interval;
-                // Fuel-free generators (no inputs) always run; otherwise burn fuel.
-                _fueled = fuel == null || Economy.SpendUpTo(fuel, fuelPerCycle, carried) >= fuelPerCycle;
+                // Fuel-free generators (no inputs) always run. Otherwise burn from the belt-fed buffer first,
+                // then fall back to the player's carried pile (so manual feeding still works).
+                if (fuel == null) _fueled = true;
+                else if (Buffer != null && Buffer.Count(fuel) >= fuelPerCycle) { Buffer.RemoveUpTo(fuel, fuelPerCycle); _fueled = true; }
+                else _fueled = Economy.SpendUpTo(fuel, fuelPerCycle, carried) >= fuelPerCycle;
             }
             if (_sr != null)
                 _sr.color = _fueled ? _baseColor : Color.Lerp(_baseColor, Color.black, 0.55f);

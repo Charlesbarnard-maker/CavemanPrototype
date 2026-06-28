@@ -63,7 +63,7 @@ namespace Caveman
             rb.InBuffer = new Inventory { capacity = 24 };
             rb._cells = Footprint.Cells(go.transform.position, def.FootW, def.FootH);
             foreach (var c in rb._cells) WorldGrid.Research[c] = rb;
-            Ports.PlacePorts(go.transform, def.FootW, def.FootH, outputSide, true, false); // input notch only
+            Ports.PlacePorts(go.transform, def.FootW, def.FootH, outputSide, true, false, singlePort: true); // single input notch
             return rb;
         }
 

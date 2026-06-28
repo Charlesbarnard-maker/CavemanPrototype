@@ -26,6 +26,33 @@ namespace Caveman
         public bool Paused { get; private set; }            // player can halt it (priorities)
         public void TogglePause() => Paused = !Paused;
         public ResourceNode Source => _source;
+        /// <summary>True while this collector is actively gathering — drives the visible worker units.</summary>
+        public bool Working => !Paused && _source != null && _source.HasResource && Buffer.Total() < Buffer.capacity;
+
+        // ---- Manual paid age-upgrade (stone tools → metal → machines): faster gather rate + a look change. ----
+        public int Tier { get; private set; }
+        private float _speedMult = 1f;
+        public UpgradeTier PendingUpgrade =>
+            (def != null && def.upgrades != null && Tier < def.upgrades.Count) ? def.upgrades[Tier] : null;
+        public bool UpgradeUnlocked
+        { get { var u = PendingUpgrade; return u != null && (Colony.Instance == null || u.unlockAge <= Colony.Instance.Age); } }
+
+        /// <summary>Buy the next upgrade tier (paid from the carried pile) — speeds the building up and
+        /// recolours it. Returns false if there's no tier available, it's age-locked, or unaffordable.</summary>
+        public bool TryUpgrade()
+        {
+            var u = PendingUpgrade;
+            if (u == null || !UpgradeUnlocked) return false;
+            var carried = Colony.Instance != null ? Colony.Instance.carried : null;
+            if (!Economy.CanAfford(u.cost, carried)) return false;
+            Economy.Spend(u.cost, carried);
+            Tier++;
+            _speedMult = Mathf.Max(0.1f, u.speedMult);
+            _baseColor = u.tint;
+            if (_sr != null) _sr.color = _baseColor;
+            Pulse();
+            return true;
+        }
 
         public static readonly List<ProductionBuilding> All = new();
         private List<Vector2Int> _cells; // every grid cell this building occupies
@@ -74,9 +101,11 @@ namespace Caveman
             pb.OutputSide = outputSide;
             pb._cells = Footprint.Cells(go.transform.position, def.FootW, def.FootH);
             foreach (var c in pb._cells) WorldGrid.Collectors[c] = pb;
-            Ports.PlacePorts(go.transform, def.FootW, def.FootH, outputSide, false, true);
+            Ports.PlacePorts(go.transform, def.FootW, def.FootH, outputSide, false, true, singlePort: true);
             pb.Bind();
-            pb._fx = MachineWorkFX.Attach(go.transform.position); // cosmetic working animation
+            // Visible GATHERERS: little caveman workers walk out to the node and back (replaces the old
+            // machine-arm FX). Cosmetic — the gather timer above does the real work.
+            WorkerUnit.SpawnForCollector(pb, Mathf.Clamp(def.maxWorkers, 1, 3));
             return pb;
         }
 
@@ -160,10 +189,11 @@ namespace Caveman
             bool working = !Paused && _source != null && _source.HasResource && Buffer.Total() < Buffer.capacity;
             if (working)
             {
+                float iv = interval / Mathf.Max(0.1f, _speedMult); // upgrades shorten the gather cadence
                 _timer += Time.deltaTime;
-                if (_timer >= interval)
+                if (_timer >= iv)
                 {
-                    _timer -= interval;
+                    _timer -= iv;
                     int got = _source.Extract(GatherPerCycle);
                     if (got > 0)
                     {

@@ -12,6 +12,10 @@ namespace Caveman
     {
         public float moveSpeed = 6f; // Stone-age base (also the fallback)
 
+        /// <summary>Bought from a Harbour — lets the player sail over WATER (to reach islands). Static so the
+        /// avatar + movement can read it; reset on a fresh game in GameBootstrap.</summary>
+        public static bool HasBoat;
+
         // Travel tier per age (index = Colony.Age). Faster travel is itself a
         // progression reward — later ages add real mounts/vehicles.
         private static readonly (string name, float speed)[] Mounts =
@@ -54,10 +58,11 @@ namespace Caveman
             Vector3 step = (Vector3)(dir.normalized * (speed * Time.deltaTime));
             Vector3 p = transform.position;
             bool insideBuilding = BuildController.SolidBuildingAt(p);
+            bool boat = HasBoat; // a boat lets you cross water (land stays walkable too)
             Vector3 tryX = new Vector3(p.x + step.x, p.y, 0f);
-            if (TerrainGrid.Walkable(tryX) && (insideBuilding || !BuildController.SolidBuildingAt(tryX))) p = tryX;
+            if ((boat || TerrainGrid.Walkable(tryX)) && (insideBuilding || !BuildController.SolidBuildingAt(tryX))) p = tryX;
             Vector3 tryY = new Vector3(p.x, p.y + step.y, 0f);
-            if (TerrainGrid.Walkable(tryY) && (insideBuilding || !BuildController.SolidBuildingAt(tryY))) p = tryY;
+            if ((boat || TerrainGrid.Walkable(tryY)) && (insideBuilding || !BuildController.SolidBuildingAt(tryY))) p = tryY;
             transform.position = p;
         }
     }

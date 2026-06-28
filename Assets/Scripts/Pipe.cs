@@ -31,7 +31,7 @@ namespace Caveman
             go.transform.localScale = Vector3.one * 0.55f;
 
             var sr = go.AddComponent<SpriteRenderer>();
-            sr.sprite = SpriteDatabase.ForBuilding(def);
+            sr.sprite = PlaceholderArt.PipeTile(); // a proper pipe tube (not a building structure)
             sr.color = def != null ? def.color : new Color(0.40f, 0.62f, 0.85f);
             sr.sortingOrder = 0; // above terrain/bridge (-90/-80), below belts (1) & buildings (5)
 

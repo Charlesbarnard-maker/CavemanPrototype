@@ -49,10 +49,11 @@ namespace Caveman
         public bool isSplitter;
         private int _splitNext;
 
-        // Merger: an N→1 belt that ACCEPTS hand-offs from any feeder (used to deliberately combine
-        // two belt lines). Normal belts reject a 2nd feeder (so you can't silently merge by pointing
-        // a belt onto a line — you must place a Merger; see AcceptsHandoffFrom).
+        // Merger: an N→1 belt that PULLS from its three input sides round-robin (so every feeder line
+        // gets a fair turn into the single output). Normal belts reject a 2nd feeder (so you can't
+        // silently merge by pointing a belt onto a line — you must place a Merger).
         public bool isMerger;
+        private int _mergeNext; // round-robin input preference (0=back, 1=right, 2=left)
 
         private SpriteRenderer _sr;
         private readonly List<BeltItem> _items = new();           // lead-first: _items[0] has the highest p
@@ -94,7 +95,7 @@ namespace Caveman
         {
             var go = new GameObject(isSplitter ? "Splitter" : isMerger ? "Merger" : displayName);
             go.transform.position = new Vector3(cell.x, cell.y, 0f);
-            go.transform.localScale = Vector3.one * 0.8f;
+            go.transform.localScale = Vector3.one; // fill the whole cell so a run reads as ONE continuous conveyor (sprites are full-bleed)
             go.transform.rotation = Quaternion.Euler(0f, 0f, Angle(dir));
 
             var sr = go.AddComponent<SpriteRenderer>();
@@ -108,6 +109,7 @@ namespace Caveman
             b.isSplitter = isSplitter;
             b.isMerger = isMerger;
             b.DisplayName = isSplitter ? "Splitter" : isMerger ? "Merger" : displayName;
+            b._tier = BeltTier(b.DisplayName);
             b.interval = Mathf.Max(0.05f, interval);
             b._sr = sr;
             if (baseColor.HasValue) b._baseColor = baseColor.Value; // per-tier tint (else the default brown)
@@ -189,7 +191,11 @@ namespace Caveman
         {
             interval = Mathf.Max(0.05f, newInterval);
             _baseColor = newColor; // the per-frame flow-state colouring in Update uses this as the base
-            if (displayName != null && !isSplitter && !isMerger) { DisplayName = displayName; gameObject.name = displayName; }
+            if (displayName != null && !isSplitter && !isMerger)
+            {
+                DisplayName = displayName; gameObject.name = displayName;
+                _tier = BeltTier(displayName); _lastBeltKey = -1; // re-pick the per-tier sprite next Update
+            }
         }
 
         /// <summary>Overlay-convert a plain belt into a splitter or merger in place (keeps its
@@ -319,7 +325,13 @@ namespace Caveman
             }
 
             if (moved) _items.RemoveAt(0);
-            else _blocked = true; // downstream full / dead-end → lead holds at the exit edge
+            else
+            {
+                // Not truly "blocked" if a Merger ahead is going to PULL from us this step (it just
+                // hasn't yet) — only show backed-up when the forward target genuinely has no room.
+                var fwd = At(_cell + Step(dir));
+                _blocked = !(fwd != null && fwd.isMerger && fwd.CanAccept(lead.def));
+            }
         }
 
         // PASS 4: pull a new item from an adjacent feeder building into a cleared entry. Gated by
@@ -328,6 +340,9 @@ namespace Caveman
         public void SimPull()
         {
             if (!_connected || !TailRoom()) return;
+            // A Merger fairly round-robins its belt inputs first (so all lines flow); if none had an
+            // item ready this step it falls through to the building scan below (a building feeding it).
+            if (isMerger && MergerPullFromBelts()) return;
             for (int di = 0; di < 4; di++)
             {
                 var c = _cell + Step((Dir)di);
@@ -359,11 +374,35 @@ namespace Caveman
                 }
 
                 if (WorldGrid.Depots.TryGetValue(c, out var dp) && dp != null && dp.item != null && !dp.item.isLiquid
+                    && dp.IsOutputPull(c, (Dir)di)                       // OUT only on the station's north edge
                     && (item == null || item == dp.item) && dp.store.Count(dp.item) > 0)
                 {
                     if (dp.store.RemoveUpTo(dp.item, 1) > 0) { ReceiveItem(dp.item, (Dir)di, 0f); return; }
                 }
             }
+        }
+
+        // MERGER input: round-robin across the three non-output sides — back (Opposite dir), right
+        // (RotateCW), left (RotateCCW) — pulling a matured item from whichever feeder belt POINTS INTO
+        // us. Every line therefore gets a fair turn through the single output, and a belt that doesn't
+        // point in is never touched. Returns true if one item was taken this step.
+        private Dir MergeInputDir(int idx) => idx == 1 ? RotateCW(dir) : idx == 2 ? RotateCCW(dir) : Opposite(dir);
+        private bool MergerPullFromBelts()
+        {
+            for (int k = 0; k < 3; k++)
+            {
+                int idx = (_mergeNext + k) % 3;
+                Dir side = MergeInputDir(idx);
+                var f = At(_cell + Step(side));
+                if (f == null || f == this) continue;
+                if (f._cell + Step(f.dir) != _cell) continue;     // it must point INTO me
+                if (f._items.Count == 0) continue;
+                var lead = f._items[0];
+                if (lead.p < 1f - 1e-3f) continue;                 // its lead must have reached its exit edge
+                if (item != null && item != lead.def) continue;    // a cell carries one item type at a time
+                if (ReceiveItem(lead.def, side, 0f)) { f._items.RemoveAt(0); _mergeNext = (idx + 1) % 3; return true; }
+            }
+            return false;
         }
 
         // Move ONE item out in direction d — into a belt (carry-over hand-off), or a building sink
@@ -374,9 +413,14 @@ namespace Caveman
             var nb = At(ahead);
             if (nb != null)
             {
+                // A Merger PULLS its inputs round-robin (see MergerPullFromBelts) so every feeder line
+                // gets a fair turn — never push into one here. (The old push let whichever feeder came
+                // first in cell order win the merger's single slot every step, starving the others —
+                // the "items get stuck and don't go in the sides" bug.)
+                if (nb.isMerger) return false;
                 // The item enters the next belt from the edge facing us (Opposite our dir). p=1 on
                 // this cell == p=0 on the next in world space, so entry at ~0 is seamless. A normal
-                // belt only accepts ONE feeder (straight or a single corner); a Merger accepts any.
+                // belt only accepts ONE feeder (straight or a single corner).
                 if (nb.CanAccept(def) && nb.AcceptsHandoffFrom(this)) return nb.ReceiveItem(def, Opposite(d), 0f);
                 return false;
             }
@@ -407,8 +451,8 @@ namespace Caveman
                 w.InBuffer.Add(def, 1); return true;
             }
 
-            // Depot that handles this item (route endpoint).
-            if (WorldGrid.Depots.TryGetValue(ahead, out var dp) && dp != null && dp.item == def)
+            // Station, on its INPUT (south) edge, if it handles this item.
+            if (WorldGrid.Depots.TryGetValue(ahead, out var dp) && dp != null && dp.IsInputDeposit(ahead, d) && dp.item == def)
             {
                 if (dp.def != null && dp.store.Total() >= dp.def.capacity) return false;
                 dp.store.Add(def, 1); return true;
@@ -419,6 +463,15 @@ namespace Caveman
             {
                 if (rb.InBuffer.Total() >= rb.InBuffer.capacity) return false;
                 rb.InBuffer.Add(def, 1); return true;
+            }
+
+            // Power generator FUEL input, on its input edge — belt-feed charcoal/wood so a generator runs
+            // without hand-feeding from the carried pile.
+            if (WorldGrid.Generators.TryGetValue(ahead, out var gen) && gen != null && gen.fuel == def
+                && d == Opposite(gen.InputSide))
+            {
+                if (gen.Buffer == null || gen.Buffer.Total() >= gen.Buffer.capacity) return false;
+                gen.Buffer.Add(def, 1); return true;
             }
             return false;
         }
@@ -450,10 +503,12 @@ namespace Caveman
                 && (item == null || s.accepts == item || (s.accepts == null && s.configurable))) return true;
             if (WorldGrid.Workshops.TryGetValue(ahead, out var w) && w != null && AcceptsInputSide(w, d)
                 && (item == null || w.WantsInput(item))) return true;
-            if (WorldGrid.Depots.TryGetValue(ahead, out var dp) && dp != null
-                && (item == null || dp.item == null || dp.item == item)) return true; // depots omnidirectional
+            if (WorldGrid.Depots.TryGetValue(ahead, out var dp) && dp != null && dp.IsInputDeposit(ahead, d)
+                && (item == null || dp.item == null || dp.item == item)) return true; // deliver on the station's south edge
             if (WorldGrid.Research.TryGetValue(ahead, out var rb) && rb != null && d == rb.OutputSide
                 && (item == null || rb.Accepts(item))) return true;
+            if (WorldGrid.Generators.TryGetValue(ahead, out var gen) && gen != null && d == Opposite(gen.InputSide)
+                && (item == null || gen.fuel == item)) return true; // fuel feeds a generator
             if (At(ahead) != null) return LeadsToSink(_cell, d);
             return false;
         }
@@ -506,7 +561,46 @@ namespace Caveman
                           : _blocked   ? new Color(0.85f, 0.66f, 0.18f)        // yellow — backed up downstream
                           : _baseColor;                                         // brown — ok
 
+            // Plain belts pick their sprite from TIER (look) + SHAPE (straight vs corner), so a run reads
+            // per-age and corners visibly connect. Splitters/mergers keep their junction sprite.
+            if (!isSplitter && !isMerger) UpdateBeltShape();
             UpdateDots();
+        }
+
+        // ---- Per-tier + corner sprite selection ------------------------------------------------
+        private int _tier = 1;        // 0 Wooden(rollers) 1 Conveyor(chevron) 2 Geared 3 Steel
+        private int _lastBeltKey = -1; // tier*3+shape the current sprite is drawn for
+        private static int BeltTier(string name)
+        {
+            if (string.IsNullOrEmpty(name)) return 1;
+            if (name.StartsWith("Wood")) return 0;
+            if (name.StartsWith("Geared")) return 2;
+            if (name.StartsWith("Steel")) return 3;
+            return 1; // Conveyor / default
+        }
+
+        private void UpdateBeltShape()
+        {
+            if (_sr == null) return;
+            int shape = BeltShape();
+            int key = _tier * 3 + shape;
+            if (key != _lastBeltKey) { _lastBeltKey = key; _sr.sprite = PlaceholderArt.BeltSprite(_tier, shape); }
+        }
+
+        // 0 = straight (fed from behind / by a building), 1 = corner from the RIGHT side, 2 = from the LEFT.
+        private int BeltShape()
+        {
+            if (FeedsInto(Opposite(dir))) return 0;       // straight feeder behind takes priority
+            if (FeedsInto(RotateCW(dir))) return 1;        // a belt curves IN from our right
+            if (FeedsInto(RotateCCW(dir))) return 2;       // …or our left
+            return 0;
+        }
+
+        // True if the belt on `side` has its output pointing INTO this cell (so it feeds us from there).
+        private bool FeedsInto(Dir side)
+        {
+            var nb = At(_cell + Step(side));
+            return nb != null && nb._cell + Step(nb.dir) == _cell;
         }
 
         // Draw one sprite per carried item at its own continuous position along the lane. The path

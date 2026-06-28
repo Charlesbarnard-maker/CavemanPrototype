@@ -41,6 +41,26 @@ namespace Caveman
         }
     }
 
+    /// <summary>One manual, paid UPGRADE step for a production building — bought from its panel once the
+    /// colony reaches <see cref="unlockAge"/>. It multiplies the building's base rate by <see cref="speedMult"/>
+    /// and recolours it (a stand-in for the per-age art) — the "stone tools → metal tools → machines" ladder.</summary>
+    [System.Serializable]
+    public class UpgradeTier
+    {
+        public string name = "Upgrade";
+        public int unlockAge = 1;        // colony age required before this tier can be bought
+        public float speedMult = 1.5f;   // ABSOLUTE rate multiplier vs the building's base (tiers ascend)
+        public Color tint = Color.white; // look change until real per-age art lands
+        public List<ItemAmount> cost = new();
+
+        public UpgradeTier() { }
+        public UpgradeTier(string name, int unlockAge, float speedMult, Color tint, params ItemAmount[] cost)
+        {
+            this.name = name; this.unlockAge = unlockAge; this.speedMult = speedMult; this.tint = tint;
+            this.cost = new List<ItemAmount>(cost);
+        }
+    }
+
     public enum BuildingKind
     {
         Collector, // auto-harvests a nearby resource patch (fully automatic — no workers)
@@ -49,11 +69,14 @@ namespace Caveman
         Belt,      // a directional conveyor segment placed on the grid
         Depot,     // a long-distance transfer station (route endpoint)
         Route,     // a tool: link two depots with a caravan vehicle
-        Power,     // a generator: burns fuel to supply power to the connected pole network
-        Pole,      // a power pole: relays power across distance, linking generators to consumers
+        Power,     // a generator: burns fuel to supply power to the wired network
+        Pole,      // a power pole: a wired relay node, linking generators/batteries to consumers
+        Battery,   // stores surplus power and releases it on a deficit (a wired node)
         Bridge,    // a plank tile placed on water to make it passable (feet + belts)
         Pipe,      // a liquid-network segment (continuous flow, not items)
         Pump,      // draws water from adjacent water terrain into the pipe network
+        Rail,      // a track segment — route vehicles (trains) path along laid rail
+        Signal,    // a rail signal — one-way + block control for train planning
         Research,  // a Research Lodge: consumes crafted research items into research points
     }
 
@@ -103,10 +126,18 @@ namespace Caveman
         public bool splitter = false;
         [Tooltip("Belt: this is an N→1 MERGER (deliberately combines two belt lines into one) rather than a plain belt.")]
         public bool merger = false;
+        [Tooltip("Signal: this is a TWO-WAY block signal (trains may pass in EITHER direction; it still enforces one-train-per-block) rather than a one-way signal.")]
+        public bool bothWaySignal = false;
+        [Tooltip("Depot: this is a HARBOUR (a dock placed on the shore) — no rail lane; cargo SHIPS run between harbours over water.")]
+        public bool isHarbour = false;
+        [Tooltip("Build-menu category override (e.g. \"Boats\"). Empty = categorised by kind. Lets a Harbour (a Depot) sit under Boats while a Station sits under Trains.")]
+        public string menuCategory = "";
 
         [Header("Progression")]
         [Tooltip("Age at which this becomes buildable (0 = Stone Age, available from the start).")]
         public int unlockAge = 0;
+        [Tooltip("Manual, paid age-upgrade ladder (stone tools → metal → machines). Empty = not upgradable.")]
+        public List<UpgradeTier> upgrades = new();
         [Tooltip("Optional Research Tech id that must be PURCHASED before this can be built (empty = none).")]
         public string requiredTech = "";
 
@@ -117,12 +148,16 @@ namespace Caveman
         public int powerOutput = 0;
 
         [Header("Energy — power network")]
-        [Tooltip("Generator/Pole: how far this links to OTHER poles/generators to form a network (0 = default).")]
+        [Tooltip("Legacy (unused): the wired grid has no radius — connections are player-drawn wires.")]
         public float connectRange = 0f;
-        [Tooltip("Generator/Pole: how far it SUPPLIES power to nearby consuming buildings (0 = default).")]
+        [Tooltip("Legacy (unused): the wired grid has no radius — connections are player-drawn wires.")]
         public float supplyRange = 0f;
-        [Tooltip("Workshop: needs a power connection to run — STOPS if not connected to a powered network.")]
+        [Tooltip("Workshop: needs a power connection to run — STOPS if not wired to a powered network.")]
         public bool requiresPower = false;
+        [Tooltip("Battery: stored-energy capacity (power × seconds).")]
+        public float batteryCapacity = 0f;
+        [Tooltip("Battery: max power it can charge or discharge at once.")]
+        public float batteryRate = 0f;
 
         [Header("Logistics")]
         [Tooltip("Route vehicles only: travel speed (cart < caravan < train < drone).")]

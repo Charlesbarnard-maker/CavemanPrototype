@@ -29,10 +29,50 @@ namespace Caveman
         public Inventory InBuffer { get; private set; }     // inputs delivered by belts
         public bool Paused { get; private set; }            // player can halt it to free shared inputs
         public void TogglePause() => Paused = !Paused;
+        /// <summary>True while this workshop is actively producing — drives the visible worker units.</summary>
+        public bool Working => !Paused && output != null && Buffer.Total() < Buffer.capacity && !_starved;
 
-        // Power network: a requiresPower machine draws PowerDraw and runs only while connected to a
-        // powered network (see PowerNet); the network's supply/demand factor scales its speed.
+        // ---- Manual paid age-upgrade (geared → reinforced → automated): faster processing + a look change. ----
+        public int Tier { get; private set; }
+        private float _speedMult = 1f;
+        public UpgradeTier PendingUpgrade =>
+            (def != null && def.upgrades != null && Tier < def.upgrades.Count) ? def.upgrades[Tier] : null;
+        public bool UpgradeUnlocked
+        { get { var u = PendingUpgrade; return u != null && (Colony.Instance == null || u.unlockAge <= Colony.Instance.Age); } }
+
+        /// <summary>Buy the next upgrade tier (paid from the carried pile) — speeds processing + recolours.
+        /// Returns false if there's no tier available, it's age-locked, or unaffordable.</summary>
+        public bool TryUpgrade()
+        {
+            var u = PendingUpgrade;
+            if (u == null || !UpgradeUnlocked) return false;
+            var carried = Colony.Instance != null ? Colony.Instance.carried : null;
+            if (!Economy.CanAfford(u.cost, carried)) return false;
+            Economy.Spend(u.cost, carried);
+            Tier++;
+            _speedMult = Mathf.Max(0.1f, u.speedMult);
+            _baseColor = u.tint;
+            if (_sr != null) _sr.color = _baseColor;
+            _flash = 0.25f;
+            return true;
+        }
+
+        // Power network: a requiresPower machine is wired into a powered network (see PowerNet) and runs
+        // at its supply/demand factor. PowerDraw is its draw at full tilt; CurrentDraw is what it pulls
+        // RIGHT NOW — full while actively processing, a trickle while stalled, ZERO when switched off.
         public int PowerDraw => def != null ? def.powerDraw : 0;
+        public const float IdleDrawFraction = 0.1f; // a stalled (but on) machine still sips power
+        /// <summary>Live power draw, fed to PowerNet's demand: 0 when switched off (Paused), full while
+        /// actively processing, a small idle trickle while stalled (starved / output-full).</summary>
+        public float CurrentDraw
+        {
+            get
+            {
+                if (!RequiresPower || Paused) return 0f;
+                bool working = output != null && Buffer.Total() < Buffer.capacity && !_starved;
+                return working ? PowerDraw : PowerDraw * IdleDrawFraction;
+            }
+        }
 
         public static readonly List<WorkshopBuilding> All = new();
         private List<Vector2Int> _cells; // every grid cell this building occupies
@@ -88,7 +128,17 @@ namespace Caveman
             foreach (var c in w._cells) WorldGrid.Workshops[c] = w;
             Ports.PlacePorts(go.transform, def.FootW, def.FootH, outputSide,
                 def.inputs != null && def.inputs.Count > 0, true,
-                def.inputs != null && def.inputs.Count > 1); // multi-input → input ports on all non-output sides
+                def.inputs != null && def.inputs.Count > 1, singlePort: true); // one in/out slot per side (multi-input → one per non-output side)
+
+            // Powered machines are wired CONSUMER nodes (1 wire — they're fed, not relays). See PowerNet.
+            if (def.requiresPower)
+            {
+                var node = go.AddComponent<PowerNode>();
+                node.role = PowerNode.Role.Consumer;
+                node.maxConnections = 1;
+                node.consumer = w;
+            }
+            WorkerUnit.SpawnForWorkshop(w, 1); // a visible worker tending the machine while it runs
             return w;
         }
 
@@ -313,13 +363,14 @@ namespace Caveman
 
             if (!Paused && output != null && Buffer.Total() < Buffer.capacity)
             {
+                float pt = processTime / Mathf.Max(0.1f, _speedMult); // upgrades shorten the process time
                 float pw = EffectivePowerFactor();
                 _timer += Time.deltaTime * pw; // fixed rate (no workers); slowed/stopped by the energy seam
-                if (_timer >= processTime)
+                if (_timer >= pt)
                 {
                     if (CanMake(carried))
                     {
-                        _timer -= processTime;
+                        _timer -= pt;
                         ConsumeInputs(carried);
                         Buffer.Add(output, outputPerCycle);
                         _producedWindow += outputPerCycle;
@@ -331,7 +382,7 @@ namespace Caveman
                     {
                         // Inputs missing — back off so we don't re-scan the whole pool every
                         // frame while starved (perf); recheck roughly twice a second.
-                        _timer = Mathf.Max(0f, processTime - 0.5f);
+                        _timer = Mathf.Max(0f, pt - 0.5f);
                         _starved = true;
                     }
                 }
