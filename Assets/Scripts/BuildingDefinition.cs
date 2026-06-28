@@ -50,6 +50,7 @@ namespace Caveman
         Depot,     // a long-distance transfer station (route endpoint)
         Route,     // a tool: link two depots with a caravan vehicle
         Power,     // a generator: burns fuel to supply electrical power (Industrial age)
+        Hearth,    // burns fuel to project a HEAT RADIUS (Stone-age proximity power — no grid/wires)
         Bridge,    // a plank tile placed on water to make it passable (feet + belts)
         Pipe,      // a liquid-network segment (continuous flow, not items)
         Pump,      // draws water from adjacent water terrain into the pipe network
@@ -114,6 +115,12 @@ namespace Caveman
         public int powerDraw = 0;
         [Tooltip("Power plant: electrical power supplied while fuelled.")]
         public int powerOutput = 0;
+
+        [Header("Energy — Stone-age heat radius")]
+        [Tooltip("Hearth: heat coverage radius in world units (machines inside a lit hearth can run).")]
+        public float heatRadius = 0f;
+        [Tooltip("Workshop: needs energy to run (a lit Hearth's heat radius now, electricity later) — HARD-STOPS without it.")]
+        public bool requiresPower = false;
 
         [Header("Logistics")]
         [Tooltip("Route vehicles only: travel speed (cart < caravan < train < drone).")]

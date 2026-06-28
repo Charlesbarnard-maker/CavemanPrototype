@@ -3,7 +3,28 @@
 A running record so progress/problems don't get lost. Newest first. Move items to
 **Fixed** when done. Maintained alongside the code — see DESIGN.md for the roadmap.
 
-## #24 Smelters: Basic + Advanced (configurable multi-recipe), replacing 4 fixed buildings (2026-06-27) — most recent
+## #25 SR-P3: Stone-age hearth RADIUS energy + headless compile-check tool (2026-06-28) — most recent
+Energy phase 3 of the systems redesign + a way for Claude to self-verify compilation.
+- **NEW `Hearth.cs`** (BuildingKind.Hearth): burns Wood (PowerPlant-style auto loop, no workers) and
+  projects a **heat radius** (default 7) with a faint coverage ring. **NEW `HeatField.cs`**: static
+  registry of lit hearths + `FactorAt(pos)` = 1 inside any lit hearth, else 0 (HARD-STOP, per user choice).
+- **Seam wired:** `WorkshopBuilding.EffectivePowerFactor` pre-Industrial branch → `requiresPower` machines
+  read `HeatField.FactorAt` (0 outside → stall); Industrial still uses `Power.Factor`. `requiresPower`
+  set on the HEAT machines only: **Basic Smelter, Advanced Smelter, Kiln, Potter** (smelters/kilns — not
+  every workshop, so the early economy isn't bricked). Hearth is age 0 so it's always available before them.
+- **Feedback:** new "no heat" status (blue dot) + selected-panel hint "⚡ No heat — place a Hearth so this
+  sits inside its ring", so a heat-stalled machine doesn't look like it's working.
+- **Wiring:** BuildingDefinition gains `heatRadius`/`requiresPower`; BuildingKind.Hearth + ConstructionSite
+  spawn case + InventoryHud Production category + buildables entry. Hearth def: Wood fuel, interval 2.5,
+  radius 7, age 0, cost stone 6 + wood 4. Coal deferred to SR-P5 (lands with the Boiler that burns it).
+- **NEW `Tools/compile-check.ps1`** — headless `Unity.exe -batchmode -quit` compile + `error CS` parse, so
+  Claude can self-verify compilation when the Editor is CLOSED (it locks the project while open). Confirmed
+  the whole prior blind stack already compiles CLEAN (read the Editor recompiled June 28 08:38 — no errors).
+- **Recompile check:** Hearth appears in Build → Production; place + feed Wood → warm ring, lit; a Smelter/
+  Kiln inside the ring runs, outside it shows the blue "no heat" status + stalls; let the hearth run dry → it
+  darkens and machines in range stall. Belt-independent.
+
+## #24 Smelters: Basic + Advanced (configurable multi-recipe), replacing 4 fixed buildings (2026-06-27)
 Request: drop separate Copper/Iron smelters → a **Basic Smelter** (ore→bar, like the old ones) + an
 **Advanced Smelter** (combine materials → alloy bars). User chose: **configurable** recipe (select in panel,
 like the warehouse) + **keep Bronze/Steel** consolidated (no new alloys). **NOT yet Unity-compiled.**

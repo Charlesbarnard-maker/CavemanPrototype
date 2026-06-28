@@ -296,10 +296,14 @@ namespace Caveman
         // returns its speed factor through here, so machine code never changes as energy evolves.
         // P0: behaviour-identical to the old inline logic (Industrial brownout, else full speed). A
         // later phase makes the pre-Industrial branch consult the hearth/steam heat field.
+        public bool RequiresPower => def != null && def.requiresPower;
         private float EffectivePowerFactor()
         {
             if (Power.Active) return PowerDraw > 0 ? Power.Factor : 1f; // Industrial electricity (unchanged)
-            return 1f;                                                  // pre-Industrial: heat radius plugs in here later
+            // Pre-Industrial: a heat-requiring machine (smelter/kiln) runs ONLY inside a lit Hearth's
+            // radius — hard-stop (0) outside, so processing must cluster around a fuelled hearth.
+            if (RequiresPower) return HeatField.FactorAt(transform.position);
+            return 1f;
         }
 
         void Update()
@@ -354,11 +358,14 @@ namespace Caveman
 
         /// <summary>Live status colour (green working / yellow output-full / red missing-input /
         /// grey paused) — also drives minimap dots.</summary>
+        // Pre-Industrial heat-requiring machine sitting outside any lit Hearth → it can't run.
+        public bool NoPower => RequiresPower && !Power.Active && !HeatField.Covered(transform.position);
         public Color StatusColor
         {
             get
             {
                 if (Paused) return Status.Idle;
+                if (NoPower) return new Color(0.40f, 0.62f, 1f); // blue — needs heat (no Hearth in range)
                 if (Buffer.Total() >= Buffer.capacity) return Status.BackedUp;
                 if (_starved) return Status.Starved;
                 return Status.Working;

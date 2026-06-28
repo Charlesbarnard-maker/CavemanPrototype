@@ -68,7 +68,7 @@ namespace Caveman
         // Meta-groups keep the menu to a handful of headers (not one per building kind).
         private static readonly (string label, BuildingKind[] kinds)[] Cats =
         {
-            ("Production", new[] { BuildingKind.Collector, BuildingKind.Workshop, BuildingKind.Power, BuildingKind.Research }),
+            ("Production", new[] { BuildingKind.Collector, BuildingKind.Workshop, BuildingKind.Power, BuildingKind.Research, BuildingKind.Hearth }),
             ("Logistics", new[] { BuildingKind.Belt, BuildingKind.Bridge, BuildingKind.Pipe, BuildingKind.Pump, BuildingKind.Depot }),
             ("Infrastructure", new[] { BuildingKind.Storage }),
         };
@@ -945,6 +945,9 @@ namespace Caveman
                     GUILayout.Label($"<size=12>Making: <b>{(wb.output != null ? wb.output.displayName : "?")}</b> <color=#888>from {string.Join(" + ", ins)}</color></size>", _small);
                     if (GUILayout.Button("<size=12>↻ Change recipe</size>", _btn)) wb.CycleRecipe();
                 }
+                // Heat-requiring machine outside any lit Hearth → tell the player why it's stalled.
+                if (wb != null && wb.NoPower)
+                    GUILayout.Label("<size=12><color=#6cf>⚡ No heat — place a Hearth so this sits inside its ring</color></size>", _small);
             }
             else if (sb != null)
             {

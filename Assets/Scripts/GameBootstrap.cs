@@ -196,7 +196,7 @@ namespace Caveman
             // --- Age 2: Bronze ---
             var kiln = MakeWorkshop("Kiln", bricks, 1, 3.5f, 2, 12, new Color(0.70f, 0.42f, 0.34f),
                 new List<ItemAmount> { new ItemAmount(clay, 2), new ItemAmount(charcoal, 1) },
-                new ItemAmount(wood, 8), new ItemAmount(stone, 6)); kiln.unlockAge = 2;
+                new ItemAmount(wood, 8), new ItemAmount(stone, 6)); kiln.unlockAge = 2; kiln.requiresPower = true;
             var farm = MakeWorkshop("Farm", grain, 2, 3.0f, 3, 16, new Color(0.80f, 0.72f, 0.38f),
                 new List<ItemAmount> { new ItemAmount(water, 1) },
                 new ItemAmount(wood, 8)); farm.unlockAge = 2;
@@ -286,6 +286,19 @@ namespace Caveman
                 new Recipe(steel,       1, 4.0f, 3, new ItemAmount(metal, 1),  new ItemAmount(charcoal, 1)),
             };
             advancedSmelter.description = "ADVANCED SMELTER — combines materials into alloy bars; select its recipe: Copper + Bricks → Bronze Plate, or Iron + Charcoal → Steel (Steel unlocks in the Iron Age). One furnace for both alloys (click it to switch).";
+            // Both smelters need HEAT — they only run inside a lit Hearth's radius (the Stone-age energy constraint).
+            basicSmelter.requiresPower = true;
+            advancedSmelter.requiresPower = true;
+            // HEARTH — Stone-age RADIUS energy. Burns Wood; heat machines (smelters/kiln/potter) must sit
+            // in its ring to run. No grid/wires — proximity only. The first energy tier (steam, then
+            // electricity, evolve from this via the same EffectivePowerFactor seam).
+            var hearth = ScriptableObject.CreateInstance<BuildingDefinition>();
+            hearth.displayName = "Hearth"; hearth.kind = BuildingKind.Hearth; hearth.unlockAge = 0;
+            hearth.inputs = new List<ItemAmount> { new ItemAmount(wood, 1) };
+            hearth.interval = 2.5f; hearth.heatRadius = 7f;
+            hearth.color = new Color(0.88f, 0.45f, 0.20f);
+            hearth.cost = new List<ItemAmount> { new ItemAmount(stone, 6), new ItemAmount(wood, 4) };
+            hearth.description = "HEARTH — burns Wood to project a HEAT RADIUS (the warm ring). Smelters, Kilns and Potters must sit INSIDE a lit Hearth to run (they hard-stop outside it), so cluster your processing around a fuelled Hearth. No grid or wires — just keep it fed Wood.";
             // Toolmaker: Metal + Planks -> Tools (an Iron-age comfort good).
             var toolmaker = MakeWorkshop("Toolmaker", tools, 1, 4.0f, 2, 12, new Color(0.50f, 0.55f, 0.60f),
                 new List<ItemAmount> { new ItemAmount(metal, 1), new ItemAmount(planks, 1) },
@@ -312,7 +325,7 @@ namespace Caveman
             // Pottery (Bronze): Clay -> Pottery. Reuses the clay you already mine.
             var potter = MakeWorkshop("Potter", pot, 1, 3.0f, 2, 12, new Color(0.72f, 0.50f, 0.40f),
                 new List<ItemAmount> { new ItemAmount(clay, 2) },
-                new ItemAmount(wood, 6), new ItemAmount(stone, 4)); potter.unlockAge = 2;
+                new ItemAmount(wood, 6), new ItemAmount(stone, 4)); potter.unlockAge = 2; potter.requiresPower = true;
             // Textiles: Cotton -> Fiber -> Cloth -> Clothes (an Industrial luxury).
             var cottonFarm = MakeCollector("Cotton Farm", fiber, 1, 2.0f, 2, 12, new Color(0.70f, 0.78f, 0.55f),
                 new ItemAmount(wood, 6)); cottonFarm.unlockAge = 2;
@@ -432,7 +445,7 @@ namespace Caveman
             { // Gather
               woodHut, stonePit, clayPit, copperMine, mine,
               // Process — incl. the deeper metal chain (copper → bronze → steel) that gates each age
-              sawmill, charcoalBurner, kiln, potter, basicSmelter, advancedSmelter, toolmaker,
+              sawmill, charcoalBurner, kiln, potter, basicSmelter, advancedSmelter, toolmaker, hearth,
               // Research
               ideaBench, scrollMaker, draftingTable, engineeringLab, researchLodge,
               // Logistics — belt tier ladder (wooden→conveyor→geared→steel) + junctions + transport
