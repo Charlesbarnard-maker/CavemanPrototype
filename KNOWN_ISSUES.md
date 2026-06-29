@@ -57,6 +57,20 @@ sprite packs.
   Keep KNOWN_ISSUES newest-first. CavemanPrototype stays OUT of global memory.
 ---
 
+## #44 RAIL OVERHAUL (in progress) — bug fixes first (2026-06-29)
+Start of a big rail/train overhaul (user-requested: per-age vehicles, loco + cargo/liquid wagons up to an
+age-gated limit, mixed consist, pipe-fed liquid stations, a global line overview). Phase 1 = the two bugs the
+user flagged. NEEDS interactive testing (placement is drag-based; routing needs live trains).
+- **Blueprint orientation (fixed):** `BuildController.RebuildRailPlanGhosts` + the hover ghost now pick their
+  sprite from a neighbour mask along the planned path (new `GhostMask`/`GhostRail`), so the drag blueprint reads
+  in the direction you're laying (straight/corner) instead of a default horizontal tile.
+- **Parallel tracks linking (fixed):** `RailTile.Connects` is now `internal` and `RailNet.FindPath` calls it, so
+  pathfinding respects the SAME parallel-merge rule the visual already used — trains no longer hop between two
+  parallel lines laid side by side (only real corners / tees / crossings link). `Connects` is symmetric.
+- **DESIGN locked with the user for the rest:** wagons = MIXED consist (different cargo per wagon, generic
+  carriers: load at a Load stop, drop at an Unload stop); liquids by rail via PIPE-FED liquid stations; the line
+  UI pain to fix = MANAGING MANY LINES (a global overview). Phases 2-4 to follow.
+
 ## #43 Buildings mechanise by upgrade tier — a growing machinery overlay (2026-06-29)
 The sibling to #42's workers: a building now visibly gets more TECHNOLOGICAL as you upgrade it, instead of just
 re-tinting. An additive overlay (its own object, white tint — never fights the body's colour) bolts onto the

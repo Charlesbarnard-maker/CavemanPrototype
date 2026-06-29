@@ -1037,7 +1037,7 @@ namespace Caveman
             var cell = new Vector2Int(Mathf.RoundToInt(world.x), Mathf.RoundToInt(world.y));
             _ghost.transform.position = new Vector3(cell.x, cell.y, 0f);
             _ghost.transform.rotation = Quaternion.identity;
-            _ghostSr.sprite = PlaceholderArt.Rail();
+            _ghostSr.sprite = PlaceholderArt.RailMask(GhostMask(cell)); // orient to neighbours / drag direction
             _ghost.transform.localScale = Vector3.one;
 
             bool ok = RailCellFree(cell) && Economy.CanAfford(def.cost, Carried);
@@ -1140,11 +1140,26 @@ namespace Caveman
                 if (!go.activeSelf) go.SetActive(true);
                 var c = _railPlan[i];
                 go.transform.position = new Vector3(c.x, c.y, 0f);
-                go.GetComponent<SpriteRenderer>().color = RailCellFree(c)
+                var sr = go.GetComponent<SpriteRenderer>();
+                sr.sprite = PlaceholderArt.RailMask(GhostMask(c)); // orient the ghost to the drag direction (straight/corner)
+                sr.color = RailCellFree(c)
                     ? new Color(0.4f, 0.9f, 1f, 0.5f) : new Color(1f, 0.35f, 0.35f, 0.55f);
             }
             for (int k = n; k < _railPlanGhosts.Count; k++) if (_railPlanGhosts[k].activeSelf) _railPlanGhosts[k].SetActive(false);
         }
+
+        // Neighbour mask of a planned rail cell (counting other plan cells + already-laid rail) so the ghost
+        // is DRAWN in the direction you're dragging — straight / corner — not a default tile. N=1,E=2,S=4,W=8.
+        private int GhostMask(Vector2Int c)
+        {
+            int m = 0;
+            if (GhostRail(c + Belt.Step(Belt.Dir.N))) m |= 1;
+            if (GhostRail(c + Belt.Step(Belt.Dir.E))) m |= 2;
+            if (GhostRail(c + Belt.Step(Belt.Dir.S))) m |= 4;
+            if (GhostRail(c + Belt.Step(Belt.Dir.W))) m |= 8;
+            return m;
+        }
+        private bool GhostRail(Vector2Int c) => _railPlan.Contains(c) || RailNet.IsRail(c);
 
         // Signal mode: click a rail cell to drop/aim a signal (R rotates its allowed travel direction).
         private void UpdateSignalPlacement(Mouse mouse, Keyboard kb)

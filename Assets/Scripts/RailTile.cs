@@ -83,7 +83,11 @@ namespace Caveman
             return m;
         }
 
-        private static bool Connects(Vector2Int c, Belt.Dir d)
+        /// <summary>True when this rail cell genuinely links to its neighbour in direction d — i.e. they're
+        /// both rail AND it isn't just two parallel runs sitting side by side. Shared by the render mask AND
+        /// by <see cref="RailNet.FindPath"/>, so a train never hops between parallel lines that don't visually
+        /// connect (only real corners / tees / crossings link).</summary>
+        internal static bool Connects(Vector2Int c, Belt.Dir d)
         {
             var nb = c + Belt.Step(d);
             if (!RailNet.IsRail(nb)) return false;
@@ -142,6 +146,7 @@ namespace Caveman
                 {
                     var nx = cur + _dirs[i];
                     if (came.ContainsKey(nx) || !IsRail(nx)) continue;
+                    if (!RailTile.Connects(cur, Belt.FromTo(cur, nx))) continue; // don't hop between parallel runs that don't actually link
                     var sig = Signal.At(nx);
                     if (sig != null && !sig.Allows(Belt.FromTo(cur, nx))) continue; // one-way: wrong way blocked (two-way allows its axis)
                     came[nx] = cur;
