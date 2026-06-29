@@ -143,13 +143,12 @@ namespace Caveman
                             int room = st.def.capacity - st.Store.Total();
                             if (room > 0) { int add = Mathf.Min(budget, room); st.Store.Add(water, add); budget -= add; delivered = true; }
                         }
-                        // Sink 2: a liquid-using workshop (Refinery, Campfire…) — fed into its input buffer,
-                        // capped at a fair share per liquid so one liquid can't fill the buffer and starve another.
-                        if (budget > 0 && WorldGrid.Workshops.TryGetValue(nb, out var wk) && wk != null && wk.WantsInput(water))
+                        // Sink 2: a liquid-using workshop (Refinery, Campfire…) — fed into its input buffer under
+                        // the SAME reserve-floor fair-share the belt gate uses (a fast pipe can't starve the other
+                        // inputs, but a liquid can buffer past the old capacity/N hard cap that under-filled it).
+                        if (budget > 0 && WorldGrid.Workshops.TryGetValue(nb, out var wk) && wk != null)
                         {
-                            int inputs = wk.inputs != null ? Mathf.Max(1, wk.inputs.Count) : 1;
-                            int perCap = wk.InBuffer.capacity / inputs;
-                            int room = Mathf.Min(wk.InBuffer.capacity - wk.InBuffer.Total(), perCap - wk.InBuffer.Count(water));
+                            int room = wk.LiquidInputRoom(water);
                             if (room > 0) { int add = Mathf.Min(budget, room); wk.InBuffer.Add(water, add); budget -= add; delivered = true; }
                         }
                         // Sink 3: a liquid transfer STATION (Depot) — pipe-FED like a barrel, so a train can haul

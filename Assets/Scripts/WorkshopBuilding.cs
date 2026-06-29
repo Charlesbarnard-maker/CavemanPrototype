@@ -259,15 +259,37 @@ namespace Caveman
             // the "first few go through then pile up even though there's space" bug.) Gating on the
             // free space minus the others' OWED reserve fixes that AND prevents two fast belts from
             // jointly starving a third input on a 3-/4-input recipe (Campfire, Monument).
-            const int reservePerOther = 4;
-            int owedToOthers = 0;
+            return InBuffer.Total() + 1 + OwedReserve(i) <= InBuffer.capacity;
+        }
+
+        // Slots the OTHER inputs are still owed up to their guaranteed floor — so a fast feed of input `i`
+        // can't fill the buffer and deadlock the recipe. Shared by the belt gate AND the liquid-pipe path.
+        private const int ReservePerOther = 4;
+        private int OwedReserve(ItemDefinition i)
+        {
+            if (inputs == null) return 0;
+            int owed = 0;
             foreach (var c in inputs)
             {
                 if (c == null || c.item == null || c.item == i) continue;
                 int have = InBuffer.Count(c.item);
-                if (have < reservePerOther) owedToOthers += reservePerOther - have;
+                if (have < ReservePerOther) owed += ReservePerOther - have;
             }
-            return InBuffer.Total() + 1 + owedToOthers <= InBuffer.capacity;
+            return owed;
+        }
+
+        /// <summary>How many units of liquid input `i` a PIPE may deposit into the shared InBuffer right now,
+        /// under the SAME reserve-floor fair-share the belt gate uses — so a fast pipe can't starve the other
+        /// inputs (fixes the old WaterPump `capacity/N` hard-share that under-filled multi-input liquid recipes).
+        /// Returns 0 if `i` isn't wanted or there's no fair room. The caller still bounds the add by its flow.</summary>
+        public int LiquidInputRoom(ItemDefinition i)
+        {
+            if (!WantsInput(i)) return 0;
+            int free = InBuffer.capacity - InBuffer.Total();
+            if (free <= 0) return 0;
+            int distinct = inputs != null ? inputs.Count : 1;
+            if (distinct <= 1) return free; // single input may use the whole buffer
+            return Mathf.Max(0, free - OwedReserve(i));
         }
 
         // Inputs: belt-fed InBuffer first, then —

@@ -115,17 +115,22 @@ buffer / inline the loop in the placement predicates); `DrawTopBar` runs `CalcSi
 frame) — cache chips+widths once/frame; minimap/full-map dot loops scan every `*.All` each pass — throttle to ~5-10
 Hz; `DrawStatus`/`DrawObjective`/`DrawHoverInfo` rebuild interpolated strings every pass — cache once/frame.
 
-**Deferred — LOGIC (need an in-EDITOR check before changing — don't flip blind):**
-- **Belt input-side deposit gate** (`Belt.cs` ~439/485): storage/workshop input edge may be `OutputSide` vs
-  `Opposite(OutputSide)`; the agent flagged the comments/Ports disagree — VERIFY one belt→warehouse→belt pass
-  before touching, since the wrong flip breaks the working case.
-- **Powered machine reports FULL `CurrentDraw` while browned-out** (`WorkshopBuilding.cs` ~67) → can deepen
-  brownout in a feedback loop; verify against intended energy model.
-- **WaterPump per-liquid fair-share** divides by ALL recipe inputs, under-filling multi-input liquid recipes.
-- **Multi-stop line only loads at stop 0** + a `Depot.CycleItem` on a routed stop can desync the line's commodity
-  → both are SUBSUMED by the queued mixed-consist train rework (task — loco+wagons).
-- `autoStore` flag unimplemented (survival-era, mostly dead since factory-first); `ApplyRecipe` runs before
-  `InBuffer` is assigned in `Spawn` (latent ordering, no NRE today).
+**Deferred — LOGIC — REVIEWED 2026-06-29 (see #50 review notes):**
+- **Belt input-side deposit gate** (`Belt.cs` ~439/485): ✅ VERIFIED CORRECT, no change. Traced the full chain —
+  a belt moving `d` feeds the cell ahead from its `Opposite(d)` edge, so `d == OutputSide` correctly identifies a
+  belt approaching the INPUT edge (opposite the green OUT arrow). `Ports` puts the cyan IN notch on `Opposite(outputSide)`
+  (`Ports.cs:15`), which matches. Storage/workshop/depot gates all consistent. The agent's flag was a false alarm.
+- **Powered machine FULL `CurrentDraw` while browned-out** (`WorkshopBuilding.cs` ~67): ✅ VERIFIED CORRECT, no change.
+  Demand is DESIRE-based by design: `factor = supply/demand`, and actual consumption = `factor×demand = supply`, so
+  energy is conserved (`PowerNet.cs:143-162`). Reporting factor-scaled draw would make demand≈supply → factor≈1 →
+  brownout could never occur. The full-draw report is load-bearing, not a bug.
+- **WaterPump per-liquid fair-share**: ✅ FIXED. It used the OLD `capacity/N` hard cap that the BELT gate had already
+  abandoned (the "stalled at ≈12 / half-empty" bug, see `CanAcceptBeltInput`). Added shared `WorkshopBuilding.LiquidInputRoom`
+  (reserve-floor model) now used by the pump (Sink 2) AND `Depot.DrainLiquid`, so belt/pipe fair-share can't drift again.
+- **Multi-stop line only loads at stop 0** + routed-stop `CycleItem` desync: ✅ SUBSUMED by the #50 consist rework
+  (every stop now loads/unloads; stops keep their own items by design).
+- **Still open:** `autoStore` flag unimplemented (survival-era, mostly dead since factory-first); `ApplyRecipe` runs
+  before `InBuffer` is assigned in `Spawn` (latent ordering, no NRE today — left as-is).
 
 ## #48 Deeper crafting chains + critical balance retune (2026-06-29)
 Built on the existing recipe system (no replacement) — a deeper late-game MECHANICAL tree + a balance pass driven

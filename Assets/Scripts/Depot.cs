@@ -248,11 +248,9 @@ namespace Caveman
                             int room = st.def.capacity - st.Store.Total();
                             if (room > 0) { int add = Mathf.Min(budget, room); st.Store.Add(item, add); budget -= add; delivered += add; }
                         }
-                        if (budget > 0 && WorldGrid.Workshops.TryGetValue(nb, out var wk) && wk != null && wk.WantsInput(item))
+                        if (budget > 0 && WorldGrid.Workshops.TryGetValue(nb, out var wk) && wk != null)
                         {
-                            int inputs = wk.inputs != null ? Mathf.Max(1, wk.inputs.Count) : 1;
-                            int perCap = wk.InBuffer.capacity / inputs;
-                            int room = Mathf.Min(wk.InBuffer.capacity - wk.InBuffer.Total(), perCap - wk.InBuffer.Count(item));
+                            int room = wk.LiquidInputRoom(item); // shared reserve-floor fair-share (matches the pump + belt gate)
                             if (room > 0) { int add = Mathf.Min(budget, room); wk.InBuffer.Add(item, add); budget -= add; delivered += add; }
                         }
                     }
