@@ -20,6 +20,8 @@ namespace Caveman
         public int foodValue = 0;
         [Tooltip("Liquid (e.g. water): moves only via pipes / carrying, NEVER on belts.")]
         public bool isLiquid = false;
+        [Tooltip("Bulk raw with its own dedicated stockpile (Stone/Ore): the configurable Warehouse won't hold it.")]
+        public bool noWarehouse = false;
         [Tooltip("Icon shown on belts (and later in UI). Resolved from `sprite` via SpriteDatabase — do not set directly.")]
         public Sprite icon = null;
         [Tooltip("Visual reference resolved via SpriteDatabase — external sprite if one exists, else the procedural fallback shape.")]

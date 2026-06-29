@@ -23,7 +23,7 @@ namespace Caveman
         {
             if (!configurable || Store.Total() > 0) return;
             var items = new List<ItemDefinition>();
-            void Add(ItemDefinition i) { if (i != null && !items.Contains(i)) items.Add(i); }
+            void Add(ItemDefinition i) { if (i != null && !i.noWarehouse && !items.Contains(i)) items.Add(i); } // Stone/Ore keep their own stockpiles
             foreach (var p in ProductionBuilding.All) Add(p.produces);
             foreach (var w in WorkshopBuilding.All) Add(w.output);
             if (items.Count == 0) return;

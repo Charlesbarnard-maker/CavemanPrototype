@@ -42,7 +42,7 @@ namespace Caveman
         private readonly List<int> _recent = new(); // recently-placed buildable indices
         private readonly List<int> _recentSnapshot = new(); // reused copy for safe iteration in OnGUI
         private readonly HashSet<int> _pinned = new(); // pinned (favourite) buildable indices
-        private string _activeCat = "Production"; // build-menu accordion: only this group is open
+        private string _activeCat = "Gathering"; // build-menu accordion: only this group is open
         private bool _showMinimap = true;
         private bool _showMap;            // full-screen pan/zoom world map (M)
         private float _mapZoom = 1f;      // 1 = whole world fits the map area; higher = zoomed in
@@ -97,7 +97,8 @@ namespace Caveman
         // under Trains; storage is its own tab.
         private static readonly (string label, BuildingKind[] kinds)[] Cats =
         {
-            ("Production",     new[] { BuildingKind.Collector, BuildingKind.Workshop }),
+            ("Gathering",      new[] { BuildingKind.Collector }), // resource collectors (Wood/Stone/Clay/Ore/Oil…)
+            ("Fabrication",    new[] { BuildingKind.Workshop }),  // workshops that process raws into goods
             ("Research",       new[] { BuildingKind.Research }), // Research Lodge + the research-item crafters (tagged via menuCategory)
             ("Energy",         new[] { BuildingKind.Power, BuildingKind.Pole, BuildingKind.Battery }),
             ("Belts",          new[] { BuildingKind.Belt }),

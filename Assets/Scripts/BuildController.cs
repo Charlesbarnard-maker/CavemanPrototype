@@ -220,6 +220,107 @@ namespace Caveman
             CancelWire();
         }
 
+        // The Power Pole buildable (cached) — used by the wire-drag-builds-a-pole QoL.
+        private BuildingDefinition PoleDef()
+        {
+            if (_poleDef == null && buildables != null)
+                foreach (var d in buildables) if (d != null && d.kind == BuildingKind.Pole) { _poleDef = d; break; }
+            return _poleDef;
+        }
+
+        // True if `cell` is a clear, buildable spot for a 1×1 pole (land, not occupied by a building / reserved / pipe).
+        private bool PoleCellOk(Vector2Int cell)
+        {
+            var w = new Vector3(cell.x, cell.y, 0f);
+            return TerrainGrid.Buildable(cell) && !SolidBuildingAt(w) && !WorldGrid.IsReserved(cell) && PipeNet.At(cell) == null;
+        }
+
+        // While wiring, a left-click on empty ground drops a POWER POLE there, wires it to the current source,
+        // and continues the chain FROM the new pole — so you can string poles across a gap in a few clicks.
+        private bool TryBuildWirePole(Mouse mouse)
+        {
+            var def = PoleDef();
+            if (def == null || WireFrom == null || _cam == null) return false;
+            Vector3 world = _cam.ScreenToWorldPoint(mouse.position.ReadValue());
+            var cell = new Vector2Int(Mathf.RoundToInt(world.x), Mathf.RoundToInt(world.y));
+            var p = new Vector3(cell.x, cell.y, 0f);
+            if ((WireFrom.Pos - (Vector2)p).sqrMagnitude > PowerNet.MaxWireLength * PowerNet.MaxWireLength)
+            { Toast.Show("<color=#f99>Too far for one wire — click closer; poles chain.</color>"); return false; }
+            if (!PoleCellOk(cell)) { Toast.Show("<color=#f99>Can't place a pole there.</color>"); return false; }
+            if (!Economy.CanAfford(def.cost, Carried)) { Toast.Show("<color=#f99>Can't afford a Power Pole.</color>"); return false; }
+            Economy.Spend(def.cost, Carried);
+            var pole = PowerPole.Spawn(def, p, autoLink: false); // wire the chain explicitly below
+            var node = pole != null ? pole.GetComponent<PowerNode>() : null;
+            if (node == null) return false;
+            WireFrom.Connect(node);   // join the new pole to the chain
+            node.AutoLinkBackbone();  // …and to any other nearby backbone
+            WireFrom = node;          // keep wiring from the new pole
+            BuildingsPlaced++;
+            return true;
+        }
+
+        // Live wiring feedback: a preview cable from the source node to the cursor (cyan = a valid target /
+        // pole spot, red = blocked), plus a ghost POWER POLE over buildable terrain in reach.
+        private void UpdateWiringVisuals()
+        {
+            if (WireFrom == null)
+            {
+                if (_wireGhost != null && _wireGhost.activeSelf) _wireGhost.SetActive(false);
+                if (_wirePreview != null && _wirePreview.gameObject.activeSelf) _wirePreview.gameObject.SetActive(false);
+                return;
+            }
+            var mouse = Mouse.current;
+            if (_cam == null || mouse == null) return;
+            Vector3 world = _cam.ScreenToWorldPoint(mouse.position.ReadValue()); world.z = 0f;
+            var go = BuildingGOUnderCursor(mouse);
+            var node = go != null ? go.GetComponent<PowerNode>() : null;
+            var cell = new Vector2Int(Mathf.RoundToInt(world.x), Mathf.RoundToInt(world.y));
+            var cellW = new Vector3(cell.x, cell.y, 0f);
+            bool inRange = (WireFrom.Pos - (Vector2)cellW).sqrMagnitude <= PowerNet.MaxWireLength * PowerNet.MaxWireLength;
+
+            if (_wirePreview == null)
+            {
+                var lo = new GameObject("WirePreview");
+                _wirePreview = lo.AddComponent<LineRenderer>();
+                _wirePreview.material = PlaceholderArt.LineMaterial(); // shared
+                _wirePreview.widthMultiplier = 0.08f; _wirePreview.numCapVertices = 2;
+                _wirePreview.useWorldSpace = true; _wirePreview.sortingOrder = 12; _wirePreview.positionCount = 2;
+            }
+            if (!_wirePreview.gameObject.activeSelf) _wirePreview.gameObject.SetActive(true);
+
+            Vector3 from = new Vector3(WireFrom.Pos.x, WireFrom.Pos.y, 0f);
+            Vector3 to; Color col; bool showGhost = false;
+            if (node != null && node != WireFrom)
+            {
+                to = new Vector3(node.Pos.x, node.Pos.y, 0f);
+                col = WireFrom.CanLink(node) ? PowerWire.Powered : new Color(1f, 0.4f, 0.4f, 0.9f);
+            }
+            else if (node == null && PoleDef() != null && inRange && PoleCellOk(cell) && Economy.CanAfford(PoleDef().cost, Carried))
+            {
+                to = cellW; showGhost = true; col = new Color(0.5f, 0.9f, 1f, 0.85f);
+            }
+            else { to = world; col = new Color(1f, 0.5f, 0.3f, 0.7f); }
+            _wirePreview.SetPosition(0, from);
+            _wirePreview.SetPosition(1, to);
+            _wirePreview.startColor = _wirePreview.endColor = col;
+
+            if (showGhost)
+            {
+                if (_wireGhost == null)
+                {
+                    _wireGhost = new GameObject("WirePoleGhost");
+                    _wireGhostSr = _wireGhost.AddComponent<SpriteRenderer>();
+                    _wireGhostSr.sprite = PlaceholderArt.Pole();
+                    _wireGhostSr.sortingOrder = 9;
+                    _wireGhost.transform.localScale = Vector3.one * 0.55f;
+                }
+                if (!_wireGhost.activeSelf) _wireGhost.SetActive(true);
+                _wireGhost.transform.position = cellW;
+                _wireGhostSr.color = new Color(1f, 1f, 1f, 0.6f);
+            }
+            else if (_wireGhost != null && _wireGhost.activeSelf) _wireGhost.SetActive(false);
+        }
+
         /// <summary>Upgrade EXISTING routes to the newest unlocked vehicle tier in place — the
         /// "Donkey Track → Train" path persists without rebuilding. Called when the age advances.</summary>
         public void UpgradeAllRoutes()
@@ -236,6 +337,11 @@ namespace Caveman
 
         private GameObject _highlight; // glow ring around the selected building
         private LineRenderer _linkPreview; // amber line through the stops being collected (+ cursor)
+        // Power-wiring QoL: a live preview cable from the source node to the cursor, and a ghost POWER POLE
+        // shown over buildable terrain — click empty ground while wiring to drop a pole + wire it into the chain.
+        private LineRenderer _wirePreview;
+        private GameObject _wireGhost; private SpriteRenderer _wireGhostSr;
+        private BuildingDefinition _poleDef;
         public Belt.Dir BuildDir { get; private set; } = Belt.Dir.E; // output side for the building being placed
         // Per-cell I/O markers on the ghost — one per edge cell, so a 2×2 warehouse shows
         // 2 output arrows + 2 input notches (matching the built ports), not a single marker.
@@ -258,6 +364,7 @@ namespace Caveman
         {
             UpdateHighlight();
             UpdateLinkPreview();
+            UpdateWiringVisuals(); // live wire cable + ghost-pole preview while wiring
             // Building "reach" indicator: a harvest-radius RING for a collector (selected OR being
             // placed) + a box outline of the input-adjacency cells for any other selected building.
             // Runs BEFORE the placement highlight so that starting a placement cleanly re-lights nodes.
@@ -317,8 +424,9 @@ namespace Caveman
                 {
                     var go = BuildingGOUnderCursor(mouse);
                     var node = go != null ? go.GetComponent<PowerNode>() : null;
-                    if (node != null && node != WireFrom) CompleteWire(node);
-                    else CancelWire();
+                    if (node == WireFrom) CancelWire();        // clicked the source again → stop
+                    else if (node != null) CompleteWire(node); // another building → wire to it (done)
+                    else TryBuildWirePole(mouse);              // empty ground → drop a pole + keep chaining (toasts if it can't)
                 }
                 if (mouse != null && mouse.rightButton.wasPressedThisFrame) CancelWire();
                 return;

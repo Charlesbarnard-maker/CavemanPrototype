@@ -83,16 +83,14 @@ namespace Caveman
 
         void Update()
         {
-            var carried = Colony.Instance != null ? Colony.Instance.carried : null;
             _timer += Time.deltaTime;
             if (_timer >= interval)
             {
                 _timer -= interval;
-                // Fuel-free generators (no inputs) always run. Otherwise burn from the belt-fed buffer first,
-                // then fall back to the player's carried pile (so manual feeding still works).
-                if (fuel == null) _fueled = true;
-                else if (Buffer != null && Buffer.Count(fuel) >= fuelPerCycle) { Buffer.RemoveUpTo(fuel, fuelPerCycle); _fueled = true; }
-                else _fueled = Economy.SpendUpTo(fuel, fuelPerCycle, carried) >= fuelPerCycle;
+                // A generator burns FUEL it's actually been fed — belt fuel into its cyan intake. No more
+                // silently draining your carried pile: out of belt-fed fuel → no power (the grid browns out).
+                if (fuel == null) _fueled = true; // (no current generator is fuel-free)
+                else _fueled = Buffer != null && Buffer.Count(fuel) >= fuelPerCycle && Buffer.RemoveUpTo(fuel, fuelPerCycle) >= fuelPerCycle;
             }
             if (_sr != null)
                 _sr.color = _fueled ? _baseColor : Color.Lerp(_baseColor, Color.black, 0.55f);

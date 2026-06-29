@@ -78,6 +78,27 @@ namespace Caveman
             other.links.Remove(this);
             PowerWire.Destroy(this, other);
         }
+
+        /// <summary>Auto-wire this node to the nearest few BACKBONE nodes (poles / generators / batteries —
+        /// never a consuming machine) within reach, so dropping a row of poles links them up without hand-
+        /// drawing every wire. Machine hookups stay deliberate.</summary>
+        public void AutoLinkBackbone(int max = 2)
+        {
+            float maxSq = PowerNet.MaxWireLength * PowerNet.MaxWireLength;
+            var cands = new List<PowerNode>();
+            foreach (var n in All)
+            {
+                if (n == this || n.role == Role.Consumer || !n.CanLinkMore || links.Contains(n)) continue;
+                if ((Pos - n.Pos).sqrMagnitude <= maxSq) cands.Add(n);
+            }
+            cands.Sort((x, y) => (Pos - x.Pos).sqrMagnitude.CompareTo((Pos - y.Pos).sqrMagnitude)); // nearest first
+            int linked = 0;
+            foreach (var n in cands)
+            {
+                if (linked >= max || !CanLinkMore) break;
+                if (Connect(n)) linked++;
+            }
+        }
     }
 
     /// <summary>The visible cable for one wire (a thin LineRenderer between two nodes). Created/destroyed

@@ -23,7 +23,7 @@ namespace Caveman
             WorkshopBuilding.ResetPowerHint();
 
             // --- Items ---
-            var stone = MakeItem("stone", "Stone", new Color(0.55f, 0.55f, 0.62f));
+            var stone = MakeItem("stone", "Stone", new Color(0.55f, 0.55f, 0.62f)); stone.noWarehouse = true; // has its own Stone Stockpile
             var wood = MakeItem("wood", "Wood", new Color(0.52f, 0.34f, 0.16f));
             var food = MakeItem("food", "Food", new Color(0.85f, 0.35f, 0.35f));
             food.foodValue = 1;
@@ -39,7 +39,7 @@ namespace Caveman
             var grain = MakeItem("grain", "Grain", new Color(0.86f, 0.76f, 0.36f));
             var flour = MakeItem("flour", "Flour", new Color(0.90f, 0.86f, 0.72f));
             var bread = MakeItem("bread", "Bread", new Color(0.80f, 0.58f, 0.30f)); bread.foodValue = 4;
-            var ore = MakeItem("ore", "Iron Ore", new Color(0.62f, 0.58f, 0.42f)); // FINITE — far in the hills (Iron age)
+            var ore = MakeItem("ore", "Iron Ore", new Color(0.62f, 0.58f, 0.42f)); ore.noWarehouse = true; // FINITE — far in the hills (Iron age); has its own Ore Stockpile
             var metal = MakeItem("metal", "Iron", new Color(0.66f, 0.68f, 0.74f)); // smelted from Iron Ore
             var tools = MakeItem("tools", "Tools", new Color(0.55f, 0.60f, 0.68f));
             // LIQUIDS: Oil (pumped from deposits, moved by pipes) + Fuel (refined from Oil + Water).
@@ -187,7 +187,8 @@ namespace Caveman
                 new ItemAmount(wood, 4), new ItemAmount(stone, 2));
             var woodStore = MakeStorage("Woodpile", wood, 100, new Color(0.62f, 0.40f, 0.20f),
                 new ItemAmount(wood, 8));
-            woodStore.description = "Resource-specific storage: holds Wood only. (Each basic store is named for what it holds — Woodpile, Stone Storage, Granary, Water Barrel. The configurable 'Warehouse' is the ONE general store you assign yourself.)";
+            woodStore.footprintW = 1; woodStore.footprintH = 1; // a small pile — 1 belt in + 1 belt out
+            woodStore.description = "Resource-specific storage: holds Wood only. A small pile — one belt in, one belt out. (Each basic store is named for what it holds — Woodpile, Stone Stockpile, Granary, Water Barrel. The configurable 'Warehouse' is the ONE general store you assign yourself.)";
             var stoneStore = MakeStorage("Stone Stockpile", stone, 160, new Color(0.66f, 0.67f, 0.70f),
                 new ItemAmount(wood, 8));
             var foodStore = MakeStorage("Granary", food, 100, new Color(0.70f, 0.45f, 0.35f),
@@ -197,7 +198,8 @@ namespace Caveman
             // Generic warehouse: the player picks what it stores (e.g. Planks, Cooked Food).
             var warehouse = MakeStorage("Warehouse", null, 300, new Color(0.55f, 0.52f, 0.45f),
                 new ItemAmount(wood, 14), new ItemAmount(stone, 6)); warehouse.configurable = true;
-            warehouse.footprintW = 3; warehouse.footprintH = 3; // a proper HUB store — big, with 3 in + 3 out slots
+            // 2×2 → 2 belts in + 2 belts out. A big-capacity general store you assign yourself (but not Stone/Ore —
+            // those keep their own stockpiles).
             // (Construction is INSTANT now — no Construction Yard / builders.)
             // Long-distance logistics: depots + caravan routes (replaces the old haulers).
             var depot = ScriptableObject.CreateInstance<BuildingDefinition>();
@@ -447,13 +449,13 @@ namespace Caveman
             // brown out and slow down). Unlocks in Iron so you can prepare before it bites.
             var generator = MakePower("Coal Generator", 60, charcoal, 1, 3f, 3, new Color(0.30f, 0.30f, 0.34f),
                 new ItemAmount(bricks, 12), new ItemAmount(metal, 6));
-            generator.description = "Burns Charcoal to supply Power to the grid — a bigger, steadier source than the Wood Generator for a large powered base. BELT Charcoal into its cyan fuel edge (R aims it) to automate it, or it sips from your carried pile. Wire it (up to 4 cables) to poles, batteries or machines. Too little generation and wired machines brown out (slow down).";
+            generator.description = "Burns Charcoal to supply Power to the grid — a bigger, steadier source than the Wood Generator for a large powered base. You MUST belt Charcoal into its cyan fuel edge (R aims it) — no fuel, no power. Wire it (up to 4 cables) to poles, batteries or machines. Too little generation and wired machines brown out (slow down).";
             // BRONZE-AGE POWER: electricity is introduced in the Bronze age. A Wood Generator feeds the
             // grid; you draw WIRES from it to Poles/Batteries/machines (no radius). From Bronze,
             // requiresPower machines must be WIRED to a powered network to run (before Bronze they run free).
             var woodGen = MakePower("Wood Generator", 40, wood, 1, 2.5f, 2, new Color(0.55f, 0.40f, 0.25f),
                 new ItemAmount(wood, 6), new ItemAmount(stone, 4));
-            woodGen.description = "WOOD GENERATOR — burns Wood to supply POWER (introduced in the Bronze age). BELT Wood into its cyan fuel edge (R aims it) to automate it, or it sips from your carried pile. Select it and 'Connect wire' to a machine, Battery or Power Pole (up to 4 wires). Wired machines run; unwired ones stop. Powers ~4 machines.";
+            woodGen.description = "WOOD GENERATOR — burns Wood to supply POWER (introduced in the Bronze age). You MUST belt Wood into its cyan fuel edge (R aims it) — no fuel, no power. Select it and 'Connect wire' to a machine, Battery or Power Pole (up to 4 wires). Wired machines run; unwired ones stop. Powers ~4 machines.";
             var pole = ScriptableObject.CreateInstance<BuildingDefinition>();
             pole.displayName = "Power Pole"; pole.kind = BuildingKind.Pole; pole.unlockAge = 2;
             pole.color = new Color(0.55f, 0.42f, 0.28f);

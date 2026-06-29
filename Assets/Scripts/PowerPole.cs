@@ -17,7 +17,7 @@ namespace Caveman
         void OnEnable() => All.Add(this);
         void OnDisable() => All.Remove(this);
 
-        public static PowerPole Spawn(BuildingDefinition def, Vector3 pos)
+        public static PowerPole Spawn(BuildingDefinition def, Vector3 pos, bool autoLink = true)
         {
             var go = new GameObject(def.displayName);
             go.transform.position = new Vector3(pos.x, pos.y, 0f);
@@ -36,6 +36,9 @@ namespace Caveman
             var node = go.AddComponent<PowerNode>();
             node.role = PowerNode.Role.Pole;
             node.maxConnections = 4;
+            // QoL: a freshly-placed pole auto-wires to nearby poles/generators/batteries so the backbone forms
+            // itself. The wire-drag-builds-a-pole flow passes autoLink:false and wires the chain explicitly.
+            if (autoLink) node.AutoLinkBackbone();
             return p;
         }
     }
