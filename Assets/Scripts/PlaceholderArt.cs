@@ -19,6 +19,9 @@ namespace Caveman
         private static Sprite _pole;
         private static Sprite[] _caveman;         // player avatar per age × walk-frame
         private static Sprite _tree, _rock, _boat, _clay, _oreCopper, _oreIron, _oilPatch, _pipe;
+        private static Sprite[] _pipeTiles;            // 16 connection-pattern tubes (N=1,E=2,S=4,W=8)
+        private static Sprite _pipeValveS, _pipeValveM; // junction pieces: splitter (teal) / merger (amber)
+        private static Sprite _pipeDrop;               // animated flow droplet (direction + that fluid moves)
         private static Material _lineMat;
 
         /// <summary>One SHARED material for every LineRenderer (wires, route lines, reach rings, previews).
@@ -1051,35 +1054,102 @@ namespace Caveman
     return _tree;
 }
 
-        /// <summary>A liquid PIPE tile — a metal tube cross (connects any way). White body (tinted by the
-        /// pipe's colour: blue water / dark oil), with baked darker rims so it reads as a pipe.</summary>
-        public static Sprite PipeTile()
+        /// <summary>Legacy no-arg pipe sprite — the full cross. New code passes a connection MASK.</summary>
+        public static Sprite PipeTile() => PipeTile(15);
+
+        /// <summary>A liquid PIPE tile that auto-connects: only the arms toward connected neighbours are drawn
+        /// (mask bits N=1,E=2,S=4,W=8), so a run reads as one continuous tube and corners/tees/crosses are
+        /// obvious. White body (tinted by the pipe's fluid colour), baked rims + centre highlight.</summary>
+        public static Sprite PipeTile(int mask)
         {
-            if (_pipe != null) return _pipe;
+            mask &= 15;
+            _pipeTiles ??= new Sprite[16];
+            if (_pipeTiles[mask] != null) return _pipeTiles[mask];
             const int s = 64;
             var tex = NewTex(s);
             var px = new Color[s * s];
             var body = Color.white;
             var rim = new Color(0.45f, 0.47f, 0.52f, 1f);
             var hi = new Color(1f, 1f, 1f, 1f);
+            bool n = (mask & 1) != 0, e = (mask & 2) != 0, so = (mask & 4) != 0, w = (mask & 8) != 0;
+            if (mask == 0) { n = so = true; } // a lone pipe still shows a short stub so it's visible
             for (int y = 0; y < s; y++)
                 for (int x = 0; x < s; x++)
                 {
                     float fx = x / (float)(s - 1), fy = y / (float)(s - 1);
                     float ax = Mathf.Abs(fx - 0.5f), ay = Mathf.Abs(fy - 0.5f);
-                    bool horiz = ay < 0.20f, vert = ax < 0.20f;
+                    bool armE = e && ay < 0.20f && fx >= 0.5f;
+                    bool armW = w && ay < 0.20f && fx <= 0.5f;
+                    bool armN = n && ax < 0.20f && fy >= 0.5f;
+                    bool armS = so && ax < 0.20f && fy <= 0.5f;
+                    bool hub = ax < 0.20f && ay < 0.20f; // the centre always reads as the junction body
                     Color c = Clear;
-                    if (horiz || vert)
+                    if (armE || armW || armN || armS || hub)
                     {
-                        c = body;
-                        if ((horiz && ay > 0.15f) || (vert && ax > 0.15f)) c = rim;      // tube rims
-                        if ((horiz && ay < 0.04f) || (vert && ax < 0.04f)) c = hi;        // centre highlight
+                        // "across" = distance from the tube's centreline → rim near the edge, highlight at the core.
+                        float across = (armN || armS) ? ax : (armE || armW) ? ay : Mathf.Min(ax, ay);
+                        c = across > 0.15f ? rim : across < 0.04f ? hi : body;
                     }
                     px[y * s + x] = c;
                 }
             tex.SetPixels(px); tex.Apply();
-            _pipe = Sprite.Create(tex, new Rect(0, 0, s, s), new Vector2(0.5f, 0.5f), s);
-            return _pipe;
+            _pipeTiles[mask] = Sprite.Create(tex, new Rect(0, 0, s, s), new Vector2(0.5f, 0.5f), s);
+            return _pipeTiles[mask];
+        }
+
+        /// <summary>A pipe JUNCTION piece — a full cross with a central VALVE box so splitters/mergers read
+        /// distinctly from plain pipe (teal valve = splitter, amber = merger), like conveyor junctions.</summary>
+        public static Sprite PipeValve(bool merger)
+        {
+            if (merger && _pipeValveM != null) return _pipeValveM;
+            if (!merger && _pipeValveS != null) return _pipeValveS;
+            const int s = 64;
+            var tex = NewTex(s);
+            var px = new Color[s * s];
+            var body = Color.white;
+            var rim = new Color(0.45f, 0.47f, 0.52f, 1f);
+            var valve = merger ? new Color(0.86f, 0.62f, 0.34f, 1f) : new Color(0.34f, 0.74f, 0.70f, 1f);
+            var valveHi = merger ? new Color(0.98f, 0.78f, 0.5f, 1f) : new Color(0.55f, 0.92f, 0.88f, 1f);
+            for (int y = 0; y < s; y++)
+                for (int x = 0; x < s; x++)
+                {
+                    float fx = x / (float)(s - 1), fy = y / (float)(s - 1);
+                    float ax = Mathf.Abs(fx - 0.5f), ay = Mathf.Abs(fy - 0.5f);
+                    Color c = Clear;
+                    if (ax < 0.20f || ay < 0.20f) // the full cross of tube
+                    {
+                        float across = ax < 0.20f && ay < 0.20f ? Mathf.Min(ax, ay) : Mathf.Min(ax < 0.20f ? ax : 1f, ay < 0.20f ? ay : 1f);
+                        c = across > 0.15f ? rim : body;
+                    }
+                    // central valve box (a rounded square) on top
+                    if (ax < 0.16f && ay < 0.16f) c = (ax < 0.10f && ay < 0.10f) ? valveHi : valve;
+                    px[y * s + x] = c;
+                }
+            tex.SetPixels(px); tex.Apply();
+            var sp = Sprite.Create(tex, new Rect(0, 0, s, s), new Vector2(0.5f, 0.5f), s);
+            if (merger) _pipeValveM = sp; else _pipeValveS = sp;
+            return sp;
+        }
+
+        /// <summary>A small bright droplet that slides along a pipe to show fluid is FLOWING and which way.</summary>
+        public static Sprite PipeDroplet()
+        {
+            if (_pipeDrop != null) return _pipeDrop;
+            const int s = 32;
+            var tex = NewTex(s);
+            var px = new Color[s * s];
+            for (int y = 0; y < s; y++)
+                for (int x = 0; x < s; x++)
+                {
+                    float dx = x / (float)(s - 1) - 0.5f, dy = y / (float)(s - 1) - 0.5f;
+                    float r = Mathf.Sqrt(dx * dx + dy * dy);
+                    Color c = Clear;
+                    if (r <= 0.34f) c = new Color(1f, 1f, 1f, Mathf.SmoothStep(1f, 0.2f, r / 0.34f)); // soft glowing dot
+                    px[y * s + x] = c;
+                }
+            tex.SetPixels(px); tex.Apply();
+            _pipeDrop = Sprite.Create(tex, new Rect(0, 0, s, s), new Vector2(0.5f, 0.5f), s);
+            return _pipeDrop;
         }
 
         /// <summary>A dark oil pool with a purple sheen — for Oil deposit nodes.</summary>

@@ -576,12 +576,20 @@ namespace Caveman
             // PointerOverUI guard stops a build-menu click from also dropping a building.
             if (mouse.leftButton.wasPressedThisFrame && PlacementValid && !InventoryHud.PointerOverUI)
             {
-                // TIMED construction: pay the cost up front, then drop a construction SITE that assembles
-                // itself over a few seconds (size-scaled) before becoming the finished building — no builder
-                // units, no hauling. (Economy.Spend no-ops in sandbox/FreeBuild.) Cancelling refunds in full.
-                Economy.Spend(def.cost, Carried);
-                ConstructionSite.Spawn(def, world, BuildDir);
-                BuildingsPlaced++;
+                // One-fluid rule: refuse a source (pump/well) that would touch a network of a different fluid.
+                if (def.kind == BuildingKind.Pump && !def.booster && PumpFluidClash(world, ew, eh, def.item, out string pmsg))
+                {
+                    Toast.Show($"<color=#ffb24d>⛔ {pmsg}</color>");
+                }
+                else
+                {
+                    // TIMED construction: pay the cost up front, then drop a construction SITE that assembles
+                    // itself over a few seconds (size-scaled) before becoming the finished building — no builder
+                    // units, no hauling. (Economy.Spend no-ops in sandbox/FreeBuild.) Cancelling refunds in full.
+                    Economy.Spend(def.cost, Carried);
+                    ConstructionSite.Spawn(def, world, BuildDir);
+                    BuildingsPlaced++;
+                }
             }
             if (mouse.rightButton.wasPressedThisFrame) CancelPlacement();
         }
@@ -1142,8 +1150,13 @@ namespace Caveman
             if (mouse.rightButton.wasPressedThisFrame) CancelPlacement();
         }
 
-        // Pipe mode: drag to lay liquid-network segments on land (or bridged water). No
-        // direction; placed instantly. A Water Pump pushes water through them into storage.
+        // Pipe mode: drag to lay liquid-network segments on land (or bridged water). No direction; placed
+        // instantly. A Water Pump pushes water through them into storage. ONE-FLUID rule: a pipe can't join a
+        // line/source carrying a different fluid — the ghost goes amber + a toast explains when you try.
+        private static readonly Belt.Dir[] _pdirs = { Belt.Dir.N, Belt.Dir.E, Belt.Dir.S, Belt.Dir.W };
+        private Vector2Int _pipeCheckCell = new Vector2Int(int.MinValue, int.MinValue);
+        private bool _pipeClash; private string _pipeClashMsg;
+        private float _pipeClashToastT = -9f;
         private void UpdatePipePlacement(Mouse mouse)
         {
             if (_cam == null || mouse == null || _ghost == null) return;
@@ -1157,16 +1170,26 @@ namespace Caveman
             _ghostSr.sprite = PlaceholderArt.Square();
             _ghost.transform.localScale = Vector3.one * 0.6f;
 
+            // The fluid-clash flood is O(network), so recompute it only when the hovered cell changes.
+            if (cell != _pipeCheckCell) { _pipeCheckCell = cell; _pipeClash = PipeFluidClash(cell, out _pipeClashMsg); }
+
             bool ok = PipeNet.At(cell) == null && TerrainGrid.BeltAllowed(cell)
                       && !SolidBuildingAt(new Vector3(cell.x, cell.y, 0f)) // never lay a pipe on/under a building
+                      && !_pipeClash                                       // can't merge two different fluids
                       && Economy.CanAfford(def.cost, Carried);
             PlacementValid = ok;
-            _ghostSr.color = ok ? new Color(0.35f, 1f, 0.4f, 0.55f) : new Color(1f, 0.3f, 0.3f, 0.5f);
+            _ghostSr.color = ok ? new Color(0.35f, 1f, 0.4f, 0.55f)
+                           : _pipeClash ? new Color(1f, 0.55f, 0.15f, 0.65f)  // amber = fluid clash (distinct from plain invalid)
+                           : new Color(1f, 0.3f, 0.3f, 0.5f);
 
             if (!mouse.leftButton.isPressed) _dragging = false;
-            if (mouse.leftButton.isPressed && ok && !InventoryHud.PointerOverUI)
+            if (mouse.leftButton.isPressed && !InventoryHud.PointerOverUI)
             {
-                if (!_dragging || cell != _dragLast)
+                // Surface the clash reason when the player actually tries to connect (rate-limited so a drag won't spam).
+                if (_pipeClash && Time.unscaledTime - _pipeClashToastT > 1.5f)
+                { Toast.Show($"<color=#ffb24d>⛔ {_pipeClashMsg}</color>"); _pipeClashToastT = Time.unscaledTime; }
+
+                if (ok && (!_dragging || cell != _dragLast))
                 {
                     Economy.Spend(def.cost, Carried);
                     Pipe.Spawn(def, new Vector3(cell.x, cell.y, 0f));
@@ -1177,6 +1200,54 @@ namespace Caveman
             }
             if (mouse.rightButton.wasPressedThisFrame) CancelPlacement();
         }
+
+        // True if placing a pipe at `cell` would JOIN two different fluids — an existing line of one fluid meeting
+        // another fluid's line or an adjacent source of a different fluid. Sets `msg` with a player-facing reason.
+        private bool PipeFluidClash(Vector2Int cell, out string msg)
+        {
+            msg = null;
+            ItemDefinition f0 = null;
+            foreach (var d in _pdirs) // adjacent existing pipe networks
+            {
+                var nb = cell + Belt.Step(d);
+                if (PipeNet.At(nb) == null) continue;
+                var nf = PipeNet.NetworkFluid(nb, out _);
+                if (nf == null) continue;
+                if (f0 == null) f0 = nf; else if (f0 != nf) { msg = ClashMsg(f0, nf); return true; }
+            }
+            foreach (var p in WaterPump.All) // adjacent fluid SOURCES (a pump/well imposes its fluid)
+            {
+                if (p == null || p.isBooster || p.water == null) continue;
+                var pc = new Vector2Int(Mathf.RoundToInt(p.transform.position.x), Mathf.RoundToInt(p.transform.position.y));
+                bool adj = false; foreach (var d in _pdirs) if (pc + Belt.Step(d) == cell) { adj = true; break; }
+                if (!adj) continue;
+                if (f0 == null) f0 = p.water; else if (f0 != p.water) { msg = ClashMsg(f0, p.water); return true; }
+            }
+            return false;
+        }
+
+        // True if a fluid SOURCE placed over footprint (w×h at `world`) would touch a pipe network already
+        // carrying a different fluid (e.g. an Oil Well dropped onto a water line). Sets `msg` with the reason.
+        private bool PumpFluidClash(Vector3 world, int w, int h, ItemDefinition fluid, out string msg)
+        {
+            msg = null;
+            if (fluid == null) return false;
+            var a = Footprint.Anchor(world, w, h);
+            for (int i = 0; i < w; i++)
+                for (int j = 0; j < h; j++)
+                {
+                    var c = new Vector2Int(a.x + i, a.y + j);
+                    foreach (var d in _pdirs)
+                    {
+                        var nf = PipeNet.At(c + Belt.Step(d)) != null ? PipeNet.NetworkFluid(c + Belt.Step(d), out _) : null;
+                        if (nf != null && nf != fluid) { msg = ClashMsg(fluid, nf); return true; }
+                    }
+                }
+            return false;
+        }
+
+        private static string ClashMsg(ItemDefinition a, ItemDefinition b)
+            => $"Can't connect {a.displayName} and {b.displayName} pipes — keep each fluid on its own line.";
 
         // Rail mode: BLUEPRINT placement, like belts — drag to plan a continuous 90° run (cyan ghosts, no
         // cost), click to build it, right-click to cancel. Only orthogonal L-paths (no diagonals) so track

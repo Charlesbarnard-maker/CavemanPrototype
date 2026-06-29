@@ -34,6 +34,8 @@ namespace Caveman
         private bool _flowing;
         private SpriteRenderer _sr;
         private Color _base;
+        private SpriteRenderer _statusPip; // green = pumping, red = idle/dry (source pumps only)
+        private float _pipBase;            // resting pip scale (kept world-constant despite footprint scale)
 
         private static readonly Queue<Vector2Int> _q = new();
         private static readonly Dictionary<Vector2Int, int> _dist = new(); // pipe cell → pressure distance
@@ -58,6 +60,22 @@ namespace Caveman
             p.isBooster = def.booster;
             p._sr = sr;
             p._base = def.color;
+            // Source pumps get a status pip so you can tell at a glance whether they're actually pumping
+            // (green) or idle/dry/disconnected (red). Boosters are passive relays — the flowing pipes show it.
+            if (!p.isBooster)
+            {
+                float scale = Mathf.Max(0.01f, go.transform.localScale.x);
+                var pip = new GameObject("status");
+                pip.transform.SetParent(go.transform);
+                pip.transform.localPosition = new Vector3(0.34f, 0.34f, 0f); // parent space: ~the top-right corner
+                p._pipBase = 0.24f / scale;
+                pip.transform.localScale = Vector3.one * p._pipBase;
+                var psr = pip.AddComponent<SpriteRenderer>();
+                psr.sprite = PlaceholderArt.PipeDroplet(); // a soft round dot
+                psr.color = new Color(1f, 0.35f, 0.3f, 0.9f);
+                psr.sortingOrder = 6;
+                p._statusPip = psr;
+            }
             // A booster registers its neighbouring cells as pressure-reset points.
             if (p.isBooster)
             {
@@ -91,10 +109,19 @@ namespace Caveman
         {
             if (isBooster) return; // passive relay — only marks BoostCells
             _t += Time.deltaTime;
-            if (_t < interval) return;
-            _t = 0f;
-            _flowing = Pump();
-            if (_sr != null) _sr.color = _flowing ? _base : Color.Lerp(_base, Color.black, 0.5f);
+            if (_t >= interval)
+            {
+                _t = 0f;
+                _flowing = Pump();
+                if (_sr != null) _sr.color = _flowing ? _base : Color.Lerp(_base, new Color(0.2f, 0.12f, 0.12f), 0.55f);
+            }
+            // The status pip animates EVERY frame off the cached _flowing state (Pump itself only ticks each interval).
+            if (_statusPip != null)
+            {
+                _statusPip.color = _flowing ? new Color(0.3f, 1f, 0.4f, 0.95f) : new Color(1f, 0.35f, 0.3f, 0.9f);
+                float pulse = _flowing ? 0.9f + 0.18f * Mathf.Sin(Time.time * 6f) : 1f; // a heartbeat while pumping
+                _statusPip.transform.localScale = Vector3.one * (_pipBase * pulse);
+            }
         }
 
         // Source water only if adjacent to water terrain; then flood the connected pipe network
@@ -117,7 +144,8 @@ namespace Caveman
             foreach (var d in _dirs)
             {
                 var s = me + Belt.Step(d);
-                if (PipeNet.At(s) != null && !_dist.ContainsKey(s)) { _dist[s] = 1; _q.Enqueue(s); }
+                var sp = PipeNet.At(s);
+                if (sp != null && !_dist.ContainsKey(s)) { _dist[s] = 1; _q.Enqueue(s); sp.MarkFlow(water, d); } // flows OUT from the pump
             }
             if (_q.Count == 0) return false; // no connected pipe → nothing to pump (and don't waste finite oil)
 
@@ -168,9 +196,10 @@ namespace Caveman
                 foreach (var d in _dirs)
                 {
                     var nb = c + Belt.Step(d);
-                    if (PipeNet.At(nb) == null) continue;
+                    var np = PipeNet.At(nb);
+                    if (np == null) continue;
                     int nd = baseD + 1;
-                    if (!_dist.TryGetValue(nb, out var old) || nd < old) { _dist[nb] = nd; _q.Enqueue(nb); }
+                    if (!_dist.TryGetValue(nb, out var old) || nd < old) { _dist[nb] = nd; _q.Enqueue(nb); np.MarkFlow(water, d); } // flows c→nb
                 }
             }
             return delivered;

@@ -227,7 +227,8 @@ namespace Caveman
                     foreach (var dir in RailTile.Four)
                     {
                         var s = cell + Belt.Step(dir);
-                        if (PipeNet.At(s) != null && !_ldist.ContainsKey(s)) { _ldist[s] = 1; _lq.Enqueue(s); }
+                        var sp = PipeNet.At(s);
+                        if (sp != null && !_ldist.ContainsKey(s)) { _ldist[s] = 1; _lq.Enqueue(s); sp.MarkFlow(item, dir); }
                     }
             if (_lq.Count == 0) return;
 
@@ -259,9 +260,10 @@ namespace Caveman
                 foreach (var dir in RailTile.Four)
                 {
                     var nb = c + Belt.Step(dir);
-                    if (PipeNet.At(nb) == null) continue;
+                    var np = PipeNet.At(nb);
+                    if (np == null) continue;
                     int nd = baseD + 1;
-                    if (!_ldist.TryGetValue(nb, out var old) || nd < old) { _ldist[nb] = nd; _lq.Enqueue(nb); }
+                    if (!_ldist.TryGetValue(nb, out var old) || nd < old) { _ldist[nb] = nd; _lq.Enqueue(nb); np.MarkFlow(item, dir); }
                 }
             }
             if (delivered > 0) store.RemoveUpTo(item, delivered);

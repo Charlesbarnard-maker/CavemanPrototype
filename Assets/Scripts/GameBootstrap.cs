@@ -153,7 +153,19 @@ namespace Caveman
             pipe.displayName = "Pipe"; pipe.kind = BuildingKind.Pipe; pipe.unlockAge = 2;
             pipe.color = new Color(0.40f, 0.62f, 0.85f);
             pipe.cost = new List<ItemAmount> { new ItemAmount(stone, 1) };
-            pipe.description = "A liquid-network segment — continuous flow, NOT items. Drag to run pipes from a Water Pump to your Water Barrels. The pump only fills storage its pipes actually reach, so layout/topology matters.";
+            pipe.description = "A liquid-network segment — continuous flow, NOT items. Drag to run pipes from a Water Pump to your Water Barrels. Tubes auto-connect + tint to their fluid, and a droplet shows the flow direction. A line carries ONE fluid only.";
+            // Pipe JUNCTION pieces — like conveyor splitters/mergers but for fluids. They read distinctly (a
+            // valve) so branches/joins are obvious; flow still floods through them. Same fluid only.
+            var pipeSplitter = ScriptableObject.CreateInstance<BuildingDefinition>();
+            pipeSplitter.displayName = "Pipe Splitter"; pipeSplitter.kind = BuildingKind.Pipe; pipeSplitter.splitter = true; pipeSplitter.unlockAge = 2;
+            pipeSplitter.color = new Color(0.34f, 0.74f, 0.70f);
+            pipeSplitter.cost = new List<ItemAmount> { new ItemAmount(stone, 2) };
+            pipeSplitter.description = "A pipe JUNCTION that branches a fluid line out to every connected pipe (teal valve). Place it where you want a clear split. Same fluid only — like the rest of the line.";
+            var pipeMerger = ScriptableObject.CreateInstance<BuildingDefinition>();
+            pipeMerger.displayName = "Pipe Merger"; pipeMerger.kind = BuildingKind.Pipe; pipeMerger.merger = true; pipeMerger.unlockAge = 2;
+            pipeMerger.color = new Color(0.86f, 0.62f, 0.34f);
+            pipeMerger.cost = new List<ItemAmount> { new ItemAmount(stone, 2) };
+            pipeMerger.description = "A pipe JUNCTION that combines fluid lines into one (amber valve). Same fluid only — a Water line and an Oil line can't be merged.";
             var pump = ScriptableObject.CreateInstance<BuildingDefinition>();
             pump.displayName = "Water Pump"; pump.kind = BuildingKind.Pump; pump.item = water; pump.unlockAge = 2;
             pump.color = new Color(0.30f, 0.55f, 0.78f);
@@ -646,8 +658,8 @@ namespace Caveman
               // Logistics — belt tier ladder (wooden→conveyor→geared→steel) + junctions + smart-logistics tools + transport
               woodBelt, fastBelt, gearedBelt, steelBelt, splitter, merger,
               undergroundBelt, filterBelt, prioritySplitter, conditionalGate, depot, rail, elevatedRail, signal, twoWaySignal, bridge, harbour,
-              // Liquids — pipes carry oil/water (never belts); Oil Well pumps oil, Water Pump pumps water, Booster relays pressure
-              pipe, pump, booster, oilWell,
+              // Liquids — pipes carry oil/water (never belts); splitter/merger junctions; Oil Well pumps oil, Water Pump pumps water, Booster relays pressure
+              pipe, pipeSplitter, pipeMerger, pump, booster, oilWell,
               // Storage — open-air piles for raw materials (Woodpile / Stone + Ore Stockpiles / Clay / Brick),
               // the big configurable Warehouse hub, and liquid tanks (Oil Tank / Water Barrel)
               woodStore, stoneStore, oreStore, clayStore, brickStore, warehouse, oilTank, waterStore,
