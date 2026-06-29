@@ -167,9 +167,13 @@ namespace Caveman
 
         private int FirstUnlockedRecipe()
         {
+            // Default to the LOWEST-age unlocked recipe (the simplest one), independent of list order, so a
+            // freshly placed multi-recipe machine never auto-selects a higher-tier recipe by authoring accident.
             int age = Colony.Instance != null ? Colony.Instance.Age : 0;
-            for (int i = 0; i < recipes.Count; i++) if (recipes[i].unlockAge <= age) return i;
-            return 0; // nothing unlocked yet (shouldn't happen — first recipe is age 0) → default to first
+            int best = -1, bestAge = int.MaxValue;
+            for (int i = 0; i < recipes.Count; i++)
+                if (recipes[i].unlockAge <= age && recipes[i].unlockAge < bestAge) { bestAge = recipes[i].unlockAge; best = i; }
+            return best >= 0 ? best : 0; // none unlocked yet → the first
         }
 
         /// <summary>Switch to the next age-unlocked recipe (player clicks "change recipe" in the panel).

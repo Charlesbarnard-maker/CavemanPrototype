@@ -57,6 +57,32 @@ sprite packs.
   Keep KNOWN_ISSUES newest-first. CavemanPrototype stays OUT of global memory.
 ---
 
+## #49 Optimisation / logic / balance sweep — 3-agent review (2026-06-29)
+Ran 3 parallel review agents (logic, balance, perf). Balance fixes landed in #48. This entry records the rest.
+**Applied (compile-clean):**
+- **PERF:** `BuildController.SolidBuildingAt` now uses `Physics2D.OverlapPoint` NonAlloc + a reused buffer/filter
+  (was allocating a `Collider2D[]` per call — run per footprint cell every frame a ghost is active). Also added
+  **Garage** to the solid check (it should block placement/walking).
+- **LOGIC:** `WorkshopBuilding.FirstUnlockedRecipe` now defaults to the LOWEST-age unlocked recipe regardless of
+  list order (so a multi-recipe machine can't auto-pick a higher tier by authoring accident).
+
+**Deferred — PERF (clear + safe, for a focused follow-up):** `Footprint.Cells` allocates a List per call (reuse a
+buffer / inline the loop in the placement predicates); `DrawTopBar` runs `CalcSize` per chip every OnGUI pass (2×/
+frame) — cache chips+widths once/frame; minimap/full-map dot loops scan every `*.All` each pass — throttle to ~5-10
+Hz; `DrawStatus`/`DrawObjective`/`DrawHoverInfo` rebuild interpolated strings every pass — cache once/frame.
+
+**Deferred — LOGIC (need an in-EDITOR check before changing — don't flip blind):**
+- **Belt input-side deposit gate** (`Belt.cs` ~439/485): storage/workshop input edge may be `OutputSide` vs
+  `Opposite(OutputSide)`; the agent flagged the comments/Ports disagree — VERIFY one belt→warehouse→belt pass
+  before touching, since the wrong flip breaks the working case.
+- **Powered machine reports FULL `CurrentDraw` while browned-out** (`WorkshopBuilding.cs` ~67) → can deepen
+  brownout in a feedback loop; verify against intended energy model.
+- **WaterPump per-liquid fair-share** divides by ALL recipe inputs, under-filling multi-input liquid recipes.
+- **Multi-stop line only loads at stop 0** + a `Depot.CycleItem` on a routed stop can desync the line's commodity
+  → both are SUBSUMED by the queued mixed-consist train rework (task — loco+wagons).
+- `autoStore` flag unimplemented (survival-era, mostly dead since factory-first); `ApplyRecipe` runs before
+  `InBuffer` is assigned in `Spawn` (latent ordering, no NRE today).
+
 ## #48 Deeper crafting chains + critical balance retune (2026-06-29)
 Built on the existing recipe system (no replacement) — a deeper late-game MECHANICAL tree + a balance pass driven
 by a 3-agent logic/balance/perf review.

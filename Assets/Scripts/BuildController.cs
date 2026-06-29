@@ -702,16 +702,21 @@ namespace Caveman
         /// <summary>True if a SOLID building (or construction site) overlaps this point — used for
         /// placement blocking, belt-on-building blocking, and player/worker collision. Belts,
         /// bridges, pipes and resource nodes are NOT solid (you build/walk over them).</summary>
+        // Reused query buffer + filter so this hot test (run per footprint cell, every frame a ghost is active)
+        // doesn't allocate a Collider2D[] each call.
+        private static readonly Collider2D[] _solidBuf = new Collider2D[24];
+        private static readonly ContactFilter2D _solidFilter = new ContactFilter2D { useTriggers = true, useLayerMask = false };
         public static bool SolidBuildingAt(Vector3 world)
         {
-            var hits = Physics2D.OverlapPointAll(world);
-            foreach (var h in hits)
+            int n = Physics2D.OverlapPoint((Vector2)world, _solidFilter, _solidBuf);
+            for (int i = 0; i < n; i++)
             {
+                var h = _solidBuf[i];
                 if (h == null) continue;
                 if (h.GetComponent<ProductionBuilding>() || h.GetComponent<StorageBuilding>()
                     || h.GetComponent<WorkshopBuilding>() || h.GetComponent<Depot>()
                     || h.GetComponent<PowerPlant>() || h.GetComponent<WaterPump>() || h.GetComponent<Battery>()
-                    || h.GetComponent<ResearchBuilding>() || h.GetComponent<ConstructionSite>()) return true;
+                    || h.GetComponent<ResearchBuilding>() || h.GetComponent<Garage>() || h.GetComponent<ConstructionSite>()) return true;
             }
             return false;
         }
