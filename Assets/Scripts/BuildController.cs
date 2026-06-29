@@ -1343,6 +1343,7 @@ namespace Caveman
                               || hit.GetComponent<PowerPlant>() != null
                               || hit.GetComponent<PowerPole>() != null
                               || hit.GetComponent<Battery>() != null
+                              || hit.GetComponent<Garage>() != null
                               || hit.GetComponent<WaterPump>() != null
                               || hit.GetComponent<ResearchBuilding>() != null
                               || hit.GetComponent<Bridge>() != null

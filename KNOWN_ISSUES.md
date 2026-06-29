@@ -57,6 +57,15 @@ sprite packs.
   Keep KNOWN_ISSUES newest-first. CavemanPrototype stays OUT of global memory.
 ---
 
+## #47 Garage selectable fix + electricity review/onboarding (2026-06-29)
+- **Garage bug (fixed):** the Garage was missing from `BuildController.BuildingGOUnderCursor`'s selectable-component
+  whitelist, so clicking a built Garage returned null (couldn't open its panel). Added `GetComponent<Garage>()`.
+- **Electricity (reviewed):** it works as designed — `PowerNet.Active` turns on at the **Bronze age (2)**; from then
+  the `requiresPower` machines (**Kiln, Potter, Basic Smelter, Advanced Smelter**) must be WIRED to a powered
+  network (Generator → Power Poles → machine) or they STOP (blue status dot). Before Bronze they run free; Refinery
+  is exempt. Fixed two misleading "Industrial age" comments (it's Bronze) and added a **one-time onboarding toast**
+  the first time a machine loses power, explaining to build + wire a Generator (`WorkshopBuilding.ResetPowerHint`).
+
 ## #46 Rail EXPLICIT connectivity — accurate blueprint + working merge (2026-06-29)
 Replaced the `ParallelMerge` geometry HEURISTIC (which couldn't tell "two parallel lines I want apart" from "a
 connector I'm dragging to merge") with EXPLICIT per-tile links set from the laid drag PATH. Fixes both rail

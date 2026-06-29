@@ -20,6 +20,7 @@ namespace Caveman
             PlayerController.HasBoat = false; // fresh game: no boat yet (statics persist with domain-reload-off)
             PlayerController.ResetMounts();    // fresh game: on foot, no mounts owned
             Garage.BuiltCount = 0; PlayerController.RecomputeGarageSlots();
+            WorkshopBuilding.ResetPowerHint();
 
             // --- Items ---
             var stone = MakeItem("stone", "Stone", new Color(0.55f, 0.55f, 0.62f));
@@ -850,12 +851,12 @@ namespace Caveman
             def.color = color;
             def.inputs = inputs;
             def.footprintW = 2; def.footprintH = 2;
-            def.powerDraw = 10; // machines draw power once the Industrial age arrives
+            def.powerDraw = 10; // only matters for requiresPower machines (Kiln/Potter/Smelters) from the Bronze age
             def.cost = new List<ItemAmount>(cost);
             return def;
         }
 
-        // A power plant: burns `fuel` to supply `output` electrical power (Industrial age).
+        // A power plant: burns `fuel` to supply `output` electrical power (electricity starts in the Bronze age).
         private static BuildingDefinition MakePower(string name, int output, ItemDefinition fuel, int fuelPerCycle,
             float interval, int unlockAge, Color color, params ItemAmount[] cost)
         {

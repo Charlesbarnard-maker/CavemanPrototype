@@ -424,10 +424,17 @@ namespace Caveman
             }
         }
 
+        private static bool _powerHintShown; // one-time onboarding when a machine first needs power
+        public static void ResetPowerHint() => _powerHintShown = false;
         private void UpdateStatus()
         {
             if (_statusDot == null) _statusDot = Status.MakeDot(transform);
             Status.Apply(_statusDot, StatusColor);
+            if (!_powerHintShown && NoPower)
+            {
+                _powerHintShown = true;
+                Toast.Show($"<color=#6cf>⚡ {(def != null ? def.displayName : "This machine")} needs POWER now (Bronze age).</color> Build a Generator (e.g. Wood Generator), then select it / a Power Pole to draw WIRES to the machine. Unwired powered machines stop (blue dot).");
+            }
         }
 
         private void UpdateVisual(bool working)
