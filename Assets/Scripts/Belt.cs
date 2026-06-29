@@ -682,8 +682,11 @@ namespace Caveman
         {
             if (_sr == null) return;
             int shape = BeltShape();
-            int key = _tier * 3 + shape;
-            if (key != _lastBeltKey) { _lastBeltKey = key; _sr.sprite = PlaceholderArt.BeltSprite(_tier, shape); }
+            // The surface SCROLLS so a belt's travel direction + flow read at a glance even when empty; faster
+            // tiers scroll faster. Only the per-frame sprite swap happens when the animation frame actually ticks.
+            int frame = (int)(Time.time * (5f + _tier * 3f)) & (PlaceholderArt.BeltFrames - 1);
+            int key = (_tier * 3 + shape) * PlaceholderArt.BeltFrames + frame;
+            if (key != _lastBeltKey) { _lastBeltKey = key; _sr.sprite = PlaceholderArt.BeltSprite(_tier, shape, frame); }
         }
 
         // 0 = straight (fed from behind / by a building), 1 = corner from the RIGHT side, 2 = from the LEFT.

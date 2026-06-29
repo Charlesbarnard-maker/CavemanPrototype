@@ -154,7 +154,7 @@ namespace Caveman
             // Pixel-COMPOSITE the preview (URP batch-mode Camera.Render doesn't draw sprites): terrain base from
             // the real baked MapTex, then blit each decoration sprite's texture at its world position, then vignette.
             var mt = TerrainGrid.MapTex;
-            float cenX = 24f, cenY = 12f, halfW = 15f, halfH = 11.25f; int ppu = 24; // region to preview (world units → px)
+            float cenX = 44f, cenY = 33f, halfW = 20f, halfH = 15f; int ppu = 18; // region to preview (world units → px)
             int W = (int)(halfW * 2 * ppu), H = (int)(halfH * 2 * ppu);
             float ox = cenX - halfW, oy = cenY - halfH; // world coord at output (0,0)
             var px = new Color[W * H];
@@ -254,6 +254,31 @@ namespace Caveman
             string outPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "caveman-construction.png");
             File.WriteAllBytes(outPath, tex.EncodeToPNG());
             Debug.Log($"[MapGenAudit] construction snapshot: {outPath}");
+        }
+
+        // Dump the 4 animated belt frames (tier-1 conveyor) + the open stockpile (stone + ore tints) to eyeball
+        // that the belt SCROLLS and the piles read. Run: -executeMethod Caveman.MapGenAudit.ArtDump
+        public static void ArtDump()
+        {
+            var bg = new Color(0.36f, 0.46f, 0.27f);
+            var beltBrown = new Color(0.62f, 0.50f, 0.32f);
+            (Sprite sp, Color tint)[] items =
+            {
+                (PlaceholderArt.BeltSprite(1, 0, 0), beltBrown), (PlaceholderArt.BeltSprite(1, 0, 1), beltBrown),
+                (PlaceholderArt.BeltSprite(1, 0, 2), beltBrown), (PlaceholderArt.BeltSprite(1, 0, 3), beltBrown),
+                (PlaceholderArt.OpenStockpile(), new Color(0.66f, 0.67f, 0.70f)),   // stone
+                (PlaceholderArt.OpenStockpile(), new Color(0.60f, 0.48f, 0.37f)),   // ore
+            };
+            const int tile = 64, gap = 16, scale = 3;
+            int n = items.Length, outW = tile * scale * n + gap * (n + 1), outH = tile * scale + gap * 2;
+            var px = new Color[outW * outH];
+            for (int i = 0; i < px.Length; i++) px[i] = bg;
+            for (int k = 0; k < n; k++)
+                Blit(px, outW, outH, items[k].sp, gap + k * (tile * scale + gap), gap, tile * scale, items[k].tint, 1f);
+            var tex = new Texture2D(outW, outH, TextureFormat.RGBA32, false); tex.SetPixels(px); tex.Apply();
+            string outPath = Path.Combine(Path.GetTempPath(), "caveman-artdump.png");
+            File.WriteAllBytes(outPath, tex.EncodeToPNG());
+            Debug.Log($"[MapGenAudit] art dump (belt f0-3 | stone pile | ore pile): {outPath}");
         }
 
         static void Blit(Color[] dst, int W, int H, Sprite sp, int ox, int oy, int size, Color tint, float alpha)

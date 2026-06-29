@@ -9,8 +9,32 @@ namespace Caveman
 {
     public static partial class PlaceholderArt
     {
-        private static Sprite _grass, _fern, _mushroom, _pebbles, _decorRock, _reed, _cloudShadow, _waterGlint, _contactShadow;
+        private static Sprite _grass, _fern, _mushroom, _pebbles, _decorRock, _reed, _cloudShadow, _waterGlint, _contactShadow, _stockpile;
         private static Sprite[] _bush, _flower;
+
+        // An OPEN-AIR STOCKPILE — a heaped mound of loose material (no roof/walls), greyscale so def.color tints it
+        // to stone-grey or ore-brown; the storage darkens it as it empties (a shrinking pile). For Stone/Ore piles.
+        public static Sprite OpenStockpile()
+        {
+            if (_stockpile != null) return _stockpile;
+            const int s = 64; var px = new Color[s * s];
+            var lite = new Color(0.95f, 0.95f, 0.95f); var drk = new Color(0.48f, 0.48f, 0.48f);
+            const float baseY = 0.10f, peak = 0.64f;
+            for (int y = 0; y < s; y++)
+                for (int x = 0; x < s; x++)
+                {
+                    float fx = x / (float)(s - 1), fy = y / (float)(s - 1);
+                    float dome = baseY + (peak - baseY) * Mathf.Clamp01(1f - Mathf.Pow(Mathf.Abs(fx - 0.5f) / 0.46f, 1.7f));
+                    if (fy < baseY || fy > dome) continue;
+                    float up = dome > baseY ? (fy - baseY) / (dome - baseY) : 0f;       // 0 base .. 1 crest
+                    Color c = Color.Lerp(drk, lite, Mathf.Clamp01(up * 0.8f + 0.15f));
+                    float n = TerrainGrid.CellHash(x, y, 30);                            // lumpy material chunks
+                    if (n > 0.85f) c = lite; else if (n < 0.15f) c = drk;
+                    px[y * s + x] = c;
+                }
+            _stockpile = FinishDecor(px, s, 0.5f, baseY + 0.01f, 0.42f, 0.05f, 0.22f);   // dark silhouette + base shadow
+            return _stockpile;
+        }
 
         // Outline the opaque BODY, then composite a soft dark contact-shadow ellipse only where still empty
         // (centre shx/shy, radii shrx/shry in [0,1], peak alpha sha). No outline ever lands on the shadow.

@@ -218,11 +218,12 @@ namespace Caveman
         // shape: 0 straight, 1 corner from local-E (right), 2 corner from local-W (left). Output is local
         // +Y (the Belt rotates the tile to its travel dir). Drawn white+dark so the per-tier tint shows.
         private static Sprite[] _beltSprites;
-        public static Sprite BeltSprite(int tier, int shape)
+        public const int BeltFrames = 4; // animation frames per belt sprite — the moving pattern SCROLLS along travel
+        public static Sprite BeltSprite(int tier, int shape, int frame = 0)
         {
-            tier = Mathf.Clamp(tier, 0, 3); shape = Mathf.Clamp(shape, 0, 2);
-            int key = tier * 3 + shape;
-            if (_beltSprites == null) _beltSprites = new Sprite[12];
+            tier = Mathf.Clamp(tier, 0, 3); shape = Mathf.Clamp(shape, 0, 2); frame = ((frame % BeltFrames) + BeltFrames) % BeltFrames;
+            int key = (tier * 3 + shape) * BeltFrames + frame;
+            if (_beltSprites == null) _beltSprites = new Sprite[12 * BeltFrames];
             if (_beltSprites[key] != null) return _beltSprites[key];
             const int s = 64;
             var tex = NewTex(s);
@@ -230,8 +231,9 @@ namespace Caveman
             var belt = Color.white;
             var dark = new Color(0.38f, 0.38f, 0.40f, 1f);
             var edge = tier == 3 ? new Color(0.85f, 0.88f, 0.95f, 1f) : new Color(0.30f, 0.30f, 0.32f, 1f);
-            if (shape == 0) BeltStraight(px, s, tier, belt, dark, edge);
-            else BeltCorner(px, s, shape == 1, belt, dark, edge);
+            int off = frame * (16 / BeltFrames); // scroll the rollers/chevrons/arrows forward (+Y) by frame
+            if (shape == 0) BeltStraight(px, s, tier, belt, dark, edge, off);
+            else BeltCorner(px, s, shape == 1, belt, dark, edge, frame);
             tex.SetPixels(px); tex.Apply();
             var sp = Sprite.Create(tex, new Rect(0, 0, s, s), new Vector2(0.5f, 0.5f), s);
             _beltSprites[key] = sp;
@@ -241,7 +243,7 @@ namespace Caveman
         // A STRAIGHT belt that fills the full cell along travel (local +Y), so consecutive belts read as
         // ONE continuous conveyor with no gap. The roller/chevron/arrow pattern uses a 16px period that
         // divides the 64px tile, so the moving detail tiles seamlessly across cell boundaries too.
-        private static void BeltStraight(Color[] px, int s, int tier, Color belt, Color dark, Color edge)
+        private static void BeltStraight(Color[] px, int s, int tier, Color belt, Color dark, Color edge, int off)
         {
             float cx = (s - 1) * 0.5f;
             for (int y = 0; y < s; y++)
@@ -253,14 +255,14 @@ namespace Caveman
                     {
                         c = belt;
                         if (fx < 0.17f || fx > 0.83f) c = edge; // side rails / frame
-                        int p = y & 15;                          // seamless 16px period (64 = 4 × 16)
+                        int p = (y - off) & 15;                  // seamless 16px period, SCROLLED by `off` (forward +Y)
                         if (tier == 0) { if (p < 4) c = dark; }  // rollers: a dark crossbar each period
                         else
                         {
                             float dy = 13f - p;                  // apex near the top of each period; legs run down
                             if (tier == 3) { if (dy >= 0f && dy <= 13f && Mathf.Abs(x - cx) <= dy * 0.95f) c = dark; } // filled arrow
                             else { if (dy >= 0f && dy <= 13f && Mathf.Abs(Mathf.Abs(x - cx) - dy) <= 2.4f) c = dark; }   // chevron
-                            if (tier == 2 && (fx < 0.17f || fx > 0.83f) && (y & 7) < 4) c = dark; // gear teeth on the rails
+                            if (tier == 2 && (fx < 0.17f || fx > 0.83f) && ((y - off) & 7) < 4) c = dark; // gear teeth on the rails
                         }
                     }
                     px[y * s + x] = c;
@@ -270,9 +272,10 @@ namespace Caveman
         // A quarter-turn belt band from the input edge (E if fromRight, else W) to the +Y output edge. The
         // band radius matches the straight body's width (rails at the same 0.17 inset) AND reaches both
         // shared edges, so a corner joins its straight neighbours edge-to-edge instead of looking cut off.
-        private static void BeltCorner(Color[] px, int s, bool fromRight, Color belt, Color dark, Color edge)
+        private static void BeltCorner(Color[] px, int s, bool fromRight, Color belt, Color dark, Color edge, int frame)
         {
             float cx = fromRight ? 1f : 0f, cy = 1f; // arc centre on the cell corner between input + output
+            float scroll = frame / (float)BeltFrames; // shift the chevron ticks along the curve each frame
             for (int y = 0; y < s; y++)
                 for (int x = 0; x < s; x++)
                 {
@@ -284,7 +287,7 @@ namespace Caveman
                         c = belt;
                         if (d < 0.17f || d > 0.83f) c = edge; // inner/outer rails (match the straight's inset)
                         float ang = Mathf.Atan2(Mathf.Abs(dy), Mathf.Abs(dx)); // 0..π/2 along the curve
-                        if (Frac(ang / (Mathf.PI * 0.5f) * 3f) < 0.28f && d >= 0.24f && d <= 0.76f) c = dark; // chevron ticks
+                        if (Frac(ang / (Mathf.PI * 0.5f) * 3f - scroll) < 0.28f && d >= 0.24f && d <= 0.76f) c = dark; // scrolling chevron ticks
                     }
                     px[y * s + x] = c;
                 }
@@ -550,6 +553,8 @@ namespace Caveman
             "Idea Bench" => StoneIdeaBench(),
             "Research Lodge" => StoneLodge(),
             "Woodpile" => StoneWoodpile(),
+            "Stone Stockpile" => OpenStockpile(),
+            "Ore Stockpile" => OpenStockpile(),
             "Station" => StationPlatform(),
             "Harbour" => HarbourDock(),
             "Warehouse" => WarehouseShed(),

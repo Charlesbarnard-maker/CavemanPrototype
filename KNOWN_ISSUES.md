@@ -124,6 +124,21 @@ and REOPEN it afterward, autonomously, whenever a compile needs verifying — do
   cap 16k) so they sit INTO the meadow. `SwayAnimator` reworked to a DIRECTIONAL wind with travelling gusts (lean +
   ripple wave across the field) instead of random wobble. **Watch at Half=650:** ss=2 → ~27MB terrain texture + ~6.8M-
   texel bake (one-time); drop ss to 1-2 or cap decor if load feels slow.
+- **Playtest batch 3 (2026-06-29 — compile-clean, art previewed):** ① **Open-air STOCKPILES** for raw Stone + Ore
+  (`PlaceholderArt.OpenStockpile` = a greyscale material heap tinted by def.color; "Stone Stockpile"/"Ore Stockpile"
+  routed in `BespokeBuilding`, both added to the Storage build menu — stone/ore no longer need a Warehouse).
+  ② **Warehouse is now a 3×3 HUB** with **per-cell ports** (3 in + 3 out; `StorageBuilding.Spawn` singlePort=false →
+  every 2×2 store now has 2 in + 2 out), capacity 300. ③ **Animated BELTS** — the roller/chevron/arrow pattern SCROLLS
+  along travel (`PlaceholderArt.BeltSprite(tier,shape,frame)` + `Belt.UpdateBeltShape` ticks the frame; faster tiers
+  scroll faster) so direction + flow read at a glance even when empty. ④ **Production BALANCE** — workshops were
+  keeping up with their belts (no bottleneck). Slowed the core chain so each consumes BELOW its supply belt and
+  material piles up → build MORE workshops, not more nodes: Sawmill 3→5s, Charcoal 3→4s, Kiln 3.5→5s, Basic Smelter
+  3/3.5→4/4.5s, Advanced 3.5/4→4.5/5s, Toolmaker 4→5s (+ recipe times). Collectors stay 60/min (abundant raw).
+  Engineering Lab + Refinery + research-makers NOT yet retuned — next balance pass. ⑤ **MOUNTAINS read as impassable**
+  — darker cool rock (0.33 vs warm tan Hills 0.54) + directional DEPTH (shadowed base where the range meets land, lit
+  crest) in `TerrainGrid.SpawnRenderer` pass-1. **Verify in editor:** belts scroll (check direction feels right —
+  flip `(y-off)`→`(y+off)` in `BeltStraight` if backwards); stone/ore go to open piles; warehouse big w/ 3+3 slots;
+  sawmill now bottlenecks → build 2-3; mountains clearly impassable. New tool: `MapGenAudit.ArtDump`.
 
 **✅ DONE AN EARLIER SESSION (2026-06-29, entries #39–#49):**
 - **Per-age player MOUNTS + GARAGE (#39/#40):** `PlaceholderArt.PlayerMount(tier,frame)` = On Foot→Horseback→Ox Cart→

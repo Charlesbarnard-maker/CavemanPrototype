@@ -334,7 +334,7 @@ namespace Caveman
         public static Color ColorOf(Terrain t) => t switch
         {
             Terrain.Water => new Color(0.20f, 0.44f, 0.60f),     // friendlier teal
-            Terrain.Mountain => new Color(0.40f, 0.37f, 0.35f),  // warm rock
+            Terrain.Mountain => new Color(0.33f, 0.32f, 0.36f),  // dark cool rock — clearly impassable vs the warm tan Hills
             Terrain.Hills => new Color(0.54f, 0.47f, 0.34f),     // warm tan
             Terrain.Forest => new Color(0.19f, 0.38f, 0.20f),    // deep but warm green
             _ => new Color(0.39f, 0.48f, 0.25f),                 // plains — living yellow-green
@@ -375,7 +375,14 @@ namespace Caveman
                     int idx = gy * _size + gx;
                     Terrain t = _map[idx];
                     Color c = ColorOf(t);
-                    if (t != Terrain.Water && t != Terrain.Mountain)
+                    if (t == Terrain.Mountain)
+                    {
+                        // DEPTH so it reads as an impassable RAISED range: a dark cliff SHADOW where the rock
+                        // drops to passable land (its lower/south edge), and a LIT crest along the upper edge.
+                        if (MapAt(gx, gy - 1) != Terrain.Mountain) c = new Color(c.r * 0.5f, c.g * 0.5f, c.b * 0.55f);
+                        else if (MapAt(gx, gy + 1) != Terrain.Mountain) c = new Color(Mathf.Clamp01(c.r * 1.45f), Mathf.Clamp01(c.g * 1.45f), Mathf.Clamp01(c.b * 1.4f));
+                    }
+                    else if (t != Terrain.Water)
                     {
                         bool coast = MapAt(gx - 1, gy) == Terrain.Water || MapAt(gx + 1, gy) == Terrain.Water
                                    || MapAt(gx, gy - 1) == Terrain.Water || MapAt(gx, gy + 1) == Terrain.Water;

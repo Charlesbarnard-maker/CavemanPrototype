@@ -166,8 +166,8 @@ namespace Caveman
             booster.color = new Color(0.45f, 0.62f, 0.72f);
             booster.cost = new List<ItemAmount> { new ItemAmount(planks, 3), new ItemAmount(stone, 3) };
             booster.description = "Re-pressurises a pipe network next to it, extending how far water reaches. No water source needed — place it partway along a long pipe run so distant consumers stop starving. Chain several for very long networks.";
-            var sawmill = MakeWorkshop("Sawmill", planks, 1, 3.0f, 2, 12, new Color(0.66f, 0.50f, 0.30f),
-                new List<ItemAmount> { new ItemAmount(wood, 2) },
+            var sawmill = MakeWorkshop("Sawmill", planks, 1, 5.0f, 2, 12, new Color(0.66f, 0.50f, 0.30f),
+                new List<ItemAmount> { new ItemAmount(wood, 2) }, // 2 wood -> 1 plank / 5s = 24 wood/min — BELOW a wooden belt (40), so wood PILES UP: build more Sawmills
                 new ItemAmount(wood, 6), new ItemAmount(stone, 4));
             // Campfire: needs Wood as fuel and Water to cook, plus the raw Food.
             var campfire = MakeWorkshop("Campfire", cookedFood, 1, 3.0f, 2, 12, new Color(0.85f, 0.45f, 0.25f),
@@ -176,16 +176,16 @@ namespace Caveman
             var woodStore = MakeStorage("Woodpile", wood, 100, new Color(0.62f, 0.40f, 0.20f),
                 new ItemAmount(wood, 8));
             woodStore.description = "Resource-specific storage: holds Wood only. (Each basic store is named for what it holds — Woodpile, Stone Storage, Granary, Water Barrel. The configurable 'Warehouse' is the ONE general store you assign yourself.)";
-            var stoneStore = MakeStorage("Stone Storage", stone, 100, new Color(0.40f, 0.43f, 0.50f),
+            var stoneStore = MakeStorage("Stone Stockpile", stone, 160, new Color(0.66f, 0.67f, 0.70f),
                 new ItemAmount(wood, 8));
             var foodStore = MakeStorage("Granary", food, 100, new Color(0.70f, 0.45f, 0.35f),
                 new ItemAmount(wood, 8));
             var waterStore = MakeStorage("Water Barrel", water, 100, new Color(0.35f, 0.50f, 0.72f),
                 new ItemAmount(wood, 8));
             // Generic warehouse: the player picks what it stores (e.g. Planks, Cooked Food).
-            var warehouse = MakeStorage("Warehouse", null, 120, new Color(0.55f, 0.52f, 0.45f),
-                new ItemAmount(wood, 10)); warehouse.configurable = true;
-            warehouse.footprintW = 2; warehouse.footprintH = 2; // TEST: first multi-cell building
+            var warehouse = MakeStorage("Warehouse", null, 300, new Color(0.55f, 0.52f, 0.45f),
+                new ItemAmount(wood, 14), new ItemAmount(stone, 6)); warehouse.configurable = true;
+            warehouse.footprintW = 3; warehouse.footprintH = 3; // a proper HUB store — big, with 3 in + 3 out slots
             // (Construction is INSTANT now — no Construction Yard / builders.)
             // Long-distance logistics: depots + caravan routes (replaces the old haulers).
             var depot = ScriptableObject.CreateInstance<BuildingDefinition>();
@@ -247,17 +247,17 @@ namespace Caveman
                 new ItemAmount(wood, 6)); hunter.unlockAge = 1;
             var clayPit = MakeCollector("Clay Pit", clay, 1, 2.0f, 2, 12, new Color(0.68f, 0.46f, 0.36f),
                 new ItemAmount(wood, 5)); clayPit.unlockAge = 1;
-            var charcoalBurner = MakeWorkshop("Charcoal Burner", charcoal, 2, 3.0f, 2, 12, new Color(0.62f, 0.58f, 0.54f),
+            var charcoalBurner = MakeWorkshop("Charcoal Burner", charcoal, 2, 4.0f, 2, 12, new Color(0.62f, 0.58f, 0.54f),
                 new List<ItemAmount> { new ItemAmount(wood, 3) },
-                new ItemAmount(wood, 6), new ItemAmount(stone, 4)); charcoalBurner.unlockAge = 1; // 2 charcoal / 3s = 40/min (it feeds Kiln + both Smelters)
+                new ItemAmount(wood, 6), new ItemAmount(stone, 4)); charcoalBurner.unlockAge = 1; // 2 charcoal / 4s = 30/min; Kiln+both Smelters want ~57/min → you need SEVERAL — the shared bottleneck
             var clayStore = MakeStorage("Clay Pile", clay, 100, new Color(0.60f, 0.42f, 0.34f),
                 new ItemAmount(wood, 8)); clayStore.unlockAge = 1;
             var smokehouse = MakeStorage("Smokehouse", meat, 100, new Color(0.55f, 0.32f, 0.30f),
                 new ItemAmount(wood, 8), new ItemAmount(stone, 2)); smokehouse.unlockAge = 1;
 
             // --- Age 2: Bronze ---
-            var kiln = MakeWorkshop("Kiln", bricks, 1, 3.5f, 2, 12, new Color(0.70f, 0.42f, 0.34f),
-                new List<ItemAmount> { new ItemAmount(clay, 2), new ItemAmount(charcoal, 1) },
+            var kiln = MakeWorkshop("Kiln", bricks, 1, 5.0f, 2, 12, new Color(0.70f, 0.42f, 0.34f),
+                new List<ItemAmount> { new ItemAmount(clay, 2), new ItemAmount(charcoal, 1) }, // 1 brick / 5s — clay piles up: build more Kilns
                 new ItemAmount(wood, 8), new ItemAmount(stone, 6)); kiln.unlockAge = 2; kiln.requiresPower = true;
             var farm = MakeWorkshop("Farm", grain, 2, 3.0f, 3, 16, new Color(0.80f, 0.72f, 0.38f),
                 new List<ItemAmount> { new ItemAmount(water, 1) },
@@ -367,29 +367,31 @@ namespace Caveman
             // required to reach the Iron Age.
             var mine = MakeCollector("Iron Mine", ore, 1, 2.5f, 2, 12, new Color(0.50f, 0.48f, 0.40f),
                 new ItemAmount(wood, 6), new ItemAmount(stone, 4)); mine.unlockAge = 1;
-            var oreStore = MakeStorage("Ore Stockpile", ore, 100, new Color(0.52f, 0.50f, 0.42f),
+            var oreStore = MakeStorage("Ore Stockpile", ore, 160, new Color(0.60f, 0.48f, 0.37f),
                 new ItemAmount(wood, 8)); oreStore.unlockAge = 1;
+            oreStore.description = "ORE STOCKPILE — an OPEN-AIR heap for Iron Ore (no roof). Belt ore in, belt it out to a Smelter. Holds a big pile.";
+            stoneStore.description = "STONE STOCKPILE — an OPEN-AIR heap for Stone (no roof). Belt stone in and out. Cheap, holds a big pile — the natural home for raw Stone instead of a Warehouse.";
             // --- SMELTERS (configurable, multi-recipe). A BASIC smelter for ore→bar and an ADVANCED
             //     smelter that combines materials into alloy bars. Each replaces TWO old fixed-recipe
             //     buildings (Iron+Copper Smelters → Basic; Bronzeworks+Steel Foundry → Advanced). Click
             //     a smelter to switch its recipe; the selected recipe drives its inputs/output. Charcoal
             //     is shared across both smelters + the Kiln — the key bottleneck. ---
-            var basicSmelter = MakeWorkshop("Basic Smelter", copper, 1, 3.0f, 2, 12, new Color(0.74f, 0.52f, 0.42f),
+            var basicSmelter = MakeWorkshop("Basic Smelter", copper, 1, 4.0f, 2, 12, new Color(0.74f, 0.52f, 0.42f),
                 new List<ItemAmount> { new ItemAmount(copperOre, 1), new ItemAmount(charcoal, 1) },
                 new ItemAmount(stone, 8), new ItemAmount(clay, 4)); basicSmelter.unlockAge = 1;
             basicSmelter.recipes = new List<Recipe>
             {
-                new Recipe(copper, 1, 3.0f, 1, new ItemAmount(copperOre, 1), new ItemAmount(charcoal, 1)),
-                new Recipe(metal,  1, 3.5f, 1, new ItemAmount(ore, 1),       new ItemAmount(charcoal, 1)),
+                new Recipe(copper, 1, 4.0f, 1, new ItemAmount(copperOre, 1), new ItemAmount(charcoal, 1)), // 15/min — ore + charcoal both pile up: parallel smelters
+                new Recipe(metal,  1, 4.5f, 1, new ItemAmount(ore, 1),       new ItemAmount(charcoal, 1)),
             };
             basicSmelter.description = "BASIC SMELTER — select its recipe: Copper Ore + Charcoal → Copper, or Iron Ore + Charcoal → Iron. One smelter for both basic metals (click it to switch). Charcoal is shared with the Kiln + Advanced Smelter — a key bottleneck.";
-            var advancedSmelter = MakeWorkshop("Advanced Smelter", bronzePlate, 1, 3.5f, 2, 12, new Color(0.66f, 0.60f, 0.52f),
+            var advancedSmelter = MakeWorkshop("Advanced Smelter", bronzePlate, 1, 4.5f, 2, 12, new Color(0.66f, 0.60f, 0.52f),
                 new List<ItemAmount> { new ItemAmount(copper, 1), new ItemAmount(bricks, 1) },
                 new ItemAmount(bricks, 8), new ItemAmount(metal, 4)); advancedSmelter.unlockAge = 2;
             advancedSmelter.recipes = new List<Recipe>
             {
-                new Recipe(bronzePlate, 1, 3.5f, 2, new ItemAmount(copper, 1), new ItemAmount(bricks, 1)),
-                new Recipe(steel,       1, 4.0f, 3, new ItemAmount(metal, 1),  new ItemAmount(charcoal, 1)),
+                new Recipe(bronzePlate, 1, 4.5f, 2, new ItemAmount(copper, 1), new ItemAmount(bricks, 1)), // ~13/min — copper + bricks pile up
+                new Recipe(steel,       1, 5.0f, 3, new ItemAmount(metal, 1),  new ItemAmount(charcoal, 1)),
             };
             advancedSmelter.description = "ADVANCED SMELTER — combines materials into alloy bars; select its recipe: Copper + Bricks → Bronze Plate, or Iron + Charcoal → Steel (Steel unlocks in the Iron Age). One furnace for both alloys (click it to switch).";
             // Smelters need POWER — they run only while connected to a powered network (a Generator,
@@ -401,16 +403,16 @@ namespace Caveman
             basicSmelter.powerDraw = 20;
             advancedSmelter.powerDraw = 20;
             // Toolmaker: Metal + Planks -> Tools (an Iron-age comfort good).
-            var toolmaker = MakeWorkshop("Toolmaker", tools, 1, 4.0f, 2, 12, new Color(0.50f, 0.55f, 0.60f),
+            var toolmaker = MakeWorkshop("Toolmaker", tools, 1, 5.0f, 2, 12, new Color(0.50f, 0.55f, 0.60f),
                 new List<ItemAmount> { new ItemAmount(metal, 1), new ItemAmount(planks, 1) },
                 new ItemAmount(planks, 8), new ItemAmount(bricks, 6)); toolmaker.unlockAge = 2;
             // The Toolmaker is a FORGE: one building shapes alloys/metals into the mechanical COMPONENTS, picked
             // by recipe (click it to switch). Reuses a single building for the whole component tier (less clutter).
             toolmaker.recipes = new List<Recipe>
             {
-                new Recipe(bronzeGear, 1, 3.5f, 2, new ItemAmount(bronzePlate, 1), new ItemAmount(planks, 1)), // Bronze age
-                new Recipe(tools,      1, 4.0f, 3, new ItemAmount(metal, 1),       new ItemAmount(planks, 1)), // Iron age
-                new Recipe(steelBeam,  1, 4.0f, 3, new ItemAmount(steel, 1),       new ItemAmount(planks, 1)), // Iron age
+                new Recipe(bronzeGear, 1, 4.5f, 2, new ItemAmount(bronzePlate, 1), new ItemAmount(planks, 1)), // Bronze age — components are slow: parallel Toolmakers
+                new Recipe(tools,      1, 5.0f, 3, new ItemAmount(metal, 1),       new ItemAmount(planks, 1)), // Iron age
+                new Recipe(steelBeam,  1, 5.0f, 3, new ItemAmount(steel, 1),       new ItemAmount(planks, 1)), // Iron age
             };
             toolmaker.description = "FORGE / TOOLMAKER — shapes metal into mechanical COMPONENTS; pick its recipe (click to switch): Bronze Plate + Planks → Bronze Gear (Bronze age), Iron + Planks → Tools, or Steel + Planks → Steel Beam (both Iron age). One forge for the whole component tier; build more to run several at once.";
             // --- DEEPER METAL TREE (ore split): copper (Bronze chain) + iron (Iron chain). The ores
@@ -641,8 +643,9 @@ namespace Caveman
               undergroundBelt, filterBelt, prioritySplitter, conditionalGate, depot, rail, elevatedRail, signal, twoWaySignal, bridge, harbour,
               // Liquids — pipes carry oil/water (never belts); Oil Well pumps oil, Water Pump pumps water, Booster relays pressure
               pipe, pump, booster, oilWell,
-              // Storage — Woodpile + configurable Warehouse + liquid tanks (Oil Tank / Water Barrel)
-              woodStore, clayStore, brickStore, warehouse, oilTank, waterStore,
+              // Storage — open-air piles for raw materials (Woodpile / Stone + Ore Stockpiles / Clay / Brick),
+              // the big configurable Warehouse hub, and liquid tanks (Oil Tank / Water Barrel)
+              woodStore, stoneStore, oreStore, clayStore, brickStore, warehouse, oilTank, waterStore,
               // Infrastructure / power / endgame — Wood/Coal/Oil Generators + Power Poles + Battery
               woodGen, pole, battery, generator, oilGen, monumentBldg,
               // Mounts — the Garage (buy/park your rides)
