@@ -74,36 +74,33 @@ namespace Caveman
             if (_sr != null) _sr.color = occ ? Red : Green;
         }
 
-        // Walk the track forward from this signal (in direction `d`), following turns, until the
-        // next signal or a dead end. True if any train occupies a cell in that block.
+        // Reused BFS scratch so the cosmetic lamp doesn't allocate (Update runs ~5×/sec per signal).
+        private static readonly Queue<Vector2Int> _bfs = new();
+        private static readonly HashSet<Vector2Int> _seen = new();
+
+        // Walk the track forward from this signal (in direction `d`), following ALL branches, until each
+        // hits the next signal or a dead end. True if any train occupies a cell in that block. BFS over the
+        // branches so a JUNCTION can't hide a train on the other leg (the old single-branch walk could show
+        // a false GREEN at a fork). The lamp is cosmetic; the train's own one-way/block gating is elsewhere.
         private bool BlockAheadOccupied(Belt.Dir d)
         {
-            var prev = cell;
-            var cur = cell + Belt.Step(d);
-            for (int i = 0; i < 512; i++)
+            var start = cell + Belt.Step(d);
+            if (!RailNet.IsRail(start)) return false;            // nothing ahead → block open
+            _bfs.Clear(); _seen.Clear();
+            _seen.Add(cell);                                      // never walk back through this signal
+            _bfs.Enqueue(start); _seen.Add(start);
+            for (int guard = 0; _bfs.Count > 0 && guard < 512; guard++)
             {
-                if (!RailNet.IsRail(cur)) return false;          // ran off the track → block open
-                if (RailGraph.AnyTrainAt(cur)) return true;       // a train is in this block
-                if (cur != cell && At(cur) != null) return false; // reached the next signal → block ends
-                var nxt = NextAlong(prev, cur);
-                if (nxt == cur) return false;                     // dead end
-                prev = cur; cur = nxt;
+                var c = _bfs.Dequeue();
+                if (RailGraph.AnyTrainAt(c)) return true;         // a train is in this block
+                if (At(c) != null) continue;                      // reached another signal → block boundary
+                for (int k = 0; k < 4; k++)
+                {
+                    var n = c + Belt.Step((Belt.Dir)k);
+                    if (!_seen.Contains(n) && RailNet.IsRail(n)) { _seen.Add(n); _bfs.Enqueue(n); }
+                }
             }
             return false;
-        }
-
-        // The next track cell continuing forward from `cur` (came from `prev`): straight on if possible,
-        // else the single turning neighbour. (Assumes mostly non-branching track, as railways are.)
-        private static Vector2Int NextAlong(Vector2Int prev, Vector2Int cur)
-        {
-            var straight = cur + (cur - prev);
-            if (RailNet.IsRail(straight)) return straight;
-            for (int d = 0; d < 4; d++)
-            {
-                var n = cur + Belt.Step((Belt.Dir)d);
-                if (n != prev && RailNet.IsRail(n)) return n;
-            }
-            return cur;
         }
     }
 }

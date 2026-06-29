@@ -638,9 +638,6 @@ namespace Caveman
             hud.builder = builder;
             hud.woodItem = wood;
             hud.stoneItem = stone;
-            hud.foodItem = food;
-            hud.waterItem = water;
-            hud.meatItem = meat;
             hud.clayItem = clay;
             hud.oreItem = ore;
             hud.monumentItem = monument;

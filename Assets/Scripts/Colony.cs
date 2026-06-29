@@ -10,8 +10,6 @@ namespace Caveman
     {
         public static Colony Instance { get; private set; }
 
-        public ItemDefinition foodItem;
-        public ItemDefinition waterItem;
         [System.NonSerialized] public Inventory carried; // set at runtime; not a serialized field
 
         // FACTORY-FIRST: survival pressure removed. These remain as inert API (always false) so

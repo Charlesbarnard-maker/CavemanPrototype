@@ -48,6 +48,30 @@ namespace Caveman
         private static readonly Dictionary<PowerNode, int> _comp = new();          // node → network id
         private static readonly Dictionary<WorkshopBuilding, int> _consumerComp = new();
         private static readonly Stack<PowerNode> _stack = new();
+        // Per-component scratch, grown to a high-water mark so Rebuild (every frame) doesn't re-alloc.
+        private static float[] _gen = System.Array.Empty<float>();
+        private static float[] _demand = System.Array.Empty<float>();
+        private static float[] _factorByComp = System.Array.Empty<float>();
+        private static List<Battery>[] _batteries = System.Array.Empty<List<Battery>>();
+
+        private static void EnsureScratch(int nComp)
+        {
+            if (_gen.Length < nComp)
+            {
+                int cap = Mathf.NextPowerOfTwo(Mathf.Max(4, nComp));
+                _gen = new float[cap];
+                _demand = new float[cap];
+                _factorByComp = new float[cap];
+                var nb = new List<Battery>[cap];
+                System.Array.Copy(_batteries, nb, _batteries.Length); // keep existing lists to reuse
+                _batteries = nb;
+            }
+            for (int i = 0; i < nComp; i++)
+            {
+                _gen[i] = 0f; _demand[i] = 0f; _factorByComp[i] = 0f;
+                if (_batteries[i] != null) _batteries[i].Clear();
+            }
+        }
 
         private static void Rebuild()
         {
@@ -80,10 +104,10 @@ namespace Caveman
             }
             if (nComp == 0) return;
 
-            // 2. Aggregate generation / demand / batteries per component.
-            var gen = new float[nComp];
-            var demand = new float[nComp];
-            var batteries = new List<Battery>[nComp];
+            // 2. Aggregate generation / demand / batteries per component. Reuse scratch sized to a
+            //    high-water mark (Rebuild runs every frame) — only the [0,nComp) slots are cleared/used.
+            EnsureScratch(nComp);
+            var gen = _gen; var demand = _demand; var batteries = _batteries;
             for (int i = 0; i < nodes.Count; i++)
             {
                 var n = nodes[i];
@@ -113,7 +137,7 @@ namespace Caveman
 
             // 3. Resolve each network: gen meets demand, surplus charges batteries, deficit is drawn
             //    from them; derive a supply factor (0 if truly dead, else clamped to the brownout floor).
-            var factorByComp = new float[nComp];
+            var factorByComp = _factorByComp;
             for (int c = 0; c < nComp; c++)
             {
                 float g = gen[c], d = demand[c];

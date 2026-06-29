@@ -16,9 +16,8 @@ namespace Caveman
         public int capacity = 10;
         public float speed = 3.5f;
 
-        // Back-compat accessors (first / last stop) + membership test.
+        // First stop + membership test.
         public Depot a => (stops != null && stops.Count > 0) ? stops[0] : null;
-        public Depot b => (stops != null && stops.Count > 1) ? stops[stops.Count - 1] : null;
         public bool Serves(Depot d) => d != null && stops != null && stops.Contains(d);
         public int StopCount => stops != null ? stops.Count : 0;
 

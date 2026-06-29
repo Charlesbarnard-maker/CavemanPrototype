@@ -107,48 +107,5 @@ namespace Caveman
             return totals;
         }
 
-        // ---- Food (supports multiple food types; cooked food is worth more) ----
-
-        private static int FoodPointsIn(Inventory inv)
-        {
-            if (inv == null) return 0;
-            int pts = 0;
-            foreach (var kv in inv.Items)
-                if (kv.Key != null && kv.Key.foodValue > 0) pts += kv.Value * kv.Key.foodValue;
-            return pts;
-        }
-
-        /// <summary>Total nourishment available across the pool (units × foodValue).</summary>
-        public static int FoodPoints(Inventory carried)
-        {
-            int pts = FoodPointsIn(carried);
-            foreach (var s in StorageBuilding.All) pts += FoodPointsIn(s.Store);
-            if (StoredOnly) return pts;
-            foreach (var p in ProductionBuilding.All) pts += FoodPointsIn(p.Buffer);
-            foreach (var w in WorkshopBuilding.All) pts += FoodPointsIn(w.Buffer);
-            return pts;
-        }
-
-        /// <summary>Eat up to `points` of nourishment, spending best (highest-value) food first.
-        /// Returns the nourishment actually consumed.</summary>
-        public static int SpendFoodPoints(int points, Inventory carried)
-        {
-            if (points <= 0) return 0;
-
-            var foods = new List<ItemDefinition>();
-            foreach (var kv in Totals(carried))
-                if (kv.Key != null && kv.Key.foodValue > 0) foods.Add(kv.Key);
-            foods.Sort((a, b) => b.foodValue.CompareTo(a.foodValue));
-
-            int covered = 0;
-            foreach (var f in foods)
-            {
-                if (covered >= points) break;
-                int unitsNeeded = Mathf.CeilToInt((points - covered) / (float)f.foodValue);
-                int spent = SpendUpTo(f, unitsNeeded, carried);
-                covered += spent * f.foodValue;
-            }
-            return covered;
-        }
     }
 }

@@ -14,8 +14,8 @@ namespace Caveman
     {
         public PlayerGatherer gatherer;
         public BuildController builder;
-        public ItemDefinition woodItem, stoneItem, foodItem, waterItem;
-        public ItemDefinition meatItem, clayItem, oreItem; // expansion-target hints (shown from Tribal)
+        public ItemDefinition woodItem, stoneItem;
+        public ItemDefinition clayItem, oreItem; // expansion-target hints (shown from Tribal)
         public ItemDefinition monumentItem; // endgame win-goal tracker (10 blocks = win)
         public List<ItemDefinition> debugItems; // all resources, for the sandbox resource dump
         private float _speed = 1f;

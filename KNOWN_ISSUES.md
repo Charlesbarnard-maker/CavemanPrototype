@@ -57,6 +57,23 @@ sprite packs.
   Keep KNOWN_ISSUES newest-first. CavemanPrototype stays OUT of global memory.
 ---
 
+## #41 #35 follow-ups: power-alloc + dead-code cleanup + signal-lamp fix (2026-06-29)
+Knocked out the safe, self-contained items from the #35 DEFERRED list (compile CLEAN, no gameplay-behaviour change
+except the cosmetic signal lamp). Left the behaviour-risky / subjective ones (belt I/O, rail head-on deadlock, map
+redesign) for a playtest-in-the-loop session — belt I/O especially touches the core production transfer.
+- **PERF (power):** `PowerNet.Rebuild` no longer allocates `new float[nComp]`×3 + `new List<Battery>[nComp]` every
+  frame — reuses high-water-mark scratch (`EnsureScratch`), clearing only the `[0,nComp)` slots it uses.
+- **CLEANUP — dead survival-era wiring (verified unused via usage search, then deleted):** `Economy.FoodPoints/
+  SpendFoodPoints/FoodPointsIn`, `Colony.foodItem/waterItem`, `InventoryHud.foodItem/waterItem/meatItem` + their
+  GameBootstrap assignments. (`foodValue` left — now set-but-unread, harmless; `wood/stone/clay/oreItem` kept, used.)
+- **BUG (signal false-green lamp):** `Signal.BlockAheadOccupied` now BFS-walks ALL forward branches to the next
+  signal (was a single-branch walk that could show GREEN at a junction with a train on the other leg). Cosmetic
+  only — train gating was already correct. Reused BFS scratch (no per-tick alloc); dropped the now-unused `NextAlong`.
+- **NIT:** removed the unused `RouteVehicle.b` property.
+- **STILL DEFERRED:** DrawTopBar/minimap OnGUI caching; `SolidBuildingAt` NonAlloc; rail head-on DEADLOCK
+  (behaviour); merger fairness / greedy battery discharge; `PlaceholderArt.Ground(baseCol)` latent cache trap
+  (harmless — called once). Plus the belt I/O tightening (#4) and the hand-designed map (#3).
+
 ## #40 Buyable mounts + a limited GARAGE — hybrid travel (2026-06-29)
 The "fuller version" of the mounts (continuation of #39). Travel is now HYBRID: reaching an age auto-grants a
 small BASELINE speed bump on foot, but the FULL tier speed + the mount VISUAL need a bought, parked mount.
