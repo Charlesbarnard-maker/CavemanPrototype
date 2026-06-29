@@ -6,9 +6,17 @@ A running record so progress/problems don't get lost. Newest first. Move items t
 ---
 ## 📌 NEW-THREAD HANDOFF — current state (2026-06-29, + 2 FEEDBACK BATCHES: liquids/harbour/objectives/mounts/research + storage/tabs/power — committed & pushed)
 Pinned pointer so a fresh thread (incl. on a DIFFERENT PC) can continue. Everything below is committed and pushed to
-`origin/main` (HEAD = `bcc0f76`, working tree clean, in sync) — a clean clone has the whole game. Open the project,
-Play, and continue. A full interactive PLAYTEST is the biggest owed item (user tests in the evenings) — both feedback
+`origin/main` (HEAD = `9ff393d`, working tree clean, in sync) — a clean clone has the whole game. Open the project,
+Play, and continue. A full interactive PLAYTEST is the biggest owed item (user tests in the evenings) — all feedback
 batches compile clean (`Tools/compile-check.ps1` → COMPILE CLEAN) but have NOT been interactively played yet.
+
+**✅ DONE THIS SESSION — BATCH 2b (2026-06-29 — objectives pacing + text-clip fix):** commit `9ff393d`.
+- Objectives are now **sequential** (one step at a time: wood → stone → …), not a whole age's set at once. The centre
+  popup shows ONE next-step objective (pops once per age); the top-right box shows current + "Up next"; the J journal
+  lists all by age (✔/▸/○). `Objectives.CurrentStep` drives it.
+- **Text cut-off fix:** the objective popup + top-right box now MEASURE each line's wrapped height (`GUIStyle.CalcHeight`)
+  and size the box to fit — long titles that wrap no longer clip. (Selected panel already scrolls; age card already measures.)
+  If more clipped boxes turn up, the pattern to copy is: sum `CalcHeight` of each label at the inner width + margin.
 
 **✅ DONE THIS SESSION — BATCH 2 (2026-06-29 — storage/tabs/power feedback, compile-clean, NOT yet played):** commit `bcc0f76`.
 - **Storage ports by footprint:** Woodpile → 1×1 (1 belt in + 1 out); Warehouse → 2×2 (2 in + 2 out, was 3×3/3+3). Belt
