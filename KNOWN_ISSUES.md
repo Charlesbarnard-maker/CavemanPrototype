@@ -4,54 +4,65 @@ A running record so progress/problems don't get lost. Newest first. Move items t
 **Fixed** when done. Maintained alongside the code — see DESIGN.md for the roadmap.
 
 ---
-## 📌 NEW-THREAD HANDOFF — current state (2026-06-28, all prior work + the ART session committed & pushed)
-Pinned pointer so a fresh thread (incl. on a DIFFERENT PC) can continue. Everything below was committed and
-pushed to `origin/main` at the end of the "bespoke art for all ages" session — so a clean clone has the whole
-game. Open the project, Play, and continue from "LIKELY NEXT".
+## 📌 NEW-THREAD HANDOFF — current state (2026-06-29, mounts + rail overhaul + UI scaling + crafting + balance ALL committed & pushed)
+Pinned pointer so a fresh thread (incl. on a DIFFERENT PC) can continue. Everything below is committed and pushed to
+`origin/main` (HEAD = `4a1004f`, working tree clean, in sync) — a clean clone has the whole game. Open the project,
+Play, and continue from "LIKELY NEXT". A full interactive PLAYTEST is the biggest owed item (user tests in the evenings).
 
-**⚠️ FIRST THING IN A NEW THREAD: verify the full Unity compile.** All code is static- + standalone-compile-checked
-(see below), but the authoritative check is Unity's own recompile of the whole `Assembly-CSharp`. On the new PC:
-open the project in Unity `6000.5.0f1` → it imports + recompiles → read `Logs/Editor.log`, grep `error CS` after
-the LAST "Requested script compilation" (ignore stale errors ~line 1200). Editor closed → `Tools/compile-check.ps1`.
+**⚠️ FIRST THING IN A NEW THREAD: verify the full Unity compile.** Authoritative check is Unity's own recompile of
+`Assembly-CSharp`. Editor CLOSED → `Tools/compile-check.ps1` (batch mode, ~30s-2min, prints "COMPILE CLEAN"). With the
+editor open: read `Logs/Editor.log`, grep `error CS` after the LAST "Requested script compilation". As of `4a1004f`
+the compile is CLEAN. **Gotcha:** kill zombie Unity + stale lockfile first (`Get-Process Unity | Stop-Process -Force`,
+then remove `Temp/UnityLockfile`) or you get lock races. Headless sprite previews: `BespokeSpriteDump.Dump` →
+`C:\Users\charl\CavemanArtPreview\`.
 
 - **Build:** Unity `6000.5.0f1`, 2D/URP. Open `Assets/UnitySave.unity` → Play. ALL built in code at runtime by
   `GameBootstrap.cs` (no prefabs/Inspector wiring — script `.meta` GUIDs don't matter, regenerated on import).
-  Commit as `Caveman Dev <caveman@local>`, NO AI trailer (only when asked).
-- **NEW THIS SESSION — bespoke art for EVERY buildable structure (28 buildings, ages 0–4).** See entry below.
-  Each lives in its own partial-class file under `Assets/Scripts/Bespoke/PlaceholderArt.<Name>.cs`; all dispatched
-  from `PlaceholderArt.BespokeBuilding(displayName)` (called FIRST by `SpriteDatabase.ForBuilding`, so it wins over
-  the Roguelike pack + the generic archetype). VERIFIED to compile via a standalone `dotnet build` of the 28 files
-  against `UnityEngine.CoreModule.dll` (0 errors) — but NOT yet eyeballed in Unity (visual review owed).
-- **✅ DONE 2026-06-29 (see #39): (1) Unity recompile — CLEAN (0 `error CS`), and (2) the VISUAL pass on all 28+6
-  bespoke building sprites** — eyeballed via headless renders; all read/tint well; one fix (Charcoal Burner tint).
-  Also **per-age player MOUNTS** are now implemented (the old LIKELY-NEXT #2). **STILL OWED: a full PLAYTEST** of the
-  whole accumulated game (user deferred it this session to do the mounts first).
+  **Commit as `Caveman Dev <caveman@local>`, NO AI trailer.** Push with `git -c lfs.locksverify=false push origin main`
+  if a verify-locks auth error hits (repo uses git-LFS). **CavemanPrototype stays OUT of global memory.** F3 = skip an
+  age + unlock its tech (cheat for testing). Here-string commit messages fail if they contain parentheses — keep paren-free.
 
-**PRIOR SESSION CONTENT (factory-first caveman game; all now committed):** belts (per-tier, seamless, corners,
-splitters/mergers) · rail with one/two-way signals + multi-stop train lines · boats (shore harbours, cargo-ship
-lines, boat island, buyable personal boat) · LIQUIDS (Oil Well→pipes→Refinery→Oil Generator; Water Pump) · power
-(belt-fed generators, poles, batteries) · timed construction · manual paid age-upgrades · visible caveman workers
-+ a per-age player avatar (3-frame walk) · flyout build menu · per-resource top bar · 2×2 buildings (Monument 3×3)
-with single I/O ports · stone-age bespoke art (Wood Hut/Stone Pit/Sawmill/Idea Bench/Research Lodge/Woodpile +
-Tree/Rock/Caveman). New files across the whole arc: `WorkerUnit.cs`, `PlayerAvatar.cs`, `Battery.cs`, `PowerNode.cs`,
-`RailTile.cs`, `Signal.cs`, the `Assets/Scripts/Bespoke/` art folder, and the `Assets/Roguelike/` + `Assets/Resources/`
-sprite packs.
+**✅ DONE THIS SESSION (2026-06-29, entries #39–#49):**
+- **Per-age player MOUNTS + GARAGE (#39/#40):** `PlaceholderArt.PlayerMount(tier,frame)` = On Foot→Horseback→Ox Cart→
+  Wagon→Motorbike. Buyable mounts + a limited `Garage` (timber cart-shed). Hybrid economy: age gives a baseline speed
+  bump, the bought+parked mount adds full speed + the look. `PlayerController.OwnedMount[5]/ActiveMount/MountCost[]`.
+  **Garage selectable bug FIXED** (was missing from `BuildController.BuildingGOUnderCursor` whitelist + solid-check).
+- **Collector WORKER + building tier visuals:** `PlaceholderArt.CollectorWorker(job,tier,age,frame)` = job-appropriate
+  cutters (axe/sledge/shovel/pick stepping stone→bronze→iron) early, MACHINE at tier 3; `JobForItem(id)` maps produces.id.
+  `PlaceholderArt.TierMachinery` + `MachineUpgradeFX` overlay grows with upgrade tier (gear→piston→smokestack/glow) so
+  buildings look more advanced at higher levels.
+- **RAIL overhaul (#44-#47):** reworked to EXPLICIT per-tile connectivity — `RailTile.links` bitmask (N1/E2/S4/W8),
+  `RailNet.Linked(a,b)` mutual-link check, set from the drag path via `BuildController.ApplyPathLinks`. Fixes BOTH bugs:
+  (a) blueprint ghost now follows placement DIRECTION (`GhostMaskAt`/`GhostMask`); (b) parallel adjacent tracks no longer
+  auto-connect, and you CAN now merge parallel tracks. `Signal`/`FindPath`/`Depot` all respect `Linked`. Per-age loco art
+  `PlaceholderArt.TrainLoco(tier,frame)` Donkey/Ox/Horse/Steam/Diesel + `CargoWagon`/`LiquidWagon` sprites exist.
+- **Responsive UI scaling (#42/#43):** `InventoryHud` now scales IMGUI by `GUI.matrix` with a logical 1080-ref canvas
+  (`_uiScale = clamp(Screen.height/1080, 0.5, 1.0)`, `_vw/_vh`). Fixes small-screen pile-up ("couldn't select the train").
+- **Electricity reviewed (#48):** power matters from **Bronze age (Colony.Age >= 2)** — `requiresPower` machines (Kiln,
+  Potter, Basic Smelter, Advanced Smelter) stop + show a BLUE dot if unwired. Was wildly over-supplied → smelters +
+  Engineering Lab now draw 20 each. Added a one-time "needs power" onboarding toast. Fixed misleading "Industrial age" comments.
+- **Deeper CRAFTING chains (#48), reusing buildings (no new ones):** Forge/Toolmaker → multi-recipe (BronzeGear / Tools /
+  SteelBeam). Engineering Lab → multi-recipe assembly (3-input MachinePart → Engine). Industrial Blueprint = Steel+MachinePart.
+  Monument win now needs Engine + Jewelry + Bricks. New items: `bronzeGear, steelBeam, machinePart, engine`.
+- **Balance retune (#48) + optimisation sweep (#49):** age-cost curve was a grind → retuned to **12/150/400/800** with
+  higher per-item research points; Charcoal Burner 2/cycle; Wooden Belt 40/min; fixed dead `outputPerCycle` collector lever.
+  PERF: `SolidBuildingAt` now NonAlloc. Multi-recipe machines default to lowest-age recipe.
 
 - **🔜 LIKELY NEXT (user's open threads, roughly priority order):**
-  1. ~~Unity recompile + visual pass on the 28 new building sprites~~ **✅ DONE 2026-06-29 (#39)** — all read/tint
-     well; Charcoal Burner tint lifted so its dark mound + embers read.
-  2. ~~Player VEHICLE/MOUNT visuals per age~~ **✅ DONE 2026-06-29 (#39 visuals, #40 garage)** —
-     `PlaceholderArt.PlayerMount(tier,frame)` bakes side-profile Horseback/Ox Cart/Wagon/Motorbike + an age-tinted
-     rider, animated over 3 frames. Now BUYABLE + a limited GARAGE (hybrid travel): age gives a baseline speed bump
-     on foot, the bought+parked mount adds the full speed + the look. **OWED: an INTERACTIVE PLAYTEST of the garage**
-     (build it → buy a mount → ride/switch) — UI/economy couldn't be verified headlessly.
-  2b. **Full PLAYTEST** of the whole accumulated game (deferred this session) — belts/rail/boats/liquids/power/ages.
-  3. **Make the WHOLE map feel hand-designed** (only the island was reshaped so far) — `TerrainGrid` / resource zones.
-  4. **Tighten 2×2 single-port belt I/O to ONE cell** (belts still functionally connect anywhere along a side though
-     only one port marker shows — see `Ports.singlePort` + `Belt.cs` deposit/pull).
-  5. **#35 deferred audit items** (PERF: `DrawTopBar`/minimap OnGUI caching, `PowerNet.Rebuild` per-frame allocs,
-     `SolidBuildingAt` allocs; BUGS: rail head-on deadlock, signal false-green lamp at a junction; dead survival-era
-     wiring to delete) — see the #35 entry for the full list.
+  1. **FULL INTERACTIVE PLAYTEST** (the biggest owed item; user tests in the evenings) — verify: faster age pacing, power
+     now biting in Bronze (build a generator, wire smelters), new Forge/Engineering-Lab recipes (click building to switch),
+     deeper Monument, mounts+garage (build→buy→ride/switch), rail merge/parallel + ghost direction, per-age locos in motion,
+     UI scaling on a small window. Tune from feedback.
+  2. **TRAIN CONSIST mechanics (queued — design already chosen with user):** loco + N wagons coupled (snake the track via
+     breadcrumb trail), MIXED cargo (per-stop Load/Unload roles, different cargo per wagon), age-gated add/remove-wagon UI,
+     pipe-fed LIQUID stations + liquid wagons, and a GLOBAL line-overview UI ("managing many lines" was the pain point).
+     Art (`TrainLoco`/`CargoWagon`/`LiquidWagon`) already exists; the MECHANICS are not built yet. Needs interactive iteration.
+  3. **Deferred from #49 (need in-editor verification — do NOT change blind):** belt input-side deposit-gate orientation
+     (agent warned flipping wrong breaks the working case), browned-out machine reports full `CurrentDraw`, WaterPump
+     fair-share divides by all inputs, multi-stop route loading (will be replaced by the consist rework anyway).
+  4. **Deferred PERF from #49/#35:** `DrawTopBar`/minimap/`DrawStatus`/hover OnGUI caching, `Footprint.Cells` alloc reuse,
+     `PowerNet.Rebuild` per-frame allocs.
+  5. **Make the WHOLE map feel hand-designed** (only the island was reshaped) — `TerrainGrid` / resource zones.
   6. Fuller UI/tutorial polish; bespoke ITEM icons (currently shape-by-family).
 - **Canon:** GAME_DESIGN.md is partly SUPERSEDED (factory-first, but workers are back as a COSMETIC layer).
   Keep KNOWN_ISSUES newest-first. CavemanPrototype stays OUT of global memory.
