@@ -1,8 +1,9 @@
-# Headless Unity compile check — compiles the project in batch mode and reports any C# errors,
+# Headless Unity compile check - compiles the project in batch mode and reports any C# errors,
 # with no human in the loop. The Unity EDITOR must be CLOSED first (it locks the project, so a
 # second instance can't open it). Usage:  powershell -ExecutionPolicy Bypass -File Tools/compile-check.ps1
 param(
-    [string]$Project = "C:\Users\charl\Projects\CavemanPrototype",
+    # Defaults to the repo root (this script lives in <repo>/Tools), so it works on any clone/PC.
+    [string]$Project = (Split-Path $PSScriptRoot -Parent),
     [string]$Unity   = "C:\Program Files\Unity\Hub\Editor\6000.5.0f1\Editor\Unity.exe"
 )
 
@@ -16,7 +17,7 @@ if (Test-Path "$Project\Temp\UnityLockfile") {
 $log = Join-Path $env:TEMP "caveman-compile.log"
 if (Test-Path $log) { Remove-Item $log -Force }
 
-Write-Output "Compiling (batch mode) — this takes ~30s-2min..."
+Write-Output "Compiling (batch mode) - this takes ~30s-2min..."
 & $Unity -batchmode -quit -projectPath $Project -logFile $log | Out-Null
 $code = $LASTEXITCODE
 

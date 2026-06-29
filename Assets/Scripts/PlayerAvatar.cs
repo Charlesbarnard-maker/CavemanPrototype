@@ -2,9 +2,10 @@ using UnityEngine;
 
 namespace Caveman
 {
-    /// <summary>Re-skins the player to the age-appropriate caveman as the colony advances ages
-    /// (Stone fur + club → Tribal → Bronze → Iron → Industrial hard-hat + wrench). Pure cosmetic —
-    /// the art is generated in <see cref="PlaceholderArt.Caveman"/>.</summary>
+    /// <summary>Re-skins the player to the age-appropriate travel mount as the colony advances ages:
+    /// On Foot (the caveman) → Horseback → Ox Cart → Wagon → Motorbike — mirroring the speed tiers in
+    /// <see cref="PlayerController"/>. Pure cosmetic — art is generated in <see cref="PlaceholderArt.PlayerMount"/>
+    /// (age 0 falls through to <see cref="PlaceholderArt.Caveman"/>). On water with a boat, shows the boat.</summary>
     public class PlayerAvatar : MonoBehaviour
     {
         private SpriteRenderer _sr;
@@ -35,7 +36,7 @@ namespace Caveman
             if (moving) { _animT += Time.deltaTime; if (_animT >= 0.14f) { _animT = 0f; _frame = (_frame + 1) % 3; } }
             else { _frame = 0; _animT = 0f; }
             int key = age * 3 + _frame;
-            if (key != _shownKey && _sr != null) { _shownKey = key; _sr.sprite = PlaceholderArt.Caveman(age, _frame); _sr.color = Color.white; }
+            if (key != _shownKey && _sr != null) { _shownKey = key; _sr.sprite = PlaceholderArt.PlayerMount(age, _frame); _sr.color = Color.white; }
         }
     }
 }

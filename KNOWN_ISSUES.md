@@ -22,9 +22,10 @@ the LAST "Requested script compilation" (ignore stale errors ~line 1200). Editor
   from `PlaceholderArt.BespokeBuilding(displayName)` (called FIRST by `SpriteDatabase.ForBuilding`, so it wins over
   the Roguelike pack + the generic archetype). VERIFIED to compile via a standalone `dotnet build` of the 28 files
   against `UnityEngine.CoreModule.dll` (0 errors) — but NOT yet eyeballed in Unity (visual review owed).
-- **⚠️ OWED: (1) a Unity recompile + VISUAL eyeball of the new building art** (it's blind procedural art — Play
-  through the ages, age-skip with F3, and check each building reads well / tints right; tweak the offending
-  `PlaceholderArt.<Name>.cs` method). **(2) a full PLAYTEST** of the whole accumulated game.
+- **✅ DONE 2026-06-29 (see #39): (1) Unity recompile — CLEAN (0 `error CS`), and (2) the VISUAL pass on all 28+6
+  bespoke building sprites** — eyeballed via headless renders; all read/tint well; one fix (Charcoal Burner tint).
+  Also **per-age player MOUNTS** are now implemented (the old LIKELY-NEXT #2). **STILL OWED: a full PLAYTEST** of the
+  whole accumulated game (user deferred it this session to do the mounts first).
 
 **PRIOR SESSION CONTENT (factory-first caveman game; all now committed):** belts (per-tier, seamless, corners,
 splitters/mergers) · rail with one/two-way signals + multi-stop train lines · boats (shore harbours, cargo-ship
@@ -37,11 +38,13 @@ Tree/Rock/Caveman). New files across the whole arc: `WorkerUnit.cs`, `PlayerAvat
 sprite packs.
 
 - **🔜 LIKELY NEXT (user's open threads, roughly priority order):**
-  1. **Unity recompile + visual pass on the 28 new building sprites** (the immediate owed item — iterate any that
-     look off; they're procedural + un-eyeballed).
-  2. **Player VEHICLE/MOUNT visuals per age** (deferred — was about to start when paused). `PlayerController` already
-     names the tiers (On Foot→Horseback→Ox Cart→Wagon→Motorbike); give each a sprite shown by `PlayerAvatar`. The
-     fuller version is a buyable mount + a limited GARAGE to park them.
+  1. ~~Unity recompile + visual pass on the 28 new building sprites~~ **✅ DONE 2026-06-29 (#39)** — all read/tint
+     well; Charcoal Burner tint lifted so its dark mound + embers read.
+  2. ~~Player VEHICLE/MOUNT visuals per age~~ **✅ CORE DONE 2026-06-29 (#39)** — `PlaceholderArt.PlayerMount(age,frame)`
+     bakes side-profile Horseback/Ox Cart/Wagon/Motorbike + an age-tinted rider, animated over 3 frames; shown by
+     `PlayerAvatar` (age 0 = on-foot caveman). **STRETCH STILL OPEN:** make the mount BUYABLE + a limited GARAGE to
+     park them (right now it auto-applies by age, mirroring the existing speed tiers).
+  2b. **Full PLAYTEST** of the whole accumulated game (deferred this session) — belts/rail/boats/liquids/power/ages.
   3. **Make the WHOLE map feel hand-designed** (only the island was reshaped so far) — `TerrainGrid` / resource zones.
   4. **Tighten 2×2 single-port belt I/O to ONE cell** (belts still functionally connect anywhere along a side though
      only one port marker shows — see `Ports.singlePort` + `Belt.cs` deposit/pull).
@@ -52,6 +55,28 @@ sprite packs.
 - **Canon:** GAME_DESIGN.md is partly SUPERSEDED (factory-first, but workers are back as a COSMETIC layer).
   Keep KNOWN_ISSUES newest-first. CavemanPrototype stays OUT of global memory.
 ---
+
+## #39 Unity verify + visual pass on bespoke art + per-age player MOUNTS (2026-06-29)
+Fresh-PC continuation. Reconciled the clone (was 23 commits behind → fast-forwarded `main` to `origin/main` =
+`bb3636c`), then worked the owed list.
+- **Compile — CLEAN.** `Tools/compile-check.ps1` has a PowerShell 5.1 parse bug (a `"...($($x.Count) error(s)):"`
+  string trips the parser before Unity even launches — STILL TO FIX). Worked around it by invoking Unity batch
+  directly: `Unity -batchmode -quit -projectPath <p> -logFile <l>` → full `Assembly-CSharp` recompile, **0 `error CS`**,
+  exit 0. (Headless licensing/d3d12 log lines are noise, not compile errors.)
+- **Visual pass — DONE via headless renders.** Added `Assets/Editor/BespokeSpriteDump.cs` (a dev/editor tool, run
+  with `-executeMethod BespokeSpriteDump.Dump`) that bakes every bespoke sprite × its real `def.color` into contact
+  sheets + zooms under `C:\Users\charl\CavemanArtPreview\` (outside Assets). All 28 new + 6 stone-age sprites read
+  well and tint correctly. **One fix:** the **Charcoal Burner** `def.color` was `(0.30,0.30,0.33)` — so dark it
+  crushed its already-dark authored mound + ember glow to near-black; lifted to `(0.62,0.58,0.54)` (GameBootstrap)
+  so the shading/embers read while it stays a sooty clamp.
+- **Per-age player MOUNTS — implemented.** NEW `Assets/Scripts/Bespoke/PlaceholderArt.PlayerMounts.cs`:
+  `PlayerMount(age,frame)` → age 0 = on-foot Caveman; 1 Horseback, 2 Ox Cart, 3 Wagon, 4 Motorbike. Side-profile,
+  baked full-colour (avatar renders at white tint), 64×64 centre-pivot, 3-frame anim (trotting legs / spinning
+  spokes via a shared `WheelPixel` helper) + a small age-tinted rider (`StampRider`). `PlayerAvatar` now calls
+  `PlayerMount` instead of `Caveman` (workers in `WorkerUnit` still use `Caveman`, unchanged). Mounts auto-apply by
+  age, mirroring the existing `PlayerController` speed tiers.
+- **Not committed** — all changes sit in the working tree for review. `BespokeSpriteDump.cs` is a keep-or-delete dev
+  tool (like `compile-check.ps1`).
 
 ## #38 BESPOKE ART for every buildable structure — all ages 0–4 (2026-06-28)
 Extended the stone-age bespoke-art treatment to EVERY remaining building the player can place (28 structures),
