@@ -365,55 +365,57 @@ namespace Caveman
         public static void SpawnRenderer()
         {
             if (_map == null) return;
-            var tex = new Texture2D(_size, _size, TextureFormat.RGBA32, false)
-            { filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Clamp }; // smooth, not a blocky quilt at play zoom
-            var px = new Color[_map.Length];
+            int ss = _size > 900 ? 2 : 4; // SUPERSAMPLE: bake several texels per cell so fine grain is crisp (POINT-filtered, sharp) rather than a blurry 1px-per-cell smear. Lower for huge worlds.
+
+            // Pass 1 — per-cell base colour: warm biome palette, sandy COASTLINE rim, dithered biome EDGES.
+            var cellCol = new Color[_map.Length];
             for (int gy = 0; gy < _size; gy++)
                 for (int gx = 0; gx < _size; gx++)
                 {
                     int idx = gy * _size + gx;
                     Terrain t = _map[idx];
                     Color c = ColorOf(t);
-
-                    if (t == Terrain.Water)
+                    if (t != Terrain.Water && t != Terrain.Mountain)
                     {
-                        float wv = 0.93f + 0.12f * CellHash(gx, gy, 5);          // gentle ripple shimmer
-                        px[idx] = new Color(c.r * wv, c.g * wv, c.b * wv); continue;
+                        bool coast = MapAt(gx - 1, gy) == Terrain.Water || MapAt(gx + 1, gy) == Terrain.Water
+                                   || MapAt(gx, gy - 1) == Terrain.Water || MapAt(gx, gy + 1) == Terrain.Water;
+                        if (coast) c = Color.Lerp(c, Sand, 0.6f);
+                        else { Terrain nb = NeighbourLand(gx, gy, t); if (nb != t && CellHash(gx, gy, 2) < 0.30f) c = ColorOf(nb); }
                     }
-                    if (t == Terrain.Mountain)
-                    {
-                        float mv = 0.86f + 0.22f * CellHash(gx, gy, 6);          // rocky mottle
-                        px[idx] = new Color(c.r * mv, c.g * mv, c.b * mv); continue;
-                    }
-
-                    // --- land (plains/forest/hills) ---
-                    bool coast = MapAt(gx - 1, gy) == Terrain.Water || MapAt(gx + 1, gy) == Terrain.Water
-                               || MapAt(gx, gy - 1) == Terrain.Water || MapAt(gx, gy + 1) == Terrain.Water;
-                    if (coast)
-                    {
-                        c = Color.Lerp(c, Sand, 0.6f);                           // sandy beach rim
-                    }
-                    else
-                    {
-                        // dithered biome edge: a land cell next to a DIFFERENT land biome adopts it ~30% of the
-                        // time (stable per cell), softening the hard border into a speckled transition.
-                        Terrain nb = NeighbourLand(gx, gy, t);
-                        if (nb != t && CellHash(gx, gy, 2) < 0.30f) c = ColorOf(nb);
-                        float v = 0.93f + 0.13f * CellHash(gx, gy, 0);           // gentle brightness mottle
-                        float warm = (CellHash(gx, gy, 3) - 0.5f) * 0.05f;       // warmth wander
-                        c = new Color(Mathf.Clamp01(c.r * v + warm), Mathf.Clamp01(c.g * v), Mathf.Clamp01(c.b * v - warm * 0.5f));
-                        if (CellHash(gx, gy, 1) > 0.95f)                         // sparse bright fleck (grass/pebble)
-                            c = new Color(Mathf.Clamp01(c.r * 1.14f), Mathf.Clamp01(c.g * 1.14f), Mathf.Clamp01(c.b * 1.10f));
-                    }
-                    px[idx] = c;
+                    cellCol[idx] = c;
                 }
+
+            // Pass 2 — the sharp high-res surface: each texel = its cell's colour + FINE per-texel grain (a few
+            // px of brightness wander, sparse bright flecks = grass/pebble highlights, sparse dark specks = dirt/
+            // shade). Point-filtered so it reads as detailed natural ground, not a soft wash.
+            int tw = _size * ss;
+            float inv = 1f / ss;
+            var px = new Color[tw * tw];
+            for (int ty = 0; ty < tw; ty++)
+                for (int tx = 0; tx < tw; tx++)
+                {
+                    // BILINEAR-blend the cell base colour → soft, organic biome edges (no stair-stepped coast),
+                    // then add SHARP per-texel grain on top (kept crisp by the Point filter) for natural detail.
+                    float fcx = (tx + 0.5f) * inv - 0.5f, fcy = (ty + 0.5f) * inv - 0.5f;
+                    int x0 = Mathf.Clamp(Mathf.FloorToInt(fcx), 0, _size - 1), y0 = Mathf.Clamp(Mathf.FloorToInt(fcy), 0, _size - 1);
+                    int x1 = Mathf.Min(x0 + 1, _size - 1), y1 = Mathf.Min(y0 + 1, _size - 1);
+                    float ax = Mathf.Clamp01(fcx - x0), ay = Mathf.Clamp01(fcy - y0);
+                    Color b = Color.Lerp(Color.Lerp(cellCol[y0 * _size + x0], cellCol[y0 * _size + x1], ax),
+                                         Color.Lerp(cellCol[y1 * _size + x0], cellCol[y1 * _size + x1], ax), ay);
+                    float g = 0.90f + 0.18f * CellHash(tx, ty, 20);
+                    float f = CellHash(tx, ty, 21);
+                    if (f > 0.975f) g *= 1.18f;            // bright fleck
+                    else if (f < 0.025f) g *= 0.84f;       // dark speck
+                    px[ty * tw + tx] = new Color(Mathf.Clamp01(b.r * g), Mathf.Clamp01(b.g * g), Mathf.Clamp01(b.b * g), 1f);
+                }
+            var tex = new Texture2D(tw, tw, TextureFormat.RGBA32, false) { filterMode = FilterMode.Point, wrapMode = TextureWrapMode.Clamp };
             tex.SetPixels(px);
             tex.Apply();
-            MapTex = tex;
+            MapTex = tex; // covers _size world units; pixel for world cell c ≈ (c+Half)*ss
 
             var go = new GameObject("Terrain");
             var sr = go.AddComponent<SpriteRenderer>();
-            sr.sprite = Sprite.Create(tex, new Rect(0, 0, _size, _size), new Vector2(0.5f, 0.5f), 1f); // 1px = 1 unit
+            sr.sprite = Sprite.Create(tex, new Rect(0, 0, tw, tw), new Vector2(0.5f, 0.5f), ss); // ppu = ss → tw/ss = _size world units
             sr.sortingOrder = -90; // above the plain ground backdrop (-100), below world objects
             go.transform.position = Vector3.zero;
         }

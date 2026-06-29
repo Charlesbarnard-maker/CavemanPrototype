@@ -8,8 +8,8 @@ namespace Caveman
     /// Density is front-loaded near spawn and the total is hard-capped, so cost is bounded on any map size.</summary>
     public static class DecorScatter
     {
-        private const int Step = 4;        // one candidate cell per Step×Step block
-        private const int MaxSprites = 14000;
+        private const int Step = 3;        // one candidate cell per Step×Step block (denser, small props → a fuller meadow)
+        private const int MaxSprites = 16000;
         private const int SortOrder = -80;
 
         public static void Populate()
@@ -58,9 +58,9 @@ namespace Caveman
             switch (t)
             {
                 case Terrain.Plains:
-                    if (r < 0.55f) return PlaceholderArt.GrassTuft();
-                    if (r < 0.78f) return PlaceholderArt.Flower((int)(TerrainGrid.CellHash(x, y, 15) * 3f));
-                    if (r < 0.90f) return PlaceholderArt.Bush(0);
+                    if (r < 0.66f) return PlaceholderArt.GrassTuft();
+                    if (r < 0.78f) return PlaceholderArt.Flower((int)(TerrainGrid.CellHash(x, y, 15) * 3f)); // fewer flowers — accents, not a carpet
+                    if (r < 0.92f) return PlaceholderArt.Bush(0);
                     return PlaceholderArt.Pebbles();
                 case Terrain.Forest:
                     if (r < 0.40f) return PlaceholderArt.Bush(0);
@@ -92,7 +92,7 @@ namespace Caveman
             go.transform.SetParent(root, false);
             float ox = (TerrainGrid.CellHash(x, y, 16) - 0.5f) * 0.85f, oy = (TerrainGrid.CellHash(x, y, 17) - 0.5f) * 0.85f;
             go.transform.position = new Vector3(x + ox, y + oy, 0f);
-            float sc = 0.55f + 0.40f * TerrainGrid.CellHash(x, y, 18); // size variety
+            float sc = 0.42f + 0.24f * TerrainGrid.CellHash(x, y, 18); // small + a little variety, so props sit INTO the meadow rather than standing out
             go.transform.localScale = new Vector3(sc, sc, 1f);
             var sr = go.AddComponent<SpriteRenderer>();
             sr.sprite = sprite;

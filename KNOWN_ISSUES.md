@@ -116,6 +116,14 @@ and REOPEN it afterward, autonomously, whenever a compile needs verifying — do
   Camera.Render renders sprites white — so the harness samples MapTex + blits decoration textures directly). **To
   verify in editor:** Play → warm textured ground, grass/bushes/flowers, sand coasts, drifting cloud shadows, swaying
   grass, water glints, vignette. Tuning knobs: `DecorScatter` Density/Step, `TerrainGrid.SpawnRenderer` mottle, vignette alphas.
+  **Refinement (same day):** terrain was BLURRY (bilinear over a 1px/cell texture) → `SpawnRenderer` now SUPERSAMPLES
+  the bake (ss=4 small / ss=2 for huge worlds): pass-1 per-cell base, pass-2 high-res = BILINEAR-blended base colour
+  (soft organic biome edges, smooth coast) + SHARP per-texel grain, Point-filtered → crisp grassy ground, not a smear.
+  MapTex is now ss× resolution covering 2*Half+1 world units; the M-map stretches it fine; `LookSnapshot` samples it
+  nearest with world-extent normalisation. Decorations SMALLER (scale 0.42-0.66) + denser (Step 3, ~8.5k at Half=280,
+  cap 16k) so they sit INTO the meadow. `SwayAnimator` reworked to a DIRECTIONAL wind with travelling gusts (lean +
+  ripple wave across the field) instead of random wobble. **Watch at Half=650:** ss=2 → ~27MB terrain texture + ~6.8M-
+  texel bake (one-time); drop ss to 1-2 or cap decor if load feels slow.
 
 **✅ DONE AN EARLIER SESSION (2026-06-29, entries #39–#49):**
 - **Per-age player MOUNTS + GARAGE (#39/#40):** `PlaceholderArt.PlayerMount(tier,frame)` = On Foot→Horseback→Ox Cart→

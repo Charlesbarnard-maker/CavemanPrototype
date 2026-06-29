@@ -154,16 +154,20 @@ namespace Caveman
             // Pixel-COMPOSITE the preview (URP batch-mode Camera.Render doesn't draw sprites): terrain base from
             // the real baked MapTex, then blit each decoration sprite's texture at its world position, then vignette.
             var mt = TerrainGrid.MapTex;
-            float cenX = 22f, cenY = 12f, halfW = 19f, halfH = 14.25f; int ppu = 19; // region to preview (world units → px)
+            float cenX = 24f, cenY = 12f, halfW = 15f, halfH = 11.25f; int ppu = 24; // region to preview (world units → px)
             int W = (int)(halfW * 2 * ppu), H = (int)(halfH * 2 * ppu);
             float ox = cenX - halfW, oy = cenY - halfH; // world coord at output (0,0)
             var px = new Color[W * H];
             for (int y = 0; y < H; y++)
                 for (int x = 0; x < W; x++)
                 {
-                    // bilinear-sample MapTex (mirrors the in-game Bilinear filter → smooth, not blocky)
+                    // nearest-sample the supersampled MapTex (mirrors the in-game Point filter → sharp grain).
+                    // MapTex covers (2*Half+1) world units, so world→normalized = (w+Half)/(2*Half+1).
                     float wx = ox + x / (float)ppu, wy = oy + y / (float)ppu;
-                    px[y * W + x] = mt != null ? mt.GetPixelBilinear((wx + Half) / mt.width, (wy + Half) / mt.height) : new Color(0.16f, 0.19f, 0.16f);
+                    if (mt == null) { px[y * W + x] = new Color(0.16f, 0.19f, 0.16f); continue; }
+                    int sx = Mathf.Clamp(Mathf.RoundToInt((wx + Half) / (2f * Half + 1f) * mt.width), 0, mt.width - 1);
+                    int sy = Mathf.Clamp(Mathf.RoundToInt((wy + Half) / (2f * Half + 1f) * mt.height), 0, mt.height - 1);
+                    px[y * W + x] = mt.GetPixel(sx, sy);
                 }
             if (decorRoot != null)
                 foreach (Transform d in decorRoot.transform)
