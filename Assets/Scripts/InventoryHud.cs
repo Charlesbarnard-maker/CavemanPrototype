@@ -63,7 +63,7 @@ namespace Caveman
         private bool _showObjectives;                                          // the quest journal panel (J)
         private Vector2 _objPanelScroll;
         private Rect _objPanelRect;
-        private readonly List<(int age, List<Quest> set)> _revealQueue = new(); // new-age objectives, shown centre-screen one at a time
+        private readonly List<Quest> _revealQueue = new(); // next-step objectives, shown centre-screen one at a time
         private Rect _objRevealRect;
         private bool _revealConsume;                                           // set by the popup's OK; applied in Update (no mid-frame queue mutation)
         private bool _localTipShown; // one-time hint when a workshop first starves
@@ -1447,60 +1447,77 @@ namespace Caveman
             int age = Colony.Instance != null ? Colony.Instance.Age : 0;
             string ageName = Colony.AgeNames[Mathf.Clamp(age, 0, Colony.AgeNames.Length - 1)];
 
-            var active = new List<Quest>();
-            foreach (var q in o.ActivePending(5)) active.Add(q);
+            // SEQUENTIAL: the current step (bright) + the one after it (faint "Up next"). One thing at a time.
+            var steps = new List<Quest>();
+            foreach (var q in o.ActivePending(2)) steps.Add(q);
 
-            float h = 38f + Mathf.Max(1, active.Count) * 22f;
-            var rect = new Rect(_vw - 314, 62, 302, h);
+            const float w = 320f;
+            float inner = w - 24f;
+            string header = $"<b>🎯 Objectives</b>   <size=11><color=#bbb>{ageName} · J for all</color></size>";
+            var lines = new List<string>();
+            if (steps.Count == 0) lines.Add("<size=13><color=#9f9>All objectives complete! 🎉</color></size>");
+            else
+            {
+                lines.Add($"<size=14><color=#ffd24d>▸</color> <b>{steps[0].title}</b>"
+                    + (string.IsNullOrEmpty(steps[0].rewardText) ? "" : $"  <size=11><color=#9c9>({steps[0].rewardText})</color></size>") + "</size>");
+                if (steps.Count > 1) lines.Add($"<size=12><color=#999>Up next: {steps[1].title}</color></size>");
+            }
+
+            // Measure every line at the box's inner width and size the box to fit, so long titles that WRAP
+            // are never clipped (the recurring text cut-off bug).
+            float bodyH = _small.CalcHeight(new GUIContent(header), inner) + 4f;
+            foreach (var l in lines) bodyH += _small.CalcHeight(new GUIContent(l), inner) + 3f;
+            float h = bodyH + 16f;
+            var rect = new Rect(_vw - w - 12f, 62f, w, h);
             _objRect = rect;
             PanelBg(rect);
-            GUILayout.BeginArea(new Rect(rect.x + 12, rect.y + 8, rect.width - 24, rect.height - 14));
-            GUILayout.Label($"<b>🎯 Objectives</b>   <size=11><color=#bbb>{ageName} · J for all</color></size>", _small);
-            if (active.Count == 0)
-                GUILayout.Label("<size=13><color=#9f9>All current goals done — research the next Age (T).</color></size>", _small);
-            else
-                foreach (var q in active)
-                    GUILayout.Label($"<size=13><color=#ffd24d>▸</color> {q.title}"
-                        + (string.IsNullOrEmpty(q.rewardText) ? "" : $"  <size=11><color=#9c9>({q.rewardText})</color></size>") + "</size>", _small);
+            GUILayout.BeginArea(new Rect(rect.x + 12, rect.y + 8, inner, h - 14));
+            GUILayout.Label(header, _small);
+            GUILayout.Space(2f);
+            foreach (var l in lines) GUILayout.Label(l, _small);
             GUILayout.EndArea();
         }
 
-        /// <summary>Queue a centre-screen "new objectives" popup for an age's goal set — called by Objectives
-        /// when an age unlocks (incl. age 0 at game start). Shown one at a time; OK docks them to the box.</summary>
-        public void ShowObjectiveReveal(int age, List<Quest> set)
+        /// <summary>Queue a centre-screen popup for the player's NEXT objective — called by Objectives at game
+        /// start and at each Age. Shown one at a time; OK docks it back to the top-right box.</summary>
+        public void ShowObjectiveReveal(Quest q)
         {
-            if (set == null || set.Count == 0) return;
-            _revealQueue.Add((age, set));
+            if (q != null) _revealQueue.Add(q);
         }
 
-        // The centre-screen objective REVEAL: when an age unlocks, its new goals appear big in the middle so
-        // they're read, then "OK" docks them to the top-right box. Waits behind the age card so they sequence;
-        // the OK click only flags a consume (Update pops the queue) so the queue is stable across OnGUI passes.
+        // The centre-screen objective REVEAL: ONE next-step objective, big in the middle to read, then "OK" docks
+        // it to the top-right box. Waits behind the age card so they sequence; the OK click only flags a consume
+        // (Update pops the queue) so the queue is stable across OnGUI passes. Height is MEASURED so it never clips.
         private void DrawObjectiveReveal()
         {
             if (_revealQueue.Count == 0 || _ageCardT > 0f) { _objRevealRect = default; return; }
-            var entry = _revealQueue[0];
-            string ageName = Colony.AgeNames[Mathf.Clamp(entry.age, 0, Colony.AgeNames.Length - 1)];
+            var q = _revealQueue[0];
+            string ageName = Colony.AgeNames[Mathf.Clamp(q.age, 0, Colony.AgeNames.Length - 1)];
 
-            float w = Mathf.Min(560f, _vw - 60f);
+            float w = Mathf.Min(520f, _vw - 60f);
             float inner = w - 40f;
-            var sb = new System.Text.StringBuilder();
-            foreach (var q in entry.set)
-                sb.Append("• ").Append(q.title)
-                  .Append(string.IsNullOrEmpty(q.rewardText) ? "" : $"   <color=#9c9>({q.rewardText})</color>").Append('\n');
-            string title = $"<size=20><color=#ffd24d><b>🎯 New objectives — {ageName}</b></color></size>";
-            string body = $"<size=14>{sb.ToString().TrimEnd()}</size>";
-            float h = _s.CalcHeight(new GUIContent(title), inner) + _small.CalcHeight(new GUIContent(body), inner) + 78f;
-            var r = new Rect(_vw / 2f - w / 2f, _vh * 0.30f, w, h);
+            string title = $"<size=20><color=#ffd24d><b>🎯 Objective — {ageName}</b></color></size>";
+            string hint = "<size=12><color=#bbb>Your next step — do this, then the next appears. (full list: J)</color></size>";
+            string body = $"<size=15><color=#ffd24d>▸</color> <b>{q.title}</b>"
+                + (string.IsNullOrEmpty(q.rewardText) ? "" : $"   <color=#9c9>(reward: {q.rewardText})</color>") + "</size>";
+            string okLabel = "<b>OK ✓</b>   <size=11>(or click this card)</size>";
+
+            // Sum each element's WRAPPED height at the inner width + a comfortable margin → the box always fits.
+            float th = _s.CalcHeight(new GUIContent(title), inner);
+            float hh = _small.CalcHeight(new GUIContent(hint), inner);
+            float bh = _small.CalcHeight(new GUIContent(body), inner);
+            float btnH = _btn.CalcHeight(new GUIContent(okLabel), inner);
+            float h = th + hh + bh + btnH + 52f; // generous fixed padding/gaps so nothing clips
+            var r = new Rect(_vw / 2f - w / 2f, _vh * 0.32f, w, h);
             _objRevealRect = r;
             PanelBg(r);
             GUILayout.BeginArea(new Rect(r.x + 20, r.y + 14, inner, h - 24));
             GUILayout.Label(title, _s);
-            GUILayout.Label("<size=12><color=#bbb>Tackle them in any order — complete them to advance the Age.</color></size>", _small);
-            GUILayout.Space(2f);
+            GUILayout.Label(hint, _small);
+            GUILayout.Space(4f);
             GUILayout.Label(body, _small);
             GUILayout.Space(6f);
-            if (GUILayout.Button("<b>OK ✓</b>   <size=11>(or click this card)</size>", _btn)) _revealConsume = true;
+            if (GUILayout.Button(okLabel, _btn)) _revealConsume = true;
             GUILayout.EndArea();
 
             var e = Event.current;
@@ -1517,13 +1534,13 @@ namespace Caveman
             _objPanelRect = r;
             PanelBg(r);
             GUILayout.BeginArea(new Rect(r.x + 16, r.y + 14, r.width - 32, r.height - 28));
-            int age = Colony.Instance != null ? Colony.Instance.Age : 0;
             int done = 0, total = 0;
             if (o != null) foreach (var q in o.quests) { total++; if (q.claimed) done++; }
             GUILayout.Label($"<size=20><b>🎯 Objectives</b></size>   <color=#9c9>{done}/{total} done</color>", _s);
-            GUILayout.Label("<size=12><color=#bbb>Goals unlock per Age and can be done in ANY order. Clear an Age's goals (and research it) to move on.  (J or Close to exit)</color></size>", _small);
+            GUILayout.Label("<size=12><color=#bbb>One step at a time, in order — each goal unlocks the next, pulling you through the Ages. The ▸ marks what to do now.  (J or Close to exit)</color></size>", _small);
             GUILayout.Space(4);
 
+            var current = o != null ? o.CurrentStep() : null;
             _objPanelScroll = GUILayout.BeginScrollView(_objPanelScroll);
             if (o != null)
             {
@@ -1534,15 +1551,14 @@ namespace Caveman
                     var set = o.QuestsForAge(a);
                     if (set.Count == 0) continue;
                     string an = Colony.AgeNames[Mathf.Clamp(a, 0, Colony.AgeNames.Length - 1)];
-                    string state = a > age ? " <color=#888>(locked)</color>" : a < age ? " <color=#9c9>(past)</color>" : " <color=#ffd24d>(current)</color>";
                     GUILayout.Space(6);
-                    GUILayout.Label($"<size=14><b><color=#cda>── {an} ──</color></b>{state}</size>", _small);
+                    GUILayout.Label($"<size=14><b><color=#cda>── {an} ──</color></b></size>", _small);
                     foreach (var q in set)
                     {
                         string badge, col, txtCol;
-                        if (q.claimed) { badge = "✔"; col = "#9f9"; txtCol = "#9c9"; }
-                        else if (a > age) { badge = "🔒"; col = "#888"; txtCol = "#999"; }
-                        else { badge = "▸"; col = "#ffd24d"; txtCol = "#eee"; }
+                        if (q.claimed) { badge = "✔"; col = "#9f9"; txtCol = "#9c9"; }                 // done
+                        else if (q == current) { badge = "▸"; col = "#ffd24d"; txtCol = "#fff"; }      // do this now
+                        else { badge = "○"; col = "#888"; txtCol = "#bbb"; }                            // upcoming
                         string reward = string.IsNullOrEmpty(q.rewardText) ? "" : $"  <size=11><color=#9c9>{q.rewardText}</color></size>";
                         GUILayout.Label($"<size=13><color={col}>{badge}</color> <color={txtCol}>{q.title}</color>{reward}</size>", _small);
                     }

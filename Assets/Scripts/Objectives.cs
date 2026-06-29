@@ -29,46 +29,51 @@ namespace Caveman
         public bool Won { get; private set; }
 
         private float _t;
-        private int _revealedThrough = -1; // highest Age whose objective set we've already popped centre-screen
+        private int _poppedForAge = -1; // highest Age whose FIRST step we've already popped centre-screen
         void Awake() => Instance = this;
 
-        private int CurrentAge => Colony.Instance != null ? Colony.Instance.Age : 0;
+        /// <summary>The current step — the first goal not yet done (null = all complete). Objectives advance ONE
+        /// at a time, in order, so the player always has a single clear "do this next".</summary>
+        public Quest CurrentStep()
+        {
+            foreach (var q in quests) if (!q.claimed) return q;
+            return null;
+        }
 
         void Update()
         {
             _t += Time.deltaTime;
             if (_t < 0.5f) return;
             _t = 0f;
-            int age = CurrentAge;
 
-            // Reveal each newly-unlocked Age's objective SET centre-screen (incl. Age 0 at game start). Stepping
-            // age-by-age means even an F3 multi-age skip still queues each Age's set in order.
-            if (age > _revealedThrough)
+            // SEQUENTIAL: only the current step can complete. Claim it (and any already-satisfied steps behind it)
+            // in order — so progression is simple, one thing at a time: wood, then stone, then…
+            while (true)
             {
-                for (int a = _revealedThrough + 1; a <= age; a++)
+                var cur = CurrentStep();
+                if (cur == null) break;
+                if (cur.done != null && cur.done())
                 {
-                    var set = QuestsForAge(a);
-                    if (set.Count > 0 && InventoryHud.Instance != null) InventoryHud.Instance.ShowObjectiveReveal(a, set);
+                    cur.claimed = true;
+                    cur.reward?.Invoke();
+                    if (cur.isWin) Won = true;
+                    Toast.Show($"<color=#9f9>✔ {cur.title}</color>" + (string.IsNullOrEmpty(cur.rewardText) ? "" : $"   <size=15>{cur.rewardText}</size>"));
+                    continue; // the next step may already be satisfied → keep claiming in order
                 }
-                _revealedThrough = age;
+                break;
             }
 
-            // Claim any UNLOCKED (age ≤ current) goal whose condition is met — in ANY order, so the player has
-            // freedom in how they complete an Age. Completing one pays its reward + pops a toast.
-            foreach (var q in quests)
+            // Pop a centre-screen popup for the FIRST step of each Age as you reach it (incl. Age 0 at game start)
+            // — ONE objective at a time, not the whole set. Between popups the top-right box steps you onward.
+            var step = CurrentStep();
+            if (step != null && step.age > _poppedForAge && InventoryHud.Instance != null)
             {
-                if (q.claimed || q.age > age) continue;
-                if (q.done != null && q.done())
-                {
-                    q.claimed = true;
-                    q.reward?.Invoke();
-                    if (q.isWin) Won = true;
-                    Toast.Show($"<color=#9f9>✔ {q.title}</color>" + (string.IsNullOrEmpty(q.rewardText) ? "" : $"   <size=15>{q.rewardText}</size>"));
-                }
+                _poppedForAge = step.age;
+                InventoryHud.Instance.ShowObjectiveReveal(step);
             }
         }
 
-        /// <summary>All goals belonging to a given Age (for the reveal popup + the journal).</summary>
+        /// <summary>All goals belonging to a given Age (for the journal grouping).</summary>
         public List<Quest> QuestsForAge(int age)
         {
             var list = new List<Quest>();
@@ -76,18 +81,16 @@ namespace Caveman
             return list;
         }
 
-        /// <summary>The goals available to work on RIGHT NOW — unclaimed and unlocked by age, current Age first
-        /// (then any leftovers from earlier Ages), capped at `max` for the HUD box.</summary>
+        /// <summary>The next `max` goals to work on, in order (current step first) — for the HUD box.</summary>
         public IEnumerable<Quest> ActivePending(int max)
         {
-            int age = CurrentAge, c = 0;
-            for (int a = age; a >= 0; a--)
-                foreach (var q in quests)
-                {
-                    if (q.age != a || q.claimed) continue;
-                    yield return q;
-                    if (++c >= max) yield break;
-                }
+            int c = 0;
+            foreach (var q in quests)
+            {
+                if (q.claimed) continue;
+                yield return q;
+                if (++c >= max) yield break;
+            }
         }
 
         public bool AllDone
