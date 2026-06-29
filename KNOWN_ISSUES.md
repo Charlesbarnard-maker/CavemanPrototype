@@ -57,6 +57,21 @@ sprite packs.
   Keep KNOWN_ISSUES newest-first. CavemanPrototype stays OUT of global memory.
 ---
 
+## #42 Collector WORKERS: job-aware + tech-progressing (tree-cutter → machine) (2026-06-29)
+The collectors' little workers are no longer generic cavemen — they reflect the JOB and the building's
+UPGRADE TIER, so you see (and feel) the tech advance.
+- **NEW `PlaceholderArt.CollectorWorker(job, tier, age, frame)`** (`Bespoke/PlaceholderArt.CollectorWorker.cs`):
+  a job-appropriate worker — Wood = AXE, Stone = SLEDGE, Clay = SHOVEL, Ore = PICKAXE — whose tool HEAD steps
+  stone → bronze → iron across upgrade tiers 0-2, then becomes a tracked **MACHINE** harvester at tier 3 (buzzsaw /
+  jackhammer / auger / drill, with treads, a hazard stripe, a status lamp, exhaust). Clothing palette tracks the
+  colony AGE (reuses the caveman costume colours), so there's an advancing feel even before you upgrade.
+- **Wiring:** `WorkerUnit` now spawns collector workers with a job (from `ProductionBuilding.produces.id` via
+  `PlaceholderArt.JobForItem`) + a live tier-getter (`() => pb.Tier`), and shows `CollectorWorker(...)`; the sprite
+  key folds in tier so it re-skins the instant you buy an upgrade. Workshop hands stay the generic age caveman.
+- Driver = the upgrade TIER (player buys it, age-gated) — so upgrading is now visibly rewarding. Verified via
+  headless renders (workers.png) + a pickaxe-head redo. Compile CLEAN.
+- **Next (sibling task #9):** make the BUILDINGS escalate by tier too (today an upgrade only re-tints).
+
 ## #41 #35 follow-ups: power-alloc + dead-code cleanup + signal-lamp fix (2026-06-29)
 Knocked out the safe, self-contained items from the #35 DEFERRED list (compile CLEAN, no gameplay-behaviour change
 except the cosmetic signal lamp). Left the behaviour-risky / subjective ones (belt I/O, rail head-on deadlock, map

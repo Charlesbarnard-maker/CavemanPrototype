@@ -24,12 +24,20 @@ namespace Caveman
         private St _state = St.AtHome;
         private int _frame; private float _animT; private Vector3 _lastWalkPos; private int _shownKey = -1;
 
+        // Collector workers are JOB-aware (axe/sledge/shovel/pick) and TECH-aware (the building's upgrade
+        // tier steps their tool stone→bronze→iron, then a powered MACHINE at tier 3). -1 = a workshop hand
+        // (the generic age-skinned caveman).
+        private int _job = -1;
+        private Func<int> _tier;
+
         /// <summary>Spawn `count` gatherers for a collector — they walk to its node and back.</summary>
         public static void SpawnForCollector(ProductionBuilding pb, int count)
         {
             if (pb == null) return;
+            int job = PlaceholderArt.JobForItem(pb.produces != null ? pb.produces.id : null);
             for (int i = 0; i < count; i++)
-                Make(pb.transform, () => pb != null && pb.Working, () => pb != null ? pb.Source : null, i);
+                Make(pb.transform, () => pb != null && pb.Working, () => pb != null ? pb.Source : null, i,
+                     job, () => pb != null ? pb.Tier : 0);
         }
 
         /// <summary>Spawn `count` workers for a workshop — they work in place while it's producing.</summary>
@@ -37,10 +45,10 @@ namespace Caveman
         {
             if (wb == null) return;
             for (int i = 0; i < count; i++)
-                Make(wb.transform, () => wb != null && wb.Working, null, i);
+                Make(wb.transform, () => wb != null && wb.Working, null, i, -1, null);
         }
 
-        private static void Make(Transform home, Func<bool> working, Func<ResourceNode> node, int i)
+        private static void Make(Transform home, Func<bool> working, Func<ResourceNode> node, int i, int job, Func<int> tier)
         {
             var go = new GameObject("Worker");
             go.transform.position = home.position;
@@ -49,6 +57,7 @@ namespace Caveman
             sr.sortingOrder = 6; // above building bodies (5)
             var w = go.AddComponent<WorkerUnit>();
             w._sr = sr; w._home = home; w._isWorking = working; w._node = node;
+            w._job = job; w._tier = tier;
             w._speed = 1.7f + 0.25f * i;
             w._wait = 0.3f * i; // stagger so they don't move in lockstep
             w._lastWalkPos = home.position;
@@ -65,8 +74,17 @@ namespace Caveman
             _lastWalkPos = transform.position;
             if (moving) { _animT += Time.deltaTime; if (_animT >= 0.13f) { _animT = 0f; _frame = (_frame + 1) % 3; } }
             else { _frame = 0; }
-            int key = age * 3 + _frame;
-            if (key != _shownKey && _sr != null) { _shownKey = key; _sr.sprite = PlaceholderArt.Caveman(age, _frame); _sr.color = Color.white; }
+            // Collector: a job-appropriate worker that tech-escalates by the building's upgrade tier
+            // (tool stone→bronze→iron → a MACHINE at tier 3). Workshop hand (_job < 0): the plain caveman.
+            int tierNow = (_job >= 0 && _tier != null) ? _tier() : 0;
+            int key = _job >= 0 ? (((_job * 4 + tierNow) * 5 + age) * 3 + _frame) : (1000 + age * 3 + _frame);
+            if (key != _shownKey && _sr != null)
+            {
+                _shownKey = key;
+                _sr.sprite = _job >= 0 ? PlaceholderArt.CollectorWorker(_job, tierNow, age, _frame)
+                                       : PlaceholderArt.Caveman(age, _frame);
+                _sr.color = Color.white;
+            }
 
             bool working = _isWorking();
             Vector3 home = _home.position;

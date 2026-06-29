@@ -143,7 +143,42 @@ public static class BespokeSpriteDump
             WritePng(img, zw, zh, Path.Combine(outDir, "zoom_" + name.Replace(" ", "") + ".png"));
         }
         DumpMounts(outDir, groundBg);
-        Debug.Log("[BespokeSpriteDump] wrote contact sheets + zooms + mounts to " + outDir);
+        DumpWorkers(outDir, groundBg);
+        Debug.Log("[BespokeSpriteDump] wrote contact sheets + zooms + mounts + workers to " + outDir);
+    }
+
+    // Collector workers: rows = job (Wood/Stone/Clay/Ore), cols = upgrade tier 0..3 (3 = machine), each
+    // shown at the colony age that tier naturally reaches, mid-stride (frame 1). White tint, like in-game.
+    static void DumpWorkers(string outDir, Color groundBg)
+    {
+        int[] tierAge = { 0, 2, 3, 4 };           // tier 0 stone, 1 bronze, 2 iron, 3 industrial
+        const int rows = 4, cols = 4, scale = 4, cell = Native * scale, pad = 12;
+        int W = pad + cols * (cell + pad), H = pad + rows * (cell + pad);
+        var sheet = Fill(W, H, groundBg);
+        for (int job = 0; job < rows; job++)
+            for (int tier = 0; tier < cols; tier++)
+            {
+                var sp = PlaceholderArt.CollectorWorker(job, tier, tierAge[tier], 1);
+                if (sp == null) continue;
+                var tex = sp.texture; var src = tex.GetPixels32(); int tw = tex.width, th = tex.height;
+                int ox = pad + tier * (cell + pad);
+                int oy = (H - pad - job * (cell + pad)) - cell;
+                for (int sy = 0; sy < th; sy++)
+                    for (int sx = 0; sx < tw; sx++)
+                    {
+                        Color32 sc = src[sy * tw + sx]; float a = sc.a / 255f; if (a <= 0f) continue;
+                        Color outc = new Color(groundBg.r * (1 - a) + (sc.r / 255f) * a,
+                                               groundBg.g * (1 - a) + (sc.g / 255f) * a,
+                                               groundBg.b * (1 - a) + (sc.b / 255f) * a, 1f);
+                        for (int yy = 0; yy < scale; yy++)
+                            for (int xx = 0; xx < scale; xx++)
+                            {
+                                int bx = ox + sx * scale + xx, by = oy + sy * scale + yy;
+                                if (bx >= 0 && bx < W && by >= 0 && by < H) sheet[by * W + bx] = outc;
+                            }
+                    }
+            }
+        WritePng(sheet, W, H, Path.Combine(outDir, "workers.png"));
     }
 
     // Render the per-age player mounts (rows = age 0..4, cols = walk frame 0..2) at white tint,
