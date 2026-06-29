@@ -97,6 +97,15 @@ namespace Caveman
                 if (c.x < d._minX) d._minX = c.x; if (c.x > d._maxX) d._maxX = c.x;
                 if (c.y < d._minY) d._minY = c.y; if (c.y > d._maxY) d._maxY = c.y;
             }
+            // With EXPLICIT rail links, a station placed beside ALREADY-laid track wouldn't connect (that track
+            // has no link toward this new lane). So point each adjacent existing rail tile INTO the lane.
+            if (!harbour)
+                foreach (var c in d._cells)
+                    foreach (var dir in RailTile.Four)
+                    {
+                        var t = RailTile.At(c + Belt.Step(dir));
+                        if (t != null) t.links |= RailTile.DirBit(Belt.Opposite(dir));
+                    }
             if (harbour)
             {
                 // Belts connect on the LAND side; the ship docks on the WATER side. Put both I/O on the land edge.

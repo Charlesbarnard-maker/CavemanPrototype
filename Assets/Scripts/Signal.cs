@@ -85,7 +85,7 @@ namespace Caveman
         private bool BlockAheadOccupied(Belt.Dir d)
         {
             var start = cell + Belt.Step(d);
-            if (!RailNet.IsRail(start)) return false;            // nothing ahead → block open
+            if (!RailNet.IsRail(start) || !RailNet.Linked(cell, start)) return false; // nothing linked ahead → block open
             _bfs.Clear(); _seen.Clear();
             _seen.Add(cell);                                      // never walk back through this signal
             _bfs.Enqueue(start); _seen.Add(start);
@@ -97,7 +97,7 @@ namespace Caveman
                 for (int k = 0; k < 4; k++)
                 {
                     var n = c + Belt.Step((Belt.Dir)k);
-                    if (!_seen.Contains(n) && RailNet.IsRail(n)) { _seen.Add(n); _bfs.Enqueue(n); }
+                    if (!_seen.Contains(n) && RailNet.IsRail(n) && RailNet.Linked(c, n)) { _seen.Add(n); _bfs.Enqueue(n); }
                 }
             }
             return false;

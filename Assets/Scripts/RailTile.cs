@@ -18,6 +18,7 @@ namespace Caveman
         private Vector2Int _cell;
         private SpriteRenderer _sr;
         private int _lastMask = -1; // neighbour config the current sprite is drawn for
+        public int links;           // EXPLICIT connection bitmask (N=1,E=2,S=4,W=8) set from the laid drag path
         public Vector2Int Cell => _cell;
 
         public static RailTile At(Vector2Int c) => Grid.TryGetValue(c, out var r) ? r : null;
@@ -57,6 +58,8 @@ namespace Caveman
             if (Grid.TryGetValue(_cell, out var r) && r == this) Grid.Remove(_cell);
             WorldGrid.Remove(WorldGrid.Rails, _cell, this);
             RailGraph.Clear(_cell); // a train can't be "on" a demolished tile
+            // drop neighbours' links back to this cell so no dangling half-connection is left behind
+            foreach (var d in Four) { var n = At(_cell + Belt.Step(d)); if (n != null) n.links &= ~DirBit(Belt.Opposite(d)); }
             All.Remove(this);
         }
 
@@ -69,48 +72,27 @@ namespace Caveman
             if (mask != _lastMask) { _lastMask = mask; _sr.sprite = PlaceholderArt.RailMask(mask); }
         }
 
-        // Visual connection mask (N=1,E=2,S=4,W=8) shaped so two PARALLEL runs laid side by side don't fuse
-        // into a ladder of tee-junctions: a lateral link is dropped when it would only weld two parallel
-        // runs together. Real corners / tees / crossings keep their links. (Pathfinding in RailNet still
-        // treats every 4-neighbour as connected — this only changes how the tile is DRAWN.)
+        internal static readonly Belt.Dir[] Four = { Belt.Dir.N, Belt.Dir.E, Belt.Dir.S, Belt.Dir.W };
+
+        // Visual mask (N=1,E=2,S=4,W=8) straight from the EXPLICIT links: a cell shows a connection only where
+        // it genuinely links (set from the laid drag path), so parallel runs never fuse and the drawing always
+        // matches what trains can actually traverse (see RailNet.Linked).
         private static int RenderMask(Vector2Int c)
         {
             int m = 0;
-            if (Connects(c, Belt.Dir.N)) m |= 1;
-            if (Connects(c, Belt.Dir.E)) m |= 2;
-            if (Connects(c, Belt.Dir.S)) m |= 4;
-            if (Connects(c, Belt.Dir.W)) m |= 8;
+            foreach (var d in Four) if (RailNet.Linked(c, c + Belt.Step(d))) m |= DirBit(d);
             return m;
         }
 
-        /// <summary>True when this rail cell genuinely links to its neighbour in direction d — i.e. they're
-        /// both rail AND it isn't just two parallel runs sitting side by side. Shared by the render mask AND
-        /// by <see cref="RailNet.FindPath"/>, so a train never hops between parallel lines that don't visually
-        /// connect (only real corners / tees / crossings link).</summary>
-        internal static bool Connects(Vector2Int c, Belt.Dir d)
-        {
-            var nb = c + Belt.Step(d);
-            if (!RailNet.IsRail(nb)) return false;
-            return !ParallelMerge(c, nb, d);
-        }
+        /// <summary>The connection bit for a direction (N=1, E=2, S=4, W=8) — matches <see cref="links"/>.</summary>
+        internal static int DirBit(Belt.Dir d) => d == Belt.Dir.N ? 1 : d == Belt.Dir.E ? 2 : d == Belt.Dir.S ? 4 : 8;
 
-        // True when linking `a` to its neighbour `b` (= a+step(d)) would only weld two PARALLEL runs side by
-        // side: both cells carry on across the perpendicular axis, and NEITHER continues along d past the
-        // other — so it isn't part of a real corner / tee / crossing (those have a cell continuing along d).
-        private static bool ParallelMerge(Vector2Int a, Vector2Int b, Belt.Dir d)
+        /// <summary>Record a connection between two adjacent cells, set from the laid path. Mutual where both
+        /// are tiles; a STATION-LANE side needs no bit (lanes are promiscuous through-track). Empty side = no-op.</summary>
+        internal static void Link(Vector2Int a, Vector2Int b)
         {
-            bool aAxisOther = RailNet.IsRail(a - Belt.Step(d)); // rail on a's far side (away from b)
-            bool bAxisOther = RailNet.IsRail(b + Belt.Step(d)); // rail continuing past b
-            return HasPerp(a, d) && HasPerp(b, d) && !aAxisOther && !bAxisOther;
-        }
-
-        // Does `cell` have a rail neighbour on the axis PERPENDICULAR to d?
-        private static bool HasPerp(Vector2Int cell, Belt.Dir d)
-        {
-            bool horizontal = d == Belt.Dir.E || d == Belt.Dir.W;
-            return horizontal
-                ? RailNet.IsRail(cell + Belt.Step(Belt.Dir.N)) || RailNet.IsRail(cell + Belt.Step(Belt.Dir.S))
-                : RailNet.IsRail(cell + Belt.Step(Belt.Dir.E)) || RailNet.IsRail(cell + Belt.Step(Belt.Dir.W));
+            var ta = At(a); if (ta != null) ta.links |= DirBit(Belt.FromTo(a, b));
+            var tb = At(b); if (tb != null) tb.links |= DirBit(Belt.FromTo(b, a));
         }
     }
 
@@ -127,6 +109,17 @@ namespace Caveman
 
         /// <summary>Is this cell part of the rail network — a laid tile OR a station's through-lane?</summary>
         public static bool IsRail(Vector2Int c) => RailTile.At(c) != null || StationLane.Contains(c);
+
+        /// <summary>Do two adjacent cells actually CONNECT? Tiles must have EXPLICIT mutual links (set from the
+        /// laid path), so parallel runs laid separately never join; a station LANE is promiscuous (always links
+        /// to adjacent rail). Used by both the render mask and the pathfinder, so visuals + routing always agree.</summary>
+        public static bool Linked(Vector2Int a, Vector2Int b)
+        {
+            var ta = RailTile.At(a); var tb = RailTile.At(b);
+            bool aOk = ta == null ? StationLane.Contains(a) : (ta.links & RailTile.DirBit(Belt.FromTo(a, b))) != 0;
+            bool bOk = tb == null ? StationLane.Contains(b) : (tb.links & RailTile.DirBit(Belt.FromTo(b, a))) != 0;
+            return aOk && bOk;
+        }
 
         /// <summary>Shortest rail path (inclusive cell list) from start to goal that OBEYS one-way signals
         /// (you may only enter a signal cell travelling its allowed direction), or null if unreachable.
@@ -146,7 +139,7 @@ namespace Caveman
                 {
                     var nx = cur + _dirs[i];
                     if (came.ContainsKey(nx) || !IsRail(nx)) continue;
-                    if (!RailTile.Connects(cur, Belt.FromTo(cur, nx))) continue; // don't hop between parallel runs that don't actually link
+                    if (!Linked(cur, nx)) continue; // explicit links only — never hop between parallel lines
                     var sig = Signal.At(nx);
                     if (sig != null && !sig.Allows(Belt.FromTo(cur, nx))) continue; // one-way: wrong way blocked (two-way allows its axis)
                     came[nx] = cur;

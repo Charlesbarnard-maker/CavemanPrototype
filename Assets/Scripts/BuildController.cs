@@ -1109,7 +1109,33 @@ namespace Caveman
         private void BuildRailPlan(BuildingDefinition def)
         {
             foreach (var c in _railPlan) LayRail(c, def);
+            ApplyPathLinks(); // wire EXPLICIT connections from the laid path, so parallels stay separate + merges join
             ClearRailPlan();
+        }
+
+        // Set each tile's links from the drag PATH: consecutive cells link mutually, and each END joins an
+        // existing line only in its OWN line direction (so a connector merges two parallels, but running beside
+        // one never fuses to it). A lone tile joins whatever rail it's already touching.
+        private void ApplyPathLinks()
+        {
+            int n = _railPlan.Count;
+            if (n == 0) return;
+            for (int i = 0; i + 1 < n; i++)
+                if (Adjacent(_railPlan[i], _railPlan[i + 1])) RailTile.Link(_railPlan[i], _railPlan[i + 1]);
+            if (n == 1)
+            {
+                foreach (var d in RailTile.Four) JoinIfRail(_railPlan[0], d);
+            }
+            else
+            {
+                JoinIfRail(_railPlan[0], Belt.Opposite(Belt.FromTo(_railPlan[0], _railPlan[1])));     // extend the start backward
+                JoinIfRail(_railPlan[n - 1], Belt.FromTo(_railPlan[n - 2], _railPlan[n - 1]));        // extend the end forward
+            }
+        }
+        private static void JoinIfRail(Vector2Int c, Belt.Dir d)
+        {
+            var nb = c + Belt.Step(d);
+            if (RailNet.IsRail(nb)) RailTile.Link(c, nb);
         }
 
         private void ClearRailPlan()
@@ -1141,25 +1167,37 @@ namespace Caveman
                 var c = _railPlan[i];
                 go.transform.position = new Vector3(c.x, c.y, 0f);
                 var sr = go.GetComponent<SpriteRenderer>();
-                sr.sprite = PlaceholderArt.RailMask(GhostMask(c)); // orient the ghost to the drag direction (straight/corner)
+                sr.sprite = PlaceholderArt.RailMask(GhostMaskAt(i, n)); // EXACT preview: only what will actually connect
                 sr.color = RailCellFree(c)
                     ? new Color(0.4f, 0.9f, 1f, 0.5f) : new Color(1f, 0.35f, 0.35f, 0.55f);
             }
             for (int k = n; k < _railPlanGhosts.Count; k++) if (_railPlanGhosts[k].activeSelf) _railPlanGhosts[k].SetActive(false);
         }
 
-        // Neighbour mask of a planned rail cell (counting other plan cells + already-laid rail) so the ghost
-        // is DRAWN in the direction you're dragging — straight / corner — not a default tile. N=1,E=2,S=4,W=8.
+        // EXACT ghost mask for plan cell i — mirrors ApplyPathLinks, so the blueprint shows precisely what will
+        // connect: links along the path + each END joining an existing line only in its own line direction.
+        private int GhostMaskAt(int i, int n)
+        {
+            var c = _railPlan[i];
+            int m = 0;
+            if (i > 0 && Adjacent(c, _railPlan[i - 1])) m |= RailTile.DirBit(Belt.FromTo(c, _railPlan[i - 1]));
+            if (i < n - 1 && Adjacent(c, _railPlan[i + 1])) m |= RailTile.DirBit(Belt.FromTo(c, _railPlan[i + 1]));
+            if (n == 1)
+                foreach (var d in RailTile.Four) { if (RailNet.IsRail(c + Belt.Step(d))) m |= RailTile.DirBit(d); }
+            else if (i == 0)
+            { var b = Belt.Opposite(Belt.FromTo(c, _railPlan[1])); if (RailNet.IsRail(c + Belt.Step(b))) m |= RailTile.DirBit(b); }
+            else if (i == n - 1)
+            { var f = Belt.FromTo(_railPlan[n - 2], c); if (RailNet.IsRail(c + Belt.Step(f))) m |= RailTile.DirBit(f); }
+            return m;
+        }
+
+        // Hover ghost (single cell, no plan yet): show which adjacent EXISTING rail it would join if placed.
         private int GhostMask(Vector2Int c)
         {
             int m = 0;
-            if (GhostRail(c + Belt.Step(Belt.Dir.N))) m |= 1;
-            if (GhostRail(c + Belt.Step(Belt.Dir.E))) m |= 2;
-            if (GhostRail(c + Belt.Step(Belt.Dir.S))) m |= 4;
-            if (GhostRail(c + Belt.Step(Belt.Dir.W))) m |= 8;
+            foreach (var d in RailTile.Four) if (RailNet.IsRail(c + Belt.Step(d))) m |= RailTile.DirBit(d);
             return m;
         }
-        private bool GhostRail(Vector2Int c) => _railPlan.Contains(c) || RailNet.IsRail(c);
 
         // Signal mode: click a rail cell to drop/aim a signal (R rotates its allowed travel direction).
         private void UpdateSignalPlacement(Mouse mouse, Keyboard kb)

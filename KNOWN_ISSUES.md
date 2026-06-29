@@ -57,6 +57,23 @@ sprite packs.
   Keep KNOWN_ISSUES newest-first. CavemanPrototype stays OUT of global memory.
 ---
 
+## #46 Rail EXPLICIT connectivity — accurate blueprint + working merge (2026-06-29)
+Replaced the `ParallelMerge` geometry HEURISTIC (which couldn't tell "two parallel lines I want apart" from "a
+connector I'm dragging to merge") with EXPLICIT per-tile links set from the laid drag PATH. Fixes both rail
+complaints (misleading blueprint; can't merge parallels).
+- **`RailTile.links`** (N=1,E=2,S=4,W=8) = the directions a tile genuinely connects. **`RailNet.Linked(a,b)`** =
+  both tiles carry the mutual bit (a station LANE is promiscuous). BOTH the render mask AND `FindPath` (+ the
+  Signal block-walk) use Linked, so visuals + routing always agree — parallels laid separately never join.
+- **Set from the path (`BuildController.ApplyPathLinks`):** consecutive path cells link mutually; each END joins an
+  existing line only in its OWN line direction (a connector MERGES two parallels; running beside one never fuses).
+  A lone tile joins whatever it touches. To merge: lay a connector between the lines, or drag a short path OVER the
+  touching tiles (the link applies even though no new tile is laid).
+- **Blueprint is now EXACT** (`GhostMaskAt` mirrors ApplyPathLinks) — the preview shows precisely what will connect.
+- **Demolish** clears neighbours' back-links (no dangling); a **station placed beside existing track** points that
+  track into its lane (Depot) so it still connects. Removed the old Connects/ParallelMerge/HasPerp.
+- Compile CLEAN. **NEEDS interactive testing:** lay two parallel lines (should stay separate), merge them with a
+  connector, and confirm the blueprint + train routing match.
+
 ## #45 Responsive UI scaling — fix overlap/pile-up on small screens (2026-06-29)
 User: on a smaller monitor the objectives / menu / text pile on top of each other (e.g. can't select the train —
 the Objective + Find-Resources boxes overlap the station panel). Root cause: the OnGUI HUD positioned everything in
