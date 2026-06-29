@@ -4,11 +4,25 @@ A running record so progress/problems don't get lost. Newest first. Move items t
 **Fixed** when done. Maintained alongside the code — see DESIGN.md for the roadmap.
 
 ---
-## 📌 NEW-THREAD HANDOFF — current state (2026-06-29, + FEEDBACK BATCH: liquids rehaul, harbour rework, objectives overhaul, mounts, research tab — committed & pushed)
+## 📌 NEW-THREAD HANDOFF — current state (2026-06-29, + 2 FEEDBACK BATCHES: liquids/harbour/objectives/mounts/research + storage/tabs/power — committed & pushed)
 Pinned pointer so a fresh thread (incl. on a DIFFERENT PC) can continue. Everything below is committed and pushed to
-`origin/main` (HEAD = `4a965fc`, working tree clean, in sync) — a clean clone has the whole game. Open the project,
-Play, and continue. A full interactive PLAYTEST is the biggest owed item (user tests in the evenings) — this session's
-six feedback items all compile clean (`Tools/compile-check.ps1` → COMPILE CLEAN) but have NOT been interactively played yet.
+`origin/main` (HEAD = `bcc0f76`, working tree clean, in sync) — a clean clone has the whole game. Open the project,
+Play, and continue. A full interactive PLAYTEST is the biggest owed item (user tests in the evenings) — both feedback
+batches compile clean (`Tools/compile-check.ps1` → COMPILE CLEAN) but have NOT been interactively played yet.
+
+**✅ DONE THIS SESSION — BATCH 2 (2026-06-29 — storage/tabs/power feedback, compile-clean, NOT yet played):** commit `bcc0f76`.
+- **Storage ports by footprint:** Woodpile → 1×1 (1 belt in + 1 out); Warehouse → 2×2 (2 in + 2 out, was 3×3/3+3). Belt
+  I/O is per edge cell, so footprint size = connection count — changing size (not gating belt code) was the safe fix.
+- **Warehouse rejects Stone/Ore:** new `ItemDefinition.noWarehouse` (set on stone+ore); skipped in `StorageBuilding.CycleAccepts`
+  and blocked from belt auto-adopt into an unset warehouse (`Belt.TryDepositToBuilding`). They keep their own stockpiles.
+- **Build menu split:** the Production tab → **Gathering** (Collector kind) + **Fabrication** (Workshop kind). `InventoryHud.Cats` + default `_activeCat`.
+- **Generators need fuel:** removed the silent carried-pile fallback in `PowerPlant.Update` — a generator runs ONLY on
+  belt-fed buffer fuel now (no fuel → no power → brownout). Gen descriptions updated. This is a real difficulty bump.
+- **Power-pole QoL:** placing a pole auto-wires to nearby poles/generators/batteries (`PowerNode.AutoLinkBackbone`, max 2,
+  Consumers excluded). While wiring: a live preview cable follows the cursor + a ghost pole shows over buildable terrain;
+  click empty ground to drop a pole, wire it into the chain, and keep chaining (`BuildController.UpdateWiringVisuals`/`TryBuildWirePole`).
+- **Open/next for power:** the user said "the whole electricity grid needs more work and detail" — only the concrete asks
+  (fuel consumption + pole QoL) are done; deeper grid detail (load/priority UI, transformers, per-machine readouts) is open.
 
 **⚠️ FIRST THING IN A NEW THREAD: verify the full Unity compile.** Authoritative check is Unity's own recompile of
 `Assembly-CSharp`. Editor CLOSED → `Tools/compile-check.ps1` (batch mode, ~30s-2min, prints "COMPILE CLEAN"). With the
