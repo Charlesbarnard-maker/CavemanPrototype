@@ -57,6 +57,25 @@ sprite packs.
   Keep KNOWN_ISSUES newest-first. CavemanPrototype stays OUT of global memory.
 ---
 
+## #48 Deeper crafting chains + critical balance retune (2026-06-29)
+Built on the existing recipe system (no replacement) — a deeper late-game MECHANICAL tree + a balance pass driven
+by a 3-agent logic/balance/perf review.
+- **New chain (4 items):** Bronze Plate/Steel → **Bronze Gear / Steel Beam / Tools** (forged at the Toolmaker,
+  now a multi-recipe FORGE, unlock age 2) → **Machine Part** (Steel Beam + Bronze Gear + Tools, a 3-input
+  assembly) → **Engine** (Machine Part + Steel + Fuel) — all assembled at the **Engineering Lab** (now multi-recipe:
+  Machine Part / Blueprint / Engine). Reuses TWO existing buildings (no new buildings, less menu clutter). The
+  Industrial research item **Blueprint is now Steel + Machine Part** (deeper), and the endgame **Monument needs an
+  Engine + Jewelry + Bricks** — so the win is the culmination of the deep chains + the Engine gives the OIL→FUEL
+  chain a real purpose.
+- **Balance retune (agent-found, critical):** research age costs 12/600/1600/3600 → **12/150/400/800** with higher
+  per-item points (1/5/10/20) — ~12/30/40/40 deliveries per age instead of 300+ (the Bronze gate was a ~20-min
+  grind). Charcoal Burner **2/cycle (40/min)** to feed Kiln + both Smelters. Wooden Belt **40/min** + Conveyor tech
+  **cost 4** (was 10) so it's not a trap. Smelters + Engineering Lab **draw 20 power** (power was over-supplied and
+  never bit — this is also the answer to "when does electricity matter"). Collector `outputPerCycle` lever
+  un-deadened (`ProductionBuilding` honoured the hardcoded 2 only).
+- Compile CLEAN. NEEDS a playtest of the new chain + retuned pacing. (Remaining agent findings — incl. the
+  playtest-only ones — tracked separately for the optimisation sweep.)
+
 ## #47 Garage selectable fix + electricity review/onboarding (2026-06-29)
 - **Garage bug (fixed):** the Garage was missing from `BuildController.BuildingGOUnderCursor`'s selectable-component
   whitelist, so clicking a built Garage returned null (couldn't open its panel). Added `GetComponent<Garage>()`.

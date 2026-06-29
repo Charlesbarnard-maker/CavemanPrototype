@@ -53,6 +53,13 @@ namespace Caveman
             var copper = MakeItem("copper", "Copper", new Color(0.85f, 0.55f, 0.35f));
             var bronzePlate = MakeItem("bronze_plate", "Bronze Plate", new Color(0.78f, 0.58f, 0.32f));
             var steel = MakeItem("steel", "Steel", new Color(0.58f, 0.62f, 0.70f));
+            // MECHANICAL CHAIN (the deeper late-game tree): bars/alloys -> shaped COMPONENTS (forged at the
+            // Toolmaker) -> assembled ASSEMBLIES (built at the Engineering Lab) -> the final Engine. Each stage
+            // combines more processed inputs than the last, so complexity scales with the age you reach.
+            var bronzeGear = MakeItem("bronze_gear", "Bronze Gear", new Color(0.80f, 0.56f, 0.28f)); // Bronze-age component
+            var steelBeam  = MakeItem("steel_beam",  "Steel Beam",  new Color(0.62f, 0.66f, 0.74f)); // Iron-age component
+            var machinePart = MakeItem("machine_part", "Machine Part", new Color(0.50f, 0.58f, 0.66f)); // Iron-age assembly (3 inputs)
+            var engine     = MakeItem("engine",      "Engine",      new Color(0.36f, 0.42f, 0.50f)); // Industrial final product (needs Fuel)
             var monument = MakeItem("monument", "Monument Block", new Color(0.90f, 0.86f, 0.62f)); // endgame
             // Textiles + pottery — parallel comfort-good chains that deepen the demand sink.
             var fiber = MakeItem("fiber", "Plant Fiber", new Color(0.62f, 0.74f, 0.45f));
@@ -240,9 +247,9 @@ namespace Caveman
                 new ItemAmount(wood, 6)); hunter.unlockAge = 1;
             var clayPit = MakeCollector("Clay Pit", clay, 1, 2.0f, 2, 12, new Color(0.68f, 0.46f, 0.36f),
                 new ItemAmount(wood, 5)); clayPit.unlockAge = 1;
-            var charcoalBurner = MakeWorkshop("Charcoal Burner", charcoal, 1, 3.0f, 2, 12, new Color(0.62f, 0.58f, 0.54f),
-                new List<ItemAmount> { new ItemAmount(wood, 2) },
-                new ItemAmount(wood, 6), new ItemAmount(stone, 4)); charcoalBurner.unlockAge = 1;
+            var charcoalBurner = MakeWorkshop("Charcoal Burner", charcoal, 2, 3.0f, 2, 12, new Color(0.62f, 0.58f, 0.54f),
+                new List<ItemAmount> { new ItemAmount(wood, 3) },
+                new ItemAmount(wood, 6), new ItemAmount(stone, 4)); charcoalBurner.unlockAge = 1; // 2 charcoal / 3s = 40/min (it feeds Kiln + both Smelters)
             var clayStore = MakeStorage("Clay Pile", clay, 100, new Color(0.60f, 0.42f, 0.34f),
                 new ItemAmount(wood, 8)); clayStore.unlockAge = 1;
             var smokehouse = MakeStorage("Smokehouse", meat, 100, new Color(0.55f, 0.32f, 0.30f),
@@ -273,10 +280,10 @@ namespace Caveman
             // Geared 120 → Steel 240. Splitters/Mergers run at the top rate so they never throttle.
             var woodBelt = ScriptableObject.CreateInstance<BuildingDefinition>();
             woodBelt.displayName = "Wooden Belt"; woodBelt.kind = BuildingKind.Belt; woodBelt.unlockAge = 0;
-            woodBelt.interval = 2.0f; // 30 items/min — a SLOW starter, only HALF a collector's 60/min
+            woodBelt.interval = 1.5f; // 40 items/min — a starter belt; still below a collector's 60/min so upgrading matters
             woodBelt.color = new Color(0.60f, 0.50f, 0.35f);
             woodBelt.cost = new List<ItemAmount> { new ItemAmount(wood, 1) };
-            woodBelt.description = "Carries items along its arrow at 30/min — a SLOW starter that can't keep up with a collector (60/min), so goods back up. Research the Conveyor Belt (your first upgrade) to double it, or run a 2nd line. Drag to lay; R rotates. RED = dead end, YELLOW = backed up.";
+            woodBelt.description = "Carries items along its arrow at 40/min — a starter belt that lags a collector (60/min), so a single line backs up at full tilt. Research the cheap Conveyor (60/min) early to keep up, or run a 2nd line. Drag to lay; R rotates. RED = dead end, YELLOW = backed up.";
             var fastBelt = ScriptableObject.CreateInstance<BuildingDefinition>();
             fastBelt.displayName = "Conveyor Belt"; fastBelt.kind = BuildingKind.Belt; fastBelt.unlockAge = 0;
             fastBelt.interval = 1.0f; // 60 items/min — 2× wooden, a match for one collector
@@ -345,10 +352,23 @@ namespace Caveman
             // extended by Power Poles). See the Wood Generator + Power Pole defs below.
             basicSmelter.requiresPower = true;
             advancedSmelter.requiresPower = true;
+            // Make power an actual decision (it was wildly over-supplied): the heavy smelters draw 20 each, so a
+            // Wood Generator (40) runs ~2, a Coal Generator (60) ~3 — you plan generation as the base grows.
+            basicSmelter.powerDraw = 20;
+            advancedSmelter.powerDraw = 20;
             // Toolmaker: Metal + Planks -> Tools (an Iron-age comfort good).
             var toolmaker = MakeWorkshop("Toolmaker", tools, 1, 4.0f, 2, 12, new Color(0.50f, 0.55f, 0.60f),
                 new List<ItemAmount> { new ItemAmount(metal, 1), new ItemAmount(planks, 1) },
-                new ItemAmount(planks, 8), new ItemAmount(bricks, 6)); toolmaker.unlockAge = 3;
+                new ItemAmount(planks, 8), new ItemAmount(bricks, 6)); toolmaker.unlockAge = 2;
+            // The Toolmaker is a FORGE: one building shapes alloys/metals into the mechanical COMPONENTS, picked
+            // by recipe (click it to switch). Reuses a single building for the whole component tier (less clutter).
+            toolmaker.recipes = new List<Recipe>
+            {
+                new Recipe(bronzeGear, 1, 3.5f, 2, new ItemAmount(bronzePlate, 1), new ItemAmount(planks, 1)), // Bronze age
+                new Recipe(tools,      1, 4.0f, 3, new ItemAmount(metal, 1),       new ItemAmount(planks, 1)), // Iron age
+                new Recipe(steelBeam,  1, 4.0f, 3, new ItemAmount(steel, 1),       new ItemAmount(planks, 1)), // Iron age
+            };
+            toolmaker.description = "FORGE / TOOLMAKER — shapes metal into mechanical COMPONENTS; pick its recipe (click to switch): Bronze Plate + Planks → Bronze Gear (Bronze age), Iron + Planks → Tools, or Steel + Planks → Steel Beam (both Iron age). One forge for the whole component tier; build more to run several at once.";
             // --- DEEPER METAL TREE (ore split): copper (Bronze chain) + iron (Iron chain). The ores
             //     have their own mines; both basic metals + both alloys are made in the configurable
             //     Basic / Advanced Smelters defined above (no separate per-metal smelter buildings). ---
@@ -383,7 +403,7 @@ namespace Caveman
             // Endgame: the Monument (Industrial age). A long resource sink you pour the
             // top of every production chain into — completing it (10 blocks) is the win.
             var monumentBldg = MakeWorkshop("Monument", monument, 1, 6.0f, 3, 12, new Color(0.88f, 0.84f, 0.62f),
-                new List<ItemAmount> { new ItemAmount(metal, 2), new ItemAmount(tools, 1), new ItemAmount(bricks, 2), new ItemAmount(planks, 2) },
+                new List<ItemAmount> { new ItemAmount(engine, 1), new ItemAmount(jewelry, 1), new ItemAmount(bricks, 4) },
                 new ItemAmount(bricks, 20), new ItemAmount(metal, 15), new ItemAmount(tools, 8)); monumentBldg.unlockAge = 4;
             monumentBldg.footprintW = 3; monumentBldg.footprintH = 3; // the endgame monument is the biggest structure
 
@@ -442,33 +462,43 @@ namespace Caveman
                 new List<ItemAmount> { new ItemAmount(bronzePlate, 1), new ItemAmount(pot, 1) },
                 new ItemAmount(planks, 6), new ItemAmount(bricks, 4)); draftingTable.unlockAge = 2;
             draftingTable.description = "Bronze Plate + Pottery → Schematic (a RESEARCH item) to research the Iron Age. Needs an Advanced Smelter set to Bronze (Copper + Bricks) feeding it — a deeper multi-stage chain.";
-            var engineeringLab = MakeWorkshop("Engineering Lab", blueprint, 1, 3.0f, 2, 12, new Color(0.40f, 0.56f, 0.82f),
-                new List<ItemAmount> { new ItemAmount(steel, 1), new ItemAmount(tools, 1) },
+            var engineeringLab = MakeWorkshop("Engineering Lab", machinePart, 1, 4.0f, 2, 12, new Color(0.40f, 0.56f, 0.82f),
+                new List<ItemAmount> { new ItemAmount(steelBeam, 1), new ItemAmount(bronzeGear, 1), new ItemAmount(tools, 1) },
                 new ItemAmount(planks, 8), new ItemAmount(metal, 4)); engineeringLab.unlockAge = 3;
-            engineeringLab.description = "Steel + Tools → Blueprint (a RESEARCH item) to research the Industrial Age — the deepest chain (Advanced Smelter on Steel + Toolmaker), so the final unlock demands a real factory.";
+            // The Engineering Lab is the ASSEMBLY building — it combines the components into multi-input
+            // assemblies, the deepest stage. One building, several recipes (click to switch): build a few.
+            engineeringLab.recipes = new List<Recipe>
+            {
+                new Recipe(machinePart, 1, 4.0f, 3, new ItemAmount(steelBeam, 1), new ItemAmount(bronzeGear, 1), new ItemAmount(tools, 1)), // Iron — 3-input assembly
+                new Recipe(blueprint,   1, 3.5f, 3, new ItemAmount(steel, 1),     new ItemAmount(machinePart, 1)),                            // Iron — the RESEARCH item, now deeper
+                new Recipe(engine,      1, 5.0f, 4, new ItemAmount(machinePart, 1), new ItemAmount(steel, 1), new ItemAmount(fuel, 1)),       // Industrial final product (needs Fuel)
+            };
+            engineeringLab.description = "ENGINEERING LAB — ASSEMBLES components into the deepest products; pick its recipe (click to switch): Steel Beam + Bronze Gear + Tools → Machine Part; Steel + Machine Part → Blueprint (the Industrial RESEARCH item); or Machine Part + Steel + Fuel → Engine (the final product). Build several (one per recipe). Needs POWER.";
+            engineeringLab.requiresPower = true; engineeringLab.powerDraw = 20; // Industrial machines draw power → a real use for the Oil chain's big generation
 
             // Tiers = which research item the Lodge consumes at each age + its point value (later
             // items are worth more because their chains are deeper).
             Research.Reset();
             Research.Tiers = new List<Research.Tier>
             {
-                new Research.Tier { targetAge = 1, item = ideaTablet,  pointsPerItem = 1 },  // craft at Stone
-                new Research.Tier { targetAge = 2, item = studyScroll, pointsPerItem = 2 },  // craft at Tribal
-                new Research.Tier { targetAge = 3, item = schematic,   pointsPerItem = 4 },  // craft at Bronze
-                new Research.Tier { targetAge = 4, item = blueprint,   pointsPerItem = 8 },  // craft at Iron
+                new Research.Tier { targetAge = 1, item = ideaTablet,  pointsPerItem = 1 },   // craft at Stone
+                new Research.Tier { targetAge = 2, item = studyScroll, pointsPerItem = 5 },   // craft at Tribal (deeper chain → worth more)
+                new Research.Tier { targetAge = 3, item = schematic,   pointsPerItem = 10 },  // craft at Bronze
+                new Research.Tier { targetAge = 4, item = blueprint,   pointsPerItem = 20 },  // craft at Iron (now needs a Machine Part)
             };
             // The spendable research TREE (press T to open). Age spine (each needs the prior) + a few
-            // building-unlock branches you CHOOSE to spend points on. Age costs: 12 → 600 → 1600 → 3600 (#27).
+            // building-unlock branches you CHOOSE to spend points on. Age costs RETUNED to a smoother curve
+            // (#47-balance): 12 → 150 → 400 → 800 — roughly ~12 / 30 / 40 / 40 item deliveries per age, not 300+.
             Research.Tree = new List<Research.Tech>
             {
                 new Research.Tech { id = "tribal",     name = "Tribal Age",     cost = 12,  advanceToAge = 1, prereq = null,     desc = "Advance to the Tribal Age — Charcoal & Clay open up deeper production." },
-                new Research.Tech { id = "bronze",     name = "Bronze Age",     cost = 600,  advanceToAge = 2, prereq = "tribal", requiredBuildings = new List<BuildingDefinition>{ basicSmelter },    gateItem = studyScroll, gateItemCount = 8, desc = "Advance to the Bronze Age — but first BUILD a Basic Smelter (set it to Copper) and deliver Study Scrolls (Copper + Planks)." },
-                new Research.Tech { id = "iron",       name = "Iron Age",       cost = 1600, advanceToAge = 3, prereq = "bronze", requiredBuildings = new List<BuildingDefinition>{ advancedSmelter }, gateItem = schematic,   gateItemCount = 6, desc = "Advance to the Iron Age — but first BUILD an Advanced Smelter (set it to Bronze) and deliver Schematics (Bronze Plate + Pottery)." },
-                new Research.Tech { id = "industrial", name = "Industrial Age", cost = 3600, advanceToAge = 4, prereq = "iron",   requiredBuildings = new List<BuildingDefinition>{ advancedSmelter }, gateItem = blueprint,   gateItemCount = 5, desc = "Advance to the Industrial Age — but first set the Advanced Smelter to Steel and deliver Blueprints (Steel + Tools)." },
+                new Research.Tech { id = "bronze",     name = "Bronze Age",     cost = 150,  advanceToAge = 2, prereq = "tribal", requiredBuildings = new List<BuildingDefinition>{ basicSmelter },    gateItem = studyScroll, gateItemCount = 8, desc = "Advance to the Bronze Age — but first BUILD a Basic Smelter (set it to Copper) and deliver Study Scrolls (Copper + Planks)." },
+                new Research.Tech { id = "iron",       name = "Iron Age",       cost = 400,  advanceToAge = 3, prereq = "bronze", requiredBuildings = new List<BuildingDefinition>{ advancedSmelter }, gateItem = schematic,   gateItemCount = 6, desc = "Advance to the Iron Age — but first BUILD an Advanced Smelter (set it to Bronze) and deliver Schematics (Bronze Plate + Pottery)." },
+                new Research.Tech { id = "industrial", name = "Industrial Age", cost = 800,  advanceToAge = 4, prereq = "iron",   requiredBuildings = new List<BuildingDefinition>{ advancedSmelter }, gateItem = blueprint,   gateItemCount = 5, desc = "Advance to the Industrial Age — but first deliver Blueprints (Steel + Machine Part) — the deepest chain." },
                 new Research.Tech { id = "splitters",   name = "Splitters",     cost = 15,  prereq = "tribal", unlocks = new List<BuildingDefinition>{ splitter },   desc = "Unlocks the 1→3 Splitter — feed three machines from one supply line." },
                 // The belt-upgrade ladder: a cheap EARLY first rung (the wooden belt is deliberately
                 // slow), then deeper tiers gated by age so faster belts pace your factory's growth.
-                new Research.Tech { id = "conveyors",   name = "Conveyor Belts", cost = 10, prereq = null,     unlocks = new List<BuildingDefinition>{ fastBelt },   desc = "Your first belt upgrade: the Conveyor (60/min — 2× the slow wooden belt). Overlay it on wooden belts to upgrade in place." },
+                new Research.Tech { id = "conveyors",   name = "Conveyor Belts", cost = 4,  prereq = null,     unlocks = new List<BuildingDefinition>{ fastBelt },   desc = "Your first belt upgrade: the Conveyor (60/min — keeps up with a collector). Cheap on purpose so you can grab it early without sacrificing the Tribal-age unlock. Overlay it on wooden belts to upgrade in place." },
                 new Research.Tech { id = "geared_belts", name = "Geared Belts",  cost = 40,  prereq = "bronze", unlocks = new List<BuildingDefinition>{ gearedBelt }, desc = "The Geared Belt (120/min — 2× a Conveyor) for high-throughput lines." },
                 new Research.Tech { id = "steel_belts",  name = "Steel Belts",   cost = 80,  prereq = "iron",   unlocks = new List<BuildingDefinition>{ steelBelt },  desc = "The Steel Belt (240/min — the fastest tier) for the densest late-game lines." },
             };

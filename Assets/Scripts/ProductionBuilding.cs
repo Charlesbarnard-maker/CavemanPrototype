@@ -196,7 +196,7 @@ namespace Caveman
                 if (_timer >= iv)
                 {
                     _timer -= iv;
-                    int got = _source.Extract(GatherPerCycle);
+                    int got = _source.Extract(GatherPerCycle * Mathf.Max(1, outputPerCycle)); // honour the def's per-cycle yield (was ignored)
                     if (got > 0)
                     {
                         int accepted = Buffer.Add(produces, got);
