@@ -141,6 +141,8 @@ namespace Caveman
         public bool elevated = false;
         [Tooltip("Depot: this is a HARBOUR (a dock placed on the shore) — no rail lane; cargo SHIPS run between harbours over water.")]
         public bool isHarbour = false;
+        [Tooltip("Depot: this is a LIQUID HARBOUR — a harbour that connects by PIPE (not belts) and ships a FLUID between liquid harbours. Implies isHarbour.")]
+        public bool isLiquidHarbour = false;
         [Tooltip("Build-menu category override (e.g. \"Boats\"). Empty = categorised by kind. Lets a Harbour (a Depot) sit under Boats while a Station sits under Trains.")]
         public string menuCategory = "";
 

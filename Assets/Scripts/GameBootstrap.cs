@@ -215,7 +215,16 @@ namespace Caveman
             harbour.item = null; harbour.capacity = 80; harbour.color = new Color(0.40f, 0.52f, 0.62f);
             harbour.footprintW = 3; harbour.footprintH = 1; // a dock straddling the shore
             harbour.cost = new List<ItemAmount> { new ItemAmount(wood, 14), new ItemAmount(stone, 6) };
-            harbour.description = "HARBOUR — build it on the SHORE (next to water). Belt goods IN on the SOUTH edge / OUT on the NORTH, like a Station — but instead of rail it runs CARGO SHIPS over the water. Select a harbour → '+ Add line' → click another harbour to ship goods across the sea (the ship sails straight over water). The way to reach island resources no road can.";
+            harbour.description = "HARBOUR — build it on the SHORE (it straddles the waterline: belts connect on the LAND half, the ship docks on the WATER half). Belt goods IN + OUT on the land edge, like a Station — but instead of rail it runs CARGO SHIPS that auto-route over WATER. Select a harbour → '+ Add line' → click another Harbour to ship goods across the sea. The way to reach island resources no road can.";
+            // LIQUID HARBOUR — the fluid counterpart: connects by PIPE (not belts) and ships a fluid (water/oil)
+            // between liquid harbours. Same auto-water-routing ships; unlocks with the rest of the liquid tech.
+            var liquidHarbour = ScriptableObject.CreateInstance<BuildingDefinition>();
+            liquidHarbour.displayName = "Liquid Harbour"; liquidHarbour.kind = BuildingKind.Depot; liquidHarbour.unlockAge = 2;
+            liquidHarbour.isHarbour = true; liquidHarbour.isLiquidHarbour = true; liquidHarbour.menuCategory = "Boats";
+            liquidHarbour.item = null; liquidHarbour.capacity = 100; liquidHarbour.color = new Color(0.30f, 0.48f, 0.66f);
+            liquidHarbour.footprintW = 3; liquidHarbour.footprintH = 1; // a dock straddling the shore
+            liquidHarbour.cost = new List<ItemAmount> { new ItemAmount(planks, 10), new ItemAmount(stone, 8) };
+            liquidHarbour.description = "LIQUID HARBOUR — a dock on the SHORE that ships a FLUID across water. Connect a PIPE to its land side (a Water Pump or pipe line fills it) and it adopts whatever fluid arrives. Select it → '+ Add line' → click another Liquid Harbour: a tanker ship auto-routes the FASTEST way over WATER. Pipe the fluid onward from the far dock to your consumers.";
             // Track: drag-laid rail tiles. Route vehicles (donkey cart → … → train) path ALONG the
             // track between stations instead of cutting straight across — so you plan the line.
             var rail = ScriptableObject.CreateInstance<BuildingDefinition>();
@@ -657,7 +666,7 @@ namespace Caveman
               ideaBench, scrollMaker, draftingTable, engineeringLab, researchLodge,
               // Logistics — belt tier ladder (wooden→conveyor→geared→steel) + junctions + smart-logistics tools + transport
               woodBelt, fastBelt, gearedBelt, steelBelt, splitter, merger,
-              undergroundBelt, filterBelt, prioritySplitter, conditionalGate, depot, rail, elevatedRail, signal, twoWaySignal, bridge, harbour,
+              undergroundBelt, filterBelt, prioritySplitter, conditionalGate, depot, rail, elevatedRail, signal, twoWaySignal, bridge, harbour, liquidHarbour,
               // Liquids — pipes carry oil/water (never belts); splitter/merger junctions; Oil Well pumps oil, Water Pump pumps water, Booster relays pressure
               pipe, pipeSplitter, pipeMerger, pump, booster, oilWell,
               // Storage — open-air piles for raw materials (Woodpile / Stone + Ore Stockpiles / Clay / Brick),

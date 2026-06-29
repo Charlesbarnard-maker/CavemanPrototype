@@ -467,6 +467,21 @@ namespace Caveman
                 _waiting = false;
             }
 
+            // SHIPS follow the water route cell-by-cell — no rail claims, no signals. With no water route they
+            // HOLD (don't fly over land); line-creation prevents that, but be safe if terrain ever changes.
+            if (_isShip)
+            {
+                if (_railCells == null || _railCells.Count == 0) { _waiting = true; return false; }
+                _waiting = false;
+                var wc = _railCells[_cellIdx];
+                if (MoveTo(new Vector3(wc.x, wc.y, 0f)))
+                {
+                    if (_cellIdx >= _railCells.Count - 1) return true; // reached the dock cell → arrived
+                    _cellIdx += Step;
+                }
+                return false;
+            }
+
             if (_railCells == null || _railCells.Count == 0)
             {
                 ReleaseHeld(); // flying straight (no track) → don't keep a stale cell claimed
@@ -543,11 +558,18 @@ namespace Caveman
             _curCell = NoCell; _claimNext = NoCell;
         }
 
-        // Build the forward rail route from the vehicle's CURRENT position to `to`, or null if no track.
+        // Build the forward route from the vehicle's CURRENT position to `to`. Ships path over WATER (A* on the
+        // sea, never the rail graph); land vehicles follow laid TRACK. Null/empty = no route (ship holds; a land
+        // vehicle flies straight as before).
         private void BuildLegRoute(Depot to)
         {
             _railCells = null;
             if (to == null) return;
+            if (_isShip)
+            {
+                _railCells = WaterNet.WaterPath(transform.position, to.transform.position); // water-only — never over land
+                return;
+            }
             var ra = RailNet.RailNear(transform.position);
             var rb = RailNet.RailNear(to.transform.position);
             if (ra == null || rb == null) return;

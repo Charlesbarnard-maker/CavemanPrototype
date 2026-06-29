@@ -182,7 +182,7 @@ namespace Caveman
                         // Sink 3: a liquid transfer STATION (Depot) — pipe-FED like a barrel, so a train can haul
                         // the liquid onward in a tanker wagon. A fresh station ADOPTS the liquid the pipe brings.
                         if (budget > 0 && WorldGrid.Depots.TryGetValue(nb, out var dpo) && dpo != null && dpo.def != null
-                            && !dpo.def.isHarbour && (dpo.item == water || dpo.item == null))
+                            && (!dpo.def.isHarbour || dpo.def.isLiquidHarbour) && (dpo.item == water || dpo.item == null))
                         {
                             if (dpo.item == null) dpo.item = water;
                             int room = dpo.def.capacity - dpo.store.Total();

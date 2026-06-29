@@ -118,12 +118,17 @@ namespace Caveman
                     }
             if (harbour)
             {
-                // Belts connect on the LAND side; the ship docks on the WATER side. Put both I/O on the land edge.
+                // The ship docks on the WATER side; goods connect on the LAND side. A CARGO harbour takes belts
+                // there (1 in + 1 out); a LIQUID harbour connects by PIPE instead, so it gets no belt ports.
                 Belt.Dir waterDir = HarbourWaterDir(d._cells, go.transform.position);
                 Belt.Dir landDir = Belt.Opposite(waterDir);
                 d._outSide = landDir; d._inSide = landDir;
-                Ports.PlacePorts(go.transform, w, h, landDir, false, true);               // OUT arrows on the land edge
-                Ports.PlacePorts(go.transform, w, h, Belt.Opposite(landDir), true, false); // IN notches on the land edge
+                if (def.isLiquidHarbour) { /* pipe-connected — run a pipe up to its land side; no belt ports */ }
+                else
+                {
+                    Ports.PlacePorts(go.transform, w, h, landDir, false, true);               // OUT arrows on the land edge
+                    Ports.PlacePorts(go.transform, w, h, Belt.Opposite(landDir), true, false); // IN notches on the land edge
+                }
             }
             else
             {

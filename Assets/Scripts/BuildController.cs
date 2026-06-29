@@ -147,11 +147,40 @@ namespace Caveman
             if (LinkFrom == null || _linkTier == null) { CancelLink(); return; }
             if (dst == null) return; // clicked empty — keep the in-progress line
             if (dst == _lineStops[0] && _lineStops.Count >= 2) { FinishLine(); return; }
-            if (!_lineStops.Contains(dst))
+            if (_lineStops.Contains(dst)) return;
+
+            // A line is EITHER a Harbour (ship/water) line OR a Station (train/land) line — never mixed, so a
+            // ship can't be routed to a Station over land. Within harbour lines, cargo and liquid docks don't mix.
+            var first = _lineStops[0];
+            bool lineHarbour = first.def != null && first.def.isHarbour;
+            bool dstHarbour = dst.def != null && dst.def.isHarbour;
+            if (lineHarbour != dstHarbour)
             {
-                _lineStops.Add(dst);
-                Toast.Show($"<color=#9cf>Stop {_lineStops.Count} added.</color> Click more, or the first station / right-click to finish.");
+                Toast.Show(lineHarbour
+                    ? "<color=#f99>Ships travel by water — a Harbour line can only link other Harbours, not a Station.</color>"
+                    : "<color=#f99>A train line can't include a Harbour — start a separate Harbour line for ships.</color>");
+                return;
             }
+            if (lineHarbour)
+            {
+                bool lineLiquid = first.def != null && first.def.isLiquidHarbour;
+                bool dstLiquid = dst.def != null && dst.def.isLiquidHarbour;
+                if (lineLiquid != dstLiquid)
+                {
+                    Toast.Show("<color=#f99>Cargo and Liquid harbours can't share a line — keep solid-goods docks and fluid docks separate.</color>");
+                    return;
+                }
+                // The ship must REACH the new stop over water — no land crossing, no jump to an isolated sea.
+                var prev = _lineStops[_lineStops.Count - 1];
+                if (WaterNet.WaterPath(prev.transform.position, dst.transform.position) == null)
+                {
+                    Toast.Show("<color=#f99>No water route to that Harbour — ships can't cross land or hop between separate seas.</color>");
+                    return;
+                }
+            }
+
+            _lineStops.Add(dst);
+            Toast.Show($"<color=#9cf>Stop {_lineStops.Count} added.</color> Click more, or the first {(lineHarbour ? "Harbour" : "Station")} / right-click to finish.");
         }
 
         private void FinishLine()
