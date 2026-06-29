@@ -4,14 +4,15 @@ A running record so progress/problems don't get lost. Newest first. Move items t
 **Fixed** when done. Maintained alongside the code — see DESIGN.md for the roadmap.
 
 ---
-## 📌 NEW-THREAD HANDOFF — current state (2026-06-29, mounts + rail overhaul + UI scaling + crafting + balance ALL committed & pushed)
+## 📌 NEW-THREAD HANDOFF — current state (2026-06-29, + TRAIN CONSISTS, deferred-#49 logic/perf cleared — committed & pushed)
 Pinned pointer so a fresh thread (incl. on a DIFFERENT PC) can continue. Everything below is committed and pushed to
-`origin/main` (HEAD = `4a1004f`, working tree clean, in sync) — a clean clone has the whole game. Open the project,
-Play, and continue from "LIKELY NEXT". A full interactive PLAYTEST is the biggest owed item (user tests in the evenings).
+`origin/main` (HEAD = `210a180`, working tree clean, in sync — this handoff refresh commits on top) — a clean clone has
+the whole game. Open the project, Play, and continue from "LIKELY NEXT". A full interactive PLAYTEST is the biggest
+owed item (user tests in the evenings) — and the new CONSIST mechanics have NOT been interactively played yet.
 
 **⚠️ FIRST THING IN A NEW THREAD: verify the full Unity compile.** Authoritative check is Unity's own recompile of
 `Assembly-CSharp`. Editor CLOSED → `Tools/compile-check.ps1` (batch mode, ~30s-2min, prints "COMPILE CLEAN"). With the
-editor open: read `Logs/Editor.log`, grep `error CS` after the LAST "Requested script compilation". As of `4a1004f`
+editor open: read `Logs/Editor.log`, grep `error CS` after the LAST "Requested script compilation". As of `210a180`
 the compile is CLEAN. **Gotcha:** kill zombie Unity + stale lockfile first (`Get-Process Unity | Stop-Process -Force`,
 then remove `Temp/UnityLockfile`) or you get lock races. Headless sprite previews: `BespokeSpriteDump.Dump` →
 `C:\Users\charl\CavemanArtPreview\`.
@@ -22,7 +23,18 @@ then remove `Temp/UnityLockfile`) or you get lock races. Headless sprite preview
   if a verify-locks auth error hits (repo uses git-LFS). **CavemanPrototype stays OUT of global memory.** F3 = skip an
   age + unlock its tech (cheat for testing). Here-string commit messages fail if they contain parentheses — keep paren-free.
 
-**✅ DONE THIS SESSION (2026-06-29, entries #39–#49):**
+**✅ DONE A LATER SESSION (2026-06-29, entry #50 — train consists + deferred-#49 cleanup):**
+- **TRAIN CONSISTS (#50):** loco now pulls an age-gated consist of WAGONS (one commodity each, trailed via a
+  breadcrumb path) → a line hauls MIXED cargo; every stop unloads its resource + loads its surplus. LIQUID stations
+  are pipe-fed both ways (pump→station, train→station→pipes→consumers, disambiguated by recency). New global line
+  overview (hotkey **L**). Compile-clean; NOT yet interactively playtested.
+- **Deferred #49 LOGIC cleared:** WaterPump liquid fair-share fixed (shared `WorkshopBuilding.LiquidInputRoom`
+  reserve-floor model, also used by the depot drain); belt input-side gate + browned-out `CurrentDraw` both REVIEWED
+  and confirmed correct-by-design (no change). Multi-stop loading subsumed by the consist rework.
+- **Deferred #49 PERF cleared:** zero-alloc footprint placement predicates (inline over the anchor); `DrawTopBar`
+  chip build + `CalcSize` cached once/frame. PowerNet was already pooled; minimap/status caching judged low-value.
+
+**✅ DONE AN EARLIER SESSION (2026-06-29, entries #39–#49):**
 - **Per-age player MOUNTS + GARAGE (#39/#40):** `PlaceholderArt.PlayerMount(tier,frame)` = On Foot→Horseback→Ox Cart→
   Wagon→Motorbike. Buyable mounts + a limited `Garage` (timber cart-shed). Hybrid economy: age gives a baseline speed
   bump, the bought+parked mount adds full speed + the look. `PlayerController.OwnedMount[5]/ActiveMount/MountCost[]`.
@@ -52,18 +64,16 @@ then remove `Temp/UnityLockfile`) or you get lock races. Headless sprite preview
   1. **FULL INTERACTIVE PLAYTEST** (the biggest owed item; user tests in the evenings) — verify: faster age pacing, power
      now biting in Bronze (build a generator, wire smelters), new Forge/Engineering-Lab recipes (click building to switch),
      deeper Monument, mounts+garage (build→buy→ride/switch), rail merge/parallel + ghost direction, per-age locos in motion,
-     UI scaling on a small window. Tune from feedback.
-  2. **TRAIN CONSIST mechanics (queued — design already chosen with user):** loco + N wagons coupled (snake the track via
-     breadcrumb trail), MIXED cargo (per-stop Load/Unload roles, different cargo per wagon), age-gated add/remove-wagon UI,
-     pipe-fed LIQUID stations + liquid wagons, and a GLOBAL line-overview UI ("managing many lines" was the pain point).
-     Art (`TrainLoco`/`CargoWagon`/`LiquidWagon`) already exists; the MECHANICS are not built yet. Needs interactive iteration.
-  3. **Deferred from #49 (need in-editor verification — do NOT change blind):** belt input-side deposit-gate orientation
-     (agent warned flipping wrong breaks the working case), browned-out machine reports full `CurrentDraw`, WaterPump
-     fair-share divides by all inputs, multi-stop route loading (will be replaced by the consist rework anyway).
-  4. **Deferred PERF from #49/#35:** `DrawTopBar`/minimap/`DrawStatus`/hover OnGUI caching, `Footprint.Cells` alloc reuse,
-     `PowerNet.Rebuild` per-frame allocs.
-  5. **Make the WHOLE map feel hand-designed** (only the island was reshaped) — `TerrainGrid` / resource zones.
-  6. Fuller UI/tutorial polish; bespoke ITEM icons (currently shape-by-family).
+     UI scaling on a small window. **NEW to verify (#50):** consist wagons appear + trail correctly + grow on age-up;
+     mixed cargo rides in separate wagons + drops at the right stop; pump→pipe→liquid station→tanker→destination→pipe→
+     refinery end-to-end; the **L** line overview reads right. Tune from feedback. (Watch consist BALANCE — capacity is
+     now PER-WAGON, so late-game trains haul ~5× a single hold.)
+  2. **Consist follow-ups IF the playtest wants them:** a MANUAL add/remove-wagon UI (currently wagon count auto-scales by
+     age — confirm that's the preferred model); per-line cargo FILTERS (pin a wagon to a commodity); click-a-line-to-focus
+     camera in the L overview. None built — only do if play surfaces the need.
+  3. **Make the WHOLE map feel hand-designed** (only the island was reshaped) — `TerrainGrid` / resource zones.
+  4. Fuller UI/tutorial polish; bespoke ITEM icons (currently shape-by-family).
+  - (Deferred #49 LOGIC + PERF items are now CLEARED — see #50 + the annotated #49 block below.)
 - **Canon:** GAME_DESIGN.md is partly SUPERSEDED (factory-first, but workers are back as a COSMETIC layer).
   Keep KNOWN_ISSUES newest-first. CavemanPrototype stays OUT of global memory.
 ---
