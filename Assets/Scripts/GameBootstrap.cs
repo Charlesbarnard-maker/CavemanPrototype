@@ -521,6 +521,11 @@ namespace Caveman
             };
             engineeringLab.description = "ENGINEERING LAB — ASSEMBLES components into the deepest products; pick its recipe (click to switch): Steel Beam + Bronze Gear + Tools → Machine Part; Steel + Machine Part → Blueprint (the Industrial RESEARCH item); or Machine Part + Steel + Fuel → Engine (the final product). Build several (one per recipe). Needs POWER.";
             engineeringLab.requiresPower = true; engineeringLab.powerDraw = 20; // Industrial machines draw power → a real use for the Oil chain's big generation
+            // All five research buildings live under the dedicated RESEARCH build-menu tab. The four crafters
+            // are Workshop-kind, so they need the menuCategory override to leave Production; the Lodge is
+            // Research-kind already but tagging it too keeps the grouping explicit.
+            researchLodge.menuCategory = ideaBench.menuCategory = scrollMaker.menuCategory =
+                draftingTable.menuCategory = engineeringLab.menuCategory = "Research";
 
             // Tiers = which research item the Lodge consumes at each age + its point value (later
             // items are worth more because their chains are deeper).
@@ -622,7 +627,7 @@ namespace Caveman
             PlayerController.MountCost = new List<ItemAmount>[]
             {
                 null, // 0 = On Foot (free)
-                new List<ItemAmount> { new ItemAmount(planks, 8),  new ItemAmount(food, 6) },   // Horseback
+                new List<ItemAmount> { new ItemAmount(planks, 8),  new ItemAmount(stone, 6) },  // Horseback (stone — food isn't produced in the factory-first economy)
                 new List<ItemAmount> { new ItemAmount(planks, 8),  new ItemAmount(bricks, 6) }, // Ox Cart
                 new List<ItemAmount> { new ItemAmount(planks, 10), new ItemAmount(metal, 6) },  // Wagon
                 new List<ItemAmount> { new ItemAmount(steel, 8),   new ItemAmount(fuel, 6) },   // Motorbike

@@ -689,7 +689,9 @@ namespace Caveman
                 for (int j = 0; j < h; j++)
                 {
                     var c = new Vector2Int(a.x + i, a.y + j);
-                    if (CellOccupied(new Vector3(c.x, c.y, 0f)) || WorldGrid.IsReserved(c)) return true;
+                    // Pipes aren't "solid", but a building dropped on one would overlap/break it — so a pipe
+                    // cell blocks placement too (you clear the pipe first). Keeps liquids & buildings disjoint.
+                    if (CellOccupied(new Vector3(c.x, c.y, 0f)) || WorldGrid.IsReserved(c) || PipeNet.At(c) != null) return true;
                 }
             return false;
         }
@@ -1155,7 +1157,9 @@ namespace Caveman
             _ghostSr.sprite = PlaceholderArt.Square();
             _ghost.transform.localScale = Vector3.one * 0.6f;
 
-            bool ok = PipeNet.At(cell) == null && TerrainGrid.BeltAllowed(cell) && Economy.CanAfford(def.cost, Carried);
+            bool ok = PipeNet.At(cell) == null && TerrainGrid.BeltAllowed(cell)
+                      && !SolidBuildingAt(new Vector3(cell.x, cell.y, 0f)) // never lay a pipe on/under a building
+                      && Economy.CanAfford(def.cost, Carried);
             PlacementValid = ok;
             _ghostSr.color = ok ? new Color(0.35f, 1f, 0.4f, 0.55f) : new Color(1f, 0.3f, 0.3f, 0.5f);
 

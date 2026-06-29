@@ -34,6 +34,9 @@ namespace Caveman
         public static readonly bool[] OwnedMount = { true, false, false, false, false };
         /// <summary>The tier currently being ridden (0 = on foot). Drives speed + the avatar visual.</summary>
         public static int ActiveMount;
+        /// <summary>The mount the player last rode — so pressing E after dismounting hops back onto the SAME
+        /// ride (not just whatever's highest). Defaults to Horseback (tier 1).</summary>
+        public static int LastRidden = 1;
         /// <summary>Per-tier purchase cost, populated by GameBootstrap (it owns the ItemDefinitions).</summary>
         public static System.Collections.Generic.List<ItemAmount>[] MountCost = new System.Collections.Generic.List<ItemAmount>[5];
         /// <summary>Total parking slots across all built Garages (0 = no garage yet → can't buy mounts).</summary>
@@ -50,6 +53,15 @@ namespace Caveman
         /// <summary>The tier actually being ridden right now: the active one if owned and within your age, else on foot.</summary>
         public static int RidingTier(int age)
             => (ActiveMount >= 1 && ActiveMount < OwnedMount.Length && OwnedMount[ActiveMount] && ActiveMount <= MaxTierForAge(age)) ? ActiveMount : 0;
+
+        /// <summary>The highest mount tier the player OWNS that's allowed at this age (0 = none) — the ride
+        /// E hops onto when no remembered ride is available.</summary>
+        public static int BestOwnedMount(int age)
+        {
+            int best = 0;
+            for (int i = 1; i < OwnedMount.Length; i++) if (OwnedMount[i] && i <= MaxTierForAge(age)) best = i;
+            return best;
+        }
 
         public static bool HasGarage => GarageSlots > 0;
         public static bool CanBuy(int tier, int age)
@@ -86,6 +98,20 @@ namespace Caveman
             if (kb == null) return;
 
             int age = Colony.Instance != null ? Colony.Instance.Age : 0;
+
+            // E hops on/off your mount: if riding, dismount to foot (remembering the ride); if on foot,
+            // hop back onto the remembered ride (or your best owned one). Needs a garage-bought mount.
+            if (kb.eKey.wasPressedThisFrame)
+            {
+                if (RidingTier(age) >= 1) { LastRidden = ActiveMount; SetActive(0); Toast.Show("<color=#cfe>🚶 Dismounted — press E to ride again.</color>"); }
+                else
+                {
+                    int want = (LastRidden >= 1 && LastRidden < OwnedMount.Length && OwnedMount[LastRidden] && LastRidden <= MaxTierForAge(age))
+                               ? LastRidden : BestOwnedMount(age);
+                    if (want >= 1) { SetActive(want); Toast.Show($"<color=#ffd24d>🐎 Mounted — {Mounts[want].name}.</color>"); }
+                    else Toast.Show("<color=#fc8>No mount to ride — build a Garage and buy one from its panel first.</color>");
+                }
+            }
             int tier = Mathf.Clamp(age, 0, Mounts.Length - 1);
             if (tier != _lastTier)
             {

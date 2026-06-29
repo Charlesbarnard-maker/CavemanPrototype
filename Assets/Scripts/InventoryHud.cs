@@ -87,7 +87,8 @@ namespace Caveman
         // under Trains; storage is its own tab.
         private static readonly (string label, BuildingKind[] kinds)[] Cats =
         {
-            ("Production",     new[] { BuildingKind.Collector, BuildingKind.Workshop, BuildingKind.Research }),
+            ("Production",     new[] { BuildingKind.Collector, BuildingKind.Workshop }),
+            ("Research",       new[] { BuildingKind.Research }), // Research Lodge + the research-item crafters (tagged via menuCategory)
             ("Energy",         new[] { BuildingKind.Power, BuildingKind.Pole, BuildingKind.Battery }),
             ("Belts",          new[] { BuildingKind.Belt }),
             ("Infrastructure", new[] { BuildingKind.Bridge }),
