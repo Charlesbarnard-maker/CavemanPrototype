@@ -4,12 +4,11 @@ A running record so progress/problems don't get lost. Newest first. Move items t
 **Fixed** when done. Maintained alongside the code — see DESIGN.md for the roadmap.
 
 ---
-## 📌 NEW-THREAD HANDOFF — current state (2026-06-29, + CONSISTS + SMART LOGISTICS belts + ELEVATED track — committed & pushed)
+## 📌 NEW-THREAD HANDOFF — current state (2026-06-29, + FEEDBACK BATCH: liquids rehaul, harbour rework, objectives overhaul, mounts, research tab — committed & pushed)
 Pinned pointer so a fresh thread (incl. on a DIFFERENT PC) can continue. Everything below is committed and pushed to
-`origin/main` (HEAD = `5b15a59`, working tree clean, in sync — this handoff refresh commits on top) — a clean clone has
-the whole game. Open the project, Play, and continue from "LIKELY NEXT". A full interactive PLAYTEST is the biggest
-owed item (user tests in the evenings) — the new CONSIST mechanics (#50), SMART LOGISTICS belts (#51) and ELEVATED
-track (#52) compile clean but have NOT been interactively played yet.
+`origin/main` (HEAD = `4a965fc`, working tree clean, in sync) — a clean clone has the whole game. Open the project,
+Play, and continue. A full interactive PLAYTEST is the biggest owed item (user tests in the evenings) — this session's
+six feedback items all compile clean (`Tools/compile-check.ps1` → COMPILE CLEAN) but have NOT been interactively played yet.
 
 **⚠️ FIRST THING IN A NEW THREAD: verify the full Unity compile.** Authoritative check is Unity's own recompile of
 `Assembly-CSharp`. Editor CLOSED → `Tools/compile-check.ps1` (batch mode, ~30s-2min, prints "COMPILE CLEAN"). With the
@@ -25,6 +24,35 @@ and REOPEN it afterward, autonomously, whenever a compile needs verifying — do
   **Commit as `Caveman Dev <caveman@local>`, NO AI trailer.** Push with `git -c lfs.locksverify=false push origin main`
   if a verify-locks auth error hits (repo uses git-LFS). **CavemanPrototype stays OUT of global memory.** F3 = skip an
   age + unlock its tech (cheat for testing). Here-string commit messages fail if they contain parentheses — keep paren-free.
+
+**✅ DONE THIS SESSION (2026-06-29 — playtest-feedback batch, 6 items, all compile-clean, NOT yet interactively played):**
+Commits: `8caba16` (quick wins) · `b576b4b` (objectives) · `08bdbdc` (liquids) · `4a965fc` (harbour). HEAD = `4a965fc`.
+- **Mounts:** Horseback no longer costs Food (unpayable in the factory-first economy) — now planks + stone
+  (`GameBootstrap`). Press **E** to mount/dismount (remembers your last ride; `PlayerController.LastRidden` +
+  `BestOwnedMount`). Toasts on mount/dismount/no-mount.
+- **Research tab:** Research split out of Production into its own build-menu tab (`InventoryHud.Cats`); the 4 research
+  crafters are Workshop-kind so they're routed via `menuCategory="Research"` (set in `GameBootstrap`), Lodge is Research-kind.
+- **Pipe/building overlap:** pipes can't be placed on/under a building either way — pipe placement rejects solid-building
+  cells (`UpdatePipePlacement`), building placement rejects pipe cells (`FootprintBlocked`).
+- **Liquids rehaul (`Pipe.cs` rewrite + `WaterPump`/`Depot`/`BuildController`/`PlaceholderArt`):** ONE-fluid-per-network
+  enforced — placing a pipe (or a pump/well) that joins two different fluids is blocked, ghost goes amber + toast
+  (`PipeNet.NetworkFluid` floods the component for its source fluid). Pipes AUTO-CONNECT (16-pattern `PipeTile(mask)`
+  sprites), tint to their fluid, and show a moving DROPLET in the flow direction while a source pushes (Pump + tanker-fed
+  Depot call `Pipe.MarkFlow`). Source pumps show a green-pulse / red status pip. New **Pipe Splitter / Merger** junction
+  pieces (teal/amber valves) in the Liquids tab.
+- **Objectives overhaul (`Objectives.cs` + `InventoryHud` + `GameBootstrap` quest list):** removed the on-screen ore
+  arrows + the top-left objective line. Quests now carry an **Age** and unlock as a SET — do an age's goals in ANY order.
+  New centre-screen REVEAL popup on age unlock (incl. age 0) → OK docks them to the top-right box (queued + consumed in
+  Update so it's stable across OnGUI passes, sequences behind the age card). New quest JOURNAL (press **J**) lists every
+  goal by age with ✔/▸/🔒 status. Footer legend updated.
+- **Harbour rework (`WaterNet.cs` NEW + `RouteVehicle`/`Depot`/`WaterPump`/`BuildController`/`GameBootstrap`):** SHIPS
+  now keep to WATER — `WaterNet` A* over water cells; `RouteVehicle.BuildLegRoute`/`TravelToStop` use it for ships (no
+  rail, no land crossing, hold if no route). Harbour↔Station mixing blocked at line creation (`OnLineClick`), and a
+  harbour stop with no water route is refused. New **Liquid Harbour** (Boats tab): pipe-connected fluid dock, ships a
+  fluid between liquid harbours (auto-water-route). Cargo harbour already straddled the shore w/ 1-in/1-out land belts.
+- **Open / next:** interactive playtest of all six (esp. pipe flow droplet DIRECTION, the objective reveal/journal flow,
+  liquid-harbour end-to-end, and ship water-paths on the real coastline). Belt-scroll-direction note from prior round
+  still open. World-scale-to-Half≈650 still open (see older entries).
 
 **✅ DONE A LATER SESSION (2026-06-29, entries #50–#52 — consists, smart logistics, elevated track + #49 cleanup):**
 - **SMART LOGISTICS belts (#51):** UNDERGROUND BELT (items cross hidden under surface belts/track), FILTER BELT
