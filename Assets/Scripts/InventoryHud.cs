@@ -49,6 +49,9 @@ namespace Caveman
         private Vector2 _guideScroll;
         private Rect _guideRect;
         private bool _showResearch;       // the research tree panel (T)
+        private bool _showLines;          // the global transport-line overview (L)
+        private Vector2 _linesScroll;
+        private Rect _linesRect;
         private Vector2 _researchScroll;
         private Rect _researchRect;
         private readonly HashSet<string> _affordToasted = new(); // "research available" hint fires once per node
@@ -97,14 +100,15 @@ namespace Caveman
         // Opening any of Build / Research / Guide / Help closes the others, so the player
         // focuses on a single system. The minimap is a world overlay, not a context panel,
         // so it's exempt. ---
-        private enum Panel { Build, Research, Guide, Help, Map }
-        private void CloseAllPanels() { _showBuild = _showResearch = _showGuide = _showHelp = _showMap = false; }
+        private enum Panel { Build, Research, Guide, Help, Map, Lines }
+        private void CloseAllPanels() { _showBuild = _showResearch = _showGuide = _showHelp = _showMap = _showLines = false; }
         private void TogglePanel(Panel p)
         {
             bool wasOpen = p == Panel.Build ? _showBuild
                          : p == Panel.Research ? _showResearch
                          : p == Panel.Guide ? _showGuide
                          : p == Panel.Help ? _showHelp
+                         : p == Panel.Lines ? _showLines
                          : _showMap;
             CloseAllPanels();
             if (wasOpen) return; // it was open → we just closed it
@@ -115,10 +119,11 @@ namespace Caveman
                 case Panel.Guide: _showGuide = true; break;
                 case Panel.Help: _showHelp = true; break;
                 case Panel.Map: _showMap = true; _mapZoom = 1f; _mapPan = Vector2.zero; break; // open fitting the whole world
+                case Panel.Lines: _showLines = true; break;
             }
         }
         // A full-screen "mode" panel is up — used to dim the world and hide competing widgets.
-        private bool ModalOpen => _showResearch || _showGuide || _showHelp || _showMap;
+        private bool ModalOpen => _showResearch || _showGuide || _showHelp || _showMap || _showLines;
 
         void Update()
         {
@@ -136,6 +141,8 @@ namespace Caveman
             if (_showMap && kb.escapeKey.wasPressedThisFrame) _showMap = false;
             if (kb.gKey.wasPressedThisFrame) TogglePanel(Panel.Guide);
             if (kb.tKey.wasPressedThisFrame) TogglePanel(Panel.Research);
+            if (kb.lKey.wasPressedThisFrame) TogglePanel(Panel.Lines); // global transport-line overview
+            if (_showLines && kb.escapeKey.wasPressedThisFrame) _showLines = false;
 
             // QoL: one-time "research available" toast when a tree node first becomes affordable.
             if (Research.Tree != null)
@@ -336,6 +343,7 @@ namespace Caveman
             if (_showGuide) DrawGuide();
             if (_showResearch) DrawResearchPanel();
             if (_showMap) DrawMapScreen();
+            if (_showLines) DrawLinesPanel();
             if (_paused) GUI.Label(new Rect(0, 60, _vw, 60), "<b>PAUSED</b>  <size=18>(space)</size>", _big);
 
             // Block world clicks when the cursor is over an interactive panel. A modal mode
@@ -1441,7 +1449,7 @@ namespace Caveman
             if (builder != null && builder.PendingIndex >= 0) return;
             float w = Mathf.Min(760f, _vw - 24f);
             GUILayout.BeginArea(new Rect(_vw / 2f - w / 2f, _vh - 40f, w, 38f));
-            GUILayout.Label($"<size=13><color=#bbb>B build · <color=#9cf>T research</color> · G guide · H help · M map · N minimap {(_showMinimap ? "on" : "off")} · Space pause</color></size>", _small);
+            GUILayout.Label($"<size=13><color=#bbb>B build · <color=#9cf>T research</color> · G guide · H help · M map · L lines · N minimap {(_showMinimap ? "on" : "off")} · Space pause</color></size>", _small);
             string sandbox = Economy.FreeBuild ? "<color=#9f9>SANDBOX</color> · " : "";
             string mode = Economy.LocalProduction ? "<color=#fc8>Local logistics</color>" : "<color=#8cf>Global pool</color>";
             GUILayout.Label($"<size=11><color=#999>{sandbox}Speed x{_speed:0} · {mode} (F7) · F1–F5 sandbox</color></size>", _small);
@@ -1534,6 +1542,50 @@ namespace Caveman
         }
 
         // ---- In-game Guide (G): mechanics + a resource reference ----
+        // The global transport-line overview (L): every running line at a glance — its vehicle + consist,
+        // how full it is, what it's carrying right now, and the stops it serves (with each stop's commodity).
+        private void DrawLinesPanel()
+        {
+            float w = 660f, h = Mathf.Min(_vh - 70f, 600f);
+            var r = new Rect(_vw / 2f - w / 2f, _vh / 2f - h / 2f, w, h);
+            _linesRect = r;
+            PanelBg(r);
+            GUILayout.BeginArea(new Rect(r.x + 16, r.y + 12, r.width - 32, r.height - 24));
+            int count = 0; foreach (var rv in RouteVehicle.All) if (rv != null) count++;
+            GUILayout.Label($"<size=22><b>Transport lines</b></size>   <size=13><color=#bbb>({count} running · L to close)</color></size>", _s);
+            _linesScroll = GUILayout.BeginScrollView(_linesScroll);
+
+            if (count == 0)
+                GUILayout.Label("<size=14><color=#cfcfcf>No lines yet. Build two Stations (or Harbours), then use <b>+ Add line</b> on a Station to link them. A loco hauls a CONSIST of wagons — one commodity per wagon — so a single line can carry MIXED cargo, and the wagon count grows as you age up.</color></size>", _small);
+
+            foreach (var rv in RouteVehicle.All)
+            {
+                if (rv == null || rv.stops == null) continue;
+                float frac = rv.LoadCapacity > 0 ? (float)rv.CurrentLoad / rv.LoadCapacity : 0f;
+                string holds = rv.IsShip ? "1 hold" : $"{rv.WagonCount} wagon{(rv.WagonCount == 1 ? "" : "s")}";
+                GUILayout.Label($"<size=16><b>{rv.VehicleName()}</b></size>  <size=12><color=#9cf>{holds} · {rv.StopCount} stops · {Mathf.RoundToInt(frac * 100f)}% full ({rv.CurrentLoad}/{rv.LoadCapacity})</color></size>", _small);
+                GUILayout.Label($"<size=13>Cargo: {rv.CargoSummary()}</size>", _small);
+
+                var sb = new System.Text.StringBuilder("<size=12><color=#cfcfcf>Stops: ");
+                bool first = true;
+                foreach (var st in rv.stops)
+                {
+                    if (st == null) continue;
+                    if (!first) sb.Append("  →  ");
+                    first = false;
+                    string nm = st.def != null ? st.def.displayName : "Station";
+                    if (st.item != null) { string hex = ColorUtility.ToHtmlStringRGB(st.item.color); sb.Append($"{nm} <color=#{hex}>[{st.item.displayName}]</color>"); }
+                    else sb.Append($"{nm} <color=#f99>[unset]</color>");
+                }
+                sb.Append("</color></size>");
+                GUILayout.Label(sb.ToString(), _small);
+                GUILayout.Space(8);
+            }
+
+            GUILayout.EndScrollView();
+            GUILayout.EndArea();
+        }
+
         private void DrawGuide()
         {
             float w = 640f, h = Mathf.Min(_vh - 70f, 580f);
@@ -1594,6 +1646,9 @@ namespace Caveman
                 "• <b>Logistics matter:</b> a workshop only runs on inputs that ARRIVE — belt-fed or\n" +
                 "  in an ADJACENT storage/machine. Lay it out so each machine is fed.\n" +
                 "• Lay Belts/Splitters — or Stations + a transport route — to move goods around.\n" +
+                "• A train hauls a CONSIST of wagons (one commodity each) — so a line carries MIXED cargo, and " +
+                "the wagon count grows as you age up. Liquids ride in tankers between PIPE-fed stations. " +
+                "Press <b>L</b> for the line overview.\n" +
                 "• Click a building to see its status, pause it, or demolish it.\n" +
                 "• <b>X</b> or <b>Delete</b> removes the building under the cursor (fast un-do). " +
                 "Build menu: ★ pins a building.\n" +
@@ -1605,7 +1660,7 @@ namespace Caveman
                 "\n<b>Sandbox:</b> F1 +resources · F3 advance age · F4 free build · " +
                 "F5 game speed · F8 reveal map.\n" +
                 "</size>", _small);
-            GUILayout.Label("<size=15>Press <b>H</b> to close  ·  Press <b>G</b> for the full Guide (mechanics + every resource)  ·  <b>M</b> opens the world map  ·  <b>N</b> hides the minimap.</size>", _small);
+            GUILayout.Label("<size=15>Press <b>H</b> to close  ·  Press <b>G</b> for the full Guide (mechanics + every resource)  ·  <b>M</b> opens the world map  ·  <b>L</b> lists transport lines  ·  <b>N</b> hides the minimap.</size>", _small);
             GUILayout.EndArea();
         }
 

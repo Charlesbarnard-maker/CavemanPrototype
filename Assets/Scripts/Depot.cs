@@ -44,6 +44,16 @@ namespace Caveman
             return Mathf.Abs(d.x) >= Mathf.Abs(d.y) ? (d.x >= 0 ? Belt.Dir.E : Belt.Dir.W) : (d.y >= 0 ? Belt.Dir.N : Belt.Dir.S);
         }
 
+        // Pipe-fed liquid logistics: a station handling a LIQUID is filled by pumps through pipes (WaterPump
+        // Sink 3) and — at a destination — pushes its delivered liquid ONWARD through pipes into consumers.
+        // We disambiguate the two roles by RECENCY: a station drains only when it was train-fed more recently
+        // than pump-fed, so a pump-fed SOURCE never leaks the cargo a tanker is meant to collect.
+        public float pumpFedAt = -1f, trainFedAt = -1f;
+        private float _liquidT;
+        private static readonly Queue<Vector2Int> _lq = new();
+        private static readonly Dictionary<Vector2Int, int> _ldist = new();
+        private const int LiquidDrainRange = 24;
+
         public static readonly List<Depot> All = new();
         private List<Vector2Int> _cells; // every grid cell this building occupies
         private readonly List<GameObject> _decor = new(); // track sprites laid over the platform lane
@@ -193,6 +203,70 @@ namespace Caveman
             float f = def.capacity > 0 ? (float)store.Total() / def.capacity : 0f;
             Color empty = Color.Lerp(_baseColor, Color.black, 0.5f);
             _sr.color = Color.Lerp(empty, _baseColor, Mathf.Clamp01(0.2f + 0.8f * f));
+
+            // A train-fed liquid DESTINATION pushes its cargo onward through the pipe network (throttled).
+            if (item != null && item.isLiquid && trainFedAt > pumpFedAt)
+            {
+                _liquidT += Time.deltaTime;
+                if (_liquidT >= 0.4f) { _liquidT = 0f; DrainLiquid(); }
+            }
+        }
+
+        // Flood the connected pipe network from this station's footprint and push the held liquid into liquid
+        // storages (barrels) + liquid-using workshops — the same sinks a WaterPump feeds, so a tanker's delivery
+        // actually reaches what consumes it. Range-bounded + per-tick capped so a big network won't churn.
+        private void DrainLiquid()
+        {
+            int avail = store.Count(item);
+            if (avail <= 0) return;
+            int budget = Mathf.Min(avail, 8);
+
+            _lq.Clear(); _ldist.Clear();
+            if (_cells != null)
+                foreach (var cell in _cells)
+                    foreach (var dir in RailTile.Four)
+                    {
+                        var s = cell + Belt.Step(dir);
+                        if (PipeNet.At(s) != null && !_ldist.ContainsKey(s)) { _ldist[s] = 1; _lq.Enqueue(s); }
+                    }
+            if (_lq.Count == 0) return;
+
+            int delivered = 0, guard = 0;
+            while (_lq.Count > 0 && guard++ < 2048)
+            {
+                var c = _lq.Dequeue();
+                int dc = _ldist[c];
+                if (dc > LiquidDrainRange) continue;
+
+                if (budget > 0)
+                    foreach (var dir in RailTile.Four)
+                    {
+                        var nb = c + Belt.Step(dir);
+                        if (budget <= 0) break;
+                        if (WorldGrid.Storages.TryGetValue(nb, out var st) && st != null && st.accepts == item && st.def != null)
+                        {
+                            int room = st.def.capacity - st.Store.Total();
+                            if (room > 0) { int add = Mathf.Min(budget, room); st.Store.Add(item, add); budget -= add; delivered += add; }
+                        }
+                        if (budget > 0 && WorldGrid.Workshops.TryGetValue(nb, out var wk) && wk != null && wk.WantsInput(item))
+                        {
+                            int inputs = wk.inputs != null ? Mathf.Max(1, wk.inputs.Count) : 1;
+                            int perCap = wk.InBuffer.capacity / inputs;
+                            int room = Mathf.Min(wk.InBuffer.capacity - wk.InBuffer.Total(), perCap - wk.InBuffer.Count(item));
+                            if (room > 0) { int add = Mathf.Min(budget, room); wk.InBuffer.Add(item, add); budget -= add; delivered += add; }
+                        }
+                    }
+
+                int baseD = PipeNet.BoostCells.Contains(c) ? 0 : dc;
+                foreach (var dir in RailTile.Four)
+                {
+                    var nb = c + Belt.Step(dir);
+                    if (PipeNet.At(nb) == null) continue;
+                    int nd = baseD + 1;
+                    if (!_ldist.TryGetValue(nb, out var old) || nd < old) { _ldist[nb] = nd; _lq.Enqueue(nb); }
+                }
+            }
+            if (delivered > 0) store.RemoveUpTo(item, delivered);
         }
     }
 }

@@ -5,15 +5,17 @@ namespace Caveman
 {
     /// <summary>
     /// A long-distance carrier (donkey cart → wagon → train → drone) that serves a LINE: an ordered list
-    /// of Stations it visits in a loop. At each stop it unloads matching cargo then loads that stop's goods;
-    /// between stops it follows the laid TRACK (claiming each cell so trains never cross, and obeying
-    /// SIGNALS for one-way + block control), passing any stations that aren't on its line — or flies
-    /// straight if no track connects them. A 2-station line is just the classic A↔B shuttle.
+    /// of Stations it visits in a loop. The loco pulls a CONSIST of WAGONS — one commodity per wagon — so a
+    /// single line can haul MIXED cargo: each stop unloads the wagons carrying ITS resource then loads its own
+    /// surplus into a free wagon, picking goods up where they're made and dropping them where they're wanted.
+    /// Wagon count is AGE-GATED (donkey pulls 1, diesel pulls 5). Between stops it follows the laid TRACK
+    /// (claiming each cell so trains never cross, obeying SIGNALS for one-way + block control), passing any
+    /// stations not on its line — or flies straight if no track connects them. A ship is a single-hold variant.
     /// </summary>
     public class RouteVehicle : MonoBehaviour
     {
         public List<Depot> stops = new(); // the line, in visit order (loops back to stops[0])
-        public int capacity = 10;
+        public int capacity = 10;          // per-WAGON capacity (total haul = capacity × wagon count)
         public float speed = 3.5f;
 
         // First stop + membership test.
@@ -21,9 +23,42 @@ namespace Caveman
         public bool Serves(Depot d) => d != null && stops != null && stops.Contains(d);
         public int StopCount => stops != null ? stops.Count : 0;
 
+        // ---- Read-only summary for the global line overview (InventoryHud) ----
+        public bool IsShip => _isShip;
+        public int WagonCount => _isShip ? 1 : _wagons.Count;
+        public int CurrentLoad => TotalCarry();
+        public int LoadCapacity => capacity * Mathf.Max(1, _wagons.Count);
+        public string VehicleName()
+        {
+            if (_isShip) return "Cargo ship";
+            string[] n = { "Donkey cart", "Ox wagon", "Horse wagon", "Steam train", "Diesel train" };
+            return n[Mathf.Clamp(AgeLocoTier(), 0, 4)];
+        }
+        /// <summary>"Wood 8 · Oil 5" of what's currently loaded across the consist, or "empty".</summary>
+        public string CargoSummary()
+        {
+            var agg = new List<KeyValuePair<ItemDefinition, int>>();
+            foreach (var w in _wagons)
+            {
+                if (w.item == null || w.amount <= 0) continue;
+                int i = agg.FindIndex(kv => kv.Key == w.item);
+                if (i >= 0) agg[i] = new KeyValuePair<ItemDefinition, int>(w.item, agg[i].Value + w.amount);
+                else agg.Add(new KeyValuePair<ItemDefinition, int>(w.item, w.amount));
+            }
+            if (agg.Count == 0) return "empty";
+            var sb = new System.Text.StringBuilder();
+            for (int i = 0; i < agg.Count; i++)
+            {
+                if (i > 0) sb.Append(" · ");
+                string hex = ColorUtility.ToHtmlStringRGB(agg[i].Key.color);
+                sb.Append($"<color=#{hex}>{agg[i].Key.displayName}</color> {agg[i].Value}");
+            }
+            return sb.ToString();
+        }
+
         public static readonly List<RouteVehicle> All = new();
         void OnEnable() => All.Add(this);
-        void OnDisable() { All.Remove(this); ReleaseHeld(); }
+        void OnDisable() { All.Remove(this); ReleaseHeld(); DestroyWagons(); }
 
         private enum Phase { Travel, Service }
         private Phase _phase = Phase.Travel;
@@ -31,14 +66,27 @@ namespace Caveman
         private float _phaseTimer;
         private int _toIdx;        // index of the stop we're heading to
         private int _legBuilt = -1; // the _toIdx the current rail route was built for
-        private int _carry;
-        private ItemDefinition _carryItem;
         private SpriteRenderer _sr;
         private Color _baseColor;
         private LineRenderer _line;
         private bool _isShip;                  // ships keep the boat sprite + cargo tint; land vehicles show a per-age loco
         private int _frame; private float _animT; private float _prevX; // loco walk/wheel animation + facing flip
         private static int AgeLocoTier() => Mathf.Clamp(Colony.Instance != null ? Colony.Instance.Age : 0, 0, 4);
+
+        // ---- Consist: the loco pulls a list of WAGONS, each holding ONE commodity. A line therefore hauls
+        // MIXED cargo (a wagon per commodity), unlike the old single-hold caravan. Count is age-gated
+        // (WagonsForAge); each wagon holds up to `capacity`. A ship is one hold (one wagon, no trailing art).
+        private sealed class Wagon
+        {
+            public ItemDefinition item; // commodity carried (null = empty)
+            public int amount;
+            public Transform tf;        // trailing sprite (world-space, unparented so the loco's flip doesn't distort it)
+            public SpriteRenderer sr;
+            public int frame; public float animT;
+        }
+        private readonly List<Wagon> _wagons = new();
+        private int _wagonTier = -1;                    // loco/age tier the consist was last sized for (rebuild on age-up)
+        private readonly List<Vector3> _trail = new();  // recent loco positions (index 0 = newest) for wagon following
 
         // Track following (see CanEnter/BlockAheadClear). Each leg is a fresh forward path from the
         // vehicle's current position to the next stop, traversed cell-by-cell with claims + signals.
@@ -79,10 +127,10 @@ namespace Caveman
             v._sr = sr; v._baseColor = color; v._line = lr; v._isShip = ship;
             sr.color = ship ? color : Color.white;
 
-            // One commodity per line: give every un-set stop the first stop's item, so loads/unloads match.
-            ItemDefinition commodity = null;
-            foreach (var s in v.stops) if (s != null && s.item != null) { commodity = s.item; break; }
-            if (commodity != null) foreach (var s in v.stops) if (s != null && s.item == null) s.item = commodity;
+            // Build the consist now that ship/capacity are known. Stops KEEP their own items — a line carries
+            // mixed cargo, so we no longer force every stop onto one shared commodity (each is set by its belts
+            // or its panel; an unconfigured drop-off adopts the first cargo delivered to it, see ServiceStop).
+            v.RebuildConsist();
             return v;
         }
 
@@ -92,7 +140,7 @@ namespace Caveman
             capacity = Mathf.Max(1, newCapacity);
             speed = newSpeed;
             _baseColor = newColor;
-            if (_sr != null && _carry <= 0) _sr.color = newColor;
+            if (_sr != null && TotalCarry() <= 0) _sr.color = newColor;
         }
 
         void Update()
@@ -102,6 +150,7 @@ namespace Caveman
             if (stops == null || stops.Count < 2) { Destroy(gameObject); return; }
             if (_toIdx >= stops.Count) _toIdx = 0;
 
+            EnsureConsistForAge(); // grow the consist as the colony ages up (donkey → … → diesel)
             DrawLine();
             var to = stops[_toIdx];
 
@@ -114,7 +163,7 @@ namespace Caveman
                     _phaseTimer += Time.deltaTime;
                     if (_phaseTimer >= serviceTime)
                     {
-                        ServiceStop(to, _toIdx == 0); // stop 0 = the pickup (load); the rest are drop-offs
+                        ServiceStop(to); // unload this stop's cargo, then load its surplus into a free wagon
                         _toIdx = (_toIdx + 1) % stops.Count;
                         _phase = Phase.Travel;
                     }
@@ -132,34 +181,46 @@ namespace Caveman
                     if (_animT >= 0.12f) { _animT = 0f; _frame = (_frame + 1) % 3; }
                     _sr.sprite = PlaceholderArt.TrainLoco(AgeLocoTier(), _frame);
                 }
+                var dom = DominantItem();
                 _sr.color = _waiting ? new Color(0.95f, 0.75f, 0.25f) // amber — held at a signal / occupied cell
-                    : _isShip ? ((_carry > 0 && _carryItem != null) ? Color.Lerp(_baseColor, _carryItem.color, 0.6f) : _baseColor)
+                    : _isShip ? ((TotalCarry() > 0 && dom != null) ? Color.Lerp(_baseColor, dom.color, 0.6f) : _baseColor)
                     : Color.white; // land loco shows its own colours
             }
+
+            UpdateWagons(); // trail the wagons behind the loco + tint each to its commodity
         }
 
-        // Service a stop. The PICKUP stop (stop 0) loads its commodity up to capacity; every other stop
-        // is a DROP-OFF that receives the cargo (taking what fits; the remainder rides on to the next).
-        // This is predictable (no ping-pong) and reads as "start from the source, then list the deliveries".
-        private void ServiceStop(Depot stop, bool isSource)
+        // Service a stop. The consist UNLOADS every wagon carrying this stop's resource (delivering into its
+        // store), then LOADS this stop's surplus into a free/matching wagon — unless we just delivered that
+        // resource here (so a destination doesn't immediately re-export what it received). Each stop thus acts
+        // as a source for what it makes and a sink for what it wants; mixed commodities ride together between.
+        private void ServiceStop(Depot stop)
         {
             if (stop == null) return;
-            if (isSource)
+
+            // 1) UNLOAD — deliver wagons into the stop. An unconfigured stop adopts the first cargo delivered.
+            bool unloadedHere = false; ItemDefinition delivered = null;
+            foreach (var w in _wagons)
             {
-                if (stop.item != null && (_carryItem == null || _carryItem == stop.item))
-                {
-                    if (_carryItem == null) _carryItem = stop.item;
-                    int room = capacity - _carry;
-                    if (room > 0) _carry += stop.store.RemoveUpTo(stop.item, room);
-                }
+                if (w.item == null || w.amount <= 0) continue;
+                if (stop.item == null) stop.item = w.item;          // a fresh drop-off adopts what's delivered
+                if (w.item != stop.item) continue;
+                int moved = stop.store.Add(w.item, w.amount);
+                if (moved > 0) { w.amount -= moved; unloadedHere = true; delivered = w.item; if (w.item != null && w.item.isLiquid) stop.trainFedAt = Time.time; if (w.amount <= 0) w.item = null; }
             }
-            else if (_carry > 0 && _carryItem != null)
+
+            // 2) LOAD — pull this stop's surplus into empty (or same-commodity) wagons, up to per-wagon capacity.
+            var I = stop.item;
+            if (I != null && I != delivered && stop.store.Count(I) > 0)
             {
-                if (stop.item == null) stop.item = _carryItem;     // an un-set drop-off adopts what's delivered
-                if (stop.item == _carryItem)
+                foreach (var w in _wagons)
                 {
-                    _carry -= stop.store.Add(_carryItem, _carry);  // deliver what fits; keep any overflow for the next stop
-                    if (_carry <= 0) _carryItem = null;
+                    if (stop.store.Count(I) <= 0) break;
+                    if (w.item != null && w.item != I) continue;          // wagon dedicated to another commodity
+                    if (w.item == I && w.amount >= capacity) continue;    // this wagon's full
+                    if (w.item == null) w.item = I;
+                    int room = capacity - w.amount;
+                    if (room > 0) w.amount += stop.store.RemoveUpTo(I, room);
                 }
             }
         }
@@ -173,6 +234,123 @@ namespace Caveman
             for (int i = 0; i < n; i++)
                 _line.SetPosition(i, stops[i] != null ? stops[i].transform.position : transform.position);
             _line.SetPosition(n, stops[0] != null ? stops[0].transform.position : transform.position);
+        }
+
+        // ---- Consist sizing + cargo helpers ------------------------------------------------------
+        // Age-gated wagon count: Donkey(0):1 · Ox(1):2 · Horse(2):3 · Steam(3):4 · Diesel(4):5. The consist
+        // grows as the colony advances, so the same line hauls more (and more varied) cargo in later ages.
+        private static int WagonsForAge(int age) => Mathf.Clamp(age, 0, 4) + 1;
+
+        private void RebuildConsist()
+        {
+            int want = _isShip ? 1 : WagonsForAge(Colony.Instance != null ? Colony.Instance.Age : 0);
+            EnsureWagonCount(want);
+            _wagonTier = AgeLocoTier();
+        }
+
+        private void EnsureConsistForAge()
+        {
+            if (_isShip) return;
+            int t = AgeLocoTier();
+            if (t == _wagonTier) return;
+            _wagonTier = t;
+            EnsureWagonCount(WagonsForAge(t));
+        }
+
+        // Grow the consist to `want` wagons (creating trailing sprites for land vehicles); on the rare shrink,
+        // drop only EMPTY wagons from the tail so cargo is never silently destroyed.
+        private void EnsureWagonCount(int want)
+        {
+            want = Mathf.Max(1, want);
+            while (_wagons.Count < want)
+            {
+                var w = new Wagon();
+                if (!_isShip)
+                {
+                    var go = new GameObject("Wagon");
+                    go.transform.position = transform.position;
+                    go.transform.localScale = Vector3.one * 0.55f;
+                    var sr = go.AddComponent<SpriteRenderer>();
+                    sr.sprite = PlaceholderArt.CargoWagon(0);
+                    sr.sortingOrder = 13; // just under the loco (14)
+                    sr.color = new Color(0.78f, 0.78f, 0.78f, 1f);
+                    w.tf = go.transform; w.sr = sr;
+                }
+                _wagons.Add(w);
+            }
+            for (int i = _wagons.Count - 1; i >= want; i--)
+            {
+                if (_wagons[i].amount > 0) break; // keep extra wagons until they've emptied (don't lose cargo)
+                if (_wagons[i].tf != null) Destroy(_wagons[i].tf.gameObject);
+                _wagons.RemoveAt(i);
+            }
+        }
+
+        private void DestroyWagons()
+        {
+            foreach (var w in _wagons) if (w.tf != null) Destroy(w.tf.gameObject);
+            _wagons.Clear();
+        }
+
+        private int TotalCarry()
+        {
+            int t = 0; foreach (var w in _wagons) t += w.amount; return t;
+        }
+
+        // The commodity the consist is carrying most of (for the loco/ship tint), or null if empty.
+        private ItemDefinition DominantItem()
+        {
+            ItemDefinition best = null; int bestAmt = 0;
+            foreach (var w in _wagons) if (w.item != null && w.amount > bestAmt) { best = w.item; bestAmt = w.amount; }
+            return best;
+        }
+
+        // Trail the wagons a fixed arc-distance behind the loco along its recent path, animate wheels, face the
+        // travel direction, and tint each to its commodity (a liquid wagon shows the tanker art).
+        private void UpdateWagons()
+        {
+            if (_trail.Count == 0 || (_trail[0] - transform.position).sqrMagnitude > 0.0036f) // ~0.06 world units
+                _trail.Insert(0, transform.position);
+            const int maxTrail = 96;
+            if (_trail.Count > maxTrail) _trail.RemoveRange(maxTrail, _trail.Count - maxTrail);
+
+            if (_isShip) return;
+            for (int i = 0; i < _wagons.Count; i++)
+            {
+                var w = _wagons[i];
+                if (w.tf == null) continue;
+                SampleTrail(0.5f + i * 0.5f, out var pos, out float dirX);
+                w.tf.position = pos;
+                w.animT += Time.deltaTime;
+                if (w.animT >= 0.12f) { w.animT = 0f; w.frame = (w.frame + 1) % 3; }
+                bool liquid = w.item != null && w.item.isLiquid;
+                w.sr.sprite = liquid ? PlaceholderArt.LiquidWagon(w.frame) : PlaceholderArt.CargoWagon(w.frame);
+                var sc = w.tf.localScale; sc.x = Mathf.Abs(sc.x) * (dirX < 0f ? -1f : 1f); w.tf.localScale = sc;
+                w.sr.color = w.item != null ? Color.Lerp(Color.white, w.item.color, 0.55f) : new Color(0.78f, 0.78f, 0.78f, 1f);
+            }
+        }
+
+        // Walk back along the trail to a target arc-distance; return that world position + x travel-direction.
+        private void SampleTrail(float target, out Vector3 pos, out float dirX)
+        {
+            pos = transform.position; dirX = 1f;
+            if (_trail.Count < 2) return;
+            float acc = 0f;
+            for (int k = 1; k < _trail.Count; k++)
+            {
+                Vector3 newer = _trail[k - 1], older = _trail[k];
+                float seg = Vector3.Distance(newer, older);
+                if (seg <= 1e-5f) continue;
+                if (acc + seg >= target)
+                {
+                    pos = Vector3.Lerp(newer, older, (target - acc) / seg);
+                    dirX = newer.x - older.x; // travel direction (older → newer)
+                    return;
+                }
+                acc += seg;
+            }
+            pos = _trail[_trail.Count - 1];
+            dirX = _trail.Count >= 2 ? _trail[_trail.Count - 2].x - _trail[_trail.Count - 1].x : 1f;
         }
 
         // ---- Track-gated travel to the next stop -------------------------------------------------

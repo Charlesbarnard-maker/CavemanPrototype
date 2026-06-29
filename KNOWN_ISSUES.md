@@ -68,6 +68,39 @@ then remove `Temp/UnityLockfile`) or you get lock races. Headless sprite preview
   Keep KNOWN_ISSUES newest-first. CavemanPrototype stays OUT of global memory.
 ---
 
+## #50 TRAIN CONSIST mechanics — loco + coupled wagons, mixed cargo, pipe-fed liquids, line overview (2026-06-29)
+The queued consist feature, built on the existing rail/route/station system. **Compile-clean** (batch mode, verified).
+NOT yet interactively playtested — this is the next thing to drive in the editor.
+- **Consist + breadcrumb trailing (`RouteVehicle`):** the loco now pulls a list of `Wagon`s (one commodity each),
+  trailed behind it along a recorded position trail (`_trail` + `SampleTrail` — classic snake-follow, unparented
+  sprites so the loco's facing-flip doesn't distort them). Each wagon animates wheels + faces travel direction and
+  tints to its commodity; a liquid commodity shows the `LiquidWagon` tanker art, else `CargoWagon`.
+- **Age-gated wagon count — AUTOMATIC, not a manual buy-a-wagon UI.** `WagonsForAge(age) = age+1` → Donkey 1 · Ox 2 ·
+  Horse 3 · Steam 4 · Diesel 5. `EnsureConsistForAge` grows the consist on age-up (a rare shrink only drops EMPTY
+  tail wagons, never destroying cargo). *Divergence from the original "add/remove-wagon UI" idea:* auto-scaling means
+  zero per-line micromanagement (the "managing many lines" pain point). Say if you wanted manual control instead.
+- **Mixed cargo (`ServiceStop` rewrite):** dropped the old "stop 0 = source, rest = sink, one commodity per line"
+  model. Now EVERY stop: (1) UNLOADS wagons carrying its resource into its store (an unconfigured drop-off adopts the
+  first cargo delivered), then (2) LOADS its own surplus into a free/matching wagon — skipped if it just received that
+  resource, so a destination never re-exports. So a line picks goods up where they're made + drops them where wanted,
+  hauling different commodities in different wagons simultaneously. Source stops still need their `item` set (belts
+  require `dp.item == def` to deliver — unchanged); the old line-spawn "force one commodity on all stops" is removed.
+- **Capacity reinterpretation:** the tier's `capacity` is now PER-WAGON (total haul = capacity × wagon count). Early
+  game (1 wagon) is unchanged vs before; late game scales up with the consist. **Balance watch:** end-game total can
+  reach ~5× a single hold — eyeball during playtest, retune tier `capacity` if trains feel too strong.
+- **Pipe-fed liquid stations (`WaterPump` + `Depot`):** a liquid `Depot` is now a two-way pipe node. SOURCE side:
+  `WaterPump.Pump` Sink 3 fills a pipe-adjacent liquid station like a barrel (a fresh one ADOPTS the pumped liquid).
+  DESTINATION side: `Depot.DrainLiquid` floods the connected pipes (range-bounded, throttled, same sinks as the pump)
+  to push delivered liquid onward into barrels / liquid workshops. Source-vs-destination is disambiguated by RECENCY
+  (`pumpFedAt` vs `trainFedAt`) so a pump-fed source never leaks the cargo a tanker is meant to collect.
+- **Global line overview (`InventoryHud`, hotkey L):** a modal panel listing every line — vehicle + consist size,
+  %-full, current cargo (per-commodity), and the ordered stops with each stop's commodity. Added to footer + help.
+- **Files:** `RouteVehicle.cs` (rewrite), `Depot.cs` (drain + timestamps), `WaterPump.cs` (Sink 3), `InventoryHud.cs`
+  (Lines panel + hotkey/footer/help). Art (`TrainLoco`/`CargoWagon`/`LiquidWagon`) already existed; only mechanics added.
+- **To verify in editor:** build a 3+-stop line across two resources → confirm mixed cargo rides in separate wagons
+  and is dropped at the right stop; age up → wagons appear and trail correctly; pump→pipe→liquid station→tanker→
+  destination station→pipe→refinery end-to-end; press L mid-run and read the overview.
+
 ## #49 Optimisation / logic / balance sweep — 3-agent review (2026-06-29)
 Ran 3 parallel review agents (logic, balance, perf). Balance fixes landed in #48. This entry records the rest.
 **Applied (compile-clean):**

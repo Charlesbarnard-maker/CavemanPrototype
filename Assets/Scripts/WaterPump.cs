@@ -152,6 +152,15 @@ namespace Caveman
                             int room = Mathf.Min(wk.InBuffer.capacity - wk.InBuffer.Total(), perCap - wk.InBuffer.Count(water));
                             if (room > 0) { int add = Mathf.Min(budget, room); wk.InBuffer.Add(water, add); budget -= add; delivered = true; }
                         }
+                        // Sink 3: a liquid transfer STATION (Depot) — pipe-FED like a barrel, so a train can haul
+                        // the liquid onward in a tanker wagon. A fresh station ADOPTS the liquid the pipe brings.
+                        if (budget > 0 && WorldGrid.Depots.TryGetValue(nb, out var dpo) && dpo != null && dpo.def != null
+                            && !dpo.def.isHarbour && (dpo.item == water || dpo.item == null))
+                        {
+                            if (dpo.item == null) dpo.item = water;
+                            int room = dpo.def.capacity - dpo.store.Total();
+                            if (room > 0) { int add = Mathf.Min(budget, room); dpo.store.Add(water, add); budget -= add; delivered = true; dpo.pumpFedAt = Time.time; }
+                        }
                     }
                 }
 
