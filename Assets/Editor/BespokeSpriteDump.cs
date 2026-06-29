@@ -34,6 +34,7 @@ public static class BespokeSpriteDump
         ("Basic Smelter",   new Color(0.74f,0.52f,0.42f), 1),
         ("Scroll Maker",    new Color(0.84f,0.78f,0.50f), 1),
         ("Clay Pile",       new Color(0.60f,0.42f,0.34f), 1),
+        ("Garage",          new Color(0.60f,0.50f,0.38f), 1),
         // Age 2 (Bronze)
         ("Kiln",            new Color(0.70f,0.42f,0.34f), 2),
         ("Potter",          new Color(0.72f,0.50f,0.40f), 2),
@@ -113,7 +114,7 @@ public static class BespokeSpriteDump
         File.WriteAllText(Path.Combine(outDir, "layout.txt"), report.ToString());
 
         // Zoomed individuals (8x) for a watchlist, tinted, on ground bg — for close inspection.
-        string[] watch = { "Charcoal Burner", "Oil Tank", "Basic Smelter", "Stone Pit", "Research Lodge" };
+        string[] watch = { "Garage", "Charcoal Burner" };
         const int Z = 8;
         foreach (var name in watch)
         {

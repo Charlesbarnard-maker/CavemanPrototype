@@ -419,6 +419,7 @@ namespace Caveman
             "Basic Smelter" => TribalBasicSmelter(),
             "Scroll Maker" => TribalScrollMaker(),
             "Clay Pile" => TribalClayPile(),
+            "Garage" => GarageShed(),
             // --- Age 2 (Bronze) ---
             "Kiln" => BronzeKiln(),
             "Potter" => BronzePotter(),

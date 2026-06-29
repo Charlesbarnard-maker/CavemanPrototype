@@ -35,8 +35,15 @@ namespace Caveman
             _lastPos = transform.position;
             if (moving) { _animT += Time.deltaTime; if (_animT >= 0.14f) { _animT = 0f; _frame = (_frame + 1) % 3; } }
             else { _frame = 0; _animT = 0f; }
-            int key = age * 3 + _frame;
-            if (key != _shownKey && _sr != null) { _shownKey = key; _sr.sprite = PlaceholderArt.PlayerMount(age, _frame); _sr.color = Color.white; }
+            // Riding a bought mount → show it; otherwise the age-appropriate caveman on foot.
+            int ride = PlayerController.RidingTier(age);
+            int key = (ride >= 1 ? ride : 100 + age) * 3 + _frame; // refresh on a change of ride OR age
+            if (key != _shownKey && _sr != null)
+            {
+                _shownKey = key;
+                _sr.sprite = ride >= 1 ? PlaceholderArt.PlayerMount(ride, _frame) : PlaceholderArt.Caveman(age, _frame);
+                _sr.color = Color.white;
+            }
         }
     }
 }

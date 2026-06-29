@@ -40,10 +40,11 @@ sprite packs.
 - **🔜 LIKELY NEXT (user's open threads, roughly priority order):**
   1. ~~Unity recompile + visual pass on the 28 new building sprites~~ **✅ DONE 2026-06-29 (#39)** — all read/tint
      well; Charcoal Burner tint lifted so its dark mound + embers read.
-  2. ~~Player VEHICLE/MOUNT visuals per age~~ **✅ CORE DONE 2026-06-29 (#39)** — `PlaceholderArt.PlayerMount(age,frame)`
-     bakes side-profile Horseback/Ox Cart/Wagon/Motorbike + an age-tinted rider, animated over 3 frames; shown by
-     `PlayerAvatar` (age 0 = on-foot caveman). **STRETCH STILL OPEN:** make the mount BUYABLE + a limited GARAGE to
-     park them (right now it auto-applies by age, mirroring the existing speed tiers).
+  2. ~~Player VEHICLE/MOUNT visuals per age~~ **✅ DONE 2026-06-29 (#39 visuals, #40 garage)** —
+     `PlaceholderArt.PlayerMount(tier,frame)` bakes side-profile Horseback/Ox Cart/Wagon/Motorbike + an age-tinted
+     rider, animated over 3 frames. Now BUYABLE + a limited GARAGE (hybrid travel): age gives a baseline speed bump
+     on foot, the bought+parked mount adds the full speed + the look. **OWED: an INTERACTIVE PLAYTEST of the garage**
+     (build it → buy a mount → ride/switch) — UI/economy couldn't be verified headlessly.
   2b. **Full PLAYTEST** of the whole accumulated game (deferred this session) — belts/rail/boats/liquids/power/ages.
   3. **Make the WHOLE map feel hand-designed** (only the island was reshaped so far) — `TerrainGrid` / resource zones.
   4. **Tighten 2×2 single-port belt I/O to ONE cell** (belts still functionally connect anywhere along a side though
@@ -55,6 +56,24 @@ sprite packs.
 - **Canon:** GAME_DESIGN.md is partly SUPERSEDED (factory-first, but workers are back as a COSMETIC layer).
   Keep KNOWN_ISSUES newest-first. CavemanPrototype stays OUT of global memory.
 ---
+
+## #40 Buyable mounts + a limited GARAGE — hybrid travel (2026-06-29)
+The "fuller version" of the mounts (continuation of #39). Travel is now HYBRID: reaching an age auto-grants a
+small BASELINE speed bump on foot, but the FULL tier speed + the mount VISUAL need a bought, parked mount.
+- **`PlayerController`:** `OwnedMount[5]` (0 = on foot, always owned) + `ActiveMount` + `MountCost[]` (set in
+  GameBootstrap where the items live) + `GarageSlots`. Speed = `Lerp(onFoot, Mounts[age].speed, 0.35)` baseline,
+  or the full `Mounts[tier].speed` when riding an owned mount within your age. Helpers Buy / SetActive / Release /
+  RidingTier / CanBuy / OwnedCount / ResetMounts / RecomputeGarageSlots. Statics reset on a fresh game.
+- **NEW `Garage` building** — `BuildingKind.Garage`, "Mounts" build-menu category, 2×2, unlock age 1, **2 parking
+  slots** (the "limited"; build another Garage for +2, capped at the 4 mounts). `Garage.cs` (selectable, like
+  Battery) + a `ConstructionSite.SpawnFinished` case. Its panel `InventoryHud.DrawGaragePanel` lists On Foot + each
+  mount up to your age: **Buy** (age-gated, resource cost) / **Ride** / **✕ release** (frees a slot, no refund).
+- **`PlayerAvatar`** shows the bought ACTIVE mount when riding, else the age-costumed `Caveman` on foot — so the
+  per-age caveman costumes are visible again whenever you're un-mounted.
+- **Bespoke Garage sprite** `PlaceholderArt.Garage.cs` — timber cart-shed, gabled roof, open bay with a parked
+  wheel (reuses the `WheelPixel` helper) + a horseshoe sign.
+- Compile CLEAN (full batch recompile). **OWED: an interactive playtest** — the buy/ride/park UI + economy + 2×2
+  placement can't be verified headlessly.
 
 ## #39 Unity verify + visual pass on bespoke art + per-age player MOUNTS (2026-06-29)
 Fresh-PC continuation. Reconciled the clone (was 23 commits behind → fast-forwarded `main` to `origin/main` =

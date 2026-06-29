@@ -78,6 +78,7 @@ namespace Caveman
         Rail,      // a track segment — route vehicles (trains) path along laid rail
         Signal,    // a rail signal — one-way + block control for train planning
         Research,  // a Research Lodge: consumes crafted research items into research points
+        Garage,    // parks the player's bought MOUNTS — buy/switch your ride from its panel
     }
 
     /// <summary>Data for a placeable structure.</summary>

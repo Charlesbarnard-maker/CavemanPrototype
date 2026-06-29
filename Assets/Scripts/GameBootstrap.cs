@@ -18,6 +18,8 @@ namespace Caveman
             RailGraph.Reset();
             RailNet.StationLane.Clear();
             PlayerController.HasBoat = false; // fresh game: no boat yet (statics persist with domain-reload-off)
+            PlayerController.ResetMounts();    // fresh game: on foot, no mounts owned
+            Garage.BuiltCount = 0; PlayerController.RecomputeGarageSlots();
 
             // --- Items ---
             var stone = MakeItem("stone", "Stone", new Color(0.55f, 0.55f, 0.62f));
@@ -522,6 +524,29 @@ namespace Caveman
             var oilGen = MakePower("Oil Generator", 120, fuel, 1, 2.5f, 3, new Color(0.30f, 0.26f, 0.22f),
                 new ItemAmount(metal, 12), new ItemAmount(bricks, 8));
             oilGen.description = "OIL GENERATOR — burns FUEL (refined from Oil) for LOTS of Power, far more than a Coal Generator. Belt Fuel into its cyan intake — the payoff of the whole oil chain.";
+
+            // --- The GARAGE: parks your bought MOUNTS. Build one, then BUY the age-gated mount from its
+            //     panel and pick which to ride. HYBRID travel: age gives a baseline speed bump on foot;
+            //     the mount adds the full tier speed + the look. "Limited" = 2 parking slots per garage. ---
+            var garage = ScriptableObject.CreateInstance<BuildingDefinition>();
+            garage.displayName = "Garage"; garage.kind = BuildingKind.Garage; garage.unlockAge = 1;
+            garage.footprintW = 2; garage.footprintH = 2;
+            garage.capacity = 2;                 // parking slots (the "limited" garage)
+            garage.menuCategory = "Mounts";
+            garage.color = new Color(0.60f, 0.50f, 0.38f);
+            garage.cost = new List<ItemAmount> { new ItemAmount(planks, 6), new ItemAmount(stone, 4) };
+            garage.description = "GARAGE — parks your travel MOUNTS. Build it, then BUY the age-gated mount (Horseback → Ox Cart → Wagon → Motorbike) from its panel and pick which to ride. Holds 2 mounts; build another Garage for more slots. On foot you always get a small per-age speed boost; the mount adds the full speed + the look.";
+
+            // Mount purchase costs (tier 1..4). Set here where the ItemDefinitions live. NOT run through the
+            // building CostScale below (that only touches buildables' placement cost), so these stay as-is.
+            PlayerController.MountCost = new List<ItemAmount>[]
+            {
+                null, // 0 = On Foot (free)
+                new List<ItemAmount> { new ItemAmount(planks, 8),  new ItemAmount(food, 6) },   // Horseback
+                new List<ItemAmount> { new ItemAmount(planks, 8),  new ItemAmount(bricks, 6) }, // Ox Cart
+                new List<ItemAmount> { new ItemAmount(planks, 10), new ItemAmount(metal, 6) },  // Wagon
+                new List<ItemAmount> { new ItemAmount(steel, 8),   new ItemAmount(fuel, 6) },   // Motorbike
+            };
             // FACTORY-FIRST build menu: gathering → processing → research → logistics → storage →
             // power/endgame. Survival/comfort buildings (forager, water hole, granary, campfire,
             // farm/mill/bakery, hunter, housing, pipes, textiles, jewelry, masonry) are intentionally
@@ -540,7 +565,9 @@ namespace Caveman
               // Storage — Woodpile + configurable Warehouse + liquid tanks (Oil Tank / Water Barrel)
               woodStore, clayStore, brickStore, warehouse, oilTank, waterStore,
               // Infrastructure / power / endgame — Wood/Coal/Oil Generators + Power Poles + Battery
-              woodGen, pole, battery, generator, oilGen, monumentBldg };
+              woodGen, pole, battery, generator, oilGen, monumentBldg,
+              // Mounts — the Garage (buy/park your rides)
+              garage };
 
             // --- Manual paid AGE-UPGRADES (stone tools → metal → machines): each production building can be
             //     upgraded from its panel once you reach the tier's age, spending resources for a faster rate

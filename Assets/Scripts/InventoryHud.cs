@@ -82,6 +82,7 @@ namespace Caveman
             ("Trains",     new[] { BuildingKind.Depot, BuildingKind.Rail, BuildingKind.Signal }),
             ("Boats",      new BuildingKind[0]),  // tag-only (Harbour sets menuCategory="Boats")
             ("Planes",     new BuildingKind[0]),  // reserved — appears once it has a buildable
+            ("Mounts",     new[] { BuildingKind.Garage }),  // the Garage — buy/park your travel mounts
             ("Storage",    new[] { BuildingKind.Storage }),
         };
         private static bool InGroup(BuildingKind[] kinds, BuildingKind k) => System.Array.IndexOf(kinds, k) >= 0;
@@ -1002,13 +1003,18 @@ namespace Caveman
             var pole = sel.GetComponent<PowerPole>();
             var bat = sel.GetComponent<Battery>();
             var pnode = sel.GetComponent<PowerNode>();
+            var garage = sel.GetComponent<Garage>();
             string name = wb != null ? wb.def.displayName : pbSel != null ? pbSel.def.displayName
                 : sb != null ? sb.def.displayName
                 : dp != null ? dp.def.displayName : resB != null ? resB.def.displayName
                 : pwr != null ? pwr.def.displayName : pole != null ? pole.def.displayName
                 : bat != null ? bat.def.displayName
+                : garage != null ? garage.def.displayName
                 : cs != null ? cs.def.displayName : "Building";
             GUILayout.Label($"<b>{name}</b>", _s);
+
+            // GARAGE — buy age-gated mounts + pick which to ride (the limited mount garage).
+            if (garage != null) DrawGaragePanel();
 
             // Plain-language status line for producers (the "understandable bottleneck" cue).
             if (wb != null || pbSel != null)
@@ -1232,6 +1238,59 @@ namespace Caveman
 
             if (demo) builder.DemolishSelected();
             if (close) builder.Deselect();
+        }
+
+        // The mount GARAGE panel: buy age-gated mounts, switch which you ride, release one to free a slot.
+        private void DrawGaragePanel()
+        {
+            int age = Colony.Instance != null ? Colony.Instance.Age : 0;
+            var cb = gatherer != null ? gatherer.Inventory : null;
+            int riding = PlayerController.RidingTier(age);
+            GUILayout.Label($"<size=11><color=#bbb>Parking {PlayerController.OwnedCount()}/{PlayerController.GarageSlots}. Buy a mount up to your age, then ride it. On foot you still get a small per-age speed boost.</color></size>", _small);
+
+            // On Foot row
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("<size=13>On Foot</size>", _small);
+            GUILayout.FlexibleSpace();
+            if (riding == 0) GUILayout.Label("<size=11><color=#9f9>● riding</color></size>", _small);
+            else if (GUILayout.Button("<size=11>Walk</size>", _btn, GUILayout.Width(60))) PlayerController.SetActive(0);
+            GUILayout.EndHorizontal();
+
+            for (int t = 1; t <= PlayerController.MountTierMax; t++)
+            {
+                string mname = PlayerController.Mounts[t].name;
+                bool owned = PlayerController.OwnedMount[t];
+                bool active = riding == t;
+                bool ageOk = t <= PlayerController.MaxTierForAge(age);
+
+                GUILayout.BeginHorizontal();
+                GUILayout.Label($"<size=13>{mname}</size> <size=10><color=#888>{PlayerController.Mounts[t].speed:0.#} spd</color></size>", _small);
+                GUILayout.FlexibleSpace();
+                if (!ageOk)
+                    GUILayout.Label("<size=10><color=#888>reach its age</color></size>", _small);
+                else if (active)
+                    GUILayout.Label("<size=11><color=#9f9>● riding</color></size>", _small);
+                else if (owned)
+                {
+                    if (GUILayout.Button("<size=11>Ride</size>", _btn, GUILayout.Width(60))) PlayerController.SetActive(t);
+                    if (GUILayout.Button("<size=10><color=#f99>✕</color></size>", _btn, GUILayout.Width(24))) PlayerController.Release(t);
+                }
+                else
+                {
+                    var cost = (PlayerController.MountCost != null && t < PlayerController.MountCost.Length) ? PlayerController.MountCost[t] : null;
+                    bool slot = PlayerController.OwnedCount() < PlayerController.GarageSlots;
+                    bool afford = cost != null && cb != null && Economy.CanAfford(cost, cb);
+                    string cc = (afford && slot) ? "#9f9" : "#f99";
+                    string label = !slot ? "Garage full" : $"Buy <color={cc}>({CostList(cost)})</color>";
+                    if (GUILayout.Button($"<size=11>{label}</size>", _btn, GUILayout.Width(130)))
+                    {
+                        if (!slot) Toast.Show("<color=#f99>Garage full — release a parked mount (✕) or build another Garage.</color>");
+                        else if (afford) { Economy.Spend(cost, cb); PlayerController.Buy(t); Toast.Show($"<color=#9f9>{mname} bought!</color> You're riding it now."); }
+                        else Toast.Show($"<color=#f99>Need {CostList(cost)} for the {mname}.</color>");
+                    }
+                }
+                GUILayout.EndHorizontal();
+            }
         }
 
         // The wiring controls for a selected power node (generator / pole / battery / machine):
