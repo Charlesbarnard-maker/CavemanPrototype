@@ -775,6 +775,16 @@ namespace Caveman
                     GUILayout.Label($"<b>Placing {def.displayName}</b> — <color=#9cf>{builder.BeltDir}</color>  <size=14>(R to rotate)</size>", _s);
                     GUILayout.Label("<size=14><color=#9f9>green ▸ = out</color> · <color=#6cf>cyan = in</color> · click to place · right-click to finish</size>", _small);
                 }
+                else if (def.kind == BuildingKind.Belt && def.underground)
+                {
+                    GUILayout.Label($"<b>Placing Underground Belt</b> — flow <color=#9cf>{builder.BeltDir}</color>  <size=14>(R rotates)</size>", _s);
+                    GUILayout.Label("<size=14>click the ENTRANCE, then click up to 4 tiles ahead (same way) for the EXIT — belts/track cross the gap · right-click to finish</size>", _small);
+                }
+                else if (def.kind == BuildingKind.Belt && (def.filter || def.gate))
+                {
+                    GUILayout.Label($"<b>Placing {def.displayName}</b> — <color=#9cf>{builder.BeltDir}</color>  <size=14>(R rotates)</size>", _s);
+                    GUILayout.Label("<size=14>click an empty cell or a plain belt to convert it · right-click to finish</size>", _small);
+                }
                 else if (def.kind == BuildingKind.Belt)
                 {
                     GUILayout.Label("<b>Belt blueprint</b> — <color=#9cf>drag to plan</color>, <color=#9f9>click to build</color>  <size=14>(R rotates)</size>", _s);

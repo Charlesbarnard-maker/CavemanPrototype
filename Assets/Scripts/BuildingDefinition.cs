@@ -127,6 +127,14 @@ namespace Caveman
         public bool splitter = false;
         [Tooltip("Belt: this is an N→1 MERGER (deliberately combines two belt lines into one) rather than a plain belt.")]
         public bool merger = false;
+        [Tooltip("Belt: this is an UNDERGROUND belt (entrance/exit pair) — items travel hidden up to a few tiles so surface belts/track can cross over the gap. Placed one click at a time; auto-pairs with an aligned end.")]
+        public bool underground = false;
+        [Tooltip("Belt: this is a FILTER belt — conveys ONLY its chosen item type (set in its panel), so unwanted items are turned away (back up / take another route).")]
+        public bool filter = false;
+        [Tooltip("Belt/Splitter: PRIORITY routing — a splitter fills its forward output first and only sends OVERFLOW to the sides (instead of an even 1→3 split).")]
+        public bool priority = false;
+        [Tooltip("Belt: this is a CONDITIONAL GATE — only passes items while the line it feeds still has room (its nearest downstream storage is below a fill threshold).")]
+        public bool gate = false;
         [Tooltip("Signal: this is a TWO-WAY block signal (trains may pass in EITHER direction; it still enforces one-train-per-block) rather than a one-way signal.")]
         public bool bothWaySignal = false;
         [Tooltip("Depot: this is a HARBOUR (a dock placed on the shore) — no rail lane; cargo SHIPS run between harbours over water.")]

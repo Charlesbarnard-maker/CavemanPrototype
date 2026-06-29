@@ -78,6 +78,33 @@ then remove `Temp/UnityLockfile`) or you get lock races. Headless sprite preview
   Keep KNOWN_ISSUES newest-first. CavemanPrototype stays OUT of global memory.
 ---
 
+## #51 SMART LOGISTICS belts — underground, filter, priority splitter, conditional gate (2026-06-29)
+Four mid-game belt tools, gated behind a new **Smart Logistics** research (prereq Bronze, cost 30) + `unlockAge = 2`
+so they can't be grabbed early. **Compile-clean** (batch). NOT yet interactively playtested. All are `BuildingKind.Belt`
+flags on `Belt`/`BuildingDefinition` (like splitter/merger) — placed one click at a time; filter/gate also OVERLAY a
+plain belt to convert it (underground needs an empty cell).
+- **Underground Belt:** an ENTRANCE/EXIT pair. The entrance pulls + carries normally then TELEPORTS its matured lead
+  to the paired exit up to 4 cells ahead (so up to 3 hidden tiles — belts/track cross OVER the gap). Auto-pairs on
+  placement (`Belt.PairUnderground` — nearest aligned unpaired end within `MaxTunnel`, same dir; handles both orders).
+  The exit ignores surface feeders (`AcceptsHandoffFrom`/`SimPull` return early) and the entrance's connectivity +
+  `DistToSink` follow the pair. Distinct procedural sprite (`PlaceholderArt.UndergroundBelt`, entrance/exit mouths);
+  an unpaired end reads red. `OnDisable` drops the pair link.
+- **Filter Belt:** conveys ONLY one item type, refusing the rest (they back up / route elsewhere). It ADOPTS the first
+  item to arrive (auto-config — no panel yet; *follow-up: a panel item-picker*). Enforced in `ReceiveItem`/`CanAccept`
+  + the `SimPull` building branches (via `FilterAccepts`). Pair with a splitter to SORT a mixed line.
+- **Priority Splitter:** a splitter (`splitter=true` + `priority=true`) that fills FORWARD first and only spills
+  OVERFLOW to the sides — `SimHandoff` iterates forward→right→left in fixed order instead of round-robin.
+- **Gate Belt:** opens only while the line it feeds has room — `GateConditionOpen` walks forward to the nearest
+  STORAGE and shuts (backs up, amber) once it's ≥`GateOpenBelow` (90%) full; no storage ahead (feeds a workshop) →
+  always open. Closed → `SimHandoff`/`SimPull`/`LeadHeadLimit` hold the line.
+- **Files:** `Belt.cs` (flags + sim hooks), `BuildingDefinition.cs` (flags), `BuildController.cs` (single-click
+  placement + convert), `GameBootstrap.cs` (4 defs + Smart Logistics tech + buildables), `InventoryHud.cs` (placement
+  hints), `Bespoke/PlaceholderArt.Underground.cs` (new sprite).
+- **To verify in editor:** research Smart Logistics in Bronze; underground entrance→exit pairs + an item crosses a
+  surface belt laid over the gap; filter belt locks to the first item + turns others away; priority splitter keeps
+  forward fed at full rate; gate belt shuts when its target store fills. **Follow-ups:** filter/gate could use a
+  selection panel + clearer bespoke sprites (filter/gate currently read by colour + hover name only).
+
 ## #50 TRAIN CONSIST mechanics — loco + coupled wagons, mixed cargo, pipe-fed liquids, line overview (2026-06-29)
 The queued consist feature, built on the existing rail/route/station system. **Compile-clean** (batch mode, verified).
 NOT yet interactively playtested — this is the next thing to drive in the editor.

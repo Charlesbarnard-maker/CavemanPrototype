@@ -319,6 +319,41 @@ namespace Caveman
             merger.cost = new List<ItemAmount> { new ItemAmount(wood, 2) };
             merger.description = "N→1 MERGER: combines belt lines — point two belts into it and it pushes their items out forward (R rotates). Plain belts refuse a 2nd feeder, so a Merger is how you deliberately join two lanes of the same item.";
 
+            // --- MID-GAME SMART LOGISTICS (research "Smart Logistics", needs Bronze) — placed one click at a
+            //     time like a junction; filter/gate also OVERLAY a plain belt to convert it. Gated behind a
+            //     tech + the Bronze age so they arrive once a base is established (not too early). ---
+            var undergroundBelt = ScriptableObject.CreateInstance<BuildingDefinition>();
+            undergroundBelt.displayName = "Underground Belt"; undergroundBelt.kind = BuildingKind.Belt; undergroundBelt.underground = true;
+            undergroundBelt.unlockAge = 2; undergroundBelt.requiredTech = "smart_logistics";
+            undergroundBelt.interval = 1.0f; // 60/min — matches a Conveyor
+            undergroundBelt.color = new Color(0.85f, 0.85f, 0.92f);
+            undergroundBelt.cost = new List<ItemAmount> { new ItemAmount(metal, 1), new ItemAmount(planks, 1) };
+            undergroundBelt.description = "UNDERGROUND BELT — items travel HIDDEN up to 3 tiles, so other belts and TRACK can cross over the gap. Click to place the ENTRANCE (facing the flow, R rotates), then click up to 4 tiles ahead in the SAME direction for the EXIT — they auto-pair. An unpaired end shows red until you place its partner.";
+
+            var filterBelt = ScriptableObject.CreateInstance<BuildingDefinition>();
+            filterBelt.displayName = "Filter Belt"; filterBelt.kind = BuildingKind.Belt; filterBelt.filter = true;
+            filterBelt.unlockAge = 2; filterBelt.requiredTech = "smart_logistics";
+            filterBelt.interval = 1.0f;
+            filterBelt.color = new Color(0.45f, 0.72f, 0.55f);
+            filterBelt.cost = new List<ItemAmount> { new ItemAmount(planks, 1), new ItemAmount(metal, 1) };
+            filterBelt.description = "FILTER BELT — conveys ONLY one item type and turns the rest away (they back up / take another route). It LOCKS onto the first item that reaches it. Pair with a Splitter to SORT a mixed line: send the one you want down the filtered lane, the rest carry on. Overlay it on a plain belt to convert in place.";
+
+            var prioritySplitter = ScriptableObject.CreateInstance<BuildingDefinition>();
+            prioritySplitter.displayName = "Priority Splitter"; prioritySplitter.kind = BuildingKind.Belt; prioritySplitter.splitter = true; prioritySplitter.priority = true;
+            prioritySplitter.unlockAge = 2; prioritySplitter.requiredTech = "smart_logistics";
+            prioritySplitter.interval = 0.25f; // top belt rate so it never throttles
+            prioritySplitter.color = new Color(0.55f, 0.55f, 0.80f);
+            prioritySplitter.cost = new List<ItemAmount> { new ItemAmount(planks, 2), new ItemAmount(metal, 1) };
+            prioritySplitter.description = "PRIORITY SPLITTER — fills its FORWARD output first and only sends OVERFLOW to the sides (left/right). Keep a key machine fed at full rate and spill the surplus elsewhere. Pulls from behind; R rotates; never stalls.";
+
+            var conditionalGate = ScriptableObject.CreateInstance<BuildingDefinition>();
+            conditionalGate.displayName = "Gate Belt"; conditionalGate.kind = BuildingKind.Belt; conditionalGate.gate = true;
+            conditionalGate.unlockAge = 2; conditionalGate.requiredTech = "smart_logistics";
+            conditionalGate.interval = 1.0f;
+            conditionalGate.color = new Color(0.80f, 0.62f, 0.38f);
+            conditionalGate.cost = new List<ItemAmount> { new ItemAmount(planks, 1), new ItemAmount(metal, 1) };
+            conditionalGate.description = "GATE BELT — only passes items while the line it feeds still has ROOM: it watches the nearest downstream STORAGE and SHUTS (backs up, turns amber) once that store is ~90% full, re-opening as space frees. Stops you over-filling one buffer while starving another. Overlay it on a plain belt to convert.";
+
             // Exploration payoff: Ore is mined from distant veins, hauled home, and is
             // required to reach the Iron Age.
             var mine = MakeCollector("Iron Mine", ore, 1, 2.5f, 2, 12, new Color(0.50f, 0.48f, 0.40f),
@@ -501,6 +536,7 @@ namespace Caveman
                 new Research.Tech { id = "conveyors",   name = "Conveyor Belts", cost = 4,  prereq = null,     unlocks = new List<BuildingDefinition>{ fastBelt },   desc = "Your first belt upgrade: the Conveyor (60/min — keeps up with a collector). Cheap on purpose so you can grab it early without sacrificing the Tribal-age unlock. Overlay it on wooden belts to upgrade in place." },
                 new Research.Tech { id = "geared_belts", name = "Geared Belts",  cost = 40,  prereq = "bronze", unlocks = new List<BuildingDefinition>{ gearedBelt }, desc = "The Geared Belt (120/min — 2× a Conveyor) for high-throughput lines." },
                 new Research.Tech { id = "steel_belts",  name = "Steel Belts",   cost = 80,  prereq = "iron",   unlocks = new List<BuildingDefinition>{ steelBelt },  desc = "The Steel Belt (240/min — the fastest tier) for the densest late-game lines." },
+                new Research.Tech { id = "smart_logistics", name = "Smart Logistics", cost = 30, prereq = "bronze", unlocks = new List<BuildingDefinition>{ undergroundBelt, filterBelt, prioritySplitter, conditionalGate }, desc = "Mid-game logistics tools: the UNDERGROUND BELT (cross belts/track), FILTER BELT (sort a mixed line by item), PRIORITY SPLITTER (overflow routing), and GATE BELT (stop over-filling a buffer)." },
             };
             // Gate those buildings behind their Tech (and off the age gate, so the Tech IS the gate).
             splitter.requiredTech = "splitters";
@@ -589,8 +625,9 @@ namespace Caveman
               sawmill, charcoalBurner, kiln, potter, basicSmelter, advancedSmelter, toolmaker, refinery,
               // Research
               ideaBench, scrollMaker, draftingTable, engineeringLab, researchLodge,
-              // Logistics — belt tier ladder (wooden→conveyor→geared→steel) + junctions + transport
-              woodBelt, fastBelt, gearedBelt, steelBelt, splitter, merger, depot, rail, signal, twoWaySignal, bridge, harbour,
+              // Logistics — belt tier ladder (wooden→conveyor→geared→steel) + junctions + smart-logistics tools + transport
+              woodBelt, fastBelt, gearedBelt, steelBelt, splitter, merger,
+              undergroundBelt, filterBelt, prioritySplitter, conditionalGate, depot, rail, signal, twoWaySignal, bridge, harbour,
               // Liquids — pipes carry oil/water (never belts); Oil Well pumps oil, Water Pump pumps water, Booster relays pressure
               pipe, pump, booster, oilWell,
               // Storage — Woodpile + configurable Warehouse + liquid tanks (Oil Tank / Water Barrel)

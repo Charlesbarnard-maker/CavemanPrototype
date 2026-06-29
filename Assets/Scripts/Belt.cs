@@ -55,6 +55,29 @@ namespace Caveman
         public bool isMerger;
         private int _mergeNext; // round-robin input preference (0=back, 1=right, 2=left)
 
+        // Underground belt: an ENTRANCE/EXIT pair. The entrance pulls + carries normally, then — instead of
+        // handing off forward — TELEPORTS its matured lead to its paired exit a few tiles ahead, so surface
+        // belts/track can cross the GAP between them. The exit is fed only by its entrance (it ignores surface
+        // feeders) and conveys forward like a normal belt. Auto-paired on placement (see PairUnderground).
+        public bool underground;
+        public bool undergroundExit;     // false = entrance (sends down), true = exit (comes up)
+        public Belt undergroundPair;     // the linked other end (null = unpaired → inert / shows red)
+        private const int MaxTunnel = 4; // an exit may sit up to 4 cells ahead → up to 3 hidden cells bridged
+
+        // Filter belt: conveys ONLY this item type (null = unset, accepts the first item to arrive, like a
+        // configurable warehouse). A non-matching item is refused so it backs up / takes another route.
+        public bool isFilter;
+        public ItemDefinition filterItem;
+
+        // Priority splitter: fills the forward output first, sending to the sides only as OVERFLOW.
+        public bool isPriority;
+
+        // Conditional gate: only passes while the line it feeds has room (nearest downstream storage below
+        // GateOpenBelow full). Closed → it holds items + stops pulling (acts backed-up), opening when space frees.
+        public bool isGate;
+        public const float GateOpenBelow = 0.9f; // open while the target storage is < 90% full
+        private bool _gateOpen = true;
+
         private SpriteRenderer _sr;
         private readonly List<BeltItem> _items = new();           // lead-first: _items[0] has the highest p
         private readonly List<SpriteRenderer> _dots = new();      // one sprite per carried item
@@ -91,7 +114,8 @@ namespace Caveman
 
         public static float Angle(Dir d) => d switch { Dir.N => 0f, Dir.E => -90f, Dir.S => 180f, _ => 90f };
 
-        public static Belt Spawn(Vector2Int cell, Dir dir, float interval = 0.5f, bool isSplitter = false, bool isMerger = false, Color? baseColor = null, string displayName = "Belt")
+        public static Belt Spawn(Vector2Int cell, Dir dir, float interval = 0.5f, bool isSplitter = false, bool isMerger = false, Color? baseColor = null, string displayName = "Belt",
+                                 bool underground = false, bool isFilter = false, bool isPriority = false, bool isGate = false)
         {
             var go = new GameObject(isSplitter ? "Splitter" : isMerger ? "Merger" : displayName);
             go.transform.position = new Vector3(cell.x, cell.y, 0f);
@@ -99,7 +123,8 @@ namespace Caveman
             go.transform.rotation = Quaternion.Euler(0f, 0f, Angle(dir));
 
             var sr = go.AddComponent<SpriteRenderer>();
-            sr.sprite = SpriteDatabase.ForBelt(isSplitter ? "Splitter" : isMerger ? "Merger" : displayName, isSplitter, isMerger); // routed via SpriteDatabase (fallback: conveyor / hex junction)
+            sr.sprite = underground ? PlaceholderArt.UndergroundBelt(false)
+                      : SpriteDatabase.ForBelt(isSplitter ? "Splitter" : isMerger ? "Merger" : displayName, isSplitter, isMerger); // routed via SpriteDatabase (fallback: conveyor / hex junction)
             sr.sortingOrder = 1;
 
             go.AddComponent<BoxCollider2D>(); // clickable to demolish
@@ -108,6 +133,10 @@ namespace Caveman
             b.dir = dir;
             b.isSplitter = isSplitter;
             b.isMerger = isMerger;
+            b.underground = underground;
+            b.isFilter = isFilter;
+            b.isPriority = isPriority;
+            b.isGate = isGate;
             b.DisplayName = isSplitter ? "Splitter" : isMerger ? "Merger" : displayName;
             b._tier = BeltTier(b.DisplayName);
             b.interval = Mathf.Max(0.05f, interval);
@@ -115,6 +144,7 @@ namespace Caveman
             if (baseColor.HasValue) b._baseColor = baseColor.Value; // per-tier tint (else the default brown)
             sr.color = b._baseColor;
             b.AddPortMarkers(); // in/out arrows if this is a splitter/merger (no-op for a plain belt)
+            if (underground) b.PairUnderground(); // link with an aligned entrance/exit within range
             return b;
         }
 
@@ -123,15 +153,41 @@ namespace Caveman
         {
             BeltSim.Unregister(this);
             if (Grid.TryGetValue(_cell, out var b) && b == this) Grid.Remove(_cell);
+            if (undergroundPair != null && undergroundPair.undergroundPair == this) undergroundPair.undergroundPair = null; // don't leave a dangling tunnel
             foreach (var d in _dots) if (d != null) Destroy(d.gameObject);
             _dots.Clear();
             // _portMarkers are children of this GameObject → destroyed with it automatically.
         }
 
+        // Link this freshly-placed underground end with an aligned one within range: prefer an unpaired
+        // ENTRANCE behind me (I become its EXIT), else an unpaired EXIT ahead of me (I become its ENTRANCE).
+        // Same direction + within MaxTunnel, so the two ends form one straight tunnel. Else: a lone entrance.
+        public void PairUnderground()
+        {
+            var fwd = Step(dir);
+            for (int i = 1; i <= MaxTunnel; i++)
+            {
+                var e = At(_cell - fwd * i);
+                if (e != null && e.underground && !e.undergroundExit && e.undergroundPair == null && e.dir == dir)
+                { undergroundExit = true; undergroundPair = e; e.undergroundPair = this; return; }
+            }
+            for (int i = 1; i <= MaxTunnel; i++)
+            {
+                var x = At(_cell + fwd * i);
+                if (x != null && x.underground && x.undergroundExit && x.undergroundPair == null && x.dir == dir)
+                { undergroundExit = false; undergroundPair = x; x.undergroundPair = this; return; }
+            }
+            undergroundExit = false; undergroundPair = null;
+        }
+
         // ---- Compatibility surface (used by belt-to-belt hand-off + building pulls) -------------
         private float TailP => _items.Count > 0 ? _items[_items.Count - 1].p : 1f;
         private bool TailRoom() => _items.Count < CellCapacity && (_items.Count == 0 || _items[_items.Count - 1].p >= MinGap);
-        public bool CanAccept(ItemDefinition i) => TailRoom() && (item == null || item == i);
+        public bool CanAccept(ItemDefinition i) => TailRoom() && (item == null || item == i) && FilterAccepts(i);
+
+        // A filter belt conveys ONLY its chosen item (an unset one adopts the first to arrive). Everything
+        // else is refused so it backs up / routes elsewhere. A plain belt accepts anything (no filter).
+        private bool FilterAccepts(ItemDefinition d) => !isFilter || filterItem == null || filterItem == d;
 
         // Take in one item at the tail (entry edge). startP is the desired entry progress (0 for a
         // fresh pull; a small carry-over for a belt→belt hand-off). Clamped so it never overlaps the
@@ -139,6 +195,8 @@ namespace Caveman
         public bool ReceiveItem(ItemDefinition def, Dir fromEdge, float startP)
         {
             if (!TailRoom() || (item != null && item != def)) return false;
+            if (isFilter && filterItem != null && def != filterItem) return false; // filter turns away other items
+            if (isFilter && filterItem == null) filterItem = def;                  // an unset filter adopts the first item
             float p = startP;
             if (_items.Count > 0) p = Mathf.Min(p, _items[_items.Count - 1].p - MinGap);
             p = Mathf.Clamp01(p);
@@ -154,6 +212,7 @@ namespace Caveman
         // is rejected (it backs up), so you can't silently merge two lines: place a Merger instead.
         public bool AcceptsHandoffFrom(Belt from)
         {
+            if (undergroundExit) return false; // an exit is fed ONLY by its paired entrance (direct teleport)
             if (isMerger) return true;
             var behind = _cell + Step(Opposite(dir));
             if (from._cell == behind) return true;   // inline / straight feeder — always allowed
@@ -200,15 +259,21 @@ namespace Caveman
 
         /// <summary>Overlay-convert a plain belt into a splitter or merger in place (keeps its
         /// direction + any carried items).</summary>
-        public void ConvertTo(bool splitter, bool merger)
+        public void ConvertTo(bool splitter, bool merger, bool priority = false, bool filter = false, bool gate = false, string displayName = null)
         {
             isSplitter = splitter;
             isMerger = merger;
-            DisplayName = splitter ? "Splitter" : merger ? "Merger" : DisplayName;
+            isPriority = priority;
+            isFilter = filter;
+            isGate = gate;
+            DisplayName = displayName ?? (splitter ? "Splitter" : merger ? "Merger" : DisplayName);
             gameObject.name = DisplayName;
             if (_sr != null) _sr.sprite = SpriteDatabase.ForBelt(DisplayName, splitter, merger);
             AddPortMarkers();
         }
+
+        /// <summary>Set the belt's base (flow-OK) tint — used when converting a plain belt to a variant.</summary>
+        public void SetBaseColor(Color c) { _baseColor = c; }
 
         // Build the in/out port arrows for a splitter/merger so which side is IN vs OUT is obvious.
         // Markers are parented to this (rotated) belt and use LOCAL dirs — N = forward (= world dir),
@@ -251,6 +316,26 @@ namespace Caveman
         public void SimSnapshot()
         {
             _connected = HasForwardTarget();
+            if (isGate) _gateOpen = GateConditionOpen();
+        }
+
+        // A conditional gate is OPEN while the line it feeds still has room: it walks forward to the nearest
+        // STORAGE and opens only while that store is below GateOpenBelow full. No storage ahead (it feeds a
+        // workshop/depot, which self-regulate via their own buffers) → always open.
+        private bool GateConditionOpen()
+        {
+            var cell = _cell; var d = dir;
+            for (int i = 0; i < 256; i++)
+            {
+                var ahead = cell + Step(d);
+                if (WorldGrid.Storages.TryGetValue(ahead, out var s) && s != null && s.def != null)
+                    return s.def.capacity <= 0 || (float)s.Store.Total() / s.def.capacity < GateOpenBelow;
+                if (WorldGrid.Workshops.ContainsKey(ahead) || WorldGrid.Depots.ContainsKey(ahead) || WorldGrid.Research.ContainsKey(ahead)) return true;
+                var nb = At(ahead);
+                if (nb == null) return true;
+                cell = ahead; d = nb.dir;
+            }
+            return true;
         }
 
         // PASS 2: advance every item along this cell's lane. The lead is capped at the exit edge
@@ -279,6 +364,8 @@ namespace Caveman
         // edge (1) and either deposit or pin there. A splitter takes the best of its three outputs.
         private float LeadHeadLimit()
         {
+            if (underground && !undergroundExit) return 1f; // roll to the tunnel mouth; SimHandoff teleports to the exit
+            if (isGate && !_gateOpen) return 1f;            // gate shut → pin at the exit edge so the line backs up
             if (isSplitter) return Mathf.Max(HeadLimitDir(dir), Mathf.Max(HeadLimitDir(RotateCW(dir)), HeadLimitDir(RotateCCW(dir))));
             return HeadLimitDir(dir);
         }
@@ -307,16 +394,24 @@ namespace Caveman
             var lead = _items[0];
             if (lead.p < 1f - 1e-4f) return; // not at the exit edge yet
 
+            if (isGate && !_gateOpen) { _blocked = true; return; } // shut → hold the matured lead (backs up)
+
             bool moved = false;
-            if (isSplitter)
+            if (underground && !undergroundExit)
             {
-                // 1→3 even split: try the round-robin PREFERRED output first, then fall through to
-                // the next outputs in order so a full/blocked lane never stalls the splitter. On a
-                // successful send, advance the preference to the NEXT output for even distribution.
+                // Underground entrance: TELEPORT the matured lead to the paired exit (no surface hand-off);
+                // an unpaired entrance (pair == null) just pins here (shows red/backed-up).
+                moved = undergroundPair != null && undergroundPair.ReceiveItem(lead.def, Opposite(undergroundPair.dir), 0f);
+            }
+            else if (isSplitter)
+            {
+                // 1→3 split: a PRIORITY splitter always fills forward→right→left (sides take overflow only);
+                // a plain splitter round-robins the preferred output for an even share. Either way a full/
+                // blocked lane falls through to the next so the splitter never stalls.
                 for (int k = 0; k < 3 && !moved; k++)
                 {
-                    int idx = (_splitNext + k) % 3;
-                    if (TryDepositTo(SplitDir(idx), lead.def)) { moved = true; _splitNext = (idx + 1) % 3; }
+                    int idx = isPriority ? k : (_splitNext + k) % 3;
+                    if (TryDepositTo(SplitDir(idx), lead.def)) { moved = true; if (!isPriority) _splitNext = (idx + 1) % 3; }
                 }
             }
             else
@@ -339,6 +434,8 @@ namespace Caveman
         // spacing at the entry). One item per step, mirroring the old PullFromNeighbour scan/rules.
         public void SimPull()
         {
+            if (undergroundExit) return;      // an exit is fed only by its paired entrance's teleport
+            if (isGate && !_gateOpen) return; // shut → don't draw new items onto the line
             if (!_connected || !TailRoom()) return;
             // A Merger fairly round-robins its belt inputs first (so all lines flow); if none had an
             // item ready this step it falls through to the building scan below (a building feeding it).
@@ -351,14 +448,14 @@ namespace Caveman
                 // building's output must face this belt — Opposite of our scan dir). Liquids never
                 // ride belts — they move via pipes / carrying.
                 if (WorldGrid.Collectors.TryGetValue(c, out var p) && p != null && p.produces != null && !p.produces.isLiquid
-                    && p.OutputSide == Opposite((Dir)di)
+                    && p.OutputSide == Opposite((Dir)di) && FilterAccepts(p.produces)
                     && (item == null || item == p.produces) && p.Buffer.Count(p.produces) > 0)
                 {
                     if (p.Buffer.RemoveUpTo(p.produces, 1) > 0) { ReceiveItem(p.produces, (Dir)di, 0f); return; }
                 }
 
                 if (WorldGrid.Workshops.TryGetValue(c, out var w) && w != null && w.output != null && !w.output.isLiquid
-                    && w.OutputSide == Opposite((Dir)di)
+                    && w.OutputSide == Opposite((Dir)di) && FilterAccepts(w.output)
                     && (item == null || item == w.output) && w.Buffer.Count(w.output) > 0)
                 {
                     if (w.Buffer.RemoveUpTo(w.output, 1) > 0) { ReceiveItem(w.output, (Dir)di, 0f); return; }
@@ -367,14 +464,14 @@ namespace Caveman
                 // Storages have an OUTPUT side too — a belt on it pulls the stored item, so you can
                 // belt FROM a warehouse to a workshop (e.g. warehouse → sawmill).
                 if (WorldGrid.Storages.TryGetValue(c, out var st) && st != null && st.accepts != null && !st.accepts.isLiquid
-                    && st.OutputSide == Opposite((Dir)di)
+                    && st.OutputSide == Opposite((Dir)di) && FilterAccepts(st.accepts)
                     && (item == null || item == st.accepts) && st.Store.Count(st.accepts) > 0)
                 {
                     if (st.Store.RemoveUpTo(st.accepts, 1) > 0) { ReceiveItem(st.accepts, (Dir)di, 0f); return; }
                 }
 
                 if (WorldGrid.Depots.TryGetValue(c, out var dp) && dp != null && dp.item != null && !dp.item.isLiquid
-                    && dp.IsOutputPull(c, (Dir)di)                       // OUT only on the station's north edge
+                    && dp.IsOutputPull(c, (Dir)di) && FilterAccepts(dp.item)  // OUT only on the station's north edge
                     && (item == null || item == dp.item) && dp.store.Count(dp.item) > 0)
                 {
                     if (dp.store.RemoveUpTo(dp.item, 1) > 0) { ReceiveItem(dp.item, (Dir)di, 0f); return; }
@@ -492,6 +589,9 @@ namespace Caveman
         // that ultimately reaches a sink. Stops belts conveying into nothing.
         private bool HasForwardTarget()
         {
+            // An underground entrance is "connected" only through its paired exit (its surface-forward cell is
+            // the covered gap, not its real next hop).
+            if (underground && !undergroundExit) return undergroundPair != null && undergroundPair.HasForwardTarget();
             if (isSplitter) return OutputConnected(dir) || OutputConnected(RotateCW(dir)) || OutputConnected(RotateCCW(dir));
             return OutputConnected(dir);
         }
@@ -520,6 +620,8 @@ namespace Caveman
         public int DistToSink()
         {
             var cell = _cell; var d = dir;
+            // An underground entrance continues from its paired exit (the gap between isn't its lane).
+            if (underground && !undergroundExit && undergroundPair != null) { cell = undergroundPair._cell; d = undergroundPair.dir; }
             for (int i = 0; i < 300; i++)
             {
                 var ahead = cell + Step(d);
@@ -561,9 +663,15 @@ namespace Caveman
                           : _blocked   ? new Color(0.85f, 0.66f, 0.18f)        // yellow — backed up downstream
                           : _baseColor;                                         // brown — ok
 
-            // Plain belts pick their sprite from TIER (look) + SHAPE (straight vs corner), so a run reads
-            // per-age and corners visibly connect. Splitters/mergers keep their junction sprite.
-            if (!isSplitter && !isMerger) UpdateBeltShape();
+            // Underground ends use a fixed entrance/exit sprite (role decided at pairing); plain belts pick
+            // their sprite from TIER + SHAPE so a run reads per-age and corners visibly connect; splitters/
+            // mergers keep their junction sprite.
+            if (underground)
+            {
+                int key = undergroundExit ? 901 : 900;
+                if (key != _lastBeltKey && _sr != null) { _lastBeltKey = key; _sr.sprite = PlaceholderArt.UndergroundBelt(undergroundExit); }
+            }
+            else if (!isSplitter && !isMerger) UpdateBeltShape();
             UpdateDots();
         }
 

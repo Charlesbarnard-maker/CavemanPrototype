@@ -740,6 +740,8 @@ namespace Caveman
             HideGhostPorts(); // building-style I/O ports off
             var def = buildables[PendingIndex];
             bool isJunction = def.splitter || def.merger;
+            // Discrete one-click placements (NOT the belt drag-line): junctions, underground ends, filter/gate.
+            bool singleClick = isJunction || def.underground || def.filter || def.gate;
             bool overUI = InventoryHud.PointerOverUI;
 
             if (kb.rKey.wasPressedThisFrame) BeltDir = Belt.RotateCW(BeltDir);
@@ -748,14 +750,15 @@ namespace Caveman
             Vector2Int cell = Belt.CellOf(world);
 
             // Cursor-cell direction: along the active sketch stroke, else auto-oriented toward a sink.
-            Belt.Dir dir = isJunction ? BeltDir
+            Belt.Dir dir = singleClick ? BeltDir
                          : (_strokeActive && Adjacent(cell, _strokeLast)) ? Belt.FromTo(_strokeLast, cell)
                          : AutoBeltDir(cell);
 
             _ghost.transform.position = new Vector3(cell.x, cell.y, 0f);
             _ghost.transform.rotation = Quaternion.Euler(0f, 0f, Belt.Angle(dir));
             _ghost.transform.localScale = Vector3.one; // match the placed belt (full cell)
-            _ghostSr.sprite = SpriteDatabase.ForBelt(def.displayName, def.splitter, def.merger);
+            _ghostSr.sprite = def.underground ? PlaceholderArt.UndergroundBelt(false)
+                            : SpriteDatabase.ForBelt(def.displayName, def.splitter, def.merger);
 
             // Point 1: a splitter/merger ghost shows its in (cyan) / out (green) sides.
             if (isJunction) ShowGhostJunctionPorts(def.splitter, def.merger);
@@ -765,12 +768,14 @@ namespace Caveman
             bool affordable = Economy.CanAfford(def.cost, Carried);
             bool emptyOk = existing == null && TerrainGrid.BeltAllowed(cell)
                            && !SolidBuildingAt(new Vector3(cell.x, cell.y, 0f)) && !WorldGrid.IsReserved(cell);
-            bool onPlainBelt = existing != null && !existing.isSplitter && !existing.isMerger;
-            PlacementValid = affordable && (emptyOk || onPlainBelt);
+            // A variant (splitter/merger/filter/gate) can overlay-CONVERT a plain belt in place; an underground
+            // end needs an empty cell (it's a discrete tunnel mouth, not an overlay).
+            bool onPlainBelt = existing != null && !existing.isSplitter && !existing.isMerger && !existing.isFilter && !existing.isGate && !existing.underground;
+            PlacementValid = affordable && (def.underground ? emptyOk : (emptyOk || onPlainBelt));
             _ghostSr.color = PlacementValid ? new Color(0.35f, 1f, 0.4f, 0.6f) : new Color(1f, 0.3f, 0.3f, 0.5f);
 
-            // --- Splitter / Merger: one deliberate click each (now with visible ports). ---
-            if (isJunction)
+            // --- Junctions / underground / filter / gate: one deliberate click each. ---
+            if (singleClick)
             {
                 if (mouse.leftButton.wasPressedThisFrame && PlacementValid && !overUI) EnsureBelt(cell, dir, def);
                 else if (mouse.rightButton.wasPressedThisFrame) CancelPlacement();
@@ -927,18 +932,22 @@ namespace Caveman
         private void EnsureBelt(Vector2Int cell, Belt.Dir d, BuildingDefinition def)
         {
             var existing = Belt.At(cell);
+            if (def.underground && existing != null) return; // an underground end only goes on an empty cell
             if (existing != null)
             {
-                // QoL: dropping a Splitter/Merger onto an existing plain belt CONVERTS it in place
-                // (keeps its direction + any carried items) — no need to delete the belt first. A
-                // plain belt dropped on a belt keeps the old behaviour (just re-orient it).
-                bool convert = (def.splitter || def.merger) && !existing.isSplitter && !existing.isMerger;
+                // QoL: dropping a Splitter/Merger/Filter/Gate onto an existing plain belt CONVERTS it in place
+                // (keeps its direction + any carried items) — no need to delete the belt first. A plain belt
+                // dropped on a belt keeps the old behaviour (just re-orient it).
+                bool isVariant = def.splitter || def.merger || def.filter || def.gate;
+                bool plain = !existing.isSplitter && !existing.isMerger && !existing.isFilter && !existing.isGate && !existing.underground;
+                bool convert = isVariant && plain;
                 if (convert)
                 {
                     if (Economy.CanAfford(def.cost, Carried))
                     {
                         Economy.Spend(def.cost, Carried);
-                        existing.ConvertTo(def.splitter, def.merger);
+                        existing.ConvertTo(def.splitter, def.merger, def.priority, def.filter, def.gate, def.displayName);
+                        existing.SetBaseColor(def.color);
                     }
                     return; // don't re-orient on conversion — preserve the line's flow
                 }
@@ -965,7 +974,8 @@ namespace Caveman
             if (WorldGrid.IsReserved(cell)) return; // never lay a belt on a road/rail tile
             if (!Economy.CanAfford(def.cost, Carried)) return;
             Economy.Spend(def.cost, Carried);
-            Belt.Spawn(cell, d, def.interval, def.splitter, def.merger, def.color, def.displayName);
+            Belt.Spawn(cell, d, def.interval, def.splitter, def.merger, def.color, def.displayName,
+                       def.underground, def.filter, def.priority, def.gate);
             BuildingsPlaced++;
         }
 
