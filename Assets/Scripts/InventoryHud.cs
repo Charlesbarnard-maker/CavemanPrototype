@@ -17,6 +17,9 @@ namespace Caveman
         public ItemDefinition woodItem, stoneItem;
         public ItemDefinition clayItem, oreItem; // expansion-target hints (shown from Tribal)
         public ItemDefinition monumentItem; // endgame win-goal tracker (10 blocks = win)
+        // Responsive GUI: the HUD is laid out in a LOGICAL canvas (_vw × _vh) scaled to the real screen, so it
+        // fits — and panels don't overlap — on smaller monitors. _uiScale = 1 at/above the reference (no change).
+        private float _uiScale = 1f, _vw, _vh;
         public List<ItemDefinition> debugItems; // all resources, for the sandbox resource dump
         private float _speed = 1f;
 
@@ -248,14 +251,14 @@ namespace Caveman
         private void DrawAgeCard()
         {
             if (_ageCardT <= 0f || string.IsNullOrEmpty(_ageCardBody)) return;
-            float w = Mathf.Min(600f, Screen.width - 40f);
+            float w = Mathf.Min(600f, _vw - 40f);
             float inner = w - 36f;
             // Auto-size height to the wrapped content (so a long "New buildings:" list never clips)
             // plus a row for the dismiss button.
             string title = $"<size=20>{_ageCardTitle}</size>", body = $"<size=14>{_ageCardBody}</size>";
             float h = _s.CalcHeight(new GUIContent(title), inner)
                     + _small.CalcHeight(new GUIContent(body), inner) + 34f + 30f;
-            var r = new Rect(Screen.width / 2f - w / 2f, 188f, w, h); // below the toast stack (~124+) so they don't overlap
+            var r = new Rect(_vw / 2f - w / 2f, 188f, w, h); // below the toast stack (~124+) so they don't overlap
             _ageCardRect = r;
             PanelBg(r);
             GUILayout.BeginArea(new Rect(r.x + 18, r.y + 12, inner, h - 24));
@@ -276,6 +279,12 @@ namespace Caveman
         void OnGUI()
         {
             if (gatherer == null) return;
+            // Scale the whole HUD to a 1080-tall reference canvas so it fits + stays un-overlapped on smaller
+            // monitors. At/above 1080 the matrix is identity → no change on normal/large screens. Mouse hit-tests
+            // (Event.current.mousePosition + logical rects) are transformed by the matrix, so clicks stay correct.
+            _uiScale = Mathf.Clamp(Screen.height / 1080f, 0.5f, 1.0f);
+            _vw = Screen.width / _uiScale; _vh = Screen.height / _uiScale;
+            GUI.matrix = Matrix4x4.TRS(Vector3.zero, Quaternion.identity, new Vector3(_uiScale, _uiScale, 1f));
             _s ??= new GUIStyle(GUI.skin.label) { fontSize = 20, richText = true, wordWrap = true };
             _small ??= new GUIStyle(GUI.skin.label) { fontSize = 15, richText = true, wordWrap = true };
             _big ??= new GUIStyle(GUI.skin.label) { fontSize = 40, richText = true, alignment = TextAnchor.MiddleCenter };
@@ -327,7 +336,7 @@ namespace Caveman
             if (_showGuide) DrawGuide();
             if (_showResearch) DrawResearchPanel();
             if (_showMap) DrawMapScreen();
-            if (_paused) GUI.Label(new Rect(0, 60, Screen.width, 60), "<b>PAUSED</b>  <size=18>(space)</size>", _big);
+            if (_paused) GUI.Label(new Rect(0, 60, _vw, 60), "<b>PAUSED</b>  <size=18>(space)</size>", _big);
 
             // Block world clicks when the cursor is over an interactive panel. A modal mode
             // dims the whole screen, so it blocks everywhere (clicking off-panel just focuses).
@@ -349,7 +358,7 @@ namespace Caveman
         {
             var c = GUI.color;
             GUI.color = new Color(0f, 0f, 0f, 0.6f);
-            GUI.DrawTexture(new Rect(0, 0, Screen.width, Screen.height), Texture2D.whiteTexture);
+            GUI.DrawTexture(new Rect(0, 0, _vw, _vh), Texture2D.whiteTexture);
             GUI.color = c;
         }
 
@@ -382,7 +391,7 @@ namespace Caveman
 
             var mp = Event.current.mousePosition;
             bool snap = Time.unscaledTime - _lastSnap >= 3f; // refresh the trend baseline every ~3s
-            float maxX = Screen.width - 8f;
+            float maxX = _vw - 8f;
 
             // Pre-measure so the bar can WRAP onto extra rows (many individual resources won't fit one line)
             // and the background box can size to however many rows we end up using.
@@ -398,8 +407,8 @@ namespace Caveman
                 mx += w;
             }
             float barH = rows * 24f + 6f;
-            GUI.Box(new Rect(0, 0, Screen.width, barH), GUIContent.none);
-            _topRect = new Rect(0, 0, Screen.width, barH);
+            GUI.Box(new Rect(0, 0, _vw, barH), GUIContent.none);
+            _topRect = new Rect(0, 0, _vw, barH);
 
             float x = 12f, y = 5f;
             int hover = -1; Rect hoverRect = default;
@@ -437,7 +446,7 @@ namespace Caveman
         {
             if (!_showMinimap) { _miniRect = default; return; }
             const float size = 168f;
-            var r = new Rect(Screen.width - size - 12f, Screen.height - size - 12f, size, size);
+            var r = new Rect(_vw - size - 12f, _vh - size - 12f, size, size);
             _miniRect = r;
 
             GUI.color = new Color(0.22f, 0.31f, 0.19f);
@@ -504,8 +513,8 @@ namespace Caveman
             float W = fog != null ? fog.WorldSize : 240f;
 
             // Square map area, centred, leaving headroom for the title + legend.
-            float side = Mathf.Min(Screen.width - 120f, Screen.height - 150f);
-            var area = new Rect((Screen.width - side) / 2f, (Screen.height - side) / 2f + 6f, side, side);
+            float side = Mathf.Min(_vw - 120f, _vh - 150f);
+            var area = new Rect((_vw - side) / 2f, (_vh - side) / 2f + 6f, side, side);
 
             GUI.Label(new Rect(area.x, area.y - 38f, area.width, 30f),
                 "<b><color=#e8e0c8>World Map</color></b>   <size=13><color=#aaa>drag to pan · wheel to zoom · M or Esc to close</color></size>", _s);
@@ -591,7 +600,7 @@ namespace Caveman
                 float life = Mathf.Clamp01(g.t / GatherPopup.Life); // 1 at spawn → 0 at expiry
                 Vector3 sp = cam.WorldToScreenPoint(g.world);
                 if (sp.z < 0f) continue; // behind the camera (shouldn't occur in 2D)
-                float x = sp.x, y = Screen.height - sp.y - (1f - life) * 42f; // GUI y is top-down; rise as it ages
+                float x = sp.x / _uiScale, y = _vh - sp.y / _uiScale - (1f - life) * 42f; // screen px → logical; GUI y top-down
                 string hex = ColorUtility.ToHtmlStringRGB(g.color);
                 var prev = GUI.color;
                 GUI.color = new Color(1f, 1f, 1f, Mathf.Clamp01(life * 1.5f)); // hold, then fade near the end
@@ -603,7 +612,7 @@ namespace Caveman
         // ---- Status (top bar) ----
         private void DrawStatus()
         {
-            GUILayout.BeginArea(new Rect(12, 34, Mathf.Max(620f, Screen.width - 310f), 52));
+            GUILayout.BeginArea(new Rect(12, 34, Mathf.Max(620f, _vw - 310f), 52));
             var c = Colony.Instance;
             if (c != null)
             {
@@ -652,7 +661,7 @@ namespace Caveman
         // ---- Objective ----
         private void DrawObjective()
         {
-            GUILayout.BeginArea(new Rect(12, 82, Mathf.Min(720f, Screen.width - 330f), 30));
+            GUILayout.BeginArea(new Rect(12, 82, Mathf.Min(720f, _vw - 330f), 30));
             GUILayout.Label($"<color=#ffd24d>▶ {CurrentObjective()}</color>", _s);
             GUILayout.EndArea();
         }
@@ -689,8 +698,8 @@ namespace Caveman
             string info = HoverText(hit);
             if (string.IsNullOrEmpty(info)) return;
 
-            var rect = new Rect(sp.x + 16f, Screen.height - sp.y + 8f, 234f, 30f);
-            if (rect.xMax > Screen.width) rect.x = Screen.width - rect.width - 4f;
+            var rect = new Rect(sp.x / _uiScale + 16f, _vh - sp.y / _uiScale + 8f, 234f, 30f); // screen px → logical
+            if (rect.xMax > _vw) rect.x = _vw - rect.width - 4f;
             PanelBg(rect);
             GUI.Label(new Rect(rect.x + 8f, rect.y + 5f, rect.width - 16f, rect.height - 10f), info, _small);
         }
@@ -740,7 +749,7 @@ namespace Caveman
             {
                 _buildShown = false; _flyoutShown = false;
                 var def = builder.buildables[builder.PendingIndex];
-                GUILayout.BeginArea(new Rect(12, Screen.height - 58, 520, 50));
+                GUILayout.BeginArea(new Rect(12, _vh - 58, 520, 50));
                 if (def.kind == BuildingKind.Belt && (def.splitter || def.merger))
                 {
                     GUILayout.Label($"<b>Placing {def.displayName}</b> — <color=#9cf>{builder.BeltDir}</color>  <size=14>(R to rotate)</size>", _s);
@@ -787,14 +796,14 @@ namespace Caveman
             if (!_showBuild)
             {
                 _buildShown = false; _flyoutShown = false;
-                GUILayout.BeginArea(new Rect(12, Screen.height - 34, 320, 28));
+                GUILayout.BeginArea(new Rect(12, _vh - 34, 320, 28));
                 GUILayout.Label("<size=15>Press <b>B</b> to open the build menu</size>", _small);
                 GUILayout.EndArea();
                 return;
             }
 
             const float top = 118f; // sit below the top status + objective/tips bars (which end ~112) so it doesn't cover them
-            float height = Mathf.Min(Screen.height - top - 16f, 470f);
+            float height = Mathf.Min(_vh - top - 16f, 470f);
             _buildRect = new Rect(12, top, 268, height);
             _buildShown = true;
             _flyoutShown = false; // set true below if a category flyout is open
@@ -983,9 +992,9 @@ namespace Caveman
 
             // Bottom-anchored so it clears the minimap when shown; taller + scrollable so a smelter's
             // full readout (recipe + needs + ⚠ warnings + buttons) never gets clipped off the bottom.
-            float bottom = _showMinimap ? Screen.height - 196f : Screen.height - 12f;
+            float bottom = _showMinimap ? _vh - 196f : _vh - 12f;
             float top = Mathf.Max(120f, bottom - 330f);
-            var rect = new Rect(Screen.width - 290, top, 278, bottom - top);
+            var rect = new Rect(_vw - 290, top, 278, bottom - top);
             _selRect = rect;
             _selShown = true;
 
@@ -1381,7 +1390,7 @@ namespace Caveman
             int n = _finderLines.Count;
             // Sized to fit the header + every line (was clipping the last row): generous per-line height
             // and a wider box so the label + arrow + distance never run off the edge.
-            var rect = new Rect(Screen.width - 248, 182, 236, 44 + n * 24);
+            var rect = new Rect(_vw - 248, 182, 236, 44 + n * 24);
             _finderRect = rect;
             PanelBg(rect);
             GUILayout.BeginArea(new Rect(rect.x + 12, rect.y + 9, rect.width - 24, rect.height - 18));
@@ -1397,7 +1406,7 @@ namespace Caveman
             var o = Objectives.Instance;
             if (o == null) { _objRect = default; return; }
 
-            var rect = new Rect(Screen.width - 300, 62, 290, 112);
+            var rect = new Rect(_vw - 300, 62, 290, 112);
             _objRect = rect;
             PanelBg(rect);
             GUILayout.BeginArea(new Rect(rect.x + 10, rect.y + 8, rect.width - 20, rect.height - 14));
@@ -1413,8 +1422,8 @@ namespace Caveman
         {
             // Constrained-width, word-wrapped, multi-line so long tips aren't cut off. Each toast's
             // height grows with its wrapped content so nothing clips and they don't overlap.
-            float tw = Mathf.Min(900f, Screen.width - 40f);
-            float x = (Screen.width - tw) / 2f;
+            float tw = Mathf.Min(900f, _vw - 40f);
+            float x = (_vw - tw) / 2f;
             float y = 124f;
             foreach (var t in Toast.Items)
             {
@@ -1430,8 +1439,8 @@ namespace Caveman
         private void DrawFooter()
         {
             if (builder != null && builder.PendingIndex >= 0) return;
-            float w = Mathf.Min(760f, Screen.width - 24f);
-            GUILayout.BeginArea(new Rect(Screen.width / 2f - w / 2f, Screen.height - 40f, w, 38f));
+            float w = Mathf.Min(760f, _vw - 24f);
+            GUILayout.BeginArea(new Rect(_vw / 2f - w / 2f, _vh - 40f, w, 38f));
             GUILayout.Label($"<size=13><color=#bbb>B build · <color=#9cf>T research</color> · G guide · H help · M map · N minimap {(_showMinimap ? "on" : "off")} · Space pause</color></size>", _small);
             string sandbox = Economy.FreeBuild ? "<color=#9f9>SANDBOX</color> · " : "";
             string mode = Economy.LocalProduction ? "<color=#fc8>Local logistics</color>" : "<color=#8cf>Global pool</color>";
@@ -1444,9 +1453,9 @@ namespace Caveman
         private void DrawResearchPanel()
         {
             // A dedicated MODE, not a sidebar: a large centred panel over the dimmed world.
-            float w = Mathf.Min(560f, Screen.width - 40f);
-            float h = Mathf.Min(Screen.height - 120f, 580f);
-            var r = new Rect(Screen.width / 2f - w / 2f, 70f, w, h);
+            float w = Mathf.Min(560f, _vw - 40f);
+            float h = Mathf.Min(_vh - 120f, 580f);
+            var r = new Rect(_vw / 2f - w / 2f, 70f, w, h);
             _researchRect = r;
             PanelBg(r);
             GUILayout.BeginArea(new Rect(r.x + 16, r.y + 14, r.width - 32, r.height - 28));
@@ -1515,7 +1524,7 @@ namespace Caveman
 
         private void DrawWin()
         {
-            var r = new Rect(Screen.width / 2f - 240, 150f, 480, 140);
+            var r = new Rect(_vw / 2f - 240, 150f, 480, 140);
             PanelBg(r);
             int peak = Colony.Instance != null ? Colony.Instance.PeakProsperity : 0;
             GUILayout.BeginArea(new Rect(r.x + 16, r.y + 14, r.width - 32, r.height - 28));
@@ -1527,8 +1536,8 @@ namespace Caveman
         // ---- In-game Guide (G): mechanics + a resource reference ----
         private void DrawGuide()
         {
-            float w = 640f, h = Mathf.Min(Screen.height - 70f, 580f);
-            var r = new Rect(Screen.width / 2f - w / 2f, Screen.height / 2f - h / 2f, w, h);
+            float w = 640f, h = Mathf.Min(_vh - 70f, 580f);
+            var r = new Rect(_vw / 2f - w / 2f, _vh / 2f - h / 2f, w, h);
             _guideRect = r;
             PanelBg(r);
             GUILayout.BeginArea(new Rect(r.x + 16, r.y + 12, r.width - 32, r.height - 24));
@@ -1572,7 +1581,7 @@ namespace Caveman
 
         private void DrawHelp()
         {
-            var r = new Rect(Screen.width / 2f - 240, Screen.height / 2f - 225, 500, 460);
+            var r = new Rect(_vw / 2f - 240, _vh / 2f - 225, 500, 460);
             PanelBg(r);
             GUILayout.BeginArea(new Rect(r.x + 16, r.y + 12, r.width - 32, r.height - 24));
             GUILayout.Label("<b>How to play</b>", _s);

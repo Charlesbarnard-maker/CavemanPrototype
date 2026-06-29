@@ -57,6 +57,21 @@ sprite packs.
   Keep KNOWN_ISSUES newest-first. CavemanPrototype stays OUT of global memory.
 ---
 
+## #45 Responsive UI scaling — fix overlap/pile-up on small screens (2026-06-29)
+User: on a smaller monitor the objectives / menu / text pile on top of each other (e.g. can't select the train —
+the Objective + Find-Resources boxes overlap the station panel). Root cause: the OnGUI HUD positioned everything in
+fixed pixels with NO scaling, so on a screen smaller than it was tuned for, fixed-size panels overflow + collide.
+- **Fix (InventoryHud):** the whole HUD now draws in a LOGICAL canvas scaled to the real screen via `GUI.matrix`.
+  `_uiScale = clamp(Screen.height/1080, 0.5, 1.0)` (identity at/above 1080 → **no change on normal/large screens**;
+  shrink-to-fit below). All `Screen.width/height` → logical `_vw/_vh`; the 2 world-anchored GUI spots (gather
+  popups, hover info) convert their screen px by `/_uiScale`. In the 1080-tall logical space panels no longer
+  overlap (e.g. station panel sits at y≈554, finder at y≈182), so the small-screen pile-up is gone.
+- Mouse hit-testing stays correct (GUI.matrix transforms `Event.current.mousePosition`, same as it keeps GUILayout
+  buttons clickable). Compile CLEAN. **NEEDS an interactive test on a small window** to confirm clicks land right.
+- **Still owed (user's 2nd point):** the rail blueprint still shows ALL pieces connecting (misleading) and you
+  can't MERGE parallel tracks unless a perpendicular already exists — both are the ParallelMerge HEURISTIC's
+  fault. Proper fix = EXPLICIT per-tile connection links from the laid path (task #15) — next.
+
 ## #44 RAIL OVERHAUL (in progress) — bug fixes first (2026-06-29)
 Start of a big rail/train overhaul (user-requested: per-age vehicles, loco + cargo/liquid wagons up to an
 age-gated limit, mixed consist, pipe-fed liquid stations, a global line overview). Phase 1 = the two bugs the
