@@ -742,30 +742,38 @@ namespace Caveman
             var objectives = new GameObject("Objectives").AddComponent<Objectives>();
             // FACTORY-FIRST objective ladder: gather → store → process → component → research →
             // automate → advance ages → Monument. No survival/population/comfort goals.
+            // PER-AGE objective SETS: every goal carries the Age it belongs to. Reaching an Age unlocks its whole
+            // set at once (popped up centre-screen), and you may complete them in ANY order — freedom per Age.
+            // The "Research the X Age" goal is the one you finish to move on. Stone=0, Tribal=1, Bronze=2, Iron=3, Industrial=4.
             objectives.quests = new List<Quest>
             {
-                new Quest { title = "Gather 12 Wood by hand",                         done = () => Have(wood) >= 12,        reward = () => carriedInv.Add(stone, 8),   rewardText = "+8 Stone" },
-                new Quest { title = "Build a Wood Hut, then a Woodpile to store it",   done = () => HasCollectorOf(wood) && HasStorageOf(wood), reward = () => carriedInv.Add(wood, 15), rewardText = "+15 Wood" },
-                new Quest { title = "Build a Stone Pit (gather Stone)",               done = () => HasCollectorOf(stone),   reward = () => carriedInv.Add(stone, 15),  rewardText = "+15 Stone" },
-                new Quest { title = "Build a Sawmill — process Wood into 15 Planks",   done = () => Have(planks) >= 15,      reward = () => carriedInv.Add(planks, 10), rewardText = "+10 Planks" },
-                new Quest { title = "Build an Idea Bench + Research Lodge (side by side)", done = () => HasWorkshopOf(ideaTablet) && ResearchBuilding.All.Count > 0, reward = () => carriedInv.Add(stone, 12), rewardText = "+12 Stone" },
-                new Quest { title = "Deliver your first Idea Tablet to research",     done = () => Research.TotalDelivered >= 1, reward = () => carriedInv.Add(planks, 8), rewardText = "+8 Planks" },
-                new Quest { title = "Automate it: lay 5 belts to feed a machine",     done = () => Belt.Count >= 5,         reward = () => carriedInv.Add(wood, 20),   rewardText = "+20 Wood" },
-                new Quest { title = "Research the Tribal Age",                        done = () => AgeNow() >= 1,           reward = () => carriedInv.Add(stone, 25),  rewardText = "+25 Stone" },
-                new Quest { title = "Make 10 Charcoal (build a Charcoal Burner)",     done = () => Have(charcoal) >= 10,    reward = () => carriedInv.Add(planks, 10), rewardText = "+10 Planks" },
-                new Quest { title = "Build the Copper chain: a Copper Mine + a Basic Smelter (set to Copper)", done = () => HasWorkshopOf(copper), reward = () => carriedInv.Add(copper, 8), rewardText = "+8 Copper" },
-                new Quest { title = "Research the Bronze Age",                        done = () => AgeNow() >= 2,           reward = () => carriedInv.Add(stone, 30),  rewardText = "+30 Stone" },
-                new Quest { title = "Fire 15 Bricks (Clay + Charcoal → Kiln)",        done = () => Have(bricks) >= 15,      reward = () => carriedInv.Add(clay, 20),   rewardText = "+20 Clay" },
-                new Quest { title = "Build 2 Stations & add a transport route",       done = () => RouteVehicle.All.Count >= 1, reward = () => carriedInv.Add(wood, 30), rewardText = "+30 Wood" },
-                new Quest { title = "Research the Iron Age",                          done = () => AgeNow() >= 3,           reward = () => carriedInv.Add(planks, 40), rewardText = "+40 Planks" },
-                new Quest { title = "Explore far & mine 25 Iron Ore",                 done = () => Have(ore) >= 25,         reward = () => carriedInv.Add(stone, 40),  rewardText = "+40 Stone" },
-                new Quest { title = "Smelt 20 Iron (Basic Smelter set to Iron: Iron Ore + Charcoal)",  done = () => Have(metal) >= 20,       reward = () => carriedInv.Add(planks, 20), rewardText = "+20 Planks" },
-                new Quest { title = "Craft 10 Tools (Iron + Planks → Toolmaker)",     done = () => Have(tools) >= 10,       reward = () => carriedInv.Add(planks, 30), rewardText = "+30 Planks" },
-                new Quest { title = "Research the Industrial Age",                    done = () => AgeNow() >= 4,           reward = () => carriedInv.Add(planks, 50), rewardText = "+50 Planks" },
-                new Quest { title = "Power up: build a Generator + connect a smelter",  done = () => PowerPlant.All.Count >= 1, reward = () => carriedInv.Add(metal, 10), rewardText = "+10 Metal" },
-                new Quest { title = "Reach 600 Industry (automation score)",          done = () => Colony.Instance != null && Colony.Instance.PeakProsperity >= 600, reward = () => carriedInv.Add(tools, 10), rewardText = "+10 Tools" },
-                new Quest { title = "Begin your legacy: build the Monument",          done = () => HasWorkshopOf(monument), reward = () => carriedInv.Add(planks, 40), rewardText = "+40 Planks" },
-                new Quest { title = "🏆 Complete the Monument — 10 Blocks. YOU WIN!", done = () => Have(monument) >= 10, isWin = true },
+                // ── Stone Age (0) ──
+                new Quest { age = 0, title = "Gather 12 Wood by hand",                         done = () => Have(wood) >= 12,        reward = () => carriedInv.Add(stone, 8),   rewardText = "+8 Stone" },
+                new Quest { age = 0, title = "Build a Wood Hut, then a Woodpile to store it",   done = () => HasCollectorOf(wood) && HasStorageOf(wood), reward = () => carriedInv.Add(wood, 15), rewardText = "+15 Wood" },
+                new Quest { age = 0, title = "Build a Stone Pit (gather Stone)",               done = () => HasCollectorOf(stone),   reward = () => carriedInv.Add(stone, 15),  rewardText = "+15 Stone" },
+                new Quest { age = 0, title = "Build a Sawmill — process Wood into 15 Planks",   done = () => Have(planks) >= 15,      reward = () => carriedInv.Add(planks, 10), rewardText = "+10 Planks" },
+                new Quest { age = 0, title = "Build an Idea Bench + Research Lodge (side by side)", done = () => HasWorkshopOf(ideaTablet) && ResearchBuilding.All.Count > 0, reward = () => carriedInv.Add(stone, 12), rewardText = "+12 Stone" },
+                new Quest { age = 0, title = "Deliver your first Idea Tablet to research",     done = () => Research.TotalDelivered >= 1, reward = () => carriedInv.Add(planks, 8), rewardText = "+8 Planks" },
+                new Quest { age = 0, title = "Automate it: lay 5 belts to feed a machine",     done = () => Belt.Count >= 5,         reward = () => carriedInv.Add(wood, 20),   rewardText = "+20 Wood" },
+                new Quest { age = 0, title = "Research the Tribal Age",                        done = () => AgeNow() >= 1,           reward = () => carriedInv.Add(stone, 25),  rewardText = "+25 Stone" },
+                // ── Tribal Age (1) ──
+                new Quest { age = 1, title = "Make 10 Charcoal (build a Charcoal Burner)",     done = () => Have(charcoal) >= 10,    reward = () => carriedInv.Add(planks, 10), rewardText = "+10 Planks" },
+                new Quest { age = 1, title = "Build the Copper chain: a Copper Mine + a Basic Smelter (set to Copper)", done = () => HasWorkshopOf(copper), reward = () => carriedInv.Add(copper, 8), rewardText = "+8 Copper" },
+                new Quest { age = 1, title = "Research the Bronze Age",                        done = () => AgeNow() >= 2,           reward = () => carriedInv.Add(stone, 30),  rewardText = "+30 Stone" },
+                // ── Bronze Age (2) ──
+                new Quest { age = 2, title = "Fire 15 Bricks (Clay + Charcoal → Kiln)",        done = () => Have(bricks) >= 15,      reward = () => carriedInv.Add(clay, 20),   rewardText = "+20 Clay" },
+                new Quest { age = 2, title = "Build 2 Stations & add a transport route",       done = () => RouteVehicle.All.Count >= 1, reward = () => carriedInv.Add(wood, 30), rewardText = "+30 Wood" },
+                new Quest { age = 2, title = "Research the Iron Age",                          done = () => AgeNow() >= 3,           reward = () => carriedInv.Add(planks, 40), rewardText = "+40 Planks" },
+                // ── Iron Age (3) ──
+                new Quest { age = 3, title = "Explore far & mine 25 Iron Ore",                 done = () => Have(ore) >= 25,         reward = () => carriedInv.Add(stone, 40),  rewardText = "+40 Stone" },
+                new Quest { age = 3, title = "Smelt 20 Iron (Basic Smelter set to Iron: Iron Ore + Charcoal)",  done = () => Have(metal) >= 20,       reward = () => carriedInv.Add(planks, 20), rewardText = "+20 Planks" },
+                new Quest { age = 3, title = "Craft 10 Tools (Iron + Planks → Toolmaker)",     done = () => Have(tools) >= 10,       reward = () => carriedInv.Add(planks, 30), rewardText = "+30 Planks" },
+                new Quest { age = 3, title = "Research the Industrial Age",                    done = () => AgeNow() >= 4,           reward = () => carriedInv.Add(planks, 50), rewardText = "+50 Planks" },
+                // ── Industrial Age (4) ──
+                new Quest { age = 4, title = "Power up: build a Generator + connect a smelter",  done = () => PowerPlant.All.Count >= 1, reward = () => carriedInv.Add(metal, 10), rewardText = "+10 Metal" },
+                new Quest { age = 4, title = "Reach 600 Industry (automation score)",          done = () => Colony.Instance != null && Colony.Instance.PeakProsperity >= 600, reward = () => carriedInv.Add(tools, 10), rewardText = "+10 Tools" },
+                new Quest { age = 4, title = "Begin your legacy: build the Monument",          done = () => HasWorkshopOf(monument), reward = () => carriedInv.Add(planks, 40), rewardText = "+40 Planks" },
+                new Quest { age = 4, title = "🏆 Complete the Monument — 10 Blocks. YOU WIN!", done = () => Have(monument) >= 10, isWin = true },
             };
 
             // --- Random world events (variety / surprise hook) ---

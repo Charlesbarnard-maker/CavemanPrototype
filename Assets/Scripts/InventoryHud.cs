@@ -26,6 +26,10 @@ namespace Caveman
         /// <summary>True when the cursor is over an interactive HUD panel.</summary>
         public static bool PointerOverUI { get; private set; }
 
+        /// <summary>Singleton so other systems (Objectives) can hand the HUD a centre-screen popup.</summary>
+        public static InventoryHud Instance { get; private set; }
+        void Awake() => Instance = this;
+
         private GUIStyle _s, _small, _big, _btn;
         private bool _paused;
         private bool _showHelp;
@@ -55,7 +59,13 @@ namespace Caveman
         private Vector2 _researchScroll;
         private Rect _researchRect;
         private readonly HashSet<string> _affordToasted = new(); // "research available" hint fires once per node
-        private Rect _finderRect;
+        // --- Objectives overhaul: a queued centre-screen reveal popup + the quest journal panel (J) ---
+        private bool _showObjectives;                                          // the quest journal panel (J)
+        private Vector2 _objPanelScroll;
+        private Rect _objPanelRect;
+        private readonly List<(int age, List<Quest> set)> _revealQueue = new(); // new-age objectives, shown centre-screen one at a time
+        private Rect _objRevealRect;
+        private bool _revealConsume;                                           // set by the popup's OK; applied in Update (no mid-frame queue mutation)
         private bool _localTipShown; // one-time hint when a workshop first starves
         private bool _collectorTipShown; // one-time hint when a collector first backs up
         private Texture2D _panelTex; // dark panel background for readability
@@ -108,8 +118,8 @@ namespace Caveman
         // Opening any of Build / Research / Guide / Help closes the others, so the player
         // focuses on a single system. The minimap is a world overlay, not a context panel,
         // so it's exempt. ---
-        private enum Panel { Build, Research, Guide, Help, Map, Lines }
-        private void CloseAllPanels() { _showBuild = _showResearch = _showGuide = _showHelp = _showMap = _showLines = false; }
+        private enum Panel { Build, Research, Guide, Help, Map, Lines, Objectives }
+        private void CloseAllPanels() { _showBuild = _showResearch = _showGuide = _showHelp = _showMap = _showLines = _showObjectives = false; }
         private void TogglePanel(Panel p)
         {
             bool wasOpen = p == Panel.Build ? _showBuild
@@ -117,6 +127,7 @@ namespace Caveman
                          : p == Panel.Guide ? _showGuide
                          : p == Panel.Help ? _showHelp
                          : p == Panel.Lines ? _showLines
+                         : p == Panel.Objectives ? _showObjectives
                          : _showMap;
             CloseAllPanels();
             if (wasOpen) return; // it was open → we just closed it
@@ -128,13 +139,19 @@ namespace Caveman
                 case Panel.Help: _showHelp = true; break;
                 case Panel.Map: _showMap = true; _mapZoom = 1f; _mapPan = Vector2.zero; break; // open fitting the whole world
                 case Panel.Lines: _showLines = true; break;
+                case Panel.Objectives: _showObjectives = true; break;
             }
         }
         // A full-screen "mode" panel is up — used to dim the world and hide competing widgets.
-        private bool ModalOpen => _showResearch || _showGuide || _showHelp || _showMap || _showLines;
+        private bool ModalOpen => _showResearch || _showGuide || _showHelp || _showMap || _showLines || _showObjectives;
 
         void Update()
         {
+            // Advance the centre-screen objective-reveal popup queue when the player clicked "OK" last frame.
+            // Done here (once/frame, before any early-out) so the queue never mutates between OnGUI's
+            // Layout + Repaint passes, and so it works even with no keyboard device.
+            if (_revealConsume) { if (_revealQueue.Count > 0) _revealQueue.RemoveAt(0); _revealConsume = false; }
+
             var kb = Keyboard.current;
             if (kb == null) return;
             if (kb.spaceKey.wasPressedThisFrame)
@@ -151,6 +168,8 @@ namespace Caveman
             if (kb.tKey.wasPressedThisFrame) TogglePanel(Panel.Research);
             if (kb.lKey.wasPressedThisFrame) TogglePanel(Panel.Lines); // global transport-line overview
             if (_showLines && kb.escapeKey.wasPressedThisFrame) _showLines = false;
+            if (kb.jKey.wasPressedThisFrame) TogglePanel(Panel.Objectives); // the quest journal (multiple goals at once)
+            if (_showObjectives && kb.escapeKey.wasPressedThisFrame) _showObjectives = false;
 
             // QoL: one-time "research available" toast when a tree node first becomes affordable.
             if (Research.Tree != null)
@@ -189,7 +208,6 @@ namespace Caveman
                 var sc = wkb.StatusColor; if (sc == Status.Starved) _starvedCount++; else if (sc == Status.BackedUp) _backedCount++;
                 if (monumentItem != null && wkb.output == monumentItem) _hasMonument = true;
             }
-            ComputeFinderLines(); // scans nodes/collectors — cache once/frame; OnGUI just draws the result
 
             // Toasts fade out.
             for (int i = 0; i < Toast.Items.Count; i++) Toast.Items[i].t -= Time.unscaledDeltaTime;
@@ -351,7 +369,6 @@ namespace Caveman
             // --- Layer 1: world-level always-on HUD (top bar, vitals, alerts, objectives). ---
             DrawTopBar();
             DrawStatus();
-            DrawObjective();
             DrawObjectives();
 
             // --- Layer 2: contextual / secondary widgets — hidden while a full "mode" panel
@@ -361,14 +378,14 @@ namespace Caveman
                 if (builder != null) DrawBuildMenu();
                 DrawMinimap();
                 DrawSelectedPanel();
-                DrawResourceFinder();
                 DrawFooter();
             }
 
             DrawHoverInfo();
             DrawToasts();
             DrawGatherPopups();
-            if (!modal) DrawAgeCard(); // temporary "what changed" moment; yields if a mode panel is open
+            if (!modal) DrawAgeCard();         // temporary "what changed" moment; yields if a mode panel is open
+            if (!modal) DrawObjectiveReveal();  // centre-screen "new objectives" popup → OK → docks top-right
             if (Objectives.Instance != null && Objectives.Instance.Won) DrawWin();
 
             // --- Layer 3: the focused mode panel, over a dimmed world. ---
@@ -378,6 +395,7 @@ namespace Caveman
             if (_showResearch) DrawResearchPanel();
             if (_showMap) DrawMapScreen();
             if (_showLines) DrawLinesPanel();
+            if (_showObjectives) DrawObjectivesPanel();
             if (_paused) GUI.Label(new Rect(0, 60, _vw, 60), "<b>PAUSED</b>  <size=18>(space)</size>", _big);
 
             // Block world clicks when the cursor is over an interactive panel. A modal mode
@@ -389,8 +407,8 @@ namespace Caveman
                                 || (_buildShown && _buildRect.Contains(m)) || (_selShown && _selRect.Contains(m))
                                 || (_flyoutShown && _flyoutRect.Contains(m))
                                 || _topRect.Contains(m) || _miniRect.Contains(m) || _objRect.Contains(m)
-                                || _finderRect.Contains(m)
-                                || (_ageCardT > 0f && _ageCardRect.Contains(m));
+                                || (_ageCardT > 0f && _ageCardRect.Contains(m))
+                                || (_revealQueue.Count > 0 && _objRevealRect.Contains(m));
             }
         }
 
@@ -741,28 +759,9 @@ namespace Caveman
             GUILayout.EndArea();
         }
 
-        // ---- Objective ----
-        private void DrawObjective()
-        {
-            GUILayout.BeginArea(new Rect(12, 82, Mathf.Min(720f, _vw - 330f), 30));
-            GUILayout.Label($"<color=#ffd24d>▶ {CurrentObjective()}</color>", _s);
-            GUILayout.EndArea();
-        }
-
-        private string CurrentObjective()
-        {
-            int wood = Avail(woodItem);
-            var col = Colony.Instance;
-            if (!HasCollector("wood") && wood < 5) return "Click trees & rocks to gather Wood and Stone by hand.";
-            if (!HasCollector("wood")) return "Build a Wood Hut near the trees — it gathers Wood for you.";
-            if (!HasStorage("wood")) return "Build a Woodpile next to the Wood Hut to stockpile Wood.";
-            if (!HasCollector("stone")) return "Build a Stone Pit near the rocks.";
-            if (WorkshopBuilding.All.Count == 0) return "Build a Sawmill — it turns Wood into Planks (your first processed good).";
-            if (ResearchBuilding.All.Count == 0) return "Build an Idea Bench (Planks + Stone) and a Research Lodge beside it.";
-            if (Research.TotalDelivered < 1) return "Get an Idea Tablet into the Research Lodge (belt it in, or place it adjacent).";
-            if (col != null && col.Age < 1) return "Press T and research the Tribal Age to unlock the next chain.";
-            return "Factory running! Scale production, automate with belts, and research the next Age.";
-        }
+        // (The old top-left single-objective line + the on-screen ore-finder arrows were removed in the
+        //  objectives overhaul — guidance now lives in the centre reveal popup, the top-right box, and the
+        //  J journal. See DrawObjectives / DrawObjectiveReveal / DrawObjectivesPanel below.)
 
         // ---- Build menu (left, categorised + scrollable + clickable) ----
         // Hover tooltip: name whatever's under the cursor (resource + amount, or building +
@@ -1439,79 +1438,117 @@ namespace Caveman
             if (sb.configurable && sb.Store.Total() == 0) sb.accepts = null; // ready to adopt a new type
         }
 
-        // ---- Resource finder: arrows to the nearest raw material you haven't tapped yet.
-        //      Each line disappears once you build that collector. ----
-        private static readonly string[] _arrows8 = { "→", "↗", "↑", "↖", "←", "↙", "↓", "↘" };
-        private static string ArrowFor(Vector2 dir)
-        {
-            float ang = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
-            int idx = Mathf.RoundToInt(((ang + 360f) % 360f) / 45f) % 8;
-            return _arrows8[idx];
-        }
-
-        // Build the resource-finder lines ONCE per frame (Update) — it scans ResourceNode.All × the target
-        // materials + HasCollector (which scans collector/site lists), which we don't want per OnGUI pass.
-        private readonly List<string> _finderLines = new();
-        private static readonly (int ageMin, string label)[] _finderOrder =
-            { (0, "Wood"), (0, "Stone"), (1, "Clay"), (1, "Ore") };
-        private void ComputeFinderLines()
-        {
-            _finderLines.Clear();
-            if (gatherer == null) return;
-            Vector2 p = gatherer.transform.position;
-            int age = Colony.Instance != null ? Colony.Instance.Age : 0;
-            // From the Tribal age, also point toward the expansion materials (clay/ore). Each line drops
-            // once its collector is built (HasCollector). Order matches _finderOrder / the item fields.
-            ItemDefinition[] items = { woodItem, stoneItem, clayItem, oreItem };
-            for (int i = 0; i < items.Length; i++)
-            {
-                if (_finderOrder[i].ageMin > age) continue;
-                var item = items[i];
-                if (item == null || HasCollector(item.id)) continue; // already tapped → drop it
-                ResourceNode best = null; float bestSq = float.MaxValue;
-                foreach (var n in ResourceNode.All)
-                {
-                    if (n == null || n.yields != item) continue;
-                    float sq = ((Vector2)n.transform.position - p).sqrMagnitude;
-                    if (sq < bestSq) { bestSq = sq; best = n; }
-                }
-                if (best == null) continue;
-                Vector2 dir = (Vector2)best.transform.position - p;
-                string hex = ColorUtility.ToHtmlStringRGB(item.color);
-                _finderLines.Add($"<color=#{hex}>■</color> <b>{_finderOrder[i].label}</b>  <size=18>{ArrowFor(dir)}</size> <size=12>{Mathf.RoundToInt(dir.magnitude)}m</size>");
-            }
-        }
-
-        private void DrawResourceFinder()
-        {
-            if (gatherer == null || _finderLines.Count == 0) { _finderRect = default; return; }
-            int n = _finderLines.Count;
-            // Sized to fit the header + every line (was clipping the last row): generous per-line height
-            // and a wider box so the label + arrow + distance never run off the edge.
-            var rect = new Rect(_vw - 248, 182, 236, 44 + n * 24);
-            _finderRect = rect;
-            PanelBg(rect);
-            GUILayout.BeginArea(new Rect(rect.x + 12, rect.y + 9, rect.width - 24, rect.height - 18));
-            GUILayout.Label("<size=12><b><color=#ffd24d>Find + build collectors</color></b></size>", _small);
-            GUILayout.Space(2);
-            foreach (var l in _finderLines) GUILayout.Label($"<size=13>{l}</size>", _small);
-            GUILayout.EndArea();
-        }
-
-        // ---- Objectives panel (top-right) ----
+        // ---- Objectives box (top-right): the goals available RIGHT NOW (current age, any order) ----
         private void DrawObjectives()
         {
             var o = Objectives.Instance;
             if (o == null) { _objRect = default; return; }
+            int age = Colony.Instance != null ? Colony.Instance.Age : 0;
+            string ageName = Colony.AgeNames[Mathf.Clamp(age, 0, Colony.AgeNames.Length - 1)];
 
-            var rect = new Rect(_vw - 300, 62, 290, 112);
+            var active = new List<Quest>();
+            foreach (var q in o.ActivePending(5)) active.Add(q);
+
+            float h = 38f + Mathf.Max(1, active.Count) * 22f;
+            var rect = new Rect(_vw - 314, 62, 302, h);
             _objRect = rect;
             PanelBg(rect);
-            GUILayout.BeginArea(new Rect(rect.x + 10, rect.y + 8, rect.width - 20, rect.height - 14));
-            GUILayout.Label("<b>Objectives</b>", _small);
-            bool any = false;
-            foreach (var q in o.Active(3)) { GUILayout.Label($"<size=13>▸ {q.title}</size>", _small); any = true; }
-            if (!any) GUILayout.Label("<size=13><color=#9f9>All objectives complete! 🎉</color></size>", _small);
+            GUILayout.BeginArea(new Rect(rect.x + 12, rect.y + 8, rect.width - 24, rect.height - 14));
+            GUILayout.Label($"<b>🎯 Objectives</b>   <size=11><color=#bbb>{ageName} · J for all</color></size>", _small);
+            if (active.Count == 0)
+                GUILayout.Label("<size=13><color=#9f9>All current goals done — research the next Age (T).</color></size>", _small);
+            else
+                foreach (var q in active)
+                    GUILayout.Label($"<size=13><color=#ffd24d>▸</color> {q.title}"
+                        + (string.IsNullOrEmpty(q.rewardText) ? "" : $"  <size=11><color=#9c9>({q.rewardText})</color></size>") + "</size>", _small);
+            GUILayout.EndArea();
+        }
+
+        /// <summary>Queue a centre-screen "new objectives" popup for an age's goal set — called by Objectives
+        /// when an age unlocks (incl. age 0 at game start). Shown one at a time; OK docks them to the box.</summary>
+        public void ShowObjectiveReveal(int age, List<Quest> set)
+        {
+            if (set == null || set.Count == 0) return;
+            _revealQueue.Add((age, set));
+        }
+
+        // The centre-screen objective REVEAL: when an age unlocks, its new goals appear big in the middle so
+        // they're read, then "OK" docks them to the top-right box. Waits behind the age card so they sequence;
+        // the OK click only flags a consume (Update pops the queue) so the queue is stable across OnGUI passes.
+        private void DrawObjectiveReveal()
+        {
+            if (_revealQueue.Count == 0 || _ageCardT > 0f) { _objRevealRect = default; return; }
+            var entry = _revealQueue[0];
+            string ageName = Colony.AgeNames[Mathf.Clamp(entry.age, 0, Colony.AgeNames.Length - 1)];
+
+            float w = Mathf.Min(560f, _vw - 60f);
+            float inner = w - 40f;
+            var sb = new System.Text.StringBuilder();
+            foreach (var q in entry.set)
+                sb.Append("• ").Append(q.title)
+                  .Append(string.IsNullOrEmpty(q.rewardText) ? "" : $"   <color=#9c9>({q.rewardText})</color>").Append('\n');
+            string title = $"<size=20><color=#ffd24d><b>🎯 New objectives — {ageName}</b></color></size>";
+            string body = $"<size=14>{sb.ToString().TrimEnd()}</size>";
+            float h = _s.CalcHeight(new GUIContent(title), inner) + _small.CalcHeight(new GUIContent(body), inner) + 78f;
+            var r = new Rect(_vw / 2f - w / 2f, _vh * 0.30f, w, h);
+            _objRevealRect = r;
+            PanelBg(r);
+            GUILayout.BeginArea(new Rect(r.x + 20, r.y + 14, inner, h - 24));
+            GUILayout.Label(title, _s);
+            GUILayout.Label("<size=12><color=#bbb>Tackle them in any order — complete them to advance the Age.</color></size>", _small);
+            GUILayout.Space(2f);
+            GUILayout.Label(body, _small);
+            GUILayout.Space(6f);
+            if (GUILayout.Button("<b>OK ✓</b>   <size=11>(or click this card)</size>", _btn)) _revealConsume = true;
+            GUILayout.EndArea();
+
+            var e = Event.current;
+            if (e.type == EventType.MouseDown && r.Contains(e.mousePosition)) { _revealConsume = true; e.Use(); }
+        }
+
+        // ---- Objectives journal (J): every goal, grouped by Age, with status — multiple at once ----
+        private void DrawObjectivesPanel()
+        {
+            var o = Objectives.Instance;
+            float w = Mathf.Min(560f, _vw - 40f);
+            float h = Mathf.Min(_vh - 120f, 600f);
+            var r = new Rect(_vw / 2f - w / 2f, 70f, w, h);
+            _objPanelRect = r;
+            PanelBg(r);
+            GUILayout.BeginArea(new Rect(r.x + 16, r.y + 14, r.width - 32, r.height - 28));
+            int age = Colony.Instance != null ? Colony.Instance.Age : 0;
+            int done = 0, total = 0;
+            if (o != null) foreach (var q in o.quests) { total++; if (q.claimed) done++; }
+            GUILayout.Label($"<size=20><b>🎯 Objectives</b></size>   <color=#9c9>{done}/{total} done</color>", _s);
+            GUILayout.Label("<size=12><color=#bbb>Goals unlock per Age and can be done in ANY order. Clear an Age's goals (and research it) to move on.  (J or Close to exit)</color></size>", _small);
+            GUILayout.Space(4);
+
+            _objPanelScroll = GUILayout.BeginScrollView(_objPanelScroll);
+            if (o != null)
+            {
+                int maxAge = 0;
+                foreach (var q in o.quests) if (q.age > maxAge) maxAge = q.age;
+                for (int a = 0; a <= maxAge; a++)
+                {
+                    var set = o.QuestsForAge(a);
+                    if (set.Count == 0) continue;
+                    string an = Colony.AgeNames[Mathf.Clamp(a, 0, Colony.AgeNames.Length - 1)];
+                    string state = a > age ? " <color=#888>(locked)</color>" : a < age ? " <color=#9c9>(past)</color>" : " <color=#ffd24d>(current)</color>";
+                    GUILayout.Space(6);
+                    GUILayout.Label($"<size=14><b><color=#cda>── {an} ──</color></b>{state}</size>", _small);
+                    foreach (var q in set)
+                    {
+                        string badge, col, txtCol;
+                        if (q.claimed) { badge = "✔"; col = "#9f9"; txtCol = "#9c9"; }
+                        else if (a > age) { badge = "🔒"; col = "#888"; txtCol = "#999"; }
+                        else { badge = "▸"; col = "#ffd24d"; txtCol = "#eee"; }
+                        string reward = string.IsNullOrEmpty(q.rewardText) ? "" : $"  <size=11><color=#9c9>{q.rewardText}</color></size>";
+                        GUILayout.Label($"<size=13><color={col}>{badge}</color> <color={txtCol}>{q.title}</color>{reward}</size>", _small);
+                    }
+                }
+            }
+            GUILayout.EndScrollView();
+            if (GUILayout.Button("<size=12>Close (J)</size>", _btn)) _showObjectives = false;
             GUILayout.EndArea();
         }
 
@@ -1539,7 +1576,7 @@ namespace Caveman
             if (builder != null && builder.PendingIndex >= 0) return;
             float w = Mathf.Min(760f, _vw - 24f);
             GUILayout.BeginArea(new Rect(_vw / 2f - w / 2f, _vh - 40f, w, 38f));
-            GUILayout.Label($"<size=13><color=#bbb>B build · <color=#9cf>T research</color> · G guide · H help · M map · L lines · N minimap {(_showMinimap ? "on" : "off")} · Space pause</color></size>", _small);
+            GUILayout.Label($"<size=13><color=#bbb>B build · <color=#9cf>T research</color> · <color=#ffd24d>J goals</color> · G guide · H help · M map · L lines · N minimap {(_showMinimap ? "on" : "off")} · Space pause</color></size>", _small);
             string sandbox = Economy.FreeBuild ? "<color=#9f9>SANDBOX</color> · " : "";
             string mode = Economy.LocalProduction ? "<color=#fc8>Local logistics</color>" : "<color=#8cf>Global pool</color>";
             GUILayout.Label($"<size=11><color=#999>{sandbox}Speed x{_speed:0} · {mode} (F7) · F1–F5 sandbox</color></size>", _small);

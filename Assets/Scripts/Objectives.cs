@@ -7,6 +7,7 @@ namespace Caveman
     public class Quest
     {
         public string title;
+        public int age;          // the Age this goal belongs to — its whole set unlocks together when you reach it
         public System.Func<bool> done;
         public System.Action reward;
         public string rewardText;
@@ -28,40 +29,65 @@ namespace Caveman
         public bool Won { get; private set; }
 
         private float _t;
+        private int _revealedThrough = -1; // highest Age whose objective set we've already popped centre-screen
         void Awake() => Instance = this;
+
+        private int CurrentAge => Colony.Instance != null ? Colony.Instance.Age : 0;
 
         void Update()
         {
             _t += Time.deltaTime;
             if (_t < 0.5f) return;
             _t = 0f;
+            int age = CurrentAge;
 
-            int shown = 0;
+            // Reveal each newly-unlocked Age's objective SET centre-screen (incl. Age 0 at game start). Stepping
+            // age-by-age means even an F3 multi-age skip still queues each Age's set in order.
+            if (age > _revealedThrough)
+            {
+                for (int a = _revealedThrough + 1; a <= age; a++)
+                {
+                    var set = QuestsForAge(a);
+                    if (set.Count > 0 && InventoryHud.Instance != null) InventoryHud.Instance.ShowObjectiveReveal(a, set);
+                }
+                _revealedThrough = age;
+            }
+
+            // Claim any UNLOCKED (age ≤ current) goal whose condition is met — in ANY order, so the player has
+            // freedom in how they complete an Age. Completing one pays its reward + pops a toast.
             foreach (var q in quests)
             {
-                if (q.claimed) continue;
+                if (q.claimed || q.age > age) continue;
                 if (q.done != null && q.done())
                 {
                     q.claimed = true;
                     q.reward?.Invoke();
                     if (q.isWin) Won = true;
                     Toast.Show($"<color=#9f9>✔ {q.title}</color>" + (string.IsNullOrEmpty(q.rewardText) ? "" : $"   <size=15>{q.rewardText}</size>"));
-                    continue;
                 }
-                if (++shown >= 3) break; // only the first 3 pending are "active"
             }
         }
 
-        /// <summary>The first `n` not-yet-completed goals (for the HUD list).</summary>
-        public IEnumerable<Quest> Active(int n)
+        /// <summary>All goals belonging to a given Age (for the reveal popup + the journal).</summary>
+        public List<Quest> QuestsForAge(int age)
         {
-            int c = 0;
-            foreach (var q in quests)
-            {
-                if (q.claimed) continue;
-                yield return q;
-                if (++c >= n) yield break;
-            }
+            var list = new List<Quest>();
+            foreach (var q in quests) if (q.age == age) list.Add(q);
+            return list;
+        }
+
+        /// <summary>The goals available to work on RIGHT NOW — unclaimed and unlocked by age, current Age first
+        /// (then any leftovers from earlier Ages), capped at `max` for the HUD box.</summary>
+        public IEnumerable<Quest> ActivePending(int max)
+        {
+            int age = CurrentAge, c = 0;
+            for (int a = age; a >= 0; a--)
+                foreach (var q in quests)
+                {
+                    if (q.age != a || q.claimed) continue;
+                    yield return q;
+                    if (++c >= max) yield break;
+                }
         }
 
         public bool AllDone
