@@ -145,7 +145,29 @@ public static class BespokeSpriteDump
         DumpMounts(outDir, groundBg);
         DumpWorkers(outDir, groundBg);
         DumpMachinery(outDir, groundBg);
-        Debug.Log("[BespokeSpriteDump] wrote contact sheets + zooms + mounts + workers + machinery to " + outDir);
+        DumpTrains(outDir, groundBg);
+        Debug.Log("[BespokeSpriteDump] wrote contact sheets + zooms + mounts + workers + machinery + trains to " + outDir);
+    }
+
+    // Train parts: locos tier 0..4 (Donkey/Ox/Horse/Steam/Diesel) + a cargo wagon + a liquid tanker, frame 1.
+    static void DumpTrains(string outDir, Color groundBg)
+    {
+        const int scale = 5, cell = Native * scale, pad = 14;
+        int cols = 7, rows = 1;
+        int W = pad + cols * (cell + pad), H = pad + rows * (cell + pad);
+        var sheet = Fill(W, H, groundBg);
+        var parts = new Sprite[7];
+        for (int t = 0; t < 5; t++) parts[t] = PlaceholderArt.TrainLoco(t, 1);
+        parts[5] = PlaceholderArt.CargoWagon(1);
+        parts[6] = PlaceholderArt.LiquidWagon(1);
+        var cargoTint = new Color(0.6f, 0.62f, 0.7f); // sample tint for the wagon load areas
+        for (int i = 0; i < 7; i++)
+        {
+            int ox = pad + i * (cell + pad), oy = pad;
+            Color tint = i >= 5 ? cargoTint : Color.white;
+            Blit5(sheet, W, H, parts[i], tint, ox, oy, scale, groundBg);
+        }
+        WritePng(sheet, W, H, Path.Combine(outDir, "trains.png"));
     }
 
     // Upgrade machinery overlay escalation: rows = sample buildings, cols = tier 0..3, each = the building

@@ -67,9 +67,18 @@ user flagged. NEEDS interactive testing (placement is drag-based; routing needs 
 - **Parallel tracks linking (fixed):** `RailTile.Connects` is now `internal` and `RailNet.FindPath` calls it, so
   pathfinding respects the SAME parallel-merge rule the visual already used — trains no longer hop between two
   parallel lines laid side by side (only real corners / tees / crossings link). `Connects` is symmetric.
-- **DESIGN locked with the user for the rest:** wagons = MIXED consist (different cargo per wagon, generic
-  carriers: load at a Load stop, drop at an Unload stop); liquids by rail via PIPE-FED liquid stations; the line
-  UI pain to fix = MANAGING MANY LINES (a global overview). Phases 2-4 to follow.
+- **DESIGN locked with the user:** wagons = MIXED consist (different cargo per wagon, generic carriers: load at a
+  Load stop, drop at an Unload stop); liquids by rail via PIPE-FED liquid stations; the line UI pain to fix =
+  MANAGING MANY LINES (a global overview).
+- **Phase 2a DONE — train ART + per-age loco shown:** NEW `Bespoke/PlaceholderArt.Trains.cs` —
+  `TrainLoco(tier,frame)` (0 Donkey · 1 Ox · 2 Horse · 3 Steam loco · 4 Diesel loco, animated legs/wheels) +
+  `CargoWagon(frame)` (open box) + `LiquidWagon(frame)` (tanker). `RouteVehicle` now shows the per-age loco for
+  LAND vehicles (by colony age), animated + flipped to travel direction, at white tint; ships keep the boat.
+  Verified via render (trains.png). The wagon sprites exist but AREN'T coupled yet.
+- **STILL TO DO (Phases 2b-4):** the trailing-WAGON consist (loco + N wagons snaking the track via a breadcrumb
+  trail, oriented); MIXED-cargo service (per-stop Load/Unload role; generic wagons load/drop by commodity);
+  ADD/REMOVE wagons UI with an AGE-GATED count + capacity = sum; LIQUID stations (pipe-fed buffer) + liquid
+  wagons; the GLOBAL line overview. These need interactive playtesting (movement/orientation).
 
 ## #43 Buildings mechanise by upgrade tier — a growing machinery overlay (2026-06-29)
 The sibling to #42's workers: a building now visibly gets more TECHNOLOGICAL as you upgrade it, instead of just

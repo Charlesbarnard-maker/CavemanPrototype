@@ -36,6 +36,9 @@ namespace Caveman
         private SpriteRenderer _sr;
         private Color _baseColor;
         private LineRenderer _line;
+        private bool _isShip;                  // ships keep the boat sprite + cargo tint; land vehicles show a per-age loco
+        private int _frame; private float _animT; private float _prevX; // loco walk/wheel animation + facing flip
+        private static int AgeLocoTier() => Mathf.Clamp(Colony.Instance != null ? Colony.Instance.Age : 0, 0, 4);
 
         // Track following (see CanEnter/BlockAheadClear). Each leg is a fresh forward path from the
         // vehicle's current position to the next stop, traversed cell-by-cell with claims + signals.
@@ -59,7 +62,7 @@ namespace Caveman
             go.transform.localScale = Vector3.one * (ship ? 0.85f : 0.6f);
 
             var sr = go.AddComponent<SpriteRenderer>();
-            sr.sprite = ship ? PlaceholderArt.Boat() : PlaceholderArt.Circle();
+            sr.sprite = ship ? PlaceholderArt.Boat() : PlaceholderArt.TrainLoco(AgeLocoTier(), 0);
             sr.sortingOrder = 14;
 
             var lr = go.AddComponent<LineRenderer>();
@@ -73,8 +76,8 @@ namespace Caveman
             var v = go.AddComponent<RouteVehicle>();
             v.stops = new List<Depot>(stops);
             v.capacity = Mathf.Max(1, capacity); v.speed = speed;
-            v._sr = sr; v._baseColor = color; v._line = lr;
-            sr.color = color;
+            v._sr = sr; v._baseColor = color; v._line = lr; v._isShip = ship;
+            sr.color = ship ? color : Color.white;
 
             // One commodity per line: give every un-set stop the first stop's item, so loads/unloads match.
             ItemDefinition commodity = null;
@@ -119,9 +122,20 @@ namespace Caveman
             }
 
             if (_sr != null)
+            {
+                if (!_isShip)
+                {
+                    // animate the loco (legs / wheels) + face the way it's travelling (flip x)
+                    float dx = transform.position.x - _prevX; _prevX = transform.position.x;
+                    if (Mathf.Abs(dx) > 0.0006f) { var sc = transform.localScale; sc.x = Mathf.Abs(sc.x) * (dx < 0f ? -1f : 1f); transform.localScale = sc; }
+                    _animT += Time.deltaTime;
+                    if (_animT >= 0.12f) { _animT = 0f; _frame = (_frame + 1) % 3; }
+                    _sr.sprite = PlaceholderArt.TrainLoco(AgeLocoTier(), _frame);
+                }
                 _sr.color = _waiting ? new Color(0.95f, 0.75f, 0.25f) // amber — held at a signal / occupied cell
-                    : (_carry > 0 && _carryItem != null) ? Color.Lerp(_baseColor, _carryItem.color, 0.6f)
-                    : _baseColor;
+                    : _isShip ? ((_carry > 0 && _carryItem != null) ? Color.Lerp(_baseColor, _carryItem.color, 0.6f) : _baseColor)
+                    : Color.white; // land loco shows its own colours
+            }
         }
 
         // Service a stop. The PICKUP stop (stop 0) loads its commodity up to capacity; every other stop
