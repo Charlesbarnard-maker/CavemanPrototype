@@ -81,18 +81,22 @@ namespace Caveman
         private string _ageCardTitle, _ageCardBody;
         private Rect _ageCardRect;           // cached each draw for the click-to-dismiss hit-test
 
-        // Build-menu categories. Belts get their own tab; rail/stations/signals live under Transport
-        // (long-distance); storage is its own tab (was the confusing "Infrastructure").
+        // Build-menu categories. A building lands here by its kind (or a menuCategory override). ENERGY
+        // (generators/poles/batteries) is now its own tab — separate from Production; the water Bridge sits
+        // under INFRASTRUCTURE (it's a crossing, not a belt); rail/stations/signals + elevated track live
+        // under Trains; storage is its own tab.
         private static readonly (string label, BuildingKind[] kinds)[] Cats =
         {
-            ("Production", new[] { BuildingKind.Collector, BuildingKind.Workshop, BuildingKind.Power, BuildingKind.Research, BuildingKind.Pole, BuildingKind.Battery }),
-            ("Belts",      new[] { BuildingKind.Belt, BuildingKind.Bridge }),
-            ("Liquids",    new[] { BuildingKind.Pipe, BuildingKind.Pump }),
-            ("Trains",     new[] { BuildingKind.Depot, BuildingKind.Rail, BuildingKind.Signal }),
-            ("Boats",      new BuildingKind[0]),  // tag-only (Harbour sets menuCategory="Boats")
-            ("Planes",     new BuildingKind[0]),  // reserved — appears once it has a buildable
-            ("Mounts",     new[] { BuildingKind.Garage }),  // the Garage — buy/park your travel mounts
-            ("Storage",    new[] { BuildingKind.Storage }),
+            ("Production",     new[] { BuildingKind.Collector, BuildingKind.Workshop, BuildingKind.Research }),
+            ("Energy",         new[] { BuildingKind.Power, BuildingKind.Pole, BuildingKind.Battery }),
+            ("Belts",          new[] { BuildingKind.Belt }),
+            ("Infrastructure", new[] { BuildingKind.Bridge }),
+            ("Liquids",        new[] { BuildingKind.Pipe, BuildingKind.Pump }),
+            ("Trains",         new[] { BuildingKind.Depot, BuildingKind.Rail, BuildingKind.Signal }),
+            ("Boats",          new BuildingKind[0]),  // tag-only (Harbour sets menuCategory="Boats")
+            ("Planes",         new BuildingKind[0]),  // reserved — appears once it has a buildable
+            ("Mounts",         new[] { BuildingKind.Garage }),  // the Garage — buy/park your travel mounts
+            ("Storage",        new[] { BuildingKind.Storage }),
         };
         private static bool InGroup(BuildingKind[] kinds, BuildingKind k) => System.Array.IndexOf(kinds, k) >= 0;
         // A building belongs to a category by its menuCategory tag when set (e.g. a Harbour → "Boats"), else by kind.
@@ -286,9 +290,35 @@ namespace Caveman
 
         void OnDisable() => Time.timeScale = 1f;
 
+        // A warm screen VIGNETTE (amber centre glow → cool dark corners) drawn UNDER the HUD each frame, to tie
+        // the world into a cozy, sun-warmed frame. Cached 256² texture stretched to the screen (zoom-independent).
+        private Texture2D _vignetteTex;
+        private Texture2D Vignette()
+        {
+            if (_vignetteTex != null) return _vignetteTex;
+            const int s = 256;
+            var t = new Texture2D(s, s, TextureFormat.RGBA32, false) { filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Clamp };
+            var px = new Color[s * s];
+            float c = (s - 1) * 0.5f, maxR = Mathf.Sqrt(2f) * c;
+            for (int y = 0; y < s; y++)
+                for (int x = 0; x < s; x++)
+                {
+                    float d = Mathf.Sqrt((x - c) * (x - c) + (y - c) * (y - c)) / maxR;
+                    px[y * s + x] = d < 0.5f
+                        ? new Color(1f, 0.72f, 0.34f, 0.09f * (1f - d / 0.5f))                                                   // warm centre glow
+                        : new Color(0.05f, 0.06f, 0.11f, 0.42f * Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((d - 0.55f) / 0.45f)));  // cool dark corners
+                }
+            t.SetPixels(px); t.Apply();
+            _vignetteTex = t;
+            return _vignetteTex;
+        }
+
         void OnGUI()
         {
             if (gatherer == null) return;
+            // Warm vignette over the world, drawn first (in true screen space) so the HUD panels stay on top of it.
+            if (Event.current.type == EventType.Repaint)
+                GUI.DrawTexture(new Rect(0f, 0f, Screen.width, Screen.height), Vignette());
             // Scale the whole HUD to a 1080-tall reference canvas so it fits + stays un-overlapped on smaller
             // monitors. At/above 1080 the matrix is identity → no change on normal/large screens. Mouse hit-tests
             // (Event.current.mousePosition + logical rects) are transformed by the matrix, so clicks stay correct.
@@ -566,10 +596,20 @@ namespace Caveman
             GUI.BeginGroup(area); // clips everything below to the map area
             var cr = new Rect(_mapPan.x, _mapPan.y, content, content);
 
-            GUI.color = new Color(0.22f, 0.31f, 0.19f);
+            // Base: dark ground, then the TERRAIN biome map (aligned to world coords), then fog over it
+            // (explored = transparent → terrain shows; unexplored = dark fog).
+            GUI.color = new Color(0.16f, 0.20f, 0.15f);
             GUI.DrawTexture(cr, Texture2D.whiteTexture);
             GUI.color = Color.white;
-            if (fog != null && fog.Tex != null) GUI.DrawTexture(cr, fog.Tex); // explored = transparent → ground shows
+            if (TerrainGrid.MapTex != null)
+            {
+                float uL = (W * 0.5f - TerrainGrid.Half) / W, span = (2f * TerrainGrid.Half) / W;
+                GUI.DrawTexture(new Rect(cr.x + uL * content, cr.y + uL * content, span * content, span * content), TerrainGrid.MapTex);
+            }
+            if (fog != null && fog.Tex != null) GUI.DrawTexture(cr, fog.Tex);
+
+            Vector2 gm = e != null ? e.mousePosition : new Vector2(-999f, -999f); // group-relative cursor (for hover)
+            string hoverLabel = null; Vector2 hoverScreen = default;
 
             void Dot(Vector3 wp, Color col, float s)
             {
@@ -579,6 +619,13 @@ namespace Caveman
                 GUI.DrawTexture(new Rect(cr.x + u * content - s / 2f, cr.y + (1f - v) * content - s / 2f, s, s), Texture2D.whiteTexture);
                 GUI.color = Color.white;
             }
+            void Hover(Vector3 wp, string label)
+            {
+                float u = (wp.x + W / 2f) / W, v = (wp.y + W / 2f) / W;
+                if (u < 0f || u > 1f || v < 0f || v > 1f) return;
+                float gx = cr.x + u * content, gy = cr.y + (1f - v) * content;
+                if (Mathf.Abs(gm.x - gx) <= 9f && Mathf.Abs(gm.y - gy) <= 9f) { hoverLabel = label; hoverScreen = new Vector2(area.x + gx, area.y + gy); }
+            }
 
             float ds = Mathf.Clamp(4f * Mathf.Sqrt(_mapZoom), 4f, 14f); // dots grow a bit as you zoom in
             foreach (var rn in ResourceNode.All)
@@ -586,7 +633,8 @@ namespace Caveman
                 if (rn == null || rn.yields == null) continue;
                 if (fog != null && !fog.IsExplored(rn.transform.position)) continue; // only show explored patches
                 var rc = rn.yields.color;
-                Dot(rn.transform.position, new Color(rc.r, rc.g, rc.b, 0.9f), ds * 0.7f);
+                Dot(rn.transform.position, new Color(rc.r, rc.g, rc.b, 0.95f), ds * 0.8f);
+                Hover(rn.transform.position, rn.yields.displayName);
             }
             foreach (var st in StorageBuilding.All)
             {
@@ -595,17 +643,31 @@ namespace Caveman
                 Color sc = fill >= 0.99f ? new Color(0.95f, 0.55f, 0.2f)
                          : Color.Lerp(new Color(0.5f, 0.5f, 0.62f), new Color(0.9f, 0.8f, 0.3f), fill);
                 Dot(st.transform.position, sc, ds);
+                Hover(st.transform.position, (st.accepts != null ? st.accepts.displayName + " store" : "Storage") + $"  {Mathf.RoundToInt(fill * 100f)}%");
             }
-            foreach (var dp in Depot.All) if (dp != null) Dot(dp.transform.position, new Color(0.5f, 0.8f, 0.9f), ds);
-            foreach (var p in ProductionBuilding.All) if (p != null) Dot(p.transform.position, p.StatusColor, ds);
-            foreach (var wk in WorkshopBuilding.All) if (wk != null) Dot(wk.transform.position, wk.StatusColor, ds);
+            foreach (var dp in Depot.All) { if (dp == null) continue; Dot(dp.transform.position, new Color(0.5f, 0.8f, 0.9f), ds); Hover(dp.transform.position, dp.item != null ? dp.item.displayName + " station" : "Station"); }
+            foreach (var p in ProductionBuilding.All) { if (p == null) continue; Dot(p.transform.position, p.StatusColor, ds); Hover(p.transform.position, p.produces != null ? p.produces.displayName + " collector" : "Collector"); }
+            foreach (var wk in WorkshopBuilding.All) { if (wk == null) continue; Dot(wk.transform.position, wk.StatusColor, ds); Hover(wk.transform.position, wk.output != null ? wk.output.displayName + " workshop" : "Workshop"); }
             if (gatherer != null) Dot(gatherer.transform.position, new Color(0.96f, 0.85f, 0.2f), ds * 1.7f); // you
 
             GUI.EndGroup();
             GUI.Box(area, GUIContent.none); // frame
 
+            // Hover tooltip — drawn in screen space, after the clip group, so it isn't clipped.
+            if (hoverLabel != null)
+            {
+                var tip = new GUIContent($"<size=13>{hoverLabel}</size>");
+                Vector2 sz = _small.CalcSize(tip);
+                float tw = sz.x + 16f, th = 24f;
+                float tx = hoverScreen.x + 14f; if (tx + tw > _vw) tx = hoverScreen.x - tw - 14f;
+                float ty = Mathf.Clamp(hoverScreen.y - 12f, 4f, _vh - th - 4f);
+                var tr = new Rect(tx, ty, tw, th);
+                PanelBg(tr);
+                GUI.Label(new Rect(tr.x + 8f, tr.y + 3f, tr.width - 16f, tr.height - 6f), tip, _small);
+            }
+
             GUI.Label(new Rect(area.x, area.yMax + 4f, area.width, 22f),
-                "<size=13><color=#fd2>●</color> you   <color=#6c6>●</color> ok   <color=#f66>●</color> starved   <color=#fd4>●</color> full   <color=#8cf>●</color> resource patch</size>", _small);
+                "<size=12><color=#fd2>●</color> you  <color=#6c6>●</color> ok  <color=#f66>●</color> starved  <color=#fd4>●</color> full  <color=#8cf>●</color> resource   ·   hover a dot to identify it    <color=#4f6840>▮</color>plains <color=#29542c>▮</color>forest <color=#786e5c>▮</color>hills <color=#56524f>▮</color>mtn <color=#33639e>▮</color>water</size>", _small);
         }
 
         // ---- "+N" hand-gather popups: small bold numbers that float up from the node and fade ----

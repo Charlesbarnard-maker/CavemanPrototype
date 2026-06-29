@@ -174,6 +174,41 @@ namespace Caveman
             return _rail;
         }
 
+        // A raised VIADUCT deck for ELEVATED track: a stone parapet frame around the cell edges with darker
+        // corner posts, and an OPEN centre so a belt running underneath still shows through. Drawn UNDER the
+        // (steel-tinted) rails; together with support piers + a drop shadow it reads clearly as "raised over."
+        private static Sprite _viaductDeck;
+        public static Sprite ViaductDeck()
+        {
+            if (_viaductDeck != null) return _viaductDeck;
+            const int s = 64;
+            var tex = NewTex(s);
+            var px = new Color[s * s];
+            var stone = new Color(0.58f, 0.60f, 0.67f, 1f); // deck parapet
+            var rim   = new Color(0.30f, 0.32f, 0.39f, 1f); // outer shade (depth)
+            var post  = new Color(0.22f, 0.23f, 0.28f, 1f); // corner support posts
+            const float band = 0.17f; // parapet width (fraction of the cell from each edge)
+            for (int y = 0; y < s; y++)
+                for (int x = 0; x < s; x++)
+                {
+                    float fx = x / (float)(s - 1), fy = y / (float)(s - 1);
+                    float dx = Mathf.Min(fx, 1f - fx), dy = Mathf.Min(fy, 1f - fy); // dist to nearest edge
+                    float d = Mathf.Min(dx, dy);
+                    Color c = Clear;
+                    if (d < band)
+                    {
+                        c = stone;
+                        if (d < 0.045f) c = rim;            // darker right at the outer rim
+                        if (dx < band && dy < band) c = post; // four corner posts
+                    }
+                    px[y * s + x] = c;
+                }
+            tex.SetPixels(px);
+            tex.Apply();
+            _viaductDeck = Sprite.Create(tex, new Rect(0, 0, s, s), new Vector2(0.5f, 0.5f), s);
+            return _viaductDeck;
+        }
+
         // ---- Track tiles shaped to their NEIGHBOURS (so corners curve + junctions meet) ----------
         // mask bits: N=1, E=2, S=4, W=8 (1<<Belt.Dir). Cached per mask (16). A perpendicular pair draws a
         // CURVED corner; everything else draws straight rail "arms" from the centre toward each neighbour
@@ -254,6 +289,114 @@ namespace Caveman
                     px[y * s + x] = c;
                 }
         }
+
+        // ---- Conveyor JUNCTIONS: splitter (1→3) + merger (3→1) drawn in the BELT family ----------
+        // These replace the old generic Hexagon so junctions read as part of the conveyor line. Same white
+        // body + dark chevrons + side rails as BeltSprite, so def.color tints them identically. Local +Y is
+        // forward. A vertical through-line (S↔N) crosses a horizontal branch (W↔E) over a bright central hub.
+        // SPLITTER: the branch chevrons DIVERGE outward (1 in from the back → 3 out). MERGER: they CONVERGE
+        // inward (3 in → 1 out forward). The green-out / cyan-in port arrows are drawn separately (Belt.AddPortMarkers).
+        private static Sprite _splitterSprite, _mergerSprite;
+        public static Sprite SplitterSprite() { if (_splitterSprite == null) _splitterSprite = BuildJunction(true);  return _splitterSprite; }
+        public static Sprite MergerSprite()   { if (_mergerSprite   == null) _mergerSprite   = BuildJunction(false); return _mergerSprite; }
+
+        private static Sprite BuildJunction(bool splitter)
+        {
+            const int s = 64;
+            var px = new Color[s * s];
+            var body = new bool[s * s];      // belt-body (white) pixels — outlined into a frame in pass 2
+            var solid = new bool[s * s];     // any non-transparent pixel of the "plus" shape
+            var belt = Color.white;
+            var dark = new Color(0.38f, 0.38f, 0.40f, 1f);
+            var edge = new Color(0.30f, 0.30f, 0.32f, 1f);
+            var hub  = new Color(0.92f, 0.93f, 0.96f, 1f);
+            float cx = (s - 1) * 0.5f, cy = (s - 1) * 0.5f;
+            const float L = 11f, t = 2.4f;
+
+            // Pass 1 — a belt "PLUS" (vertical through-line crossing a horizontal branch), with a bright hub
+            // at the node and flow chevrons: up the spine for both; the branch DIVERGES (splitter) or
+            // CONVERGES (merger). The arm width (0.17..0.83) matches a belt's body so a belt connects cleanly.
+            for (int y = 0; y < s; y++)
+                for (int x = 0; x < s; x++)
+                {
+                    float fx = x / (float)(s - 1), fy = y / (float)(s - 1);
+                    bool vArm = fx >= 0.17f && fx <= 0.83f; // N/S through-line
+                    bool hArm = fy >= 0.17f && fy <= 0.83f; // W/E branch
+                    if (!(vArm || hArm)) { px[y * s + x] = Clear; continue; }
+                    solid[y * s + x] = true;
+                    Color c = belt;
+                    if (Mathf.Sqrt((fx - 0.5f) * (fx - 0.5f) + (fy - 0.5f) * (fy - 0.5f)) <= 0.15f) c = hub; // central node
+                    else
+                    {
+                        bool chev = false;
+                        if (vArm && Mathf.Abs(fx - 0.5f) <= 0.33f)
+                            chev = ChevUp(x, y, 18f, cx, L, t) || ChevUp(x, y, 52f, cx, L, t);
+                        if (!chev && hArm && Mathf.Abs(fy - 0.5f) <= 0.33f)
+                            chev = splitter ? (ChevLeft(x, y, 14f, cy, L, t) || ChevRight(x, y, 50f, cy, L, t))
+                                            : (ChevRight(x, y, 30f, cy, L, t) || ChevLeft(x, y, 34f, cy, L, t));
+                        if (chev) c = dark;
+                    }
+                    if (c == belt) body[y * s + x] = true;
+                    px[y * s + x] = c;
+                }
+
+            // Pass 2 — outline the plus with a continuous side rail (dark `edge`) so it reads as belt framing,
+            // not 4 disconnected corner blocks, and lines up with a connecting belt's rails.
+            for (int y = 0; y < s; y++)
+                for (int x = 0; x < s; x++)
+                {
+                    if (!body[y * s + x]) continue;
+                    bool border = x == 0 || x == s - 1 || y == 0 || y == s - 1
+                                  || !solid[y * s + x - 1] || !solid[y * s + x + 1]
+                                  || !solid[(y - 1) * s + x] || !solid[(y + 1) * s + x];
+                    if (border) px[y * s + x] = edge;
+                }
+
+            var tex = NewTex(s);
+            tex.SetPixels(px);
+            tex.Apply();
+            return Sprite.Create(tex, new Rect(0, 0, s, s), new Vector2(0.5f, 0.5f), s);
+        }
+
+        /// <summary>A wooden SCAFFOLD frame overlaid on a building while it's under construction — braced
+        /// timber beams with an OPEN centre (so the half-built structure shows through) + a mid platform plank.
+        /// Baked wood colour; ConstructionSite fades it out as the build completes (the scaffold "comes down").</summary>
+        private static Sprite _scaffold;
+        public static Sprite Scaffold()
+        {
+            if (_scaffold != null) return _scaffold;
+            const int s = 64;
+            var tex = NewTex(s);
+            var px = new Color[s * s];
+            var wood = new Color(0.60f, 0.43f, 0.25f, 1f);
+            var woodD = new Color(0.40f, 0.28f, 0.16f, 1f);
+            for (int y = 0; y < s; y++)
+                for (int x = 0; x < s; x++)
+                {
+                    float fx = x / (float)(s - 1), fy = y / (float)(s - 1);
+                    bool frame = fx < 0.10f || fx > 0.90f || fy < 0.10f || fy > 0.90f;  // 4 outer beams
+                    bool plank = Mathf.Abs(fy - 0.5f) < 0.045f;                         // mid platform plank
+                    bool brace = (fx < 0.40f && fy < 0.40f && Mathf.Abs(fx - fy) < 0.05f)               // corner braces (X struts)
+                              || (fx > 0.60f && fy < 0.40f && Mathf.Abs((1f - fx) - fy) < 0.05f)
+                              || (fx < 0.40f && fy > 0.60f && Mathf.Abs(fx - (1f - fy)) < 0.05f)
+                              || (fx > 0.60f && fy > 0.60f && Mathf.Abs((1f - fx) - (1f - fy)) < 0.05f);
+                    Color c = (frame || plank || brace) ? wood : Clear;
+                    if (c == wood && (fx < 0.045f || fx > 0.955f || fy < 0.045f || fy > 0.955f)) c = woodD; // darker outer rim
+                    px[y * s + x] = c;
+                }
+            tex.SetPixels(px);
+            tex.Apply();
+            _scaffold = Sprite.Create(tex, new Rect(0, 0, s, s), new Vector2(0.5f, 0.5f), s);
+            return _scaffold;
+        }
+
+        // Chevron membership tests (apex point, legs trailing back) used by the junction sprites.
+        private static bool ChevUp(int x, int y, float apexY, float cx, float L, float t)
+            { float d = apexY - y; return d >= 0f && d <= L && Mathf.Abs(Mathf.Abs(x - cx) - d) <= t; } // "^" tip up
+        private static bool ChevRight(int x, int y, float apexX, float cy, float L, float t)
+            { float d = apexX - x; return d >= 0f && d <= L && Mathf.Abs(Mathf.Abs(y - cy) - d) <= t; } // ">" tip right
+        private static bool ChevLeft(int x, int y, float apexX, float cy, float L, float t)
+            { float d = x - apexX; return d >= 0f && d <= L && Mathf.Abs(Mathf.Abs(y - cy) - d) <= t; } // "<" tip left
 
         /// <summary>A small power pole — a wooden post with a crossarm + insulators, baked-colour so it
         /// reads as a pole on any tint. Kept small on the grid; it's a pure wired relay (see PowerPole).</summary>

@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace Caveman
 {
-    public enum Terrain : byte { Plains, Forest, Hills, Water }
+    public enum Terrain : byte { Plains, Forest, Hills, Water, Mountain } // Mountain appended LAST — no index shift
 
     /// <summary>
     /// The world as a system: a per-cell biome map that constrains where you can build.
@@ -29,42 +29,68 @@ namespace Caveman
             _map = new Terrain[_size * _size];
             _bridges.Clear();
 
-            // Lower frequencies = BIGGER features, so biomes read as large regions instead of a
-            // "golf course" of small patches. (Rivers keep their own low frequency.)
-            const float eF = 0.024f, mF = 0.032f, rF = 0.018f;
+            // BIG, READABLE regions: low-freq Perlin sampled at DOMAIN-WARPED coords (so biome borders
+            // wander organically instead of tracing noise contours), a RIDGED term that carves linear
+            // MOUNTAIN spines (real barriers, not blobs), and a radial CONTINENT FALLOFF that fades the
+            // land into a soft coastline near the rim instead of a hard ocean ring. Pure function of `seed`.
+            const float eF = 0.016f, mF = 0.020f, rF = 0.011f;      // elevation / moisture / rivers — LOW = big readable regions (rivers spread out)
+            const float warpAmp = 22f, warpF = 0.011f, ridgeF = 0.013f; // ridgeF low = a FEW long mountain ranges, not a vein web
             float ox = seed, oy = seed * 1.7f + 13f, ox2 = seed * 0.3f + 100f, oy2 = seed * 2.1f + 50f;
             float rox = seed * 0.7f + 200f, roy = seed * 1.3f + 300f;
-            float basin2 = basinRadius * basinRadius;
+            float wox = seed * 1.1f + 400f, woy = seed * 0.9f + 450f, wox2 = seed * 1.5f + 500f, woy2 = seed * 0.6f + 550f;
+            float rgx = seed * 0.8f + 600f, rgy = seed * 1.9f + 650f, bnox = seed * 0.4f + 700f, bnoy = seed * 1.2f + 750f;
+            float cox = seed * 1.4f + 800f, coy = seed * 0.7f + 850f; // coastline wobble
+            float core2 = (basinRadius * 0.75f) * (basinRadius * 0.75f);
+            float invHalf = half > 0 ? 1f / half : 1f;
 
             for (int gy = 0; gy < _size; gy++)
             {
                 for (int gx = 0; gx < _size; gx++)
                 {
                     int wx = gx - half, wy = gy - half;
-                    if (wx * wx + wy * wy <= basin2) { _map[gy * _size + gx] = Terrain.Plains; continue; }
+                    float d2 = wx * wx + wy * wy;
 
-                    // Ocean rim: a coastline of water near the map edge → a clean world boundary.
-                    bool ocean = (wx * wx + wy * wy) > (half - 8) * (half - 8);
+                    // Feathered basin: a GUARANTEED buildable plains core, then a noisy rim that blends out.
+                    if (d2 <= core2) { _map[gy * _size + gx] = Terrain.Plains; continue; }
+                    float bR = basinRadius * (0.85f + 0.30f * Mathf.PerlinNoise(wx * 0.05f + bnox, wy * 0.05f + bnoy));
+                    bool inBasinRim = d2 <= bR * bR;
 
-                    float e = Mathf.PerlinNoise(wx * eF + ox, wy * eF + oy);     // elevation
-                    float m = Mathf.PerlinNoise(wx * mF + ox2, wy * mF + oy2);   // moisture
-                    // Winding rivers: THIN bands where a low-freq noise crosses 0.5 — these snake
-                    // across the map and DIVIDE it into regions you bridge between (routes, not walls).
-                    bool river = Mathf.Abs(Mathf.PerlinNoise(wx * rF + rox, wy * rF + roy) - 0.5f) < 0.020f;
+                    // Domain warp the sample coordinates so borders meander.
+                    float qx = wx + warpAmp * (Mathf.PerlinNoise(wx * warpF + wox, wy * warpF + woy) - 0.5f);
+                    float qy = wy + warpAmp * (Mathf.PerlinNoise(wx * warpF + wox2, wy * warpF + woy2) - 0.5f);
+
+                    float e = Mathf.PerlinNoise(qx * eF + ox, qy * eF + oy);     // elevation
+                    float m = Mathf.PerlinNoise(qx * mF + ox2, qy * mF + oy2);   // moisture
+                    float ridge = 1f - Mathf.Abs(2f * Mathf.PerlinNoise(qx * ridgeF + rgx, qy * ridgeF + rgy) - 1f); // [0,1], 1 on a spine
+                    // Rivers: a THIN channel along a low-freq iso-contour, but ONLY through low ground (valleys)
+                    // and NOT on a ridge — so they read as a few winding rivers in the lowlands, not a web.
+                    bool river = Mathf.Abs(Mathf.PerlinNoise(qx * rF + rox, qy * rF + roy) - 0.5f) < 0.010f
+                                 && e < 0.52f && ridge < 0.80f;
+
+                    // Continent falloff: the world stays LAND across the playable interior and only fades to
+                    // SEA in the outer rim/corners. `fall` is a GLSL-style smoothstep that is 0 until ~0.90R
+                    // (wobbled by coast noise for an organic coastline), then ramps 0→1 to the edge.
+                    float dist01 = Mathf.Sqrt(d2) * invHalf;
+                    float coastN = 0.05f * (Mathf.PerlinNoise(wx * 0.025f + cox, wy * 0.025f + coy) - 0.5f);
+                    float fall = Mathf.Clamp01((dist01 - (0.90f + coastN)) / 0.14f);
+                    fall = fall * fall * (3f - 2f * fall);
+                    float land = e - fall * 1.10f;
 
                     Terrain t;
-                    if (ocean || river || e < 0.20f) t = Terrain.Water; // coastline + thin rivers + rare lakes
-                    else if (e > 0.70f) t = Terrain.Hills;              // high ground → hills
-                    else if (m > 0.60f) t = Terrain.Forest;            // wet mid ground → forest
+                    if (land < 0.16f || river) t = Terrain.Water;                  // interior lakes + thin rivers + rim sea
+                    else if (ridge > 0.92f && land > 0.45f) t = Terrain.Mountain;  // impassable spine cores (thin linear ranges)
+                    else if (ridge > 0.82f || land > 0.86f) t = Terrain.Hills;     // range flanks + high ground
+                    else if (m > 0.50f) t = Terrain.Forest;                        // wet mid ground (a major biome)
                     else t = Terrain.Plains;
+
+                    if (inBasinRim && t != Terrain.Water) t = Terrain.Plains;       // feather the basin into its surroundings
                     _map[gy * _size + gx] = t;
                 }
             }
 
-            // Clustering pass: merge stray land patches into contiguous zones so terrain
-            // transitions read clearly (forest region / hills region / plains). Deterministic
-            // (pure function of the map) and cheap (a couple of majority filters, one-time).
-            SmoothLand(2);
+            // Clustering pass: a 3×3 majority filter widens ecotones so biomes read as large contiguous
+            // regions. Water AND Mountain are never smoothed (rivers, coasts and spine ridges stay intact).
+            SmoothLand(4);
         }
 
         // Majority filter over LAND cells only: each plains/forest/hills cell becomes the most
@@ -81,7 +107,7 @@ namespace Caveman
                     for (int gx = 1; gx < _size - 1; gx++)
                     {
                         int idx = gy * _size + gx;
-                        if (src[idx] == Terrain.Water) continue; // never move water (rivers/lakes/ocean)
+                        if (src[idx] == Terrain.Water || src[idx] == Terrain.Mountain) continue; // never move water or spine ridges
 
                         int pl = 0, fo = 0, hi = 0;
                         for (int dy = -1; dy <= 1; dy++)
@@ -111,8 +137,22 @@ namespace Caveman
             _map[gy * _size + gx] = t;
         }
 
-        /// <summary>Base heading of corridor `k` (shared so resource regions can sit at its end).</summary>
-        public static float CorridorAngle(int k, int count) => (k / (float)Mathf.Max(1, count)) * Mathf.PI * 2f + 0.45f;
+        /// <summary>Base heading of corridor `k` (shared so resource regions can sit at its end). Seeded
+        /// per-corridor jitter de-symmetrises the spokes so the layout reads found, not like a diagram.</summary>
+        public static float CorridorAngle(int k, int count)
+            => (k / (float)Mathf.Max(1, count)) * Mathf.PI * 2f + 0.45f + (Hash01(k) - 0.5f) * 0.6f;
+
+        /// <summary>Deterministic [0,1) hash of an int — per-corridor/zone jitter that doesn't perturb the
+        /// global Random stream (so terrain layout stays stable independent of resource RNG draws).</summary>
+        public static float Hash01(int k)
+        {
+            unchecked
+            {
+                uint x = (uint)(k * 374761393 + 668265263);
+                x = (x ^ (x >> 13)) * 1274126177u;
+                return ((x ^ (x >> 16)) & 0xFFFFFFu) / (float)0x1000000;
+            }
+        }
 
         /// <summary>Clear `count` dry corridors (water→plains) from spawn so the basin always has
         /// expansion paths out — never water-locked. Corridors MEANDER and vary in width so they
@@ -132,7 +172,10 @@ namespace Caveman
                     int hw = halfWidth + (Mathf.PerlinNoise(r * 0.1f, k * 5f) > 0.6f ? 1 : 0); // varied width
                     for (int ox = -hw; ox <= hw; ox++)
                         for (int oy = -hw; oy <= hw; oy++)
-                            if (At(cx + ox, cy + oy) == Terrain.Water) Set(cx + ox, cy + oy, Terrain.Plains);
+                        {
+                            var tt = At(cx + ox, cy + oy);
+                            if (tt == Terrain.Water || tt == Terrain.Mountain) Set(cx + ox, cy + oy, Terrain.Plains); // dry, passable path
+                        }
                 }
             }
         }
@@ -146,6 +189,21 @@ namespace Caveman
             for (int dy = -r; dy <= r; dy++)
                 for (int dx = -r; dx <= r; dx++)
                     if (dx * dx + dy * dy <= r2) Set(cx + dx, cy + dy, biome);
+        }
+
+        /// <summary>Paint an ORGANIC region: a solid core disc plus several jittered overlapping blobs, so a
+        /// resource zone reads as a natural landmass instead of a stamped perfect circle (see the boat island).
+        /// Uses the global RNG (called post-Generate, where Random is already in play) — not for terrain gen.</summary>
+        public static void PaintBlob(Vector3 center, float radius, Terrain biome, int blobs, float jitter)
+        {
+            if (_map == null) return;
+            Paint(center, radius * 0.72f, biome); // solid core
+            for (int b = 0; b < blobs; b++)
+            {
+                Vector2 off = Random.insideUnitCircle * (radius * jitter);
+                float rr = radius * Random.Range(0.45f, 0.95f);
+                Paint(new Vector3(center.x + off.x, center.y + off.y, 0f), rr, biome);
+            }
         }
 
         /// <summary>Force a disc of water (a lake) — used to guarantee a water feature near spawn.</summary>
@@ -171,8 +229,9 @@ namespace Caveman
 
         public static bool IsWater(Vector2Int c) => At(c) == Terrain.Water;
 
-        /// <summary>Normal buildings need solid land — never water (even bridged; bridges carry belts/feet).</summary>
-        public static bool Buildable(Vector2Int c) => At(c) != Terrain.Water;
+        /// <summary>Normal buildings need flat, solid land — never water (even bridged; bridges carry belts/
+        /// feet) and never a Mountain (an impassable barrier you build around).</summary>
+        public static bool Buildable(Vector2Int c) { var t = At(c); return t != Terrain.Water && t != Terrain.Mountain; }
         public static bool Buildable(Vector3 world) =>
             Buildable(new Vector2Int(Mathf.RoundToInt(world.x), Mathf.RoundToInt(world.y)));
 
@@ -181,13 +240,13 @@ namespace Caveman
         public static void RemoveBridge(Vector2Int c) => _bridges.Remove(c);
         public static bool IsBridged(Vector2Int c) => _bridges.Contains(c);
 
-        /// <summary>Can the player walk here? Water blocks unless bridged.</summary>
-        public static bool Walkable(Vector2Int c) => At(c) != Terrain.Water || _bridges.Contains(c);
+        /// <summary>Can the player walk here? Water blocks unless bridged; Mountain always blocks.</summary>
+        public static bool Walkable(Vector2Int c) { var t = At(c); return (t != Terrain.Water && t != Terrain.Mountain) || _bridges.Contains(c); }
         public static bool Walkable(Vector3 world) =>
             Walkable(new Vector2Int(Mathf.RoundToInt(world.x), Mathf.RoundToInt(world.y)));
 
-        /// <summary>Can a belt sit here? Land, or a bridged water cell.</summary>
-        public static bool BeltAllowed(Vector2Int c) => At(c) != Terrain.Water || _bridges.Contains(c);
+        /// <summary>Can a belt sit here? Land (not Mountain), or a bridged water cell.</summary>
+        public static bool BeltAllowed(Vector2Int c) { var t = At(c); return (t != Terrain.Water && t != Terrain.Mountain) || _bridges.Contains(c); }
 
         /// <summary>Is there a water cell within `range` of this point? (for water collectors)</summary>
         public static bool HasWaterNear(Vector3 world, float range) => NearestWaterCell(world, range, out _);
@@ -223,8 +282,32 @@ namespace Caveman
                     if (dx * dx + dy * dy > r2) continue;
                     int gx = cx + dx + Half, gy = cy + dy + Half;
                     if (gx < 0 || gy < 0 || gx >= _size || gy >= _size) continue;
-                    if (_map[gy * _size + gx] == Terrain.Water) _map[gy * _size + gx] = Terrain.Plains;
+                    var tt = _map[gy * _size + gx];
+                    if (tt == Terrain.Water || tt == Terrain.Mountain) _map[gy * _size + gx] = Terrain.Plains; // keep patches reachable/buildable
                 }
+        }
+
+        /// <summary>Walk OUTWARD from spawn along `angle` and return the centre of the densest patch of
+        /// `biome` between minDist and maxDist — so a resource lands in a real, natural region of its home
+        /// biome (you explore the corridor and FIND the forest/hills there). Returns false if the biome
+        /// doesn't form a substantial patch along that ray (caller then falls back to painting one).</summary>
+        public static bool FindBiomeAlong(float angle, Terrain biome, float minDist, float maxDist, out Vector3 pos)
+        {
+            pos = default;
+            if (_map == null) return false;
+            float dx = Mathf.Cos(angle), dy = Mathf.Sin(angle);
+            float bestScore = -1f; Vector3 best = default;
+            for (float r = minDist; r <= maxDist; r += 2f)
+            {
+                int cx = Mathf.RoundToInt(dx * r), cy = Mathf.RoundToInt(dy * r);
+                int count = 0; // biome cells in a 9×9 neighbourhood → a real region, not a stray cell
+                for (int oy = -4; oy <= 4; oy++)
+                    for (int ox = -4; ox <= 4; ox++)
+                        if (At(cx + ox, cy + oy) == biome) count++;
+                if (count >= 30 && count > bestScore) { bestScore = count; best = new Vector3(cx, cy, 0f); }
+            }
+            if (bestScore < 0f) return false;
+            pos = best; return true;
         }
 
         /// <summary>Find a random cell of `biome` at least `minClear` from origin (for biome-placed
@@ -246,30 +329,104 @@ namespace Caveman
             return false;
         }
 
+        // WARM, living palette (the world used to read as flat cold blocks). Sand is a new coastline rim.
+        public static readonly Color Sand = new Color(0.78f, 0.71f, 0.49f);
         public static Color ColorOf(Terrain t) => t switch
         {
-            Terrain.Water => new Color(0.20f, 0.39f, 0.62f),
-            Terrain.Hills => new Color(0.47f, 0.43f, 0.36f),
-            Terrain.Forest => new Color(0.16f, 0.33f, 0.17f),
-            _ => new Color(0.31f, 0.41f, 0.25f), // plains
+            Terrain.Water => new Color(0.20f, 0.44f, 0.60f),     // friendlier teal
+            Terrain.Mountain => new Color(0.40f, 0.37f, 0.35f),  // warm rock
+            Terrain.Hills => new Color(0.54f, 0.47f, 0.34f),     // warm tan
+            Terrain.Forest => new Color(0.19f, 0.38f, 0.20f),    // deep but warm green
+            _ => new Color(0.39f, 0.48f, 0.25f),                 // plains — living yellow-green
         };
 
-        /// <summary>Bake the current map into a world-space sprite (call AFTER ClearAround edits).</summary>
+        /// <summary>Deterministic [0,1) per-cell hash (integer mixer, NO Perlin) — cheap enough to texture every
+        /// cell of a 1.7M-cell world at bake time. `salt` selects an independent channel (brightness, fleck, …).</summary>
+        public static float CellHash(int gx, int gy, int salt)
+        {
+            unchecked
+            {
+                uint h = (uint)(gx * 73856093) ^ (uint)(gy * 19349663) ^ (uint)(salt * 83492791 + 2654435761u);
+                h = (h ^ (h >> 13)) * 1274126177u;
+                return ((h ^ (h >> 16)) & 0xFFFFFFu) / (float)0x1000000;
+            }
+        }
+
+        private static Terrain MapAt(int gx, int gy)
+            => (gx < 0 || gy < 0 || gx >= _size || gy >= _size) ? Terrain.Plains : _map[gy * _size + gx];
+
+        /// <summary>The baked biome map texture (1px = 1 cell, world -Half..Half). Set by SpawnRenderer; used
+        /// by the full-screen map (M) to draw terrain under the fog. Null until the world is generated.</summary>
+        public static Texture2D MapTex { get; private set; }
+
+        /// <summary>Bake the current map into a world-space sprite (call AFTER ClearAround edits). The bake is no
+        /// longer a flat colour per cell: it adds a sandy COASTLINE rim, per-cell brightness/warmth MOTTLE, sparse
+        /// bright FLECKS, and DITHERED biome edges, so each region reads as textured ground instead of a slab.</summary>
         public static void SpawnRenderer()
         {
             if (_map == null) return;
             var tex = new Texture2D(_size, _size, TextureFormat.RGBA32, false)
-            { filterMode = FilterMode.Point, wrapMode = TextureWrapMode.Clamp };
-            var px = new Color32[_map.Length];
-            for (int i = 0; i < _map.Length; i++) px[i] = ColorOf(_map[i]);
-            tex.SetPixels32(px);
+            { filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Clamp }; // smooth, not a blocky quilt at play zoom
+            var px = new Color[_map.Length];
+            for (int gy = 0; gy < _size; gy++)
+                for (int gx = 0; gx < _size; gx++)
+                {
+                    int idx = gy * _size + gx;
+                    Terrain t = _map[idx];
+                    Color c = ColorOf(t);
+
+                    if (t == Terrain.Water)
+                    {
+                        float wv = 0.93f + 0.12f * CellHash(gx, gy, 5);          // gentle ripple shimmer
+                        px[idx] = new Color(c.r * wv, c.g * wv, c.b * wv); continue;
+                    }
+                    if (t == Terrain.Mountain)
+                    {
+                        float mv = 0.86f + 0.22f * CellHash(gx, gy, 6);          // rocky mottle
+                        px[idx] = new Color(c.r * mv, c.g * mv, c.b * mv); continue;
+                    }
+
+                    // --- land (plains/forest/hills) ---
+                    bool coast = MapAt(gx - 1, gy) == Terrain.Water || MapAt(gx + 1, gy) == Terrain.Water
+                               || MapAt(gx, gy - 1) == Terrain.Water || MapAt(gx, gy + 1) == Terrain.Water;
+                    if (coast)
+                    {
+                        c = Color.Lerp(c, Sand, 0.6f);                           // sandy beach rim
+                    }
+                    else
+                    {
+                        // dithered biome edge: a land cell next to a DIFFERENT land biome adopts it ~30% of the
+                        // time (stable per cell), softening the hard border into a speckled transition.
+                        Terrain nb = NeighbourLand(gx, gy, t);
+                        if (nb != t && CellHash(gx, gy, 2) < 0.30f) c = ColorOf(nb);
+                        float v = 0.93f + 0.13f * CellHash(gx, gy, 0);           // gentle brightness mottle
+                        float warm = (CellHash(gx, gy, 3) - 0.5f) * 0.05f;       // warmth wander
+                        c = new Color(Mathf.Clamp01(c.r * v + warm), Mathf.Clamp01(c.g * v), Mathf.Clamp01(c.b * v - warm * 0.5f));
+                        if (CellHash(gx, gy, 1) > 0.95f)                         // sparse bright fleck (grass/pebble)
+                            c = new Color(Mathf.Clamp01(c.r * 1.14f), Mathf.Clamp01(c.g * 1.14f), Mathf.Clamp01(c.b * 1.10f));
+                    }
+                    px[idx] = c;
+                }
+            tex.SetPixels(px);
             tex.Apply();
+            MapTex = tex;
 
             var go = new GameObject("Terrain");
             var sr = go.AddComponent<SpriteRenderer>();
             sr.sprite = Sprite.Create(tex, new Rect(0, 0, _size, _size), new Vector2(0.5f, 0.5f), 1f); // 1px = 1 unit
             sr.sortingOrder = -90; // above the plain ground backdrop (-100), below world objects
             go.transform.position = Vector3.zero;
+        }
+
+        // First 4-neighbour that is a DIFFERENT land biome (for edge dithering); else `self`.
+        private static Terrain NeighbourLand(int gx, int gy, Terrain self)
+        {
+            Terrain n;
+            n = MapAt(gx - 1, gy); if (n != self && n != Terrain.Water && n != Terrain.Mountain) return n;
+            n = MapAt(gx + 1, gy); if (n != self && n != Terrain.Water && n != Terrain.Mountain) return n;
+            n = MapAt(gx, gy - 1); if (n != self && n != Terrain.Water && n != Terrain.Mountain) return n;
+            n = MapAt(gx, gy + 1); if (n != self && n != Terrain.Water && n != Terrain.Mountain) return n;
+            return self;
         }
     }
 }

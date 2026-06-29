@@ -70,9 +70,12 @@ namespace Caveman
             return ext != null ? ext : PlaceholderArt.BuildingSprite(def);
         }
 
-        /// <summary>Belt visual — central Belt map by type name; fallback conveyor tile (hex for junctions).</summary>
+        /// <summary>Belt visual — central Belt map by type name; fallback conveyor tile (a matching
+        /// belt-family splitter/merger junction for those, else a plain conveyor).</summary>
         public static Sprite ForBelt(string beltName, bool splitter, bool merger)
-            => Resolve(Lookup(Belt, beltName), (splitter || merger) ? PlaceholderShape.Hexagon : PlaceholderShape.Conveyor);
+            => Resolve(Lookup(Belt, beltName), splitter ? PlaceholderShape.Splitter
+                                             : merger   ? PlaceholderShape.Merger
+                                                        : PlaceholderShape.Conveyor);
 
         /// <summary>Resource-node visual — central Resource map by item id; caller supplies the fallback shape.</summary>
         public static Sprite ForResource(ItemDefinition item, PlaceholderShape fallback)
@@ -180,6 +183,8 @@ namespace Caveman
             PlaceholderShape.Triangle => PlaceholderArt.Triangle(),
             PlaceholderShape.Hexagon => PlaceholderArt.Hexagon(),
             PlaceholderShape.Conveyor => PlaceholderArt.Conveyor(),
+            PlaceholderShape.Splitter => PlaceholderArt.SplitterSprite(),
+            PlaceholderShape.Merger => PlaceholderArt.MergerSprite(),
             PlaceholderShape.Tree => PlaceholderArt.Tree(),
             PlaceholderShape.Rock => PlaceholderArt.Rock(),
             PlaceholderShape.None => null,

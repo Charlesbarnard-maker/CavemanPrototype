@@ -17,6 +17,8 @@ editor open: read `Logs/Editor.log`, grep `error CS` after the LAST "Requested s
 the compile is CLEAN. **Gotcha:** kill zombie Unity + stale lockfile first (`Get-Process Unity | Stop-Process -Force`,
 then remove `Temp/UnityLockfile`) or you get lock races. Headless sprite previews: `BespokeSpriteDump.Dump` →
 `C:\Users\charl\CavemanArtPreview\`.
+**Standing permission (user, 2026-06-29):** Claude may CLOSE Unity (kill + clear lockfile) to run `compile-check.ps1`
+and REOPEN it afterward, autonomously, whenever a compile needs verifying — don't wait for the user to do it.
 
 - **Build:** Unity `6000.5.0f1`, 2D/URP. Open `Assets/UnitySave.unity` → Play. ALL built in code at runtime by
   `GameBootstrap.cs` (no prefabs/Inspector wiring — script `.meta` GUIDs don't matter, regenerated on import).
@@ -39,6 +41,81 @@ then remove `Temp/UnityLockfile`) or you get lock races. Headless sprite preview
   and confirmed correct-by-design (no change). Multi-stop loading subsumed by the consist rework.
 - **Deferred #49 PERF cleared:** zero-alloc footprint placement predicates (inline over the anchor); `DrawTopBar`
   chip build + `CalcSize` cached once/frame. PowerNet was already pooled; minimap/status caching judged low-value.
+- **UX pass (2026-06-29, later — playtest feedback batch, compile-clean, NOT yet playtested):**
+  ① **ELEVATED track now reads as a raised viaduct** (was visually identical to ground track): steel-tinted rails +
+  stone deck parapet (open centre, belt shows under) + two support piers + stronger drop shadow —
+  `PlaceholderArt.ViaductDeck()`, `RailTile.AddViaductRig()` + steel tint in `RailTile.Spawn`.
+  ② **UNDERGROUND belt is now a GUIDED two-click placement** (was: freely place two loose ends): click the entrance,
+  then the exit SNAPS to a cell ≤4 ahead along the entrance's facing with a translucent tunnel-span preview + entrance
+  ghost; both ends built + auto-paired on the exit click; right-click before then cancels cleanly (nothing built).
+  `BuildController.UpdateUndergroundPlacement` + helpers; pairing logic unchanged (`PairUnderground` already handles it).
+  ③ **Build menu recategorised:** new **Energy** tab (Power/Pole/Battery, out of Production) + new **Infrastructure**
+  tab (water Bridge, out of Belts). Elevated track stays under Trains (it's track). `InventoryHud.Cats`.
+  Noted-but-not-done: filter/gate belts still read by colour + hover name only (no bespoke sprite); water Bridge art
+  is still a flat gold square; Research Lodge still under Production.
+- **MAP-GEN OVERHAUL + junction sprites (2026-06-29, later — compile-clean, headless-verified, NOT yet playtested in motion):**
+  ① **Factorio-grade world gen** (`TerrainGrid.Generate` rewrite): low-freq **domain-warped** Perlin → large readable
+  biome regions; a **ridged** term → linear **Mountain ranges** (NEW `Terrain.Mountain`, blocks build/walk/belt — the
+  only gameplay change); a **continent falloff** (smoothstep from ~0.90R + coast noise) → organic coastline, land-
+  dominant interior; **feathered** plains basin at spawn; `SmoothLand(4)`. World grew to **Half=280** (~560 wide).
+  Reachability/no-strand guaranteed: `CarveCorridors`+`ClearAround` clear Water||Mountain, `SmoothLand` skips Mountain.
+  Added `Hash01` (deterministic jitter), `PaintBlob` (organic multi-blob zone paint); `CorridorAngle` jittered.
+  ② **Resource clusters** (`GameBootstrap`): power-law **centre falloff** (`FalloffOffset`) → dense core, sparse rim,
+  size/cap tapered; per-cluster **rich** variance (1-in-4 = 2× nodes); **distance-scaled richness** (far zones the
+  reward); zones jittered + `PaintBlob`'d; starter Wood/Stone de-mirrored. Zone distances rescaled 64–140.
+  ③ **World-size sync** (the 4 coupled constants — Generate 280, Ground 580, `FogOfWar` 580, `CameraFollow` maxZoom 190).
+  ④ **Splitter/Merger sprites** now belt-family (`PlaceholderArt.BuildJunction`: belt "plus" + frame + hub + diverging/
+  converging chevrons) instead of the alien Hexagon — new `PlaceholderShape.Splitter/Merger`, routed in `SpriteDatabase.ForBelt`.
+  **Verification:** headless `Caveman.MapGenAudit` (Assets/Editor — a KEEPER dev tool): `.Run` reports biome mix +
+  water-near-spawn + flood-fill zone reachability over 6 seeds (all PASS: ~plains23/forest16/hills18/water38/mtn5%);
+  `.Snapshot` / `.JunctionSnapshot` bake PNGs to %TEMP% for eyeballing. **Caught + fixed a `Mathf.SmoothStep`
+  misuse** (output-range vs edge-band) that had flooded the map to 98% water. **To verify in editor:** Play → the
+  world should read as a land continent with large biome regions, mountain ranges (you build/route AROUND them),
+  rivers, lakes, a sea rim; resource patches dense-core→sparse-rim; far zones richer; splitters/mergers look like belts.
+- **CONSTRUCTION FX (2026-06-29, later — compile-clean, NOT yet playtested in motion):** placing a building used to
+  only fade a faint ghost in over its `buildTime` (3–60s) — hard to tell it was building. Now `ConstructionSite`
+  spawns visible "under construction" FX: a **scaffold** overlay (`PlaceholderArt.Scaffold()`, footprint-scaled,
+  fades out as it nears done), 1–2 **animated builder workers** (reuse `CollectorWorker` Stone/sledge art, hammering
+  bob + frame cycle, age-themed; 2 for footprint ≥4), and a **progress bar** above. All are children of the site
+  (auto-destroyed on complete/cancel) via a counter-scaled `_fxRoot` so workers/bar stay world-scale. Verified with
+  `Caveman.MapGenAudit.ConstructionSnapshot` (PNG to %TEMP%). **To verify in editor:** place a building → scaffold +
+  worker(s) + filling bar; it materializes under them and the scaffold comes down on completion.
+- **Playtest batch 2 (2026-06-29, later — compile-clean, headless-verified where possible):**
+  ① **Belt placement is now BUILD-ON-RELEASE** (`BuildController.UpdateBeltPlacement`): drag = sketch a live preview,
+  RELEASE = build the line; a single tap = one belt. No more lingering blueprint / fragile separate confirm-click.
+  ② **MERGER fix** (`Belt.SimPull` → new `PullBuildingFrom`/`MergerPull`): mergers now round-robin their 3 input sides
+  taking from a belt OR a building per side, so a belt feed no longer STARVES an adjacent collector (the "merger on a
+  collector stalled the line" bug); building pulls restricted to the 3 input sides (not the output side). Dedupes the
+  belt+merger building-pull into one helper.
+  ③ **M MAP now shows TERRAIN** (`TerrainGrid.MapTex` exposed; `InventoryHud.DrawMapScreen` draws the biome texture
+  under the fog, aligned to world coords) + **hover tooltips** (resource name, building type, storage fill) + a biome
+  legend. ④ **Rivers** retuned (`TerrainGrid.Generate`): lower freq + thinner + valley/non-ridge gated → a few winding
+  lowland rivers, not a web (water ~34%). Audit still 6/6 seeds OK. **To verify in editor:** drag-lay belts; put a
+  merger on a collector + a belt line (both flow); press M (terrain + hover); rivers read as coherent lowland channels.
+  ⑤ **BIOME-GATED resources (DONE — user wants "go to a biome to get its resource"):** `TerrainGrid.FindBiomeAlong`
+  walks out each corridor and returns the densest natural patch of the resource's HOME biome (clay→Plains, copper/
+  stone/iron→Hills, wood→Forest); `GameBootstrap.Zone` places the field there, falling back to PaintBlob only if the
+  ray doesn't cross a real patch (so a resource is ALWAYS in-biome + reachable on the cleared corridor). Audit shows
+  6/6 seeds reachable, 3–5/5 zones placed in NATURAL biome (rest painted). `MapGenAudit.Run` now logs natural-biome
+  + per-zone nat/PAINT; `.Snapshot` rings each zone centre.
+  **NEXT (user chose): SCALE UP to Half≈650 (~1300 wide, ~5× area).** Just bump the 4 synced constants (Generate half,
+  Ground size, FogOfWar worldSize/res, CameraFollow maxZoom) + the MapGenAudit Half + maybe rescale zone distances /
+  corridor length. Do AFTER the user validates biome-gating in playtest. Watch on-foot travel time (trains/mounts).
+- **WORLD VISUAL POLISH ("make it feel filled-in + warm", 2026-06-29 — compile-clean, headless-previewed):** the world
+  read as flat colour blocks; now it's a warm, textured, living meadow. ① **Warm palette + textured terrain bake**
+  (`TerrainGrid.ColorOf` warmer RGBs + new `Sand`; `SpawnRenderer` adds a sandy COASTLINE rim, per-cell brightness/
+  warmth mottle, sparse flecks, dithered biome edges; **Bilinear** filter so it's smooth not blocky; `CellHash` integer
+  mixer, no Perlin — 1.7M-cell safe). ② **Decoration scatter** (`DecorScatter` + new `Bespoke/PlaceholderArt.Decor.cs`):
+  grass tufts, bushes, ferns, flowers, mushrooms, rocks, pebbles, water reeds — biome-weighted, ~5k sprites at Half=280
+  (cap 14k), front-loaded near spawn, sorted -80 (under buildings, fog-hidden), each with a baked soft contact shadow.
+  ③ **Ambient motion:** `SwayAnimator` (soft props sway, per-item phase, cap 3500), `CloudShadows` (14 drifting soft
+  shadow blobs, camera-windowed), `WaterShimmer` (glints twinkle on water). ④ **Warm VIGNETTE** overlay (`InventoryHud`
+  OnGUI, under the HUD). Wired in `GameBootstrap` after `SpawnRenderer`. Designed via a 5-agent workflow; perf budgeted
+  for the future Half=650 world (motion is camera-windowed → constant cost; scatter capped; bake one-time integer math).
+  **Verify harness:** `Caveman.MapGenAudit.LookSnapshot` PIXEL-composites the look to a PNG (URP batch-mode
+  Camera.Render renders sprites white — so the harness samples MapTex + blits decoration textures directly). **To
+  verify in editor:** Play → warm textured ground, grass/bushes/flowers, sand coasts, drifting cloud shadows, swaying
+  grass, water glints, vignette. Tuning knobs: `DecorScatter` Density/Step, `TerrainGrid.SpawnRenderer` mottle, vignette alphas.
 
 **✅ DONE AN EARLIER SESSION (2026-06-29, entries #39–#49):**
 - **Per-age player MOUNTS + GARAGE (#39/#40):** `PlaceholderArt.PlayerMount(tier,frame)` = On Foot→Horseback→Ox Cart→

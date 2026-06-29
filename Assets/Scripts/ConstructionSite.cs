@@ -57,6 +57,15 @@ namespace Caveman
         private SpriteRenderer _sr;
         private Color _baseColor;
 
+        // --- "Under construction" FX: scaffolding over the footprint + animated builder(s) hammering away +
+        //     a progress bar, so a building visibly READS as being built (not just a faint ghost). All are
+        //     children of the site, so they're destroyed automatically when it completes or is cancelled. ---
+        private Transform _fxRoot;          // counter-scaled so its children render at world scale
+        private SpriteRenderer _scaffoldSr;
+        private Transform _b1, _b2; private SpriteRenderer _b1Sr, _b2Sr; private Vector3 _b1Base, _b2Base;
+        private Transform _barFill; private float _barW;
+        private int _builderAge, _builderTier, _frame; private float _frameT, _animT;
+
         public static ConstructionSite Spawn(BuildingDefinition def, Vector3 pos, Belt.Dir outDir = Belt.Dir.E)
         {
             // Effective footprint after rotation (only rectangular kinds swap — matches BuildController/Depot).
@@ -88,7 +97,92 @@ namespace Caveman
             if (def.cost != null) foreach (var c in def.cost) if (c != null) costUnits += Mathf.Max(0, c.amount);
             int area = Mathf.Max(1, def.FootW * def.FootH);
             site.buildTime = Mathf.Clamp(3f + 0.22f * costUnits + 1.5f * (area - 1), 3f, 60f);
+            site.CreateFx(w, h, sb);
             return site;
+        }
+
+        // Build the construction FX (scaffold overlay + builder workers + progress bar) around the site.
+        private void CreateFx(int w, int h, float sb)
+        {
+            // A counter-scaled root: the site GO itself is stretched to the footprint, so to place fixed-size
+            // workers/bars we cancel that scale here and position children in plain world units from the centre.
+            var rootGo = new GameObject("BuildFx");
+            rootGo.transform.SetParent(transform, false);
+            float sx = Mathf.Max(0.001f, w * sb), sy = Mathf.Max(0.001f, h * sb);
+            rootGo.transform.localScale = new Vector3(1f / sx, 1f / sy, 1f);
+            _fxRoot = rootGo.transform;
+
+            // Scaffolding overlay — a child of the SITE so it inherits the footprint scale (covers the build).
+            var scaff = new GameObject("Scaffold");
+            scaff.transform.SetParent(transform, false);
+            scaff.transform.localScale = Vector3.one;
+            _scaffoldSr = scaff.AddComponent<SpriteRenderer>();
+            _scaffoldSr.sprite = PlaceholderArt.Scaffold();
+            _scaffoldSr.color = new Color(0.62f, 0.45f, 0.26f, 0.95f);
+            _scaffoldSr.sortingOrder = _sr.sortingOrder + 4;
+
+            // Builder worker(s) — reuse the worker art (a sledge "Stone" job reads as a builder), age-themed.
+            _builderAge = Colony.Instance != null ? Colony.Instance.Age : 0;
+            _builderTier = Mathf.Clamp(_builderAge, 0, 2);
+            float hw = w * 0.5f, hh = h * 0.5f;
+            _b1 = MakeBuilder("Builder", new Vector3(-hw - 0.1f, -hh + 0.15f, 0f), false, out _b1Sr);
+            _b1Base = _b1.localPosition;
+            if (w * h >= 4) { _b2 = MakeBuilder("Builder2", new Vector3(hw + 0.1f, -hh + 0.15f, 0f), true, out _b2Sr); _b2Base = _b2.localPosition; }
+
+            // Progress bar above the site (left-anchored fill, grown in AnimateFx).
+            _barW = Mathf.Max(0.9f, w * 0.9f);
+            float topY = hh + 0.5f;
+            MakeQuad("BarBg", new Vector3(0f, topY, 0f), new Vector3(_barW + 0.1f, 0.22f, 1f), new Color(0.08f, 0.08f, 0.10f, 0.85f), 14);
+            _barFill = MakeQuad("BarFill", new Vector3(-_barW * 0.5f, topY, 0f), new Vector3(0.001f, 0.14f, 1f), new Color(0.42f, 0.92f, 0.46f, 0.95f), 15);
+        }
+
+        private Transform MakeBuilder(string name, Vector3 localPos, bool faceLeft, out SpriteRenderer sr)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(_fxRoot, false);
+            go.transform.localPosition = localPos;
+            go.transform.localScale = new Vector3(faceLeft ? -0.7f : 0.7f, 0.7f, 1f);
+            sr = go.AddComponent<SpriteRenderer>();
+            sr.sprite = PlaceholderArt.CollectorWorker((int)PlaceholderArt.WorkerJob.Stone, _builderTier, _builderAge, 0);
+            sr.sortingOrder = 11; // above buildings — always visible at the work site
+            return go.transform;
+        }
+
+        private Transform MakeQuad(string name, Vector3 localPos, Vector3 localScale, Color color, int order)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(_fxRoot, false);
+            go.transform.localPosition = localPos;
+            go.transform.localScale = localScale;
+            var sr = go.AddComponent<SpriteRenderer>();
+            sr.sprite = PlaceholderArt.Square();
+            sr.color = color;
+            sr.sortingOrder = order;
+            return go.transform;
+        }
+
+        // Animate the FX each frame: grow the progress bar, cycle the builders' work frames + a hammering bob,
+        // and gently fade the scaffold out as the build finishes (it's "coming down").
+        private void AnimateFx()
+        {
+            float frac = BuildFraction;
+            if (_barFill != null)
+            {
+                float wgt = Mathf.Max(0.001f, _barW * frac);
+                var ls = _barFill.localScale; ls.x = wgt; _barFill.localScale = ls;
+                var lp = _barFill.localPosition; lp.x = -_barW * 0.5f + wgt * 0.5f; _barFill.localPosition = lp;
+            }
+            _frameT += Time.deltaTime;
+            if (_frameT >= 0.16f)
+            {
+                _frameT = 0f; _frame = (_frame + 1) % 3;
+                if (_b1Sr != null) _b1Sr.sprite = PlaceholderArt.CollectorWorker((int)PlaceholderArt.WorkerJob.Stone, _builderTier, _builderAge, _frame);
+                if (_b2Sr != null) _b2Sr.sprite = PlaceholderArt.CollectorWorker((int)PlaceholderArt.WorkerJob.Stone, _builderTier, _builderAge, (_frame + 1) % 3);
+            }
+            _animT += Time.deltaTime;
+            if (_b1 != null) { var p = _b1Base; p.y += Mathf.Abs(Mathf.Sin(_animT * 9f)) * 0.13f; _b1.localPosition = p; }
+            if (_b2 != null) { var p = _b2Base; p.y += Mathf.Abs(Mathf.Sin(_animT * 9f + 1.5f)) * 0.13f; _b2.localPosition = p; }
+            if (_scaffoldSr != null) _scaffoldSr.color = new Color(0.62f, 0.45f, 0.26f, Mathf.Lerp(0.95f, 0.4f, frac));
         }
 
         public Mat NextFetchable()
@@ -145,6 +239,7 @@ namespace Caveman
             // BuildController.DemolishSelected.)
             buildProgress += Time.deltaTime;
             UpdateVisual();
+            AnimateFx();
             if (buildProgress >= buildTime) Complete();
         }
 

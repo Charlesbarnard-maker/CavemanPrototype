@@ -46,24 +46,50 @@ namespace Caveman
             if (elevated)
             {
                 sr.sortingOrder = 8;                          // above belts (1) + belt items (2): the track crosses OVER them
+                sr.color = new Color(0.80f, 0.86f, 1f);       // cool STEEL tint — the rails read as metal, not warm brown ballast
                 WorldGrid.Remove(WorldGrid.Rails, cell, r);   // OnEnable reserved the cell — UN-reserve so a belt may pass under
-                r.AddElevatedShadow();
+                r.AddViaductRig();
             }
             return r;
         }
 
-        // A soft drop shadow + thin support legs so an elevated tile reads as RAISED above whatever's below it.
-        private GameObject _shadow;
-        private void AddElevatedShadow()
+        // A raised VIADUCT look so an elevated tile reads clearly as ABOVE whatever's below it: a stone deck
+        // parapet (open centre, so a belt underneath still shows), two support piers, and a soft drop shadow.
+        private GameObject _shadow, _deck;
+        private void AddViaductRig()
         {
-            _shadow = new GameObject("RailShadow");
+            // Drop shadow on the ground (offset down so the deck appears to float).
+            _shadow = new GameObject("ViaductShadow");
             _shadow.transform.SetParent(transform, false);
-            _shadow.transform.localPosition = new Vector3(0f, -0.16f, 0f);
-            _shadow.transform.localScale = new Vector3(0.92f, 0.5f, 1f);
-            var s = _shadow.AddComponent<SpriteRenderer>();
-            s.sprite = PlaceholderArt.Square();
-            s.color = new Color(0f, 0f, 0f, 0.30f);
-            s.sortingOrder = 3; // above the belt (1) + its items (2), below the elevated deck (8)
+            _shadow.transform.localPosition = new Vector3(0f, -0.20f, 0f);
+            _shadow.transform.localScale = new Vector3(1.0f, 0.52f, 1f);
+            var sh = _shadow.AddComponent<SpriteRenderer>();
+            sh.sprite = PlaceholderArt.Square();
+            sh.color = new Color(0f, 0f, 0f, 0.38f);
+            sh.sortingOrder = 3; // above the belt (1) + its items (2), below everything raised
+
+            // Two support piers (legs) peeking out below the deck.
+            for (int i = 0; i < 2; i++)
+            {
+                var pier = new GameObject("ViaductPier");
+                pier.transform.SetParent(transform, false);
+                pier.transform.localPosition = new Vector3(i == 0 ? -0.28f : 0.28f, -0.14f, 0f);
+                pier.transform.localScale = new Vector3(0.13f, 0.5f, 1f);
+                var ps = pier.AddComponent<SpriteRenderer>();
+                ps.sprite = PlaceholderArt.Square();
+                ps.color = new Color(0.22f, 0.23f, 0.28f, 1f);
+                ps.sortingOrder = 4; // above the shadow, below the deck
+            }
+
+            // The raised deck parapet (open centre so the belt below stays visible at the crossing edges).
+            _deck = new GameObject("ViaductDeck");
+            _deck.transform.SetParent(transform, false);
+            _deck.transform.localPosition = Vector3.zero;
+            _deck.transform.localScale = Vector3.one;
+            var ds = _deck.AddComponent<SpriteRenderer>();
+            ds.sprite = PlaceholderArt.ViaductDeck();
+            ds.color = Color.white;
+            ds.sortingOrder = 6; // above the piers/shadow, below the rails (8)
         }
 
         void OnEnable()

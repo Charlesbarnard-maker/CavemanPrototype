@@ -4,7 +4,7 @@ namespace Caveman
 {
     /// <summary>The procedural placeholder shape a visual falls back to when no external sprite is
     /// assigned — i.e. the current code-generated art (see PlaceholderArt).</summary>
-    public enum PlaceholderShape { None, Square, Circle, Triangle, Hexagon, Conveyor, Tree, Rock }
+    public enum PlaceholderShape { None, Square, Circle, Triangle, Hexagon, Conveyor, Tree, Rock, Splitter, Merger }
 
     /// <summary>
     /// A reference to a visual: an external sprite NAME (resolved centrally via <see cref="SpriteDatabase"/>

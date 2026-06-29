@@ -431,73 +431,64 @@ namespace Caveman
 
         // PASS 4: pull a new item from an adjacent feeder building into a cleared entry. Gated by
         // connectivity (don't pull onto a belt that leads nowhere) and tail room (deterministic
-        // spacing at the entry). One item per step, mirroring the old PullFromNeighbour scan/rules.
+        // spacing at the entry). One item per step. A MERGER instead round-robins its three input
+        // sides, taking from a belt OR a building on each side (so neither feed starves the other).
         public void SimPull()
         {
             if (undergroundExit) return;      // an exit is fed only by its paired entrance's teleport
             if (isGate && !_gateOpen) return; // shut → don't draw new items onto the line
             if (!_connected || !TailRoom()) return;
-            // A Merger fairly round-robins its belt inputs first (so all lines flow); if none had an
-            // item ready this step it falls through to the building scan below (a building feeding it).
-            if (isMerger && MergerPullFromBelts()) return;
-            for (int di = 0; di < 4; di++)
-            {
-                var c = _cell + Step((Dir)di);
+            if (isMerger) { MergerPull(); return; }
+            for (int di = 0; di < 4; di++) if (PullBuildingFrom((Dir)di)) return; // a plain belt/splitter pulls from a feeder building on any side
+        }
 
-                // Output ports: a belt only pulls a building's output from its OUTPUT side (the
-                // building's output must face this belt — Opposite of our scan dir). Liquids never
-                // ride belts — they move via pipes / carrying.
-                if (WorldGrid.Collectors.TryGetValue(c, out var p) && p != null && p.produces != null && !p.produces.isLiquid
-                    && p.OutputSide == Opposite((Dir)di) && FilterAccepts(p.produces)
-                    && (item == null || item == p.produces) && p.Buffer.Count(p.produces) > 0)
-                {
-                    if (p.Buffer.RemoveUpTo(p.produces, 1) > 0) { ReceiveItem(p.produces, (Dir)di, 0f); return; }
-                }
+        // Pull ONE matured output unit from a feeder BUILDING on `side` (its output must FACE us, i.e. its
+        // OutputSide == Opposite(side)). Liquids never ride belts. Shared by plain belts (scan all 4 sides)
+        // and mergers (their 3 input sides). Returns true if one unit was taken.
+        private bool PullBuildingFrom(Dir side)
+        {
+            var c = _cell + Step(side);
+            Dir need = Opposite(side);
+            if (WorldGrid.Collectors.TryGetValue(c, out var p) && p != null && p.produces != null && !p.produces.isLiquid
+                && p.OutputSide == need && FilterAccepts(p.produces) && (item == null || item == p.produces) && p.Buffer.Count(p.produces) > 0)
+            { if (p.Buffer.RemoveUpTo(p.produces, 1) > 0) { ReceiveItem(p.produces, side, 0f); return true; } }
 
-                if (WorldGrid.Workshops.TryGetValue(c, out var w) && w != null && w.output != null && !w.output.isLiquid
-                    && w.OutputSide == Opposite((Dir)di) && FilterAccepts(w.output)
-                    && (item == null || item == w.output) && w.Buffer.Count(w.output) > 0)
-                {
-                    if (w.Buffer.RemoveUpTo(w.output, 1) > 0) { ReceiveItem(w.output, (Dir)di, 0f); return; }
-                }
+            if (WorldGrid.Workshops.TryGetValue(c, out var w) && w != null && w.output != null && !w.output.isLiquid
+                && w.OutputSide == need && FilterAccepts(w.output) && (item == null || item == w.output) && w.Buffer.Count(w.output) > 0)
+            { if (w.Buffer.RemoveUpTo(w.output, 1) > 0) { ReceiveItem(w.output, side, 0f); return true; } }
 
-                // Storages have an OUTPUT side too — a belt on it pulls the stored item, so you can
-                // belt FROM a warehouse to a workshop (e.g. warehouse → sawmill).
-                if (WorldGrid.Storages.TryGetValue(c, out var st) && st != null && st.accepts != null && !st.accepts.isLiquid
-                    && st.OutputSide == Opposite((Dir)di) && FilterAccepts(st.accepts)
-                    && (item == null || item == st.accepts) && st.Store.Count(st.accepts) > 0)
-                {
-                    if (st.Store.RemoveUpTo(st.accepts, 1) > 0) { ReceiveItem(st.accepts, (Dir)di, 0f); return; }
-                }
+            // Storages have an OUTPUT side too — belt FROM a warehouse to a workshop (e.g. warehouse → sawmill).
+            if (WorldGrid.Storages.TryGetValue(c, out var st) && st != null && st.accepts != null && !st.accepts.isLiquid
+                && st.OutputSide == need && FilterAccepts(st.accepts) && (item == null || item == st.accepts) && st.Store.Count(st.accepts) > 0)
+            { if (st.Store.RemoveUpTo(st.accepts, 1) > 0) { ReceiveItem(st.accepts, side, 0f); return true; } }
 
-                if (WorldGrid.Depots.TryGetValue(c, out var dp) && dp != null && dp.item != null && !dp.item.isLiquid
-                    && dp.IsOutputPull(c, (Dir)di) && FilterAccepts(dp.item)  // OUT only on the station's north edge
-                    && (item == null || item == dp.item) && dp.store.Count(dp.item) > 0)
-                {
-                    if (dp.store.RemoveUpTo(dp.item, 1) > 0) { ReceiveItem(dp.item, (Dir)di, 0f); return; }
-                }
-            }
+            if (WorldGrid.Depots.TryGetValue(c, out var dp) && dp != null && dp.item != null && !dp.item.isLiquid
+                && dp.IsOutputPull(c, side) && FilterAccepts(dp.item) && (item == null || item == dp.item) && dp.store.Count(dp.item) > 0)
+            { if (dp.store.RemoveUpTo(dp.item, 1) > 0) { ReceiveItem(dp.item, side, 0f); return true; } }
+
+            return false;
         }
 
         // MERGER input: round-robin across the three non-output sides — back (Opposite dir), right
-        // (RotateCW), left (RotateCCW) — pulling a matured item from whichever feeder belt POINTS INTO
-        // us. Every line therefore gets a fair turn through the single output, and a belt that doesn't
-        // point in is never touched. Returns true if one item was taken this step.
+        // (RotateCW), left (RotateCCW). On each side it takes from whichever feeder is ready THIS step:
+        // a belt that POINTS INTO us, or a building whose output faces us. So a merger fairly combines
+        // belt lines AND draws directly from an adjacent collector/workshop/storage/depot — a belt feed
+        // never starves the building feed (the bug where a merger on a collector stalled the line).
         private Dir MergeInputDir(int idx) => idx == 1 ? RotateCW(dir) : idx == 2 ? RotateCCW(dir) : Opposite(dir);
-        private bool MergerPullFromBelts()
+        private bool MergerPull()
         {
             for (int k = 0; k < 3; k++)
             {
                 int idx = (_mergeNext + k) % 3;
                 Dir side = MergeInputDir(idx);
                 var f = At(_cell + Step(side));
-                if (f == null || f == this) continue;
-                if (f._cell + Step(f.dir) != _cell) continue;     // it must point INTO me
-                if (f._items.Count == 0) continue;
-                var lead = f._items[0];
-                if (lead.p < 1f - 1e-3f) continue;                 // its lead must have reached its exit edge
-                if (item != null && item != lead.def) continue;    // a cell carries one item type at a time
-                if (ReceiveItem(lead.def, side, 0f)) { f._items.RemoveAt(0); _mergeNext = (idx + 1) % 3; return true; }
+                if (f != null && f != this && f._cell + Step(f.dir) == _cell && f._items.Count > 0)
+                {
+                    var lead = f._items[0];
+                    if (lead.p >= 1f - 1e-3f && (item == null || item == lead.def) && ReceiveItem(lead.def, side, 0f))
+                    { f._items.RemoveAt(0); _mergeNext = (idx + 1) % 3; return true; }
+                }
+                if (PullBuildingFrom(side)) { _mergeNext = (idx + 1) % 3; return true; }
             }
             return false;
         }

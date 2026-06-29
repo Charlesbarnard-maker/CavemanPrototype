@@ -566,10 +566,12 @@ namespace Caveman
             cam.backgroundColor = new Color(0.16f, 0.19f, 0.16f);
 
             // --- Ground backdrop (behind everything; revealed as the fog clears) ---
-            MakeSprite("Ground", Color.white, Vector2.zero, 420f, -100, PlaceholderArt.Ground(new Color(0.22f, 0.31f, 0.19f)));
-            // World as a system: biome map with a clear starting basin. Water blocks building,
-            // so geography forces routing/expansion decisions. Rendered after resource spawns.
-            TerrainGrid.Generate(200, Random.value * 1000f, 22f); // big world (~400 across); open start basin
+            // Size MUST cover the terrain extent (>= 2*Half + slack) — kept in sync with Generate(280) below
+            // and FogOfWar.worldSize (580). Miss one and the world edge shows the void clear-colour / clips the map.
+            MakeSprite("Ground", Color.white, Vector2.zero, 580f, -100, PlaceholderArt.Ground(new Color(0.30f, 0.37f, 0.21f)));
+            // World as a system: biome map with a clear starting basin. Water + mountain block building, so
+            // geography forces routing/expansion decisions. Half=280 → a big ~560-wide continent. Rendered after spawns.
+            TerrainGrid.Generate(280, Random.value * 1000f, 22f); // big world (~560 across); open start basin
 
             // --- Player ---
             var player = MakeSprite("Player", Color.white, Vector2.zero, 0.85f, 10, PlaceholderArt.Caveman(0));
@@ -770,11 +772,12 @@ namespace Caveman
             //     A clear central area stays open as the player's base/processing yard. ---
             const float baseClear = 11f;
             // STARTER BASIN — small Wood + Stone clusters: enough to bootstrap your first factory,
-            // NOT to scale on (you outgrow them and must push out to the biome regions).
+            // NOT to scale on (you outgrow them and must push out to the biome regions). Centres are
+            // off-mirror (not a perfect E/W reflection) so the opening reads natural, not formulaic.
             SpawnClusters("Tree", wood, Color.white, PlaceholderArt.Tree(),
-                new Vector2(24f, 4f), 13f, 3, 3, 5, 2.2f, new Vector2(1.0f, 1.5f), 30, 1, baseClear);
+                new Vector2(25f, 3f), 13f, 3, 3, 5, 2.2f, new Vector2(1.0f, 1.5f), 30, 1, baseClear);
             SpawnClusters("Rock", stone, Color.white, PlaceholderArt.Rock(),
-                new Vector2(-24f, 4f), 13f, 3, 3, 5, 2.2f, new Vector2(1.0f, 1.5f), 30, 1, baseClear);
+                new Vector2(-23f, 8f), 12f, 3, 3, 5, 2.2f, new Vector2(1.0f, 1.5f), 30, 1, baseClear);
 
             // --- RESOURCE ZONES (logistics-first redesign): FEW, LARGE, DISTINCT, SINGLE-resource
             //     regions — each on its own corridor + biome, pushed FAR from spawn. One resource per
@@ -785,27 +788,41 @@ namespace Caveman
             //     Data-driven: one Zone() call per row; SpawnNode clears water per node so nothing
             //     strands. Coal (a mined fuel) is added with the hearth that burns it in a later phase. ---
             const int ZoneCount = 5;
-            TerrainGrid.CarveCorridors(ZoneCount, 130f, 1);
+            TerrainGrid.CarveCorridors(ZoneCount, 190f, 1);
             void Zone(int k, float dist, Terrain biome, string name, ItemDefinition item, Color color, Sprite sprite,
                       float discR, int clusters, int minN, int maxN, float clusterR, Vector2 size, int cap, int regen)
             {
                 float a = TerrainGrid.CorridorAngle(k, ZoneCount);
-                var center = new Vector2(Mathf.Cos(a) * dist, Mathf.Sin(a) * dist);
-                TerrainGrid.Paint(new Vector3(center.x, center.y, 0f), discR, biome); // theme the region
-                // Spread clusters across the disc (~0.6×radius) so the zone reads as ONE rich field.
-                SpawnClusters(name, item, color, sprite, center, discR * 0.6f, clusters, minN, maxN, clusterR, size, cap, regen, 0f);
+                Vector2 center;
+                // BIOME-GATED: prefer the NATURAL home biome found along this corridor (you explore out and
+                // DISCOVER, say, the forest there) — only fall back to PAINTING a biome region if the ray
+                // doesn't cross a real patch of it. Either way the zone sits on the (cleared) corridor → reachable.
+                if (TerrainGrid.FindBiomeAlong(a, biome, dist * 0.7f, dist * 1.35f, out var found))
+                    center = new Vector2(found.x, found.y);
+                else
+                {
+                    float d = dist + (TerrainGrid.Hash01(k + 7) - 0.5f) * 20f;
+                    center = new Vector2(Mathf.Cos(a) * d, Mathf.Sin(a) * d);
+                    TerrainGrid.PaintBlob(new Vector3(center.x, center.y, 0f), discR, biome, 4, 0.45f);
+                }
+                float dd = center.magnitude;
+                float distScale = 0.7f + dd / 180f;                           // far zones are genuinely RICHER (rewards expansion)
+                int capD = Mathf.RoundToInt(cap * distScale);
+                int clustersD = Mathf.RoundToInt(clusters * Mathf.Lerp(1f, 1.4f, Mathf.Clamp01(dd / 160f)));
+                // Spread clusters across the disc (~0.6×radius) so the zone reads as ONE rich field with a dense core.
+                SpawnClusters(name, item, color, sprite, center, discR * 0.6f, clustersD, minN, maxN, clusterR, size, capD, regen, 0f);
             }
             //   k  dist  biome           name             item       colour                         sprite                      discR clusters minN maxN clustR  size                     cap regen
-            Zone(0, 46f, Terrain.Plains, "Clay Pit",       clay,      Color.white, PlaceholderArt.ClayMound(),  30f, 5, 5, 8, 3.0f, new Vector2(1.0f,1.5f),  60, 1); // nearest — Bronze chain start
-            Zone(1, 60f, Terrain.Hills,  "Copper Deposit", copperOre, Color.white, PlaceholderArt.OreCopper(),  30f, 5, 4, 7, 3.0f, new Vector2(1.0f,1.6f), 180, 0); // finite — Bronze metal
-            Zone(2, 72f, Terrain.Forest, "Forest",         wood,      Color.white, PlaceholderArt.Tree(), 34f, 6, 6, 9, 3.4f, new Vector2(1.0f,1.6f),  40, 1); // lumber at scale
-            Zone(3, 86f, Terrain.Hills,  "Stone Outcrop",  stone,     Color.white, PlaceholderArt.Rock(),  32f, 6, 5, 8, 3.2f, new Vector2(1.0f,1.6f),  50, 1); // stone at scale
-            Zone(4,100f, Terrain.Hills,  "Iron Ore Field", ore,       Color.white, PlaceholderArt.OreIron(),  32f, 5, 4, 7, 3.0f, new Vector2(1.1f,1.6f), 220, 0); // finite — Iron age
+            Zone(0, 64f, Terrain.Plains, "Clay Pit",       clay,      Color.white, PlaceholderArt.ClayMound(),  30f, 5, 5, 8, 3.0f, new Vector2(1.0f,1.5f),  60, 1); // nearest — Bronze chain start
+            Zone(1, 84f, Terrain.Hills,  "Copper Deposit", copperOre, Color.white, PlaceholderArt.OreCopper(),  30f, 5, 4, 7, 3.0f, new Vector2(1.0f,1.6f), 180, 0); // finite — Bronze metal
+            Zone(2,100f, Terrain.Forest, "Forest",         wood,      Color.white, PlaceholderArt.Tree(), 34f, 6, 6, 9, 3.4f, new Vector2(1.0f,1.6f),  40, 1); // lumber at scale
+            Zone(3,120f, Terrain.Hills,  "Stone Outcrop",  stone,     Color.white, PlaceholderArt.Rock(),  32f, 6, 5, 8, 3.2f, new Vector2(1.0f,1.6f),  50, 1); // stone at scale
+            Zone(4,140f, Terrain.Hills,  "Iron Ore Field", ore,       Color.white, PlaceholderArt.OreIron(),  32f, 5, 4, 7, 3.0f, new Vector2(1.1f,1.6f), 220, 0); // finite — Iron age
 
             // Oil field — a Bronze-age LIQUID resource on the plains, out along the clay corridor. Finite.
             {
                 float oa = TerrainGrid.CorridorAngle(0, ZoneCount);
-                var oc = new Vector2(Mathf.Cos(oa) * 58f, Mathf.Sin(oa) * 58f);
+                var oc = new Vector2(Mathf.Cos(oa) * 80f, Mathf.Sin(oa) * 80f);
                 TerrainGrid.Paint(new Vector3(oc.x, oc.y, 0f), 14f, Terrain.Plains);
                 SpawnClusters("Oil Field", oil, Color.white, PlaceholderArt.OilPatch(), oc, 8f, 4, 4, 6, 3.0f, new Vector2(1.2f, 1.8f), 200, 0, 0f);
             }
@@ -815,7 +832,7 @@ namespace Caveman
             //     so the only way to bring the goods home is by boat. ---
             {
                 float ia = TerrainGrid.CorridorAngle(2, ZoneCount) + 0.9f; // between the carved land corridors
-                var ic = new Vector2(Mathf.Cos(ia) * 120f, Mathf.Sin(ia) * 120f);
+                var ic = new Vector2(Mathf.Cos(ia) * 168f, Mathf.Sin(ia) * 168f);
                 TerrainGrid.CarveWater(new Vector3(ic.x, ic.y, 0f), 34f); // a wide sea around the island
                 // Irregular, hand-shaped coastline: several overlapping land blobs instead of one perfect disc
                 // (so the island reads as a designed landmass, not a procedural circle).
@@ -841,6 +858,14 @@ namespace Caveman
 
             // Bake the biome map into its visual now that resource cells have been cleared.
             TerrainGrid.SpawnRenderer();
+
+            // --- World "juice": make it feel warm, filled-in and alive ---
+            new GameObject("Sway").AddComponent<SwayAnimator>();   // must exist before scatter registers soft props
+            DecorScatter.Populate();                                // grass/bushes/flowers/rocks/reeds across the biomes
+            var clouds = new GameObject("CloudShadows").AddComponent<CloudShadows>();
+            clouds.target = player.transform;                       // soft shadows drift over the ground
+            var shimmer = new GameObject("WaterShimmer").AddComponent<WaterShimmer>();
+            shimmer.target = player.transform;                      // glints twinkle on the water
         }
 
         // Spawn `clusterCount` natural clusters in an AREA (areaCenter ± areaSpread), each a tight
@@ -852,11 +877,24 @@ namespace Caveman
         {
             for (int k = 0; k < clusterCount; k++)
             {
-                Vector2 c = areaCenter + Random.insideUnitCircle * areaSpread;
-                if (c.magnitude < minClear) c = c.normalized * minClear; // keep the base clear
-                int n = Random.Range(minNodes, maxNodes + 1);
-                SpawnCluster(name, item, color, sprite, c, n, clusterRadius, sizeRange, capacity, regen);
+                Vector2 c = areaCenter + FalloffOffset(areaSpread, 1.5f, out _); // clusters bunch toward the zone core
+                if (c.magnitude < minClear) c = c.normalized * minClear;          // keep the base clear
+                bool rich = Random.value < 0.25f;                                 // ~1 in 4 is a big, rich cluster (size variety)
+                int n = Random.Range(minNodes, maxNodes + 1) * (rich ? 2 : 1);
+                float cr = clusterRadius * Random.Range(0.7f, 1.5f) * (rich ? 1.5f : 1f);
+                int capK = Mathf.RoundToInt(capacity * (rich ? 1.6f : 1f));
+                SpawnCluster(name, item, color, sprite, c, n, cr, sizeRange, capK, regen);
             }
+        }
+
+        // Radial sample with density falling off toward the rim (falloff>1 pulls mass to the centre, so a
+        // patch/zone reads as a dense core fading to a sparse edge). t01: 0 at the core, 1 at the rim.
+        private static Vector2 FalloffOffset(float radius, float falloff, out float t01)
+        {
+            float r = radius * Mathf.Pow(Random.value, falloff);
+            float a = Random.value * 6.2831853f;
+            t01 = radius <= 0f ? 0f : r / radius;
+            return new Vector2(Mathf.Cos(a) * r, Mathf.Sin(a) * r);
         }
 
         // One cluster: `nodeCount` patches packed within `radius` of `center` (a grove / outcrop).
@@ -865,11 +903,12 @@ namespace Caveman
         {
             for (int i = 0; i < nodeCount; i++)
             {
-                Vector2 pos = center + Random.insideUnitCircle * radius;
-                float size = Random.Range(sizeRange.x, sizeRange.y);
+                Vector2 pos = center + FalloffOffset(radius, 2.0f, out float t); // nodes densest at the core, sparse at the rim
+                float size = Mathf.Lerp(sizeRange.y, sizeRange.x, t);            // bigger nodes in the core
+                int cap = Mathf.Max(1, Mathf.RoundToInt(capacity * Mathf.Lerp(1f, 0.40f, t))); // rich core, thin rim
                 float b = Random.Range(0.9f, 1.1f); // slight per-node colour variation
                 var c = new Color(Mathf.Clamp01(color.r * b), Mathf.Clamp01(color.g * b), Mathf.Clamp01(color.b * b));
-                SpawnNode(name, item, c, pos, size, sprite, capacity, regen);
+                SpawnNode(name, item, c, pos, size, sprite, cap, regen);
             }
         }
 

@@ -15,7 +15,7 @@ namespace Caveman
         public float smoothTime = 0.12f;
 
         public float minZoom = 4f;
-        public float maxZoom = 140f;
+        public float maxZoom = 190f;       // zoom out far enough to read the bigger ~560-wide world
         public float zoomStep = 2.5f;
 
         private Camera _cam;

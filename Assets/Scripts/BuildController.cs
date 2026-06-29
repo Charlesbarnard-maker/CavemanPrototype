@@ -39,8 +39,17 @@ namespace Caveman
         private readonly List<GameObject> _planGhosts = new();               // translucent previews (pooled)
         private bool _strokeActive, _strokeMoved;                            // current drag stroke state
         private Vector2Int _strokeStart, _strokeLast;
-        private bool _beltPlanHinted;
+        private bool _beltDragHinted; // one-time "drag to lay a line" hint (never reset by ClearBeltPlan)
         private bool _beltPlanDirty; // ghosts rebuilt only when the plan changes (not every frame)
+        // --- Underground belt GUIDED placement: first click sets the ENTRANCE, second click the EXIT (snapped
+        //     ahead along the entrance's facing, within tunnel range). Nothing is built until the exit is
+        //     confirmed, so a cancel leaves no dangling end. ---
+        private bool _ugAwaitingExit;
+        private Vector2Int _ugEntranceCell;
+        private Belt.Dir _ugEntranceDir;
+        private GameObject _ugEntranceGhost, _ugSpanGhost; // persistent entrance preview + the tunnel-span bar
+        private const int UgMaxTunnel = 4;                 // mirrors Belt.MaxTunnel — exit may sit up to 4 cells ahead
+        private static readonly List<ItemAmount> _ugPairCostBuf = new(); // reused 2× cost (both ends paid at once)
         // --- Rail BLUEPRINT placement (same drag-plan-then-click as belts; 90° L-paths only). ---
         private readonly List<Vector2Int> _railPlan = new();
         private readonly List<GameObject> _railPlanGhosts = new();
@@ -489,6 +498,8 @@ namespace Caveman
             ClearRailPlan();
             ClearGhostJunctionPorts();
             _strokeActive = false;
+            _ugAwaitingExit = false;  // a pending underground tunnel shouldn't carry into a new tool
+            HideUndergroundGuides();
             EnsureGhost();
         }
 
@@ -749,6 +760,11 @@ namespace Caveman
             Vector3 world = _cam.ScreenToWorldPoint(mouse.position.ReadValue());
             Vector2Int cell = Belt.CellOf(world);
 
+            // Underground belts use a GUIDED two-click flow (entrance, then a snapped exit) — handled apart
+            // from the plain-belt blueprint and the splitter/filter single-click paths. (R already rotated
+            // BeltDir above; the entrance phase reads it, the exit phase locks to the entrance's facing.)
+            if (def.underground) { UpdateUndergroundPlacement(mouse, def, cell); return; }
+
             // Cursor-cell direction: along the active sketch stroke, else auto-oriented toward a sink.
             Belt.Dir dir = singleClick ? BeltDir
                          : (_strokeActive && Adjacent(cell, _strokeLast)) ? Belt.FromTo(_strokeLast, cell)
@@ -782,37 +798,154 @@ namespace Caveman
                 return;
             }
 
-            // --- Plain belts: blueprint flow (drag = plan a STRAIGHT line, click = build, right-click = cancel). ---
+            // --- Plain belts: drag to SKETCH a straight line (live preview), RELEASE to build it; a single
+            //     tap places one belt. Placement is IMMEDIATE — no lingering blueprint or separate confirm
+            //     click (the preview exists only while you hold the drag). Right-click aborts / leaves mode. ---
             if (mouse.leftButton.wasPressedThisFrame && !overUI)
             {
                 _strokeActive = true; _strokeMoved = false; _strokeStart = cell; _strokeLast = cell;
-                // Snapshot earlier strokes so this drag ADDS a straight segment (compose an L from two drags).
-                _committed.Clear();
-                foreach (var kv in _beltPlan) _committed[kv.Key] = kv.Value;
+                _committed.Clear(); _beltPlan.Clear(); _beltPlanDirty = true;
+                if (!_beltDragHinted) { _beltDragHinted = true; Toast.Show("<color=#9cf>Belt:</color> drag to lay a line · <color=#9f9>release to build</color> · right-click to cancel."); }
             }
             else if (_strokeActive && mouse.leftButton.isPressed)
             {
-                // Belts lay as a STRAIGHT run along the dominant drag axis (no auto-corner) — easier to pull
-                // a clean line; turn by doing a second drag. Replanned from the stroke start each move.
+                // Belts lay as a STRAIGHT run along the dominant drag axis (turn by doing a second drag),
+                // replanned from the stroke start each move so the preview tracks the cursor.
                 if (cell != _strokeLast) { _strokeMoved = true; _strokeLast = cell; ReplanStraight(_strokeStart, cell); }
             }
             else if (_strokeActive && mouse.leftButton.wasReleasedThisFrame)
             {
                 _strokeActive = false;
-                if (!_strokeMoved)
-                {
-                    if (_beltPlan.Count > 0) BuildBeltPlan(def);          // tap with a plan pending → build it
-                    else if (!overUI) PlanCell(cell, AutoBeltDir(cell));   // tap on empty → start a 1-tile plan
-                }
+                if (_strokeMoved) BuildBeltPlan(def);                       // dragged → build the sketched line on release
+                else if (!overUI) EnsureBelt(cell, AutoBeltDir(cell), def); // tapped → place a single belt right away
+                ClearBeltPlan();                                           // the preview is transient — clear it either way
             }
 
             if (mouse.rightButton.wasPressedThisFrame)
             {
-                if (_beltPlan.Count > 0) ClearBeltPlan(); // discard the pending plan
-                else CancelPlacement();                    // nothing planned → leave belt mode
+                if (_strokeActive) { _strokeActive = false; ClearBeltPlan(); } // abort the in-progress sketch
+                else CancelPlacement();                                        // nothing pending → leave belt mode
             }
 
             RebuildPlanGhosts(def);
+        }
+
+        // Underground belt: GUIDED two-click placement. First click picks the ENTRANCE (oriented with R);
+        // the tool then asks for the EXIT, SNAPPED to a cell up to UgMaxTunnel ahead along the entrance's
+        // facing (so the pair always connects). BOTH ends are built — and auto-paired — on the exit click,
+        // so right-clicking before then cancels cleanly with nothing left behind.
+        private void UpdateUndergroundPlacement(Mouse mouse, BuildingDefinition def, Vector2Int cell)
+        {
+            bool overUI = InventoryHud.PointerOverUI;
+            _ghostSr.sortingOrder = 20; // a prior rail/elevated ghost may have left this lowered
+
+            // ---- Phase 1: place the ENTRANCE. ----
+            if (!_ugAwaitingExit)
+            {
+                HideUndergroundGuides();
+                Belt.Dir dir = BeltDir;
+                _ghost.transform.position = new Vector3(cell.x, cell.y, 0f);
+                _ghost.transform.rotation = Quaternion.Euler(0f, 0f, Belt.Angle(dir));
+                _ghost.transform.localScale = Vector3.one;
+                _ghostSr.sprite = PlaceholderArt.UndergroundBelt(false);
+
+                bool valid = UndergroundCellFree(cell) && Economy.CanAfford(def.cost, Carried);
+                PlacementValid = valid;
+                _ghostSr.color = valid ? new Color(0.35f, 1f, 0.4f, 0.6f) : new Color(1f, 0.3f, 0.3f, 0.5f);
+
+                if (mouse.leftButton.wasPressedThisFrame && valid && !overUI)
+                {
+                    _ugEntranceCell = cell; _ugEntranceDir = dir; _ugAwaitingExit = true;
+                    Toast.Show("<color=#9cf>Underground belt:</color> now click the <color=#9f9>EXIT</color> up to 3 tiles ahead (same direction) · right-click cancels.");
+                }
+                else if (mouse.rightButton.wasPressedThisFrame) CancelPlacement();
+                return;
+            }
+
+            // ---- Phase 2: place the EXIT, snapped ahead of the entrance along its facing. ----
+            var fwd = Belt.Step(_ugEntranceDir);
+            int ahead = (cell.x - _ugEntranceCell.x) * fwd.x + (cell.y - _ugEntranceCell.y) * fwd.y;
+            ahead = Mathf.Clamp(ahead, 1, UgMaxTunnel);
+            var exitCell = _ugEntranceCell + fwd * ahead;
+
+            ShowUndergroundGuides(exitCell);
+
+            _ghost.transform.position = new Vector3(exitCell.x, exitCell.y, 0f);
+            _ghost.transform.rotation = Quaternion.Euler(0f, 0f, Belt.Angle(_ugEntranceDir));
+            _ghost.transform.localScale = Vector3.one;
+            _ghostSr.sprite = PlaceholderArt.UndergroundBelt(true);
+
+            bool ok = UndergroundCellFree(exitCell) && UndergroundCellFree(_ugEntranceCell)
+                      && CanAffordUndergroundPair(def.cost);
+            PlacementValid = ok;
+            _ghostSr.color = ok ? new Color(0.35f, 1f, 0.4f, 0.6f) : new Color(1f, 0.3f, 0.3f, 0.5f);
+
+            if (mouse.leftButton.wasPressedThisFrame && !overUI && ok)
+            {
+                EnsureBelt(_ugEntranceCell, _ugEntranceDir, def); // entrance (stays unpaired for the moment)
+                EnsureBelt(exitCell, _ugEntranceDir, def);         // exit — PairUnderground links it to the entrance behind it
+                _ugAwaitingExit = false;
+                HideUndergroundGuides();                            // ready for the next pair
+            }
+            else if (mouse.rightButton.wasPressedThisFrame)
+            {
+                _ugAwaitingExit = false; // abandon this pair (nothing was built) — back to choosing an entrance
+                HideUndergroundGuides();
+            }
+        }
+
+        // An underground end may only sit on an empty, belt-legal, unreserved, non-solid cell.
+        private bool UndergroundCellFree(Vector2Int cell)
+            => Belt.At(cell) == null && TerrainGrid.BeltAllowed(cell)
+               && !SolidBuildingAt(new Vector3(cell.x, cell.y, 0f)) && !WorldGrid.IsReserved(cell);
+
+        // Can the player afford BOTH tunnel ends? (they're paid together on the exit click)
+        private bool CanAffordUndergroundPair(List<ItemAmount> cost)
+        {
+            _ugPairCostBuf.Clear();
+            foreach (var c in cost) if (c != null && c.item != null) _ugPairCostBuf.Add(new ItemAmount(c.item, c.amount * 2));
+            return Economy.CanAfford(_ugPairCostBuf, Carried);
+        }
+
+        // Persistent previews shown while choosing the exit: a ghost of the chosen entrance + a translucent
+        // bar spanning the hidden tunnel between the two ends.
+        private void ShowUndergroundGuides(Vector2Int exitCell)
+        {
+            if (_ugEntranceGhost == null)
+            {
+                _ugEntranceGhost = new GameObject("UgEntranceGhost");
+                _ugEntranceGhost.AddComponent<SpriteRenderer>().sortingOrder = 20;
+            }
+            _ugEntranceGhost.SetActive(true);
+            var eg = _ugEntranceGhost.GetComponent<SpriteRenderer>();
+            eg.sprite = PlaceholderArt.UndergroundBelt(false);
+            eg.color = new Color(0.5f, 0.85f, 1f, 0.6f);
+            _ugEntranceGhost.transform.position = new Vector3(_ugEntranceCell.x, _ugEntranceCell.y, 0f);
+            _ugEntranceGhost.transform.rotation = Quaternion.Euler(0f, 0f, Belt.Angle(_ugEntranceDir));
+            _ugEntranceGhost.transform.localScale = Vector3.one;
+
+            if (_ugSpanGhost == null)
+            {
+                _ugSpanGhost = new GameObject("UgSpanGhost");
+                var ssr = _ugSpanGhost.AddComponent<SpriteRenderer>();
+                ssr.sprite = PlaceholderArt.Square();
+                ssr.sortingOrder = 19;
+            }
+            _ugSpanGhost.SetActive(true);
+            var span = _ugSpanGhost.GetComponent<SpriteRenderer>();
+            span.color = new Color(0.5f, 0.85f, 1f, 0.26f);
+            Vector2 a = _ugEntranceCell, b = exitCell;
+            Vector2 mid = (a + b) * 0.5f;
+            float len = Vector2.Distance(a, b);
+            bool horiz = _ugEntranceDir == Belt.Dir.E || _ugEntranceDir == Belt.Dir.W;
+            _ugSpanGhost.transform.position = new Vector3(mid.x, mid.y, 0f);
+            _ugSpanGhost.transform.localScale = horiz ? new Vector3(len + 1f, 0.32f, 1f) : new Vector3(0.32f, len + 1f, 1f);
+        }
+
+        private void HideUndergroundGuides()
+        {
+            if (_ugEntranceGhost != null) _ugEntranceGhost.SetActive(false);
+            if (_ugSpanGhost != null) _ugSpanGhost.SetActive(false);
         }
 
         // ---- Belt blueprint helpers (plan, preview, build) ------------------------------------
@@ -841,13 +974,8 @@ namespace Caveman
 
         private void PlanCell(Vector2Int cell, Belt.Dir dir)
         {
-            _beltPlan[cell] = dir;
+            _beltPlan[cell] = dir;   // a previewed cell of the in-progress drag (built on release)
             _beltPlanDirty = true;
-            if (!_beltPlanHinted)
-            {
-                _beltPlanHinted = true;
-                Toast.Show("<color=#9cf>Belt blueprint:</color> drag to extend · <color=#9f9>click to build</color> · right-click to cancel.");
-            }
         }
 
         private void BuildBeltPlan(BuildingDefinition def)
@@ -862,7 +990,6 @@ namespace Caveman
             _committed.Clear();
             foreach (var g in _planGhosts) if (g != null) Destroy(g);
             _planGhosts.Clear();
-            _beltPlanHinted = false;
             _beltPlanDirty = false;
         }
 
@@ -1274,6 +1401,8 @@ namespace Caveman
             IsPlacing = false;
             _dragging = false;
             _strokeActive = false;
+            _ugAwaitingExit = false;
+            HideUndergroundGuides();
             ClearBeltPlan();
             ClearRailPlan();
             ClearGhostJunctionPorts();
