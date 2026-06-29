@@ -144,7 +144,58 @@ public static class BespokeSpriteDump
         }
         DumpMounts(outDir, groundBg);
         DumpWorkers(outDir, groundBg);
-        Debug.Log("[BespokeSpriteDump] wrote contact sheets + zooms + mounts + workers to " + outDir);
+        DumpMachinery(outDir, groundBg);
+        Debug.Log("[BespokeSpriteDump] wrote contact sheets + zooms + mounts + workers + machinery to " + outDir);
+    }
+
+    // Upgrade machinery overlay escalation: rows = sample buildings, cols = tier 0..3, each = the building
+    // (tinted by def.color) with the tier's machinery overlay (white) composited on top, mid-animation.
+    static void DumpMachinery(string outDir, Color groundBg)
+    {
+        var samples = new System.ValueTuple<string, Color>[]
+        {
+            ("Wood Hut",  new Color(0.80f,0.52f,0.25f)),
+            ("Iron Mine", new Color(0.50f,0.48f,0.40f)),
+            ("Sawmill",   new Color(0.66f,0.50f,0.30f)),
+        };
+        const int cols = 4, scale = 5, cell = Native * scale, pad = 14;
+        int rows = samples.Length;
+        int W = pad + cols * (cell + pad), H = pad + rows * (cell + pad);
+        var sheet = Fill(W, H, groundBg);
+        for (int r = 0; r < rows; r++)
+            for (int tier = 0; tier < cols; tier++)
+            {
+                var baseSp = PlaceholderArt.BespokeBuilding(samples[r].Item1);
+                var mach = PlaceholderArt.TierMachinery(tier, 1);
+                int ox = pad + tier * (cell + pad);
+                int oy = (H - pad - r * (cell + pad)) - cell;
+                // base building, tinted by def.color
+                Blit5(sheet, W, H, baseSp, samples[r].Item2, ox, oy, scale, groundBg);
+                // machinery overlay, white tint
+                if (mach != null) Blit5(sheet, W, H, mach, Color.white, ox, oy, scale, default, true);
+            }
+        WritePng(sheet, W, H, Path.Combine(outDir, "machinery.png"));
+    }
+
+    // upscaled composite blit of a sprite × tint at (ox,oy); over=true means composite onto existing pixels.
+    static void Blit5(Color[] dst, int W, int H, Sprite sp, Color tint, int ox, int oy, int scale, Color bg, bool over = false)
+    {
+        if (sp == null) return;
+        var tex = sp.texture; var src = tex.GetPixels32(); int tw = tex.width, th = tex.height;
+        for (int sy = 0; sy < th; sy++)
+            for (int sx = 0; sx < tw; sx++)
+            {
+                Color32 sc = src[sy * tw + sx]; float a = sc.a / 255f; if (a <= 0f) continue;
+                float rr = (sc.r / 255f) * tint.r, gg = (sc.g / 255f) * tint.g, bb = (sc.b / 255f) * tint.b;
+                for (int yy = 0; yy < scale; yy++)
+                    for (int xx = 0; xx < scale; xx++)
+                    {
+                        int bx = ox + sx * scale + xx, by = oy + sy * scale + yy;
+                        if (bx < 0 || bx >= W || by < 0 || by >= H) continue;
+                        Color under = over ? dst[by * W + bx] : bg;
+                        dst[by * W + bx] = new Color(under.r * (1 - a) + rr * a, under.g * (1 - a) + gg * a, under.b * (1 - a) + bb * a, 1f);
+                    }
+            }
     }
 
     // Collector workers: rows = job (Wood/Stone/Clay/Ore), cols = upgrade tier 0..3 (3 = machine), each

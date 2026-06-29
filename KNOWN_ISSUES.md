@@ -57,6 +57,22 @@ sprite packs.
   Keep KNOWN_ISSUES newest-first. CavemanPrototype stays OUT of global memory.
 ---
 
+## #43 Buildings mechanise by upgrade tier — a growing machinery overlay (2026-06-29)
+The sibling to #42's workers: a building now visibly gets more TECHNOLOGICAL as you upgrade it, instead of just
+re-tinting. An additive overlay (its own object, white tint — never fights the body's colour) bolts onto the
+upper-right corner and GROWS with the tier:
+- **NEW `PlaceholderArt.TierMachinery(tier, frame)`** (`Bespoke/PlaceholderArt.TierMachinery.cs`): a compact
+  machine housing with **tier 1 = a bronze GEAR · tier 2 = + an iron gear & a sliding PISTON · tier 3 = + a
+  SMOKESTACK (drifting smoke) & a green POWER light**. Animated over 4 frames (gears counter-rotate, piston
+  slides, smoke rises). Shares a toothed-`Gear` helper.
+- **NEW `MachineUpgradeFX`** (MonoBehaviour): parented to the building (auto-cleaned), reads its `Tier` live each
+  frame and shows the matching overlay — so a place mechanises the instant you buy an upgrade. Attached in BOTH
+  `ProductionBuilding.Spawn` (collectors) and `WorkshopBuilding.Spawn` (workshops). Tier 0 → no overlay.
+- Tucked into the corner so it adds to the silhouette without hiding the bespoke building art. Verified via
+  headless renders (machinery.png over Wood Hut / Iron Mine / Sawmill, tiers 0-3). Compile CLEAN.
+- **Possible follow-up:** bespoke per-building tier silhouettes (more work) if the overlay isn't enough — but the
+  overlay gives the universal "advancing" feel cheaply + consistently.
+
 ## #42 Collector WORKERS: job-aware + tech-progressing (tree-cutter → machine) (2026-06-29)
 The collectors' little workers are no longer generic cavemen — they reflect the JOB and the building's
 UPGRADE TIER, so you see (and feel) the tech advance.

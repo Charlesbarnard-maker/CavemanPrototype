@@ -139,6 +139,8 @@ namespace Caveman
                 node.consumer = w;
             }
             WorkerUnit.SpawnForWorkshop(w, 1); // a visible worker tending the machine while it runs
+            // Upgrade machinery overlay — grows with the workshop's tier (gear → +piston → +smokestack/glow).
+            MachineUpgradeFX.Attach(go.transform, () => w != null ? w.Tier : 0);
             return w;
         }
 

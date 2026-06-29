@@ -106,6 +106,8 @@ namespace Caveman
             // Visible GATHERERS: little caveman workers walk out to the node and back (replaces the old
             // machine-arm FX). Cosmetic — the gather timer above does the real work.
             WorkerUnit.SpawnForCollector(pb, Mathf.Clamp(def.maxWorkers, 1, 3));
+            // Upgrade machinery overlay — grows with the building's tier (gear → +piston → +smokestack/glow).
+            MachineUpgradeFX.Attach(go.transform, () => pb != null ? pb.Tier : 0);
             return pb;
         }
 
