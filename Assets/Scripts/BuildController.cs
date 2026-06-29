@@ -669,19 +669,27 @@ namespace Caveman
         }
 
         // True if ANY cell this footprint would cover is already taken (a building, or a reserved
-        // road/rail tile — so you can't drop a building on track).
+        // road/rail tile — so you can't drop a building on track). Inlined over the anchor (these run
+        // EVERY frame a ghost is active) so there's no per-frame List alloc from Footprint.Cells.
         private bool FootprintBlocked(Vector3 center, int w, int h)
         {
-            foreach (var c in Footprint.Cells(center, w, h))
-                if (CellOccupied(new Vector3(c.x, c.y, 0f)) || WorldGrid.IsReserved(c)) return true;
+            var a = Footprint.Anchor(center, w, h);
+            for (int i = 0; i < w; i++)
+                for (int j = 0; j < h; j++)
+                {
+                    var c = new Vector2Int(a.x + i, a.y + j);
+                    if (CellOccupied(new Vector3(c.x, c.y, 0f)) || WorldGrid.IsReserved(c)) return true;
+                }
             return false;
         }
 
         // True only if EVERY footprint cell is on buildable terrain (not water).
         private bool FootprintOnLand(Vector3 center, int w, int h)
         {
-            foreach (var c in Footprint.Cells(center, w, h))
-                if (!TerrainGrid.Buildable(c)) return false;
+            var a = Footprint.Anchor(center, w, h);
+            for (int i = 0; i < w; i++)
+                for (int j = 0; j < h; j++)
+                    if (!TerrainGrid.Buildable(new Vector2Int(a.x + i, a.y + j))) return false;
             return true;
         }
 
@@ -689,11 +697,13 @@ namespace Caveman
         // boat can dock on the water half while belts connect on the land half.
         private bool FootprintStraddlesShore(Vector3 center, int w, int h)
         {
+            var a = Footprint.Anchor(center, w, h);
             bool land = false, water = false;
-            foreach (var c in Footprint.Cells(center, w, h))
-            {
-                if (TerrainGrid.IsWater(c)) water = true; else land = true;
-            }
+            for (int i = 0; i < w; i++)
+                for (int j = 0; j < h; j++)
+                {
+                    if (TerrainGrid.IsWater(new Vector2Int(a.x + i, a.y + j))) water = true; else land = true;
+                }
             return land && water;
         }
 

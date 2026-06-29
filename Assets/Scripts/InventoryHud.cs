@@ -68,6 +68,9 @@ namespace Caveman
         private float _lastSnap = -999f;
         private Rect _topRect, _miniRect, _objRect;
         private readonly List<(string label, int value, string detail, Color color)> _chips = new();
+        private int _topBarFrame = -1;              // frame the chip set + widths were last built (cache key)
+        private readonly List<float> _chipWidths = new();
+        private float _barH = 30f;
         private GUIStyle _toast;
         private GUIStyle _gatherStyle; // bold "+N" floating hand-gather popup
         private GUIStyle _legend;      // right-aligned minimap legend (so it never clips at the screen edge)
@@ -381,6 +384,48 @@ namespace Caveman
         // ---- Top resource bar: grouped, k-formatted, single line, hover for detail ----
         private void DrawTopBar()
         {
+            // The chip set + their measured widths change only when the once/frame-cached totals do, but OnGUI
+            // runs TWICE per frame — so build + CalcSize-measure the chips at most once per frame, then reuse
+            // them for both the Layout and Repaint passes (CalcSize per chip was the cost being doubled).
+            if (Time.frameCount != _topBarFrame) { _topBarFrame = Time.frameCount; BuildTopBarChips(); }
+
+            float maxX = _vw - 8f;
+            GUI.Box(new Rect(0, 0, _vw, _barH), GUIContent.none);
+            _topRect = new Rect(0, 0, _vw, _barH);
+
+            var mp = Event.current.mousePosition;
+            bool snap = Time.unscaledTime - _lastSnap >= 3f; // refresh the trend baseline every ~3s
+            float x = 12f, y = 5f;
+            int hover = -1; Rect hoverRect = default;
+            for (int i = 0; i < _chips.Count && i < _chipWidths.Count; i++)
+            {
+                if (x + _chipWidths[i] > maxX) { x = 12f; y += 24f; } // wrap to the next row
+                var c = _chips[i];
+                string hex = ColorUtility.ToHtmlStringRGB(c.color);
+                // Trend vs the last snapshot: ▲ growing, ▼ shrinking (deficit warning).
+                string arrow = "";
+                if (_trendSnap.TryGetValue(c.label, out int prev))
+                    arrow = c.value > prev ? " <color=#7d7>▲</color>" : c.value < prev ? " <color=#e96>▼</color>" : "";
+                if (snap) _trendSnap[c.label] = c.value;
+                var r = new Rect(x, y, _chipWidths[i], 22f);
+                GUI.Label(r, $"<color=#{hex}>■</color> <b>{c.label}</b> {K(c.value)}{arrow}", _small);
+                if (r.Contains(mp)) { hover = i; hoverRect = r; }
+                x += _chipWidths[i];
+            }
+            if (snap) _lastSnap = Time.unscaledTime;
+
+            if (hover >= 0 && _chips[hover].detail != null)
+            {
+                int lines = _chips[hover].detail.Split('\n').Length;
+                var dr = new Rect(hoverRect.x, hoverRect.yMax + 2f, 190f, 10f + lines * 18f);
+                GUI.Box(dr, GUIContent.none);
+                GUI.Label(new Rect(dr.x + 8, dr.y + 5, dr.width - 16, dr.height - 10), $"<size=13>{_chips[hover].detail}</size>", _small);
+            }
+        }
+
+        // Build the chip list + measure widths + bar height — once per frame (CalcSize is the cached cost).
+        private void BuildTopBarChips()
+        {
             var totals = _totals ?? Economy.Totals(gatherer.Inventory);
             int Get(ItemDefinition i) { if (i == null) return 0; totals.TryGetValue(i, out int v); return v; }
 
@@ -397,53 +442,20 @@ namespace Caveman
                     if (v > 0) _chips.Add((it.displayName, v, null, ColorOf(it)));
                 }
 
-            var mp = Event.current.mousePosition;
-            bool snap = Time.unscaledTime - _lastSnap >= 3f; // refresh the trend baseline every ~3s
-            float maxX = _vw - 8f;
-
             // Pre-measure so the bar can WRAP onto extra rows (many individual resources won't fit one line)
             // and the background box can size to however many rows we end up using.
-            var widths = new float[_chips.Count];
-            float mx = 12f; int rows = 1;
+            _chipWidths.Clear();
+            float maxX = _vw - 8f, mx = 12f; int rows = 1;
             for (int i = 0; i < _chips.Count; i++)
             {
                 var c = _chips[i];
                 string hex = ColorUtility.ToHtmlStringRGB(c.color);
                 float w = _small.CalcSize(new GUIContent($"<color=#{hex}>■</color> <b>{c.label}</b> {K(c.value)} ▲")).x + 16f;
-                widths[i] = w;
+                _chipWidths.Add(w);
                 if (mx + w > maxX) { mx = 12f; rows++; }
                 mx += w;
             }
-            float barH = rows * 24f + 6f;
-            GUI.Box(new Rect(0, 0, _vw, barH), GUIContent.none);
-            _topRect = new Rect(0, 0, _vw, barH);
-
-            float x = 12f, y = 5f;
-            int hover = -1; Rect hoverRect = default;
-            for (int i = 0; i < _chips.Count; i++)
-            {
-                if (x + widths[i] > maxX) { x = 12f; y += 24f; } // wrap to the next row
-                var c = _chips[i];
-                string hex = ColorUtility.ToHtmlStringRGB(c.color);
-                // Trend vs the last snapshot: ▲ growing, ▼ shrinking (deficit warning).
-                string arrow = "";
-                if (_trendSnap.TryGetValue(c.label, out int prev))
-                    arrow = c.value > prev ? " <color=#7d7>▲</color>" : c.value < prev ? " <color=#e96>▼</color>" : "";
-                if (snap) _trendSnap[c.label] = c.value;
-                var r = new Rect(x, y, widths[i], 22f);
-                GUI.Label(r, $"<color=#{hex}>■</color> <b>{c.label}</b> {K(c.value)}{arrow}", _small);
-                if (r.Contains(mp)) { hover = i; hoverRect = r; }
-                x += widths[i];
-            }
-            if (snap) _lastSnap = Time.unscaledTime;
-
-            if (hover >= 0 && _chips[hover].detail != null)
-            {
-                int lines = _chips[hover].detail.Split('\n').Length;
-                var dr = new Rect(hoverRect.x, hoverRect.yMax + 2f, 190f, 10f + lines * 18f);
-                GUI.Box(dr, GUIContent.none);
-                GUI.Label(new Rect(dr.x + 8, dr.y + 5, dr.width - 16, dr.height - 10), $"<size=13>{_chips[hover].detail}</size>", _small);
-            }
+            _barH = rows * 24f + 6f;
         }
 
         private static Color ColorOf(ItemDefinition i) => i != null ? i.color : Color.white;

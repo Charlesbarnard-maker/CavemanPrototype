@@ -110,10 +110,18 @@ Ran 3 parallel review agents (logic, balance, perf). Balance fixes landed in #48
 - **LOGIC:** `WorkshopBuilding.FirstUnlockedRecipe` now defaults to the LOWEST-age unlocked recipe regardless of
   list order (so a multi-recipe machine can't auto-pick a higher tier by authoring accident).
 
-**Deferred — PERF (clear + safe, for a focused follow-up):** `Footprint.Cells` allocates a List per call (reuse a
-buffer / inline the loop in the placement predicates); `DrawTopBar` runs `CalcSize` per chip every OnGUI pass (2×/
-frame) — cache chips+widths once/frame; minimap/full-map dot loops scan every `*.All` each pass — throttle to ~5-10
-Hz; `DrawStatus`/`DrawObjective`/`DrawHoverInfo` rebuild interpolated strings every pass — cache once/frame.
+**Deferred — PERF — SWEPT 2026-06-29 (see #50 review notes):**
+- ✅ `Footprint.Cells` per-frame List alloc — FIXED. The hot callers are `BuildController.FootprintBlocked/OnLand/
+  StraddlesShore` (run EVERY frame a ghost is active); inlined the loop over `Footprint.Anchor` → zero-alloc, no
+  shared buffer. The Spawn-time callers keep the allocating `Cells` (one-shot, fine).
+- ✅ `DrawTopBar` `CalcSize` per chip 2×/frame — FIXED. Chip set + widths now built once/frame (`BuildTopBarChips`,
+  keyed on `Time.frameCount`) and reused for both Layout + Repaint passes; the draw/hover loop still runs each pass.
+- ✅ `PowerNet.Rebuild` per-frame allocs — already done in a prior pass (scratch arrays at high-water mark, battery
+  lists reused + cleared in `EnsureScratch`); the note was stale. No change.
+- ⏸️ minimap/full-map dot loops — judged LOW value, left as-is: the cost is the per-dot `GUI.DrawTexture`, which only
+  runs on Repaint and MUST render; throttling the scan wouldn't remove the draws and the list iteration is cheap.
+- ⏸️ `DrawStatus`/`DrawObjective`/`DrawHoverInfo` strings — minor: the heavy bottleneck/finder scans are already
+  cached once/frame in `Update`; only a few cheap string formats remain. Not worth a cache's staleness risk.
 
 **Deferred — LOGIC — REVIEWED 2026-06-29 (see #50 review notes):**
 - **Belt input-side deposit gate** (`Belt.cs` ~439/485): ✅ VERIFIED CORRECT, no change. Traced the full chain —
