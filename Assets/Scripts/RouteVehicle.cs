@@ -58,7 +58,7 @@ namespace Caveman
 
         public static readonly List<RouteVehicle> All = new();
         void OnEnable() => All.Add(this);
-        void OnDisable() { All.Remove(this); ReleaseHeld(); DestroyWagons(); }
+        void OnDisable() { All.Remove(this); ReleaseHeld(); DestroyWagons(); DestroyPuffs(); if (_couplerGo != null) Destroy(_couplerGo); }
 
         private enum Phase { Travel, Service }
         private Phase _phase = Phase.Travel;
@@ -87,6 +87,15 @@ namespace Caveman
         private readonly List<Wagon> _wagons = new();
         private int _wagonTier = -1;                    // loco/age tier the consist was last sized for (rebuild on age-up)
         private readonly List<Vector3> _trail = new();  // recent loco positions (index 0 = newest) for wagon following
+
+        // Cosmetic only: a thin dark spine drawn through the cars (visible in the GAPS → reads as couplings),
+        // and a small pool of exhaust puffs kicked out behind a MOVING loco (white steam at tier 3, dark diesel
+        // exhaust at 4, light dust for the draft animals). No gameplay effect.
+        private LineRenderer _coupler; private GameObject _couplerGo;
+        private const int PuffCount = 8;
+        private SpriteRenderer[] _puffs;
+        private Vector3[] _puffVel; private Color[] _puffCol; private float[] _puffLife, _puffAge;
+        private int _puffNext; private float _puffTimer;
 
         // Track following (see CanEnter/BlockAheadClear). Each leg is a fresh forward path from the
         // vehicle's current position to the next stop, traversed cell-by-cell with claims + signals.
@@ -131,6 +140,7 @@ namespace Caveman
             // mixed cargo, so we no longer force every stop onto one shared commodity (each is set by its belts
             // or its panel; an unconfigured drop-off adopts the first cargo delivered to it, see ServiceStop).
             v.RebuildConsist();
+            if (!ship) v.CreateCoupler();
             return v;
         }
 
@@ -199,15 +209,18 @@ namespace Caveman
             if (stop == null) return;
 
             // 1) UNLOAD — deliver wagons into the stop. An unconfigured stop adopts the first cargo delivered.
-            bool unloadedHere = false; ItemDefinition delivered = null;
+            bool unloadedHere = false; ItemDefinition delivered = null; int deliveredTotal = 0;
             foreach (var w in _wagons)
             {
                 if (w.item == null || w.amount <= 0) continue;
                 if (stop.item == null) stop.item = w.item;          // a fresh drop-off adopts what's delivered
                 if (w.item != stop.item) continue;
                 int moved = stop.store.Add(w.item, w.amount);
-                if (moved > 0) { w.amount -= moved; unloadedHere = true; delivered = w.item; if (w.item != null && w.item.isLiquid) stop.trainFedAt = Time.time; if (w.amount <= 0) w.item = null; }
+                if (moved > 0) { w.amount -= moved; unloadedHere = true; delivered = w.item; deliveredTotal += moved; if (w.item != null && w.item.isLiquid) stop.trainFedAt = Time.time; if (w.amount <= 0) w.item = null; }
             }
+            // A floating "+N" at the stop so a working line reads as productive (reuses the hand-gather popup).
+            if (deliveredTotal > 0 && delivered != null)
+                GatherPopup.Show(stop.transform.position, $"+{deliveredTotal} {delivered.displayName}", delivered.color);
 
             // 2) LOAD — pull this stop's surplus into empty (or same-commodity) wagons, up to per-wagon capacity.
             var I = stop.item;
@@ -328,6 +341,95 @@ namespace Caveman
                 var sc = w.tf.localScale; sc.x = Mathf.Abs(sc.x) * (dirX < 0f ? -1f : 1f); w.tf.localScale = sc;
                 w.sr.color = w.item != null ? Color.Lerp(Color.white, w.item.color, 0.55f) : new Color(0.78f, 0.78f, 0.78f, 1f);
             }
+
+            // Draw the coupling spine through loco + every wagon (sits UNDER the cars, so it only shows in the gaps).
+            if (_coupler != null)
+            {
+                _coupler.positionCount = 1 + _wagons.Count;
+                _coupler.SetPosition(0, transform.position);
+                for (int i = 0; i < _wagons.Count; i++)
+                    _coupler.SetPosition(i + 1, _wagons[i].tf != null ? _wagons[i].tf.position : transform.position);
+            }
+            // Exhaust while actually travelling (not stopped to load / held at a signal).
+            UpdatePuffs(_phase == Phase.Travel && !_waiting, transform.localScale.x < 0f ? -1f : 1f);
+        }
+
+        private void CreateCoupler()
+        {
+            _couplerGo = new GameObject("Coupler");
+            _coupler = _couplerGo.AddComponent<LineRenderer>();
+            _coupler.material = PlaceholderArt.LineMaterial(); // shared
+            _coupler.useWorldSpace = true;
+            _coupler.widthMultiplier = 0.09f;
+            _coupler.numCapVertices = 1;
+            _coupler.sortingOrder = 12; // below wagons (13) + loco (14) → only the gaps show, like couplings
+            _coupler.startColor = _coupler.endColor = new Color(0.16f, 0.16f, 0.18f, 1f);
+            _coupler.positionCount = 0;
+        }
+
+        private void EnsurePuffs()
+        {
+            if (_puffs != null) return;
+            _puffs = new SpriteRenderer[PuffCount];
+            _puffVel = new Vector3[PuffCount]; _puffCol = new Color[PuffCount];
+            _puffLife = new float[PuffCount]; _puffAge = new float[PuffCount];
+            for (int i = 0; i < PuffCount; i++)
+            {
+                var go = new GameObject("Exhaust");
+                var sr = go.AddComponent<SpriteRenderer>();
+                sr.sprite = PlaceholderArt.Circle();
+                sr.sortingOrder = 15; // above the loco (14) so smoke reads on top
+                sr.enabled = false;
+                _puffs[i] = sr;
+            }
+        }
+
+        private void EmitPuff(float travelDirX)
+        {
+            int tier = AgeLocoTier();
+            int i = _puffNext; _puffNext = (_puffNext + 1) % PuffCount;
+            var sr = _puffs[i];
+            sr.enabled = true;
+            float backX = travelDirX < 0f ? 0.18f : -0.18f; // start just behind the loco
+            sr.transform.position = transform.position + new Vector3(backX, 0.22f, 0f);
+            sr.transform.localScale = Vector3.one * Random.Range(0.10f, 0.15f);
+            _puffVel[i] = new Vector3(backX * 1.3f + Random.Range(-0.08f, 0.08f), Random.Range(0.40f, 0.80f), 0f);
+            _puffLife[i] = Random.Range(0.5f, 0.9f); _puffAge[i] = 0f;
+            _puffCol[i] = tier >= 4 ? new Color(0.36f, 0.36f, 0.40f) // diesel exhaust
+                        : tier == 3 ? new Color(0.85f, 0.85f, 0.88f) // steam
+                        : new Color(0.80f, 0.74f, 0.60f);            // draft-animal dust
+            sr.color = new Color(_puffCol[i].r, _puffCol[i].g, _puffCol[i].b, 0f);
+        }
+
+        private void UpdatePuffs(bool moving, float travelDirX)
+        {
+            if (_isShip) return;
+            EnsurePuffs();
+            if (moving)
+            {
+                _puffTimer += Time.deltaTime;
+                float interval = AgeLocoTier() >= 3 ? 0.16f : 0.30f; // machines chuff faster than animals kick dust
+                if (_puffTimer >= interval) { _puffTimer = 0f; EmitPuff(travelDirX); }
+            }
+            for (int i = 0; i < PuffCount; i++)
+            {
+                var sr = _puffs[i];
+                if (sr == null || !sr.enabled) continue;
+                _puffAge[i] += Time.deltaTime;
+                float u = _puffLife[i] > 0f ? _puffAge[i] / _puffLife[i] : 1f;
+                if (u >= 1f) { sr.enabled = false; continue; }
+                sr.transform.position += _puffVel[i] * Time.deltaTime;
+                _puffVel[i] *= Mathf.Max(0f, 1f - Time.deltaTime * 1.2f);
+                var c = _puffCol[i]; c.a = (1f - u) * 0.7f; sr.color = c;
+                sr.transform.localScale = Vector3.one * Mathf.Lerp(0.10f, 0.26f, u);
+            }
+        }
+
+        private void DestroyPuffs()
+        {
+            if (_puffs == null) return;
+            foreach (var s in _puffs) if (s != null) Destroy(s.gameObject);
+            _puffs = null;
         }
 
         // Walk back along the trail to a target arc-distance; return that world position + x travel-direction.

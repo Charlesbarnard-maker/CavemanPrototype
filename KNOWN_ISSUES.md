@@ -105,8 +105,12 @@ NOT yet interactively playtested — this is the next thing to drive in the edit
   (`pumpFedAt` vs `trainFedAt`) so a pump-fed source never leaks the cargo a tanker is meant to collect.
 - **Global line overview (`InventoryHud`, hotkey L):** a modal panel listing every line — vehicle + consist size,
   %-full, current cargo (per-commodity), and the ordered stops with each stop's commodity. Added to footer + help.
-- **Files:** `RouteVehicle.cs` (rewrite), `Depot.cs` (drain + timestamps), `WaterPump.cs` (Sink 3), `InventoryHud.cs`
-  (Lines panel + hotkey/footer/help). Art (`TrainLoco`/`CargoWagon`/`LiquidWagon`) already existed; only mechanics added.
+- **Visual polish (cosmetic, no gameplay effect):** a thin dark COUPLING spine drawn through the cars (sits under
+  them so it only shows in the gaps); per-age loco EXHAUST while moving (draft-animal dust → white steam at tier 3 →
+  dark diesel smoke at 4, pooled puffs); and a floating "+N <item>" DELIVERY popup at a stop when a train unloads
+  (reuses `GatherPopup`). All in `RouteVehicle.cs`.
+- **Files:** `RouteVehicle.cs` (rewrite + polish), `Depot.cs` (drain + timestamps), `WaterPump.cs` (Sink 3),
+  `InventoryHud.cs` (Lines panel + hotkey/footer/help). Art (`TrainLoco`/`CargoWagon`/`LiquidWagon`) already existed.
 - **To verify in editor:** build a 3+-stop line across two resources → confirm mixed cargo rides in separate wagons
   and is dropped at the right stop; age up → wagons appear and trail correctly; pump→pipe→liquid station→tanker→
   destination station→pipe→refinery end-to-end; press L mid-run and read the overview.
