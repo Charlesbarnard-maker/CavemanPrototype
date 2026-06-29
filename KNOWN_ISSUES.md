@@ -4,15 +4,16 @@ A running record so progress/problems don't get lost. Newest first. Move items t
 **Fixed** when done. Maintained alongside the code — see DESIGN.md for the roadmap.
 
 ---
-## 📌 NEW-THREAD HANDOFF — current state (2026-06-29, + TRAIN CONSISTS, deferred-#49 logic/perf cleared — committed & pushed)
+## 📌 NEW-THREAD HANDOFF — current state (2026-06-29, + CONSISTS + SMART LOGISTICS belts + ELEVATED track — committed & pushed)
 Pinned pointer so a fresh thread (incl. on a DIFFERENT PC) can continue. Everything below is committed and pushed to
-`origin/main` (HEAD = `210a180`, working tree clean, in sync — this handoff refresh commits on top) — a clean clone has
+`origin/main` (HEAD = `5b15a59`, working tree clean, in sync — this handoff refresh commits on top) — a clean clone has
 the whole game. Open the project, Play, and continue from "LIKELY NEXT". A full interactive PLAYTEST is the biggest
-owed item (user tests in the evenings) — and the new CONSIST mechanics have NOT been interactively played yet.
+owed item (user tests in the evenings) — the new CONSIST mechanics (#50), SMART LOGISTICS belts (#51) and ELEVATED
+track (#52) compile clean but have NOT been interactively played yet.
 
 **⚠️ FIRST THING IN A NEW THREAD: verify the full Unity compile.** Authoritative check is Unity's own recompile of
 `Assembly-CSharp`. Editor CLOSED → `Tools/compile-check.ps1` (batch mode, ~30s-2min, prints "COMPILE CLEAN"). With the
-editor open: read `Logs/Editor.log`, grep `error CS` after the LAST "Requested script compilation". As of `210a180`
+editor open: read `Logs/Editor.log`, grep `error CS` after the LAST "Requested script compilation". As of `5b15a59`
 the compile is CLEAN. **Gotcha:** kill zombie Unity + stale lockfile first (`Get-Process Unity | Stop-Process -Force`,
 then remove `Temp/UnityLockfile`) or you get lock races. Headless sprite previews: `BespokeSpriteDump.Dump` →
 `C:\Users\charl\CavemanArtPreview\`.
@@ -23,7 +24,12 @@ then remove `Temp/UnityLockfile`) or you get lock races. Headless sprite preview
   if a verify-locks auth error hits (repo uses git-LFS). **CavemanPrototype stays OUT of global memory.** F3 = skip an
   age + unlock its tech (cheat for testing). Here-string commit messages fail if they contain parentheses — keep paren-free.
 
-**✅ DONE A LATER SESSION (2026-06-29, entry #50 — train consists + deferred-#49 cleanup):**
+**✅ DONE A LATER SESSION (2026-06-29, entries #50–#52 — consists, smart logistics, elevated track + #49 cleanup):**
+- **SMART LOGISTICS belts (#51):** UNDERGROUND BELT (items cross hidden under surface belts/track), FILTER BELT
+  (one item only, adopts first), PRIORITY SPLITTER (forward-first, sides take overflow), GATE BELT (shuts when its
+  target store is ~90% full). New "Smart Logistics" research (prereq Bronze). All `BuildingKind.Belt` flags.
+- **ELEVATED TRACK (#52):** a viaduct rail tile that doesn't reserve its cell (a belt runs under) and renders raised
+  with a shadow — so a train line crosses OVER conveyor lines. Same Smart Logistics tech. Pathing/links unchanged.
 - **TRAIN CONSISTS (#50):** loco now pulls an age-gated consist of WAGONS (one commodity each, trailed via a
   breadcrumb path) → a line hauls MIXED cargo; every stop unloads its resource + loads its surplus. LIQUID stations
   are pipe-fed both ways (pump→station, train→station→pipes→consumers, disambiguated by recency). New global line
@@ -68,9 +74,12 @@ then remove `Temp/UnityLockfile`) or you get lock races. Headless sprite preview
      mixed cargo rides in separate wagons + drops at the right stop; pump→pipe→liquid station→tanker→destination→pipe→
      refinery end-to-end; the **L** line overview reads right. Tune from feedback. (Watch consist BALANCE — capacity is
      now PER-WAGON, so late-game trains haul ~5× a single hold.)
-  2. **Consist follow-ups IF the playtest wants them:** a MANUAL add/remove-wagon UI (currently wagon count auto-scales by
-     age — confirm that's the preferred model); per-line cargo FILTERS (pin a wagon to a commodity); click-a-line-to-focus
-     camera in the L overview. None built — only do if play surfaces the need.
+  2. **NEW to verify (#51/#52):** research Smart Logistics (Bronze) → underground belt entrance/exit pairs + an item
+     crosses a surface belt over the gap; ELEVATED track laid over a belt (belt runs under, viaduct + shadow render
+     on top, a train routes over); filter belt locks to one item; priority splitter keeps forward fed; gate belt shuts
+     when its store fills. **Follow-ups (only if play wants them):** filter/gate could use a selection PANEL + clearer
+     bespoke sprites (they currently read by colour + hover name); consist MANUAL add/remove-wagon UI (now auto-by-age);
+     per-line cargo filters; click-a-line-to-focus camera in the L overview; elevated-over-elevated rail (only crosses belts now).
   3. **Make the WHOLE map feel hand-designed** (only the island was reshaped) — `TerrainGrid` / resource zones.
   4. Fuller UI/tutorial polish; bespoke ITEM icons (currently shape-by-family).
   - (Deferred #49 LOGIC + PERF items are now CLEARED — see #50 + the annotated #49 block below.)
