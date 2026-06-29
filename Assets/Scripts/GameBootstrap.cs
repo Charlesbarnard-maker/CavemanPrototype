@@ -354,6 +354,15 @@ namespace Caveman
             conditionalGate.cost = new List<ItemAmount> { new ItemAmount(planks, 1), new ItemAmount(metal, 1) };
             conditionalGate.description = "GATE BELT — only passes items while the line it feeds still has ROOM: it watches the nearest downstream STORAGE and SHUTS (backs up, turns amber) once that store is ~90% full, re-opening as space frees. Stops you over-filling one buffer while starving another. Overlay it on a plain belt to convert.";
 
+            // ELEVATED TRACK — a raised viaduct (Rail kind) that a train line crosses OVER belts on. Part of the
+            // same Smart Logistics tech as the underground belt: belts go under, trains go over.
+            var elevatedRail = ScriptableObject.CreateInstance<BuildingDefinition>();
+            elevatedRail.displayName = "Elevated Track"; elevatedRail.kind = BuildingKind.Rail; elevatedRail.elevated = true;
+            elevatedRail.unlockAge = 2; elevatedRail.requiredTech = "smart_logistics";
+            elevatedRail.color = new Color(0.70f, 0.74f, 0.82f);
+            elevatedRail.cost = new List<ItemAmount> { new ItemAmount(metal, 1), new ItemAmount(stone, 1) };
+            elevatedRail.description = "ELEVATED TRACK — a raised viaduct your train line runs on, so it can cross OVER conveyor belts (the belt passes underneath). Drag to plan like normal track (90° paths); lay it across a belt corridor and join ground track at each end. Crosses belts — not other train track.";
+
             // Exploration payoff: Ore is mined from distant veins, hauled home, and is
             // required to reach the Iron Age.
             var mine = MakeCollector("Iron Mine", ore, 1, 2.5f, 2, 12, new Color(0.50f, 0.48f, 0.40f),
@@ -536,7 +545,7 @@ namespace Caveman
                 new Research.Tech { id = "conveyors",   name = "Conveyor Belts", cost = 4,  prereq = null,     unlocks = new List<BuildingDefinition>{ fastBelt },   desc = "Your first belt upgrade: the Conveyor (60/min — keeps up with a collector). Cheap on purpose so you can grab it early without sacrificing the Tribal-age unlock. Overlay it on wooden belts to upgrade in place." },
                 new Research.Tech { id = "geared_belts", name = "Geared Belts",  cost = 40,  prereq = "bronze", unlocks = new List<BuildingDefinition>{ gearedBelt }, desc = "The Geared Belt (120/min — 2× a Conveyor) for high-throughput lines." },
                 new Research.Tech { id = "steel_belts",  name = "Steel Belts",   cost = 80,  prereq = "iron",   unlocks = new List<BuildingDefinition>{ steelBelt },  desc = "The Steel Belt (240/min — the fastest tier) for the densest late-game lines." },
-                new Research.Tech { id = "smart_logistics", name = "Smart Logistics", cost = 30, prereq = "bronze", unlocks = new List<BuildingDefinition>{ undergroundBelt, filterBelt, prioritySplitter, conditionalGate }, desc = "Mid-game logistics tools: the UNDERGROUND BELT (cross belts/track), FILTER BELT (sort a mixed line by item), PRIORITY SPLITTER (overflow routing), and GATE BELT (stop over-filling a buffer)." },
+                new Research.Tech { id = "smart_logistics", name = "Smart Logistics", cost = 30, prereq = "bronze", unlocks = new List<BuildingDefinition>{ undergroundBelt, filterBelt, prioritySplitter, conditionalGate, elevatedRail }, desc = "Mid-game logistics tools: the UNDERGROUND BELT + ELEVATED TRACK (cross belts and rail over/under each other), FILTER BELT (sort a mixed line by item), PRIORITY SPLITTER (overflow routing), and GATE BELT (stop over-filling a buffer)." },
             };
             // Gate those buildings behind their Tech (and off the age gate, so the Tech IS the gate).
             splitter.requiredTech = "splitters";
@@ -627,7 +636,7 @@ namespace Caveman
               ideaBench, scrollMaker, draftingTable, engineeringLab, researchLodge,
               // Logistics — belt tier ladder (wooden→conveyor→geared→steel) + junctions + smart-logistics tools + transport
               woodBelt, fastBelt, gearedBelt, steelBelt, splitter, merger,
-              undergroundBelt, filterBelt, prioritySplitter, conditionalGate, depot, rail, signal, twoWaySignal, bridge, harbour,
+              undergroundBelt, filterBelt, prioritySplitter, conditionalGate, depot, rail, elevatedRail, signal, twoWaySignal, bridge, harbour,
               // Liquids — pipes carry oil/water (never belts); Oil Well pumps oil, Water Pump pumps water, Booster relays pressure
               pipe, pump, booster, oilWell,
               // Storage — Woodpile + configurable Warehouse + liquid tanks (Oil Tank / Water Barrel)

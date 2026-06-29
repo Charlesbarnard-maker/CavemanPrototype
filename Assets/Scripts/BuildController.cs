@@ -1065,9 +1065,11 @@ namespace Caveman
             _ghostSr.sprite = PlaceholderArt.RailMask(GhostMask(cell)); // orient to neighbours / drag direction
             _ghost.transform.localScale = Vector3.one;
 
-            bool ok = RailCellFree(cell) && Economy.CanAfford(def.cost, Carried);
+            bool ok = RailCellFree(cell, def.elevated) && Economy.CanAfford(def.cost, Carried);
             PlacementValid = ok;
-            _ghostSr.color = ok ? new Color(0.4f, 0.9f, 1f, 0.6f) : new Color(1f, 0.35f, 0.35f, 0.5f);
+            if (_ghostSr != null) _ghostSr.sortingOrder = def.elevated ? 9 : 1; // show the elevated ghost above belts
+            _ghostSr.color = ok ? (def.elevated ? new Color(0.7f, 0.8f, 1f, 0.6f) : new Color(0.4f, 0.9f, 1f, 0.6f))
+                                : new Color(1f, 0.35f, 0.35f, 0.5f);
 
             if (mouse.leftButton.wasPressedThisFrame && !overUI)
             {
@@ -1095,16 +1097,18 @@ namespace Caveman
             RebuildRailPlanGhosts();
         }
 
-        private bool RailCellFree(Vector2Int cell)
+        // A rail cell is free if there's no rail there, the terrain is buildable, and no SOLID building sits on
+        // it. ELEVATED track additionally MAY sit over a belt (it crosses above), so it drops the no-belt rule.
+        private bool RailCellFree(Vector2Int cell, bool elevated = false)
             => RailTile.At(cell) == null && TerrainGrid.Buildable(cell)
-               && !SolidBuildingAt(new Vector3(cell.x, cell.y, 0f)) && Belt.At(cell) == null;
+               && !SolidBuildingAt(new Vector3(cell.x, cell.y, 0f)) && (elevated || Belt.At(cell) == null);
 
         // Place one rail tile at `cell` (paid) if the cell is clear; no-op otherwise.
         private void LayRail(Vector2Int cell, BuildingDefinition def)
         {
-            if (!RailCellFree(cell) || !Economy.CanAfford(def.cost, Carried)) return;
+            if (!RailCellFree(cell, def.elevated) || !Economy.CanAfford(def.cost, Carried)) return;
             Economy.Spend(def.cost, Carried);
-            RailTile.Spawn(def, new Vector3(cell.x, cell.y, 0f));
+            RailTile.Spawn(def, new Vector3(cell.x, cell.y, 0f), def.elevated);
             BuildingsPlaced++;
         }
 
@@ -1177,6 +1181,7 @@ namespace Caveman
             if (!_railPlanDirty) return;
             _railPlanDirty = false;
             int n = _railPlan.Count;
+            bool elev = PendingIndex >= 0 && PendingIndex < buildables.Count && buildables[PendingIndex].elevated;
             while (_railPlanGhosts.Count < n)
             {
                 var go = new GameObject("RailPlanGhost");
@@ -1193,7 +1198,7 @@ namespace Caveman
                 go.transform.position = new Vector3(c.x, c.y, 0f);
                 var sr = go.GetComponent<SpriteRenderer>();
                 sr.sprite = PlaceholderArt.RailMask(GhostMaskAt(i, n)); // EXACT preview: only what will actually connect
-                sr.color = RailCellFree(c)
+                sr.color = RailCellFree(c, elev) // elevated may cross belts, so a belt cell is still valid for it
                     ? new Color(0.4f, 0.9f, 1f, 0.5f) : new Color(1f, 0.35f, 0.35f, 0.55f);
             }
             for (int k = n; k < _railPlanGhosts.Count; k++) if (_railPlanGhosts[k].activeSelf) _railPlanGhosts[k].SetActive(false);

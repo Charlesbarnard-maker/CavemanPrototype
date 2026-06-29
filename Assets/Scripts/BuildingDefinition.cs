@@ -137,6 +137,8 @@ namespace Caveman
         public bool gate = false;
         [Tooltip("Signal: this is a TWO-WAY block signal (trains may pass in EITHER direction; it still enforces one-train-per-block) rather than a one-way signal.")]
         public bool bothWaySignal = false;
+        [Tooltip("Rail: this is ELEVATED track — it does NOT reserve its cell, so a belt may pass UNDER it, and it renders raised (with a shadow). Lets a train line cross over conveyor lines.")]
+        public bool elevated = false;
         [Tooltip("Depot: this is a HARBOUR (a dock placed on the shore) — no rail lane; cargo SHIPS run between harbours over water.")]
         public bool isHarbour = false;
         [Tooltip("Build-menu category override (e.g. \"Boats\"). Empty = categorised by kind. Lets a Harbour (a Depot) sit under Boats while a Station sits under Trains.")]

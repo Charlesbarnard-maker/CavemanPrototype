@@ -790,6 +790,11 @@ namespace Caveman
                     GUILayout.Label("<b>Belt blueprint</b> — <color=#9cf>drag to plan</color>, <color=#9f9>click to build</color>  <size=14>(R rotates)</size>", _s);
                     GUILayout.Label("<size=14>plan a run, then click to build it · right-click to cancel</size>", _small);
                 }
+                else if (def.kind == BuildingKind.Rail && def.elevated)
+                {
+                    GUILayout.Label("<b>Elevated Track</b> — <color=#9cf>drag to plan</color> (90°), <color=#9f9>click to build</color>", _s);
+                    GUILayout.Label("<size=14>lay it OVER belts to cross them; join ground track at each end · right-click to cancel</size>", _small);
+                }
                 else if (def.kind == BuildingKind.Rail)
                 {
                     GUILayout.Label("<b>Track blueprint</b> — <color=#9cf>drag to plan</color> (90°), <color=#9f9>click to build</color>", _s);

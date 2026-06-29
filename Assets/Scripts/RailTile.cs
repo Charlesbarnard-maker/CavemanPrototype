@@ -19,17 +19,18 @@ namespace Caveman
         private SpriteRenderer _sr;
         private int _lastMask = -1; // neighbour config the current sprite is drawn for
         public int links;           // EXPLICIT connection bitmask (N=1,E=2,S=4,W=8) set from the laid drag path
+        public bool elevated;       // raised viaduct: doesn't reserve its cell (a belt may run UNDER it), renders on top
         public Vector2Int Cell => _cell;
 
         public static RailTile At(Vector2Int c) => Grid.TryGetValue(c, out var r) ? r : null;
 
-        public static RailTile Spawn(BuildingDefinition def, Vector3 pos)
+        public static RailTile Spawn(BuildingDefinition def, Vector3 pos, bool elevated = false)
         {
             var cell = new Vector2Int(Mathf.RoundToInt(pos.x), Mathf.RoundToInt(pos.y));
             var prev = At(cell);
             if (prev != null) return prev; // one rail per cell
 
-            var go = new GameObject("Rail");
+            var go = new GameObject(elevated ? "Elevated Rail" : "Rail");
             go.transform.position = new Vector3(cell.x, cell.y, 0f);
             go.transform.localScale = Vector3.one;
 
@@ -41,8 +42,28 @@ namespace Caveman
             go.AddComponent<BoxCollider2D>(); // clickable to demolish
 
             var r = go.AddComponent<RailTile>();
-            r.def = def; r._sr = sr; r._cell = cell;
+            r.def = def; r._sr = sr; r._cell = cell; r.elevated = elevated;
+            if (elevated)
+            {
+                sr.sortingOrder = 8;                          // above belts (1) + belt items (2): the track crosses OVER them
+                WorldGrid.Remove(WorldGrid.Rails, cell, r);   // OnEnable reserved the cell — UN-reserve so a belt may pass under
+                r.AddElevatedShadow();
+            }
             return r;
+        }
+
+        // A soft drop shadow + thin support legs so an elevated tile reads as RAISED above whatever's below it.
+        private GameObject _shadow;
+        private void AddElevatedShadow()
+        {
+            _shadow = new GameObject("RailShadow");
+            _shadow.transform.SetParent(transform, false);
+            _shadow.transform.localPosition = new Vector3(0f, -0.16f, 0f);
+            _shadow.transform.localScale = new Vector3(0.92f, 0.5f, 1f);
+            var s = _shadow.AddComponent<SpriteRenderer>();
+            s.sprite = PlaceholderArt.Square();
+            s.color = new Color(0f, 0f, 0f, 0.30f);
+            s.sortingOrder = 3; // above the belt (1) + its items (2), below the elevated deck (8)
         }
 
         void OnEnable()

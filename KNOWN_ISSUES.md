@@ -78,6 +78,24 @@ then remove `Temp/UnityLockfile`) or you get lock races. Headless sprite preview
   Keep KNOWN_ISSUES newest-first. CavemanPrototype stays OUT of global memory.
 ---
 
+## #52 ELEVATED TRACK — a viaduct trains cross belts on (2026-06-29)
+The rail counterpart to the underground belt (belts go UNDER, trains go OVER), in the same **Smart Logistics** tech.
+**Compile-clean** (batch). NOT yet playtested. An ELEVATED `RailTile` (`elevated` flag):
+- **Coexists with belts:** it does NOT register in `WorldGrid.Rails` (OnEnable registers, `Spawn` immediately
+  un-registers for elevated), so `IsReserved` is false → a belt may be laid under it; and `SolidBuildingAt` never
+  counted rail/belts, so neither blocks the other. Placement: `RailCellFree(cell, elevated)` drops the no-belt rule
+  for elevated; the cursor + plan ghosts pass the flag so belt cells read valid.
+- **Renders raised:** the deck draws at `sortingOrder 8` (above belts=1 + belt items=2) with a soft drop-shadow
+  child at order 3, so it clearly reads as "over." Trains (order 14) draw above the deck.
+- **Pathing unchanged:** elevated tiles are normal `RailTile`s in the Grid with explicit `links`, so `FindPath`
+  routes across them and they join ground track at the ends (the ramp is implied by the raised look — no separate
+  ramp tile). One rail per cell, so it crosses BELTS, not other track (documented in the tooltip).
+- **Files:** `RailTile.cs` (flag + un-reserve + sortingOrder + shadow), `BuildingDefinition.cs` (flag),
+  `BuildController.cs` (`RailCellFree`/`LayRail`/ghosts thread `elevated`), `GameBootstrap.cs` (def + tech + buildables),
+  `InventoryHud.cs` (placement hint).
+- **To verify in editor:** lay a belt, then drag Elevated Track across it → the belt keeps running underneath, the
+  viaduct + shadow render on top, and a train routes over the crossing. Demolish either independently.
+
 ## #51 SMART LOGISTICS belts — underground, filter, priority splitter, conditional gate (2026-06-29)
 Four mid-game belt tools, gated behind a new **Smart Logistics** research (prereq Bronze, cost 30) + `unlockAge = 2`
 so they can't be grabbed early. **Compile-clean** (batch). NOT yet interactively playtested. All are `BuildingKind.Belt`
