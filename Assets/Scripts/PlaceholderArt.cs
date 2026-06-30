@@ -18,7 +18,7 @@ namespace Caveman
         private static Sprite _signalBidir;
         private static Sprite _pole;
         private static Sprite[] _caveman;         // player avatar per age × walk-frame
-        private static Sprite _tree, _rock, _boat, _clay, _oreCopper, _oreIron, _oilPatch, _pipe;
+        private static Sprite _tree, _rock, _boat, _clay, _oreCopper, _oreIron, _oilPatch, _pipe, _gem;
         private static Sprite[] _pipeTiles;            // 16 connection-pattern tubes (N=1,E=2,S=4,W=8)
         private static Sprite _pipeValveS, _pipeValveM; // junction pieces: splitter (teal) / merger (amber)
         private static Sprite _pipeDrop;               // animated flow droplet (direction + that fluid moves)
@@ -1445,6 +1445,8 @@ namespace Caveman
         public static Sprite OreCopper() { if (_oreCopper == null) _oreCopper = BakeOre(new Color(1.00f, 0.66f, 0.16f), new Color(0.50f, 0.34f, 0.18f), new Color(0.76f, 0.50f, 0.24f)); return _oreCopper; } // warm coppery boulder so it doesn't vanish into the grey hills
         /// <summary>Iron ore — grey boulders shot with RUSTY veins.</summary>
         public static Sprite OreIron() { if (_oreIron == null) _oreIron = BakeOre(new Color(0.64f, 0.40f, 0.33f), new Color(0.38f, 0.38f, 0.43f), new Color(0.54f, 0.54f, 0.59f)); return _oreIron; }
+        /// <summary>Gems — pale crystalline boulders shot with bright CYAN veins (the rarest deposit).</summary>
+        public static Sprite Gem() { if (_gem == null) _gem = BakeOre(new Color(0.45f, 0.95f, 0.90f), new Color(0.34f, 0.48f, 0.52f), new Color(0.62f, 0.80f, 0.82f)); return _gem; }
 
         // Grey boulders with coloured mineral veins (the vein colour distinguishes copper vs iron ore).
         private static Sprite BakeOre(Color vein, Color bodyDark, Color bodyMid)

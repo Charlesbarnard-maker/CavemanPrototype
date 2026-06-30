@@ -100,7 +100,7 @@ namespace Caveman
             ore.description = "IRON ORE — mined from FINITE veins far in the hills. Smelted into Iron. Its scarcity drives Iron-age exploration.";
             metal.description = "IRON — the Basic Smelter melts Iron Ore + Charcoal into Iron. The backbone of Tools, Steel and the Monument.";
             tools.description = "A Toolmaker crafts Iron + Planks into Tools — needed for Blueprints (Industrial-Age research) and the Monument.";
-            monument.description = "Built at the Monument from Iron + Tools + Bricks + Planks. Collect 10 Blocks to WIN the game.";
+            monument.description = "Built at the Monument from an Engine + Jewelry + 4 Bricks per block. Collect 10 Blocks to WIN the game.";
             copperOre.description = "COPPER ORE — the first metal ore, from copper deposits in the nearest expansion region. Smelted into Copper (the Bronze-age chain).";
             copper.description = "COPPER — the Basic Smelter melts Copper Ore + Charcoal into Copper. Feeds Study Scrolls (Bronze research) and Bronze Plates.";
             bronzePlate.description = "BRONZE PLATE — the Advanced Smelter presses Copper + Bricks into a plate. A deeper part needed to research the Iron Age (Schematics).";
@@ -311,35 +311,35 @@ namespace Caveman
             // Geared 120 → Steel 240. Splitters/Mergers run at the top rate so they never throttle.
             var woodBelt = ScriptableObject.CreateInstance<BuildingDefinition>();
             woodBelt.displayName = "Wooden Belt"; woodBelt.kind = BuildingKind.Belt; woodBelt.unlockAge = 0;
-            woodBelt.interval = 1.5f; // 40 items/min — a starter belt; still below a collector's 60/min so upgrading matters
+            woodBelt.interval = 1.5f; // 80 items/min cap (speed 1/interval ÷ MinGap 0.5) — just above one collector's 60/min
             woodBelt.color = new Color(0.60f, 0.50f, 0.35f);
             woodBelt.cost = new List<ItemAmount> { new ItemAmount(wood, 1) };
-            woodBelt.description = "Carries items along its arrow at 40/min — a starter belt that lags a collector (60/min), so a single line backs up at full tilt. Research the cheap Conveyor (60/min) early to keep up, or run a 2nd line. Drag to lay; R rotates. RED = dead end, YELLOW = backed up.";
+            woodBelt.description = "Carries items along its arrow — up to 80/min, the starter belt. It keeps pace with one collector (60/min), but a busy line (several sources merged, or feeding a hungry workshop) will saturate it: research the cheap Conveyor (120/min) and overlay to upgrade in place, or run a 2nd line. Drag to lay; R rotates. RED = dead end, YELLOW = backed up.";
             // New-player guide: STAR the three first buildings in the Stone-age menu (Wood Hut → Belt → Woodpile).
             woodHut.tutorialHighlight = true; woodBelt.tutorialHighlight = true; woodStore.tutorialHighlight = true;
             var fastBelt = ScriptableObject.CreateInstance<BuildingDefinition>();
             fastBelt.displayName = "Conveyor Belt"; fastBelt.kind = BuildingKind.Belt; fastBelt.unlockAge = 0;
-            fastBelt.interval = 1.0f; // 60 items/min — 2× wooden, a match for one collector
+            fastBelt.interval = 1.0f; // 120 items/min — 1.5× wooden; clears one collector (60/min) with headroom
             fastBelt.color = new Color(0.74f, 0.66f, 0.46f);
             fastBelt.cost = new List<ItemAmount> { new ItemAmount(planks, 1) };
-            fastBelt.description = "Conveyor Belt — 60/min, 2× the Wooden Belt and a match for one collector. OVERLAY it on a wooden belt to upgrade that segment in place (no delete needed). The first rung of the ladder → Geared (120) → Steel (240).";
+            fastBelt.description = "Conveyor Belt — 120/min, a clear step up from the Wooden Belt (80). OVERLAY it on a wooden belt to upgrade that segment in place (no delete needed). The first rung of the ladder → Geared (240) → Steel (480).";
             var gearedBelt = ScriptableObject.CreateInstance<BuildingDefinition>();
             gearedBelt.displayName = "Geared Belt"; gearedBelt.kind = BuildingKind.Belt; gearedBelt.unlockAge = 0;
-            gearedBelt.interval = 0.5f; // 120 items/min — 2× a Conveyor
+            gearedBelt.interval = 0.5f; // 240 items/min — 2× a Conveyor
             gearedBelt.color = new Color(0.80f, 0.55f, 0.34f);
             gearedBelt.cost = new List<ItemAmount> { new ItemAmount(planks, 2), new ItemAmount(metal, 1) };
-            gearedBelt.description = "Geared Belt — 120/min, 2× a Conveyor. Overlay it on a slower belt to upgrade in place. For high-throughput lines once the factory grows (Bronze).";
+            gearedBelt.description = "Geared Belt — 240/min, 2× a Conveyor. Overlay it on a slower belt to upgrade in place. For high-throughput lines once the factory grows (Bronze).";
             var steelBelt = ScriptableObject.CreateInstance<BuildingDefinition>();
             steelBelt.displayName = "Steel Belt"; steelBelt.kind = BuildingKind.Belt; steelBelt.unlockAge = 0;
-            steelBelt.interval = 0.25f; // 240 items/min — the fastest tier, 4× a Conveyor
+            steelBelt.interval = 0.25f; // 480 items/min — the fastest tier, 4× a Conveyor
             steelBelt.color = new Color(0.62f, 0.66f, 0.72f);
             steelBelt.cost = new List<ItemAmount> { new ItemAmount(metal, 2), new ItemAmount(planks, 2) };
-            steelBelt.description = "Steel Belt — 240/min, the fastest tier (4× a Conveyor). Overlay to upgrade. For the densest late-game lines (Iron).";
+            steelBelt.description = "Steel Belt — 480/min, the fastest tier (4× a Conveyor). Overlay to upgrade. For the densest late-game lines (Iron).";
             // Splitter: a 1→3 belt that distributes items EVENLY between three outputs. Lets one
             // supply line feed three machines. (Belt kind, flagged splitter — placed like a belt.)
             var splitter = ScriptableObject.CreateInstance<BuildingDefinition>();
             splitter.displayName = "Splitter"; splitter.kind = BuildingKind.Belt; splitter.splitter = true; splitter.unlockAge = 0;
-            splitter.interval = 0.25f; // runs at the TOP belt rate (240/min) so it never throttles any tier
+            splitter.interval = 0.25f; // runs at the TOP belt rate (480/min) so it never throttles any tier
             splitter.color = new Color(0.45f, 0.62f, 0.72f);
             splitter.cost = new List<ItemAmount> { new ItemAmount(wood, 2) };
             splitter.description = "1→3 SPLITTER: pulls from behind and sends items EVENLY to three outputs — forward, left and right (R rotates). If one output backs up it sends to the others, so it never stalls. Feed three machines from one supply line. (Smart/filtered splitters come later.)";
@@ -347,7 +347,7 @@ namespace Caveman
             // plain belt now refuses a 2nd feeder (no silent merging by pointing a belt onto a line).
             var merger = ScriptableObject.CreateInstance<BuildingDefinition>();
             merger.displayName = "Merger"; merger.kind = BuildingKind.Belt; merger.merger = true; merger.unlockAge = 0;
-            merger.interval = 0.25f; // runs at the TOP belt rate (240/min) so it never throttles any tier
+            merger.interval = 0.25f; // runs at the TOP belt rate (480/min) so it never throttles any tier
             merger.color = new Color(0.72f, 0.55f, 0.45f);
             merger.cost = new List<ItemAmount> { new ItemAmount(wood, 2) };
             merger.description = "N→1 MERGER: combines belt lines — point two belts into it and it pushes their items out forward (R rotates). Plain belts refuse a 2nd feeder, so a Merger is how you deliberately join two lanes of the same item.";
@@ -358,7 +358,7 @@ namespace Caveman
             var undergroundBelt = ScriptableObject.CreateInstance<BuildingDefinition>();
             undergroundBelt.displayName = "Underground Belt"; undergroundBelt.kind = BuildingKind.Belt; undergroundBelt.underground = true;
             undergroundBelt.unlockAge = 2; undergroundBelt.requiredTech = "smart_logistics";
-            undergroundBelt.interval = 1.0f; // 60/min — matches a Conveyor
+            undergroundBelt.interval = 1.0f; // 120/min — matches a Conveyor
             undergroundBelt.color = new Color(0.85f, 0.85f, 0.92f);
             undergroundBelt.cost = new List<ItemAmount> { new ItemAmount(metal, 1), new ItemAmount(planks, 1) };
             undergroundBelt.description = "UNDERGROUND BELT — items travel HIDDEN up to 3 tiles, so other belts and TRACK can cross over the gap. Click to place the ENTRANCE (facing the flow, R rotates), then click up to 4 tiles ahead in the SAME direction for the EXIT — they auto-pair. An unpaired end shows red until you place its partner.";
@@ -544,7 +544,7 @@ namespace Caveman
             mine.description = "Build ON a distant Iron Ore vein (the far Hills). Iron Ore is FINITE — veins deplete and vanish, so keep exploring outward and hauling it home.";
             gemMine.description = "Build ON a far Gem Deposit (the rarest, finite resource). Gems → Jewelry. Reaching them rewards exploration + good transport.";
             jeweler.description = "Gems → Jewelry, a high-value luxury good. Pairs with long-haul routes to bring distant gems home.";
-            monumentBldg.description = "ENDGAME: pour Metal + Tools + Bricks + Planks in to produce Monument Blocks. Make 10 to WIN. A massive, sustained resource sink.";
+            monumentBldg.description = "ENDGAME: feed an Engine + Jewelry + 4 Bricks per Monument Block (it draws on your deepest chains — the Engineering Lab and the Jeweler). Make 10 to WIN. Needs Power — a 40-draw megasink that strains the grid.";
             mason.description = "Stone → Stone Blocks (Stone's own processing chain). Stone Blocks build the sturdy Stone House.";
             warehouse.description = "Warehouse — stores ONE resource of your choice (Stone, Ore, Planks, anything). It adopts the first item a belt delivers, or pick it in the panel. This one building replaces a separate store per resource.";
 
@@ -610,9 +610,9 @@ namespace Caveman
                 new Research.Tech { id = "splitters",   name = "Splitters",     cost = 15,  prereq = "tribal", unlocks = new List<BuildingDefinition>{ splitter },   desc = "Unlocks the 1→3 Splitter — feed three machines from one supply line." },
                 // The belt-upgrade ladder: a cheap EARLY first rung (the wooden belt is deliberately
                 // slow), then deeper tiers gated by age so faster belts pace your factory's growth.
-                new Research.Tech { id = "conveyors",   name = "Conveyor Belts", cost = 4,  prereq = null,     unlocks = new List<BuildingDefinition>{ fastBelt },   desc = "Your first belt upgrade: the Conveyor (60/min — keeps up with a collector). Cheap on purpose so you can grab it early without sacrificing the Tribal-age unlock. Overlay it on wooden belts to upgrade in place." },
-                new Research.Tech { id = "geared_belts", name = "Geared Belts",  cost = 40,  prereq = "bronze", unlocks = new List<BuildingDefinition>{ gearedBelt }, desc = "The Geared Belt (120/min — 2× a Conveyor) for high-throughput lines." },
-                new Research.Tech { id = "steel_belts",  name = "Steel Belts",   cost = 80,  prereq = "iron",   unlocks = new List<BuildingDefinition>{ steelBelt },  desc = "The Steel Belt (240/min — the fastest tier) for the densest late-game lines." },
+                new Research.Tech { id = "conveyors",   name = "Conveyor Belts", cost = 4,  prereq = null,     unlocks = new List<BuildingDefinition>{ fastBelt },   desc = "Your first belt upgrade: the Conveyor (120/min — clears a collector with headroom). Cheap on purpose so you can grab it early without sacrificing the Tribal-age unlock. Overlay it on wooden belts to upgrade in place." },
+                new Research.Tech { id = "geared_belts", name = "Geared Belts",  cost = 40,  prereq = "bronze", unlocks = new List<BuildingDefinition>{ gearedBelt }, desc = "The Geared Belt (240/min — 2× a Conveyor) for high-throughput lines." },
+                new Research.Tech { id = "steel_belts",  name = "Steel Belts",   cost = 80,  prereq = "iron",   unlocks = new List<BuildingDefinition>{ steelBelt },  desc = "The Steel Belt (480/min — the fastest tier) for the densest late-game lines." },
                 new Research.Tech { id = "smart_logistics", name = "Smart Logistics", cost = 30, prereq = "bronze", unlocks = new List<BuildingDefinition>{ undergroundBelt, filterBelt, prioritySplitter, conditionalGate, elevatedRail }, desc = "Mid-game logistics tools: the UNDERGROUND BELT + ELEVATED TRACK (cross belts and rail over/under each other), FILTER BELT (sort a mixed line by item), PRIORITY SPLITTER (overflow routing), and GATE BELT (stop over-filling a buffer)." },
                 new Research.Tech { id = "renewables", name = "Renewable Power", cost = 60, prereq = "iron", unlocks = new List<BuildingDefinition>{ windmill, solar }, requiredBuildings = new List<BuildingDefinition>{ advancedSmelter, toolmaker }, desc = "Unlock the WINDMILL (Iron) and SOLAR PANEL (Industrial) — fuel-free power, but their output VARIES (wind gusts, solar follows daylight), so lean on Batteries. Built from Steel + Gears (+ Machine Parts) — grow the lines first." },
                 new Research.Tech { id = "rail_transport", name = "Rail Transport", cost = 18, prereq = "tribal", unlocks = new List<BuildingDefinition>{ depot, rail, signal, twoWaySignal }, desc = "Unlock TRAINS: build Stations, lay Track + Signals, then run route vehicles (Donkey Cart → Ox Cart → … → Train) between Stations to haul goods across the map." },
@@ -704,13 +704,15 @@ namespace Caveman
             };
             // FACTORY-FIRST build menu: gathering → processing → research → logistics → storage →
             // power/endgame. Survival/comfort buildings (forager, water hole, granary, campfire,
-            // farm/mill/bakery, hunter, housing, pipes, textiles, jewelry, masonry) are intentionally
-            // NOT offered — the game is now a pure production/automation loop.
+            // farm/mill/bakery, hunter, housing, textiles, masonry) are intentionally NOT offered —
+            // the game is now a pure production/automation loop. The Gem Mine → Jeweler chain IS
+            // offered, though: Jewelry is a required Monument ingredient (the win).
             builder.buildables = new List<BuildingDefinition>
-            { // Gather
-              woodHut, stonePit, clayPit, copperMine, mine,
-              // Process — incl. the deeper metal chain (copper → bronze → steel) that gates each age + the oil Refinery
-              sawmill, charcoalBurner, kiln, potter, basicSmelter, advancedSmelter, toolmaker, refinery,
+            { // Gather (gemMine is the endgame luxury source — build ON a far Gem deposit)
+              woodHut, stonePit, clayPit, copperMine, mine, gemMine,
+              // Process — incl. the deeper metal chain (copper → bronze → steel) that gates each age, the oil
+              // Refinery, and the Jeweler (Gems → Jewelry for the Monument)
+              sawmill, charcoalBurner, kiln, potter, basicSmelter, advancedSmelter, toolmaker, refinery, jeweler,
               // Research
               ideaBench, scrollMaker, draftingTable, engineeringLab, researchLodge,
               // Logistics — belt tier ladder (wooden→conveyor→geared→steel) + junctions + smart-logistics tools + transport
@@ -924,6 +926,16 @@ namespace Caveman
                 var oc = new Vector2(Mathf.Cos(oa) * 80f, Mathf.Sin(oa) * 80f);
                 TerrainGrid.Paint(new Vector3(oc.x, oc.y, 0f), 14f, Terrain.Plains);
                 SpawnClusters("Oil Field", oil, Color.white, PlaceholderArt.OilPatch(), oc, 8f, 4, 4, 6, 3.0f, new Vector2(1.2f, 1.8f), 200, 0, 0f);
+            }
+
+            // Gem field — the RAREST resource: finite, far out BEYOND the Iron Ore field on the same
+            // corridor (rewards deep expansion + long-haul logistics). REQUIRED for the Monument win
+            // (Gems → Jeweler → Jewelry), so it must exist on the map.
+            {
+                float ga = TerrainGrid.CorridorAngle(4, ZoneCount);
+                var gc = new Vector2(Mathf.Cos(ga) * 168f, Mathf.Sin(ga) * 168f);
+                TerrainGrid.PaintBlob(new Vector3(gc.x, gc.y, 0f), 16f, Terrain.Hills, 4, 0.45f);
+                SpawnClusters("Gem Deposit", gems, Color.white, PlaceholderArt.Gem(), gc, 8f, 3, 3, 5, 3.0f, new Vector2(1.0f, 1.5f), 130, 0, 0f);
             }
 
             // --- BOAT-ONLY ISLAND: a generous resource across the sea, reachable only with a Harbour + Cargo
