@@ -202,6 +202,12 @@ namespace Caveman
             UpdateWagons(); // trail the wagons behind the loco + tint each to its commodity
         }
 
+        // Per-stop load/unload mode: 0 = load + unload (default), 1 = load only, 2 = unload only. Keyed by station,
+        // so it survives reordering; missing = default. Lets a stop be a pure SOURCE or a pure SINK.
+        public readonly Dictionary<Depot, int> stopMode = new();
+        public int StopModeOf(Depot d) => d != null && stopMode.TryGetValue(d, out var m) ? m : 0;
+        public void CycleStopMode(Depot d) { if (d != null) stopMode[d] = (StopModeOf(d) + 1) % 3; }
+
         // Service a stop. The consist UNLOADS every wagon carrying this stop's resource (delivering into its
         // store), then LOADS this stop's surplus into a free/matching wagon — unless we just delivered that
         // resource here (so a destination doesn't immediately re-export what it received). Each stop thus acts
@@ -209,9 +215,12 @@ namespace Caveman
         private void ServiceStop(Depot stop)
         {
             if (stop == null) return;
+            int mode = StopModeOf(stop);                       // 0 = load+unload, 1 = load only, 2 = unload only
+            bool doUnload = mode != 1, doLoad = mode != 2;
 
             // 1) UNLOAD — deliver wagons into the stop. An unconfigured stop adopts the first cargo delivered.
             bool unloadedHere = false; ItemDefinition delivered = null; int deliveredTotal = 0;
+            if (doUnload)
             foreach (var w in _wagons)
             {
                 if (w.item == null || w.amount <= 0) continue;
@@ -226,7 +235,7 @@ namespace Caveman
 
             // 2) LOAD — pull this stop's surplus into empty (or same-commodity) wagons, up to per-wagon capacity.
             var I = stop.item;
-            if (I != null && I != delivered && stop.store.Count(I) > 0)
+            if (doLoad && I != null && I != delivered && stop.store.Count(I) > 0)
             {
                 foreach (var w in _wagons)
                 {

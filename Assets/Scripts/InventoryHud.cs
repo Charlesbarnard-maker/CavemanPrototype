@@ -1923,19 +1923,19 @@ namespace Caveman
                 GUILayout.Label($"<size=16><b>{rv.VehicleName()}</b></size>  <size=12><color=#9cf>{holds} · {rv.StopCount} stops · {Mathf.RoundToInt(frac * 100f)}% full ({rv.CurrentLoad}/{rv.LoadCapacity})</color></size>", _small);
                 GUILayout.Label($"<size=13>Cargo: {rv.CargoSummary()}</size>", _small);
 
-                var sb = new System.Text.StringBuilder("<size=12><color=#cfcfcf>Stops: ");
-                bool first = true;
+                GUILayout.Label("<size=12><color=#cfcfcf>Stops</color>  <size=10><color=#888>(click a mode to make a stop pickup-only or drop-only)</color></size></size>", _small);
                 foreach (var st in rv.stops)
                 {
                     if (st == null) continue;
-                    if (!first) sb.Append("  →  ");
-                    first = false;
+                    GUILayout.BeginHorizontal();
                     string nm = st.def != null ? st.def.displayName : "Station";
-                    if (st.item != null) { string hex = ColorUtility.ToHtmlStringRGB(st.item.color); sb.Append($"{nm} <color=#{hex}>[{st.item.displayName}]</color>"); }
-                    else sb.Append($"{nm} <color=#f99>[unset]</color>");
+                    string itxt = st.item != null ? $"<color=#{ColorUtility.ToHtmlStringRGB(st.item.color)}>[{st.item.displayName}]</color>" : "<color=#f99>[unset]</color>";
+                    GUILayout.Label($"<size=12>{nm} {itxt}</size>", _small, GUILayout.Width(160));
+                    int m = rv.StopModeOf(st);
+                    string mlab = m == 1 ? "<color=#9f9>⬆ Load only</color>" : m == 2 ? "<color=#9cf>⬇ Unload only</color>" : "<color=#dfd>⇅ Load + Unload</color>";
+                    if (GUILayout.Button($"<size=11>{mlab}</size>", _btn, GUILayout.Width(132))) rv.CycleStopMode(st);
+                    GUILayout.EndHorizontal();
                 }
-                sb.Append("</color></size>");
-                GUILayout.Label(sb.ToString(), _small);
                 GUILayout.Space(8);
             }
 
