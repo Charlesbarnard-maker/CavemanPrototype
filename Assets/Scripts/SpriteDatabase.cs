@@ -72,9 +72,10 @@ namespace Caveman
 
         /// <summary>Belt visual — central Belt map by type name; fallback conveyor tile (a matching
         /// belt-family splitter/merger junction for those, else a plain conveyor).</summary>
-        public static Sprite ForBelt(string beltName, bool splitter, bool merger)
+        public static Sprite ForBelt(string beltName, bool splitter, bool merger, bool filter = false)
             => Resolve(Lookup(Belt, beltName), splitter ? PlaceholderShape.Splitter
                                              : merger   ? PlaceholderShape.Merger
+                                             : filter   ? PlaceholderShape.Filter
                                                         : PlaceholderShape.Conveyor);
 
         /// <summary>Resource-node visual — central Resource map by item id; caller supplies the fallback shape.</summary>
@@ -187,6 +188,7 @@ namespace Caveman
             PlaceholderShape.Conveyor => PlaceholderArt.Conveyor(),
             PlaceholderShape.Splitter => PlaceholderArt.SplitterSprite(),
             PlaceholderShape.Merger => PlaceholderArt.MergerSprite(),
+            PlaceholderShape.Filter => PlaceholderArt.FilterSprite(),
             PlaceholderShape.Tree => PlaceholderArt.Tree(),
             PlaceholderShape.Rock => PlaceholderArt.Rock(),
             PlaceholderShape.None => null,

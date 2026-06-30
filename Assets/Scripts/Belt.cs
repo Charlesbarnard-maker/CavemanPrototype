@@ -65,10 +65,11 @@ namespace Caveman
         public Belt undergroundPair;     // the linked other end (null = unpaired → inert / shows red)
         private const int MaxTunnel = 4; // an exit may sit up to 4 cells ahead → up to 3 hidden cells bridged
 
-        // Filter belt: conveys ONLY this item type (null = unset, accepts the first item to arrive, like a
-        // configurable warehouse). A non-matching item is refused so it backs up / takes another route.
+        // Filter belt: conveys ONLY items on its WHITELIST (empty = pass everything until the player picks). A
+        // non-whitelisted item is refused (backs up / reroutes). The whitelist (up to 5 items) is set in the belt's
+        // panel, and a filter belt MAY carry several different whitelisted types at once (a plain belt can't).
         public bool isFilter;
-        public ItemDefinition filterItem;
+        public readonly List<ItemDefinition> filterItems = new();
 
         // Priority splitter: fills the forward output first, sending to the sides only as OVERFLOW.
         public bool isPriority;
@@ -125,7 +126,7 @@ namespace Caveman
 
             var sr = go.AddComponent<SpriteRenderer>();
             sr.sprite = underground ? PlaceholderArt.UndergroundBelt(false)
-                      : SpriteDatabase.ForBelt(isSplitter ? "Splitter" : isMerger ? "Merger" : displayName, isSplitter, isMerger); // routed via SpriteDatabase (fallback: conveyor / hex junction)
+                      : SpriteDatabase.ForBelt(isSplitter ? "Splitter" : isMerger ? "Merger" : displayName, isSplitter, isMerger, isFilter); // routed via SpriteDatabase (fallback: conveyor / junction / filter)
             sr.sortingOrder = 1;
 
             go.AddComponent<BoxCollider2D>(); // clickable to demolish
@@ -184,20 +185,19 @@ namespace Caveman
         // ---- Compatibility surface (used by belt-to-belt hand-off + building pulls) -------------
         private float TailP => _items.Count > 0 ? _items[_items.Count - 1].p : 1f;
         private bool TailRoom() => _items.Count < CellCapacity && (_items.Count == 0 || _items[_items.Count - 1].p >= MinGap);
-        public bool CanAccept(ItemDefinition i) => TailRoom() && (item == null || item == i) && FilterAccepts(i);
+        // A filter belt bypasses the single-type lock (it may carry mixed whitelisted items); a plain belt keeps it.
+        public bool CanAccept(ItemDefinition i) => TailRoom() && (isFilter || item == null || item == i) && FilterAccepts(i);
 
-        // A filter belt conveys ONLY its chosen item (an unset one adopts the first to arrive). Everything
-        // else is refused so it backs up / routes elsewhere. A plain belt accepts anything (no filter).
-        private bool FilterAccepts(ItemDefinition d) => !isFilter || filterItem == null || filterItem == d;
+        // A filter belt conveys ONLY whitelisted items (empty whitelist = pass everything). A plain belt has no filter.
+        private bool FilterAccepts(ItemDefinition d) => !isFilter || filterItems.Count == 0 || filterItems.Contains(d);
 
         // Take in one item at the tail (entry edge). startP is the desired entry progress (0 for a
         // fresh pull; a small carry-over for a belt→belt hand-off). Clamped so it never overlaps the
         // current tail. Returns false if there is no room. The list stays lead-first (descending p).
         public bool ReceiveItem(ItemDefinition def, Dir fromEdge, float startP)
         {
-            if (!TailRoom() || (item != null && item != def)) return false;
-            if (isFilter && filterItem != null && def != filterItem) return false; // filter turns away other items
-            if (isFilter && filterItem == null) filterItem = def;                  // an unset filter adopts the first item
+            if (!TailRoom() || (!isFilter && item != null && item != def)) return false; // plain belt: one type only
+            if (isFilter && !FilterAccepts(def)) return false;                            // filter belt: whitelist only
             float p = startP;
             if (_items.Count > 0) p = Mathf.Min(p, _items[_items.Count - 1].p - MinGap);
             p = Mathf.Clamp01(p);
@@ -274,7 +274,7 @@ namespace Caveman
             isGate = gate;
             DisplayName = displayName ?? (splitter ? "Splitter" : merger ? "Merger" : DisplayName);
             gameObject.name = DisplayName;
-            if (_sr != null) _sr.sprite = SpriteDatabase.ForBelt(DisplayName, splitter, merger);
+            if (_sr != null) _sr.sprite = SpriteDatabase.ForBelt(DisplayName, splitter, merger, filter);
             AddPortMarkers();
         }
 
@@ -381,7 +381,7 @@ namespace Caveman
             var nb = At(ahead);
             if (nb != null)
             {
-                bool typeOk = item == null || nb.item == null || nb.item == item;
+                bool typeOk = nb.isFilter ? nb.FilterAccepts(item) : (item == null || nb.item == null || nb.item == item);
                 if (typeOk && nb.AcceptsHandoffFrom(this))
                     // Empty downstream → roll to the exit edge. Occupied → trail its LIVE tail by
                     // MinGap across the shared boundary (1 + tail − MinGap), so no two items ever
@@ -456,20 +456,20 @@ namespace Caveman
             var c = _cell + Step(side);
             Dir need = Opposite(side);
             if (WorldGrid.Collectors.TryGetValue(c, out var p) && p != null && p.produces != null && !p.produces.isLiquid
-                && p.OutputSide == need && FilterAccepts(p.produces) && (item == null || item == p.produces) && p.Buffer.Count(p.produces) > 0)
+                && p.OutputSide == need && FilterAccepts(p.produces) && (isFilter || item == null || item == p.produces) && p.Buffer.Count(p.produces) > 0)
             { if (p.Buffer.RemoveUpTo(p.produces, 1) > 0) { ReceiveItem(p.produces, side, 0f); return true; } }
 
             if (WorldGrid.Workshops.TryGetValue(c, out var w) && w != null && w.output != null && !w.output.isLiquid
-                && w.OutputSide == need && FilterAccepts(w.output) && (item == null || item == w.output) && w.Buffer.Count(w.output) > 0)
+                && w.OutputSide == need && FilterAccepts(w.output) && (isFilter || item == null || item == w.output) && w.Buffer.Count(w.output) > 0)
             { if (w.Buffer.RemoveUpTo(w.output, 1) > 0) { ReceiveItem(w.output, side, 0f); return true; } }
 
             // Storages have an OUTPUT side too — belt FROM a warehouse to a workshop (e.g. warehouse → sawmill).
             if (WorldGrid.Storages.TryGetValue(c, out var st) && st != null && st.accepts != null && !st.accepts.isLiquid
-                && st.OutputSide == need && FilterAccepts(st.accepts) && (item == null || item == st.accepts) && st.Store.Count(st.accepts) > 0)
+                && st.OutputSide == need && FilterAccepts(st.accepts) && (isFilter || item == null || item == st.accepts) && st.Store.Count(st.accepts) > 0)
             { if (st.Store.RemoveUpTo(st.accepts, 1) > 0) { ReceiveItem(st.accepts, side, 0f); return true; } }
 
             if (WorldGrid.Depots.TryGetValue(c, out var dp) && dp != null && dp.item != null && !dp.item.isLiquid
-                && dp.IsOutputPull(c, side) && FilterAccepts(dp.item) && (item == null || item == dp.item) && dp.store.Count(dp.item) > 0)
+                && dp.IsOutputPull(c, side) && FilterAccepts(dp.item) && (isFilter || item == null || item == dp.item) && dp.store.Count(dp.item) > 0)
             { if (dp.store.RemoveUpTo(dp.item, 1) > 0) { ReceiveItem(dp.item, side, 0f); return true; } }
 
             return false;
@@ -685,7 +685,7 @@ namespace Caveman
                 int key = undergroundExit ? 901 : 900;
                 if (key != _lastBeltKey && _sr != null) { _lastBeltKey = key; _sr.sprite = PlaceholderArt.UndergroundBelt(undergroundExit); }
             }
-            else if (!isSplitter && !isMerger) UpdateBeltShape();
+            else if (!isSplitter && !isMerger && !isFilter) UpdateBeltShape(); // filter belt keeps its static funnel sprite
             UpdateDots();
         }
 

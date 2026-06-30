@@ -1094,13 +1094,14 @@ namespace Caveman
             var bat = sel.GetComponent<Battery>();
             var pnode = sel.GetComponent<PowerNode>();
             var garage = sel.GetComponent<Garage>();
+            var blt = sel.GetComponent<Belt>();
             string name = wb != null ? wb.def.displayName : pbSel != null ? pbSel.def.displayName
                 : sb != null ? sb.def.displayName
                 : dp != null ? dp.def.displayName : resB != null ? resB.def.displayName
                 : pwr != null ? pwr.def.displayName : pole != null ? pole.def.displayName
                 : bat != null ? bat.def.displayName
                 : garage != null ? garage.def.displayName
-                : cs != null ? cs.def.displayName : "Building";
+                : cs != null ? cs.def.displayName : blt != null ? blt.DisplayName : "Building";
             GUILayout.Label($"<b>{name}</b>", _s);
 
             // GARAGE — buy age-gated mounts + pick which to ride (the limited mount garage).
@@ -1228,6 +1229,11 @@ namespace Caveman
                         if (GUILayout.Button("<size=12>Empty (to hands)</size>", _btn)) EmptyStorage(sb);
                     }
                 }
+            }
+            else if (blt != null)
+            {
+                if (blt.isFilter) DrawFilterBeltPanel(blt);
+                else GUILayout.Label($"<size=12><color=#bbb>{(blt.item != null ? "Carrying " + blt.item.displayName : "Empty")}</color></size>", _small);
             }
             else if (dp != null)
             {
@@ -1443,6 +1449,36 @@ namespace Caveman
 
         // The wiring controls for a selected power node (generator / pole / battery / machine):
         // current wire count, battery charge, and Connect / Disconnect buttons.
+        private static readonly List<ItemDefinition> _filterCandidates = new();
+        // Filter-belt whitelist: toggle up to 5 items the belt will convey (empty = pass everything). The toggle
+        // is APPLIED after rendering so the control count stays identical between the IMGUI Layout/Repaint passes.
+        private void DrawFilterBeltPanel(Belt blt)
+        {
+            GUILayout.Label($"<size=12><b>Filter</b> — conveys only the picked items ({blt.filterItems.Count}/5)</size>", _small);
+            if (blt.filterItems.Count == 0)
+                GUILayout.Label("<size=11><color=#888>Nothing picked → passes everything. Tap items below.</color></size>", _small);
+            _filterCandidates.Clear();
+            foreach (var p in ProductionBuilding.All)
+                if (p != null && p.produces != null && !p.produces.isLiquid && !_filterCandidates.Contains(p.produces)) _filterCandidates.Add(p.produces);
+            foreach (var w in WorkshopBuilding.All)
+                if (w != null && w.output != null && !w.output.isLiquid && !_filterCandidates.Contains(w.output)) _filterCandidates.Add(w.output);
+            foreach (var f in blt.filterItems) if (f != null && !_filterCandidates.Contains(f)) _filterCandidates.Add(f);
+            ItemDefinition toggle = null; bool clear = false;
+            foreach (var it in _filterCandidates)
+            {
+                bool on = blt.filterItems.Contains(it);
+                if (GUILayout.Button($"<size=12><color={(on ? "#9f9" : "#888")}>{(on ? "☑" : "☐")} {it.displayName}</color></size>", _btn)) toggle = it;
+            }
+            if (blt.filterItems.Count > 0 && GUILayout.Button("<size=11>Clear filter</size>", _btn)) clear = true;
+            if (clear) blt.filterItems.Clear();
+            else if (toggle != null)
+            {
+                if (blt.filterItems.Contains(toggle)) blt.filterItems.Remove(toggle);
+                else if (blt.filterItems.Count < 5) blt.filterItems.Add(toggle);
+                else Toast.Show("<color=#f99>A filter belt holds up to 5 items.</color>");
+            }
+        }
+
         private void DrawWirePanel(PowerNode node)
         {
             if (builder == null) return;
