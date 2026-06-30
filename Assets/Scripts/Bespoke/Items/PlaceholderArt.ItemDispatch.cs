@@ -34,6 +34,11 @@ namespace Caveman
             "steel_beam" => ItemSteelBeam(),
             "machine_part" => ItemMachinePart(),
             "engine" => ItemEngine(),
+            // Vehicle + electronics components
+            "locomotive" => ItemLocomotive(),
+            "hull" => ItemHull(),
+            "wiring" => ItemWiring(),
+            "circuit" => ItemCircuit(),
             "bricks" => ItemBricks(),
             "stoneblock" => ItemStoneBlock(),
             // Food chain
