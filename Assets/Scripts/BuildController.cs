@@ -258,8 +258,7 @@ namespace Caveman
             var pole = PowerPole.Spawn(def, p, autoLink: false); // wire the chain explicitly below
             var node = pole != null ? pole.GetComponent<PowerNode>() : null;
             if (node == null) return false;
-            WireFrom.Connect(node);   // join the new pole to the chain
-            node.AutoLinkBackbone();  // …and to any other nearby backbone
+            WireFrom.Connect(node);   // join the new pole to the chain — the ONLY wire it gets (no auto-link to nearby poles)
             WireFrom = node;          // keep wiring from the new pole
             BuildingsPlaced++;
             return true;
@@ -917,6 +916,7 @@ namespace Caveman
                 if (h.GetComponent<ProductionBuilding>() || h.GetComponent<StorageBuilding>()
                     || h.GetComponent<WorkshopBuilding>() || h.GetComponent<Depot>()
                     || h.GetComponent<PowerPlant>() || h.GetComponent<WaterPump>() || h.GetComponent<Battery>()
+                    || h.GetComponent<PowerPole>()   // poles are solid — you can no longer build on top of a pole
                     || h.GetComponent<ResearchBuilding>() || h.GetComponent<Garage>() || h.GetComponent<ConstructionSite>()) return true;
             }
             return false;

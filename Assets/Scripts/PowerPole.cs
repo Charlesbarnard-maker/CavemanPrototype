@@ -21,8 +21,8 @@ namespace Caveman
         {
             var go = new GameObject(def.displayName);
             go.transform.position = new Vector3(pos.x, pos.y, 0f);
-            // A high-slot Power Hub renders a touch bigger; everything else is the standard small post.
-            float scale = 0.55f * (def != null && def.maxConnections > 4 ? 1.35f : 1f);
+            // A small post so poles fit easily between buildings; a high-slot Power Hub renders a touch bigger.
+            float scale = 0.40f * (def != null && def.maxConnections > 4 ? 1.35f : 1f);
             go.transform.localScale = Vector3.one * scale;
 
             var sr = go.AddComponent<SpriteRenderer>();
@@ -41,9 +41,8 @@ namespace Caveman
             node.role = PowerNode.Role.Pole;
             node.maxConnections = def != null && def.maxConnections > 0 ? def.maxConnections : 4; // def-driven (Power Hub = 8)
             node.wireReach = def != null ? def.wireReach : 0f;                                    // def-driven (Tall Pylon = long)
-            // QoL: a freshly-placed pole auto-wires to nearby poles/generators/batteries so the backbone forms
-            // itself. The wire-drag-builds-a-pole flow passes autoLink:false and wires the chain explicitly.
-            if (autoLink) node.AutoLinkBackbone();
+            // No auto-connect: a placed pole starts UNWIRED — the player draws every wire deliberately
+            // (the `autoLink` parameter is kept for call-site compatibility but no longer auto-wires).
             return p;
         }
     }

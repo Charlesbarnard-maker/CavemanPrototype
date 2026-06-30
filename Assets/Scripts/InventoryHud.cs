@@ -39,8 +39,7 @@ namespace Caveman
         private bool _buildShown, _selShown, _flyoutShown;
         private Vector2 _selScroll; // selected-panel scroll so long content (warnings + buttons) never clips
         private bool _showBuild;
-        private readonly List<int> _recent = new(); // recently-placed buildable indices
-        private readonly List<int> _recentSnapshot = new(); // reused copy for safe iteration in OnGUI
+        // (Removed the "recent" build-menu shortcuts — the menu just shows Pinned + Categories now.)
         private readonly HashSet<int> _pinned = new(); // pinned (favourite) buildable indices
         private string _activeCat = "Gathering"; // build-menu accordion: only this group is open
         private bool _showMinimap = true;
@@ -66,8 +65,6 @@ namespace Caveman
         private readonly List<Quest> _revealQueue = new(); // next-step objectives, shown centre-screen one at a time
         private Rect _objRevealRect;
         private bool _revealConsume;                                           // set by the popup's OK; applied in Update (no mid-frame queue mutation)
-        private bool _localTipShown; // one-time hint when a workshop first starves
-        private bool _collectorTipShown; // one-time hint when a collector first backs up
         private bool _upgradeHintShown; // one-time hint when an upgrade first becomes affordable
         private Texture2D _panelTex; // dark panel background for readability
         private Texture2D _accentTex, _btnTex, _btnHoverTex; // top accent bar + flat button skins
@@ -220,31 +217,8 @@ namespace Caveman
             // The age-advance card no longer auto-dismisses — it stays up until the player clicks
             // "Got it" / the card (see DrawAgeCard), so there's always time to read the new tips.
 
-            // One-time onboarding hint the first time a workshop starves under local
-            // production — so a new player learns inputs must be delivered, not pooled.
-            if (!_localTipShown && Economy.LocalProduction)
-            {
-                foreach (var w in WorkshopBuilding.All)
-                    if (w != null && w.StatusColor == Status.Starved)
-                    {
-                        _localTipShown = true;
-                        Toast.Show("<color=#ffd24d>💡 Tip:</color> a workshop only runs on inputs that ARRIVE — put it next to its input storage/source, or belt the inputs in.");
-                        break;
-                    }
-            }
-
-            // One-time hint the first time a COLLECTOR backs up — teaches the core early-game
-            // rule (its output is unusable until belted to a Storage) at the exact moment it bites.
-            if (!_collectorTipShown && Economy.StoredOnly)
-            {
-                foreach (var p in ProductionBuilding.All)
-                    if (p != null && p.StatusColor == Status.BackedUp)
-                    {
-                        _collectorTipShown = true;
-                        Toast.Show("<color=#ffd24d>💡 Tip:</color> a collector's output piles up until something USES it. Easiest: place a workshop right NEXT TO it — machines pull from their neighbours, no belt needed. To stock a Storage (to build with, or feed a workshop), belt it in from the green output arrow.");
-                        break;
-                    }
-            }
+            // (Removed: the one-time "workshop starved" and "collector backed up" tip toasts — they popped up
+            // and were more annoying than useful. The status dots + the bottleneck counter still convey the state.)
 
             // One-time hint the first time ANY building can be upgraded + afforded — teaches the upgrade
             // mechanic at the moment it becomes actionable (and points at the new green ⬆ badge).
@@ -846,13 +820,6 @@ namespace Caveman
             return null;
         }
 
-        private void RecordRecent(int i)
-        {
-            _recent.Remove(i);
-            _recent.Insert(0, i);
-            while (_recent.Count > 4) _recent.RemoveAt(_recent.Count - 1);
-        }
-
         private void DrawBuildMenu()
         {
             if (builder.PendingIndex >= 0)
@@ -989,7 +956,7 @@ namespace Caveman
                     string key = i < 9 ? (i + 1).ToString() : i == 9 ? "0" : "·";
                     string nm = guide ? $"<color=#ffd24d>★ {def.displayName}</color>" : obsolete ? $"<color=#9a9a9a>{def.displayName}</color>" : def.displayName;
                     var label = new GUIContent($"<size=12>[{key}] {nm}  <color={costCol}>{CostText(def)}</color></size>", Describe(def));
-                    if (GUILayout.Button(label, _btn)) { builder.BeginPlacement(i); RecordRecent(i); }
+                    if (GUILayout.Button(label, _btn)) builder.BeginPlacement(i);
                 }
                 GUILayout.EndHorizontal();
             }
@@ -1005,7 +972,7 @@ namespace Caveman
                 return false;
             }
 
-            // ---- LEFT panel: Pinned + Recent shortcuts, then the category list. Clicking a category
+            // ---- LEFT panel: Pinned shortcuts, then the category list. Clicking a category
             //      OPENS it as a flyout to the RIGHT (one category at a time); click it again to close. ----
             _buildScroll = GUILayout.BeginScrollView(_buildScroll);
 
@@ -1013,18 +980,6 @@ namespace Caveman
             {
                 GUILayout.Label("<b><color=#ffd24d>★ Pinned</color></b>", _small);
                 foreach (int i in _pinned)
-                    if (i >= 0 && i < builder.buildables.Count && builder.IsUnlocked(builder.buildables[i])) Entry(i);
-                GUILayout.Space(4);
-            }
-
-            if (_recent.Count > 0)
-            {
-                GUILayout.Label("<b><color=#d8c8a0>Recent</color></b>", _small);
-                // Snapshot: Entry() can place a building, which mutates _recent — iterating the live
-                // list then throws "Collection was modified" mid-OnGUI.
-                _recentSnapshot.Clear();
-                _recentSnapshot.AddRange(_recent);
-                foreach (int i in _recentSnapshot)
                     if (i >= 0 && i < builder.buildables.Count && builder.IsUnlocked(builder.buildables[i])) Entry(i);
                 GUILayout.Space(4);
             }

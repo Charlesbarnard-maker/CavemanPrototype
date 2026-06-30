@@ -713,6 +713,9 @@ namespace Caveman
             string nm = def.displayName ?? "?";
             var bespoke = BespokeBuilding(nm);
             if (bespoke != null) return bespoke;
+            // Poles (Power Pole / Power Hub / Tall Pylon) use the post sprite, not the generic house —
+            // so the construction blueprint (which resolves through here) matches the finished pole.
+            if (def.kind == BuildingKind.Pole) return Pole();
             if (_bldgByName.TryGetValue(nm, out var sp) && sp != null) return sp;
             BK bk = def.kind switch
             {
