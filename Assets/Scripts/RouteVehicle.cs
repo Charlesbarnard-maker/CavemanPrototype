@@ -130,6 +130,7 @@ namespace Caveman
             lr.startColor = lr.endColor = new Color(0.8f, 0.72f, 0.5f, 0.3f);
             lr.useWorldSpace = true;
             lr.sortingOrder = 0;
+            lr.enabled = false; // the straight station-to-station line was ugly + redundant (the train follows the track)
 
             var v = go.AddComponent<RouteVehicle>();
             v.stops = new List<Depot>(stops);
@@ -239,15 +240,11 @@ namespace Caveman
             }
         }
 
-        // The persistent route indicator: a faint loop through the stops (the train itself follows track).
+        // The straight station-to-station route line was ugly and redundant (the train follows the track),
+        // so it's kept disabled. Left as a no-op hook in case we add a selected-only route overlay later.
         private void DrawLine()
         {
-            if (_line == null) return;
-            int n = stops.Count;
-            _line.positionCount = n + 1;
-            for (int i = 0; i < n; i++)
-                _line.SetPosition(i, stops[i] != null ? stops[i].transform.position : transform.position);
-            _line.SetPosition(n, stops[0] != null ? stops[0].transform.position : transform.position);
+            if (_line != null && _line.enabled) _line.enabled = false;
         }
 
         // ---- Consist sizing + cargo helpers ------------------------------------------------------

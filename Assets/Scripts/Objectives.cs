@@ -14,6 +14,7 @@ namespace Caveman
         public string rewardText;
         public bool claimed;
         public bool isWin; // completing this quest wins the game
+        public BuildingDefinition highlightBuilding; // the build-menu entry to flash while this goal is active (null = none)
     }
 
     /// <summary>
