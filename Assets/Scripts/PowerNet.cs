@@ -28,6 +28,8 @@ namespace Caveman
         public static float TotalDemand { get; private set; }
         public static float TotalStored { get; private set; }   // battery charge across the whole grid
         public static float TotalCapacity { get; private set; } // battery capacity across the whole grid
+        public static int BrownoutMachines { get; private set; } // wired machines running BELOW full speed right now
+        public static float WorstFactor { get; private set; } = 1f; // the slowest such machine's supply factor (1 = none)
 
         /// <summary>Power factor for a consumer: 1 connected with enough supply, &lt;1 if its network is
         /// oversubscribed, 0 if it has no power / isn't wired in. Drives the machine's run speed.</summary>
@@ -77,6 +79,7 @@ namespace Caveman
         {
             _factor.Clear(); _comp.Clear(); _consumerComp.Clear();
             TotalGen = TotalDemand = TotalStored = TotalCapacity = 0f;
+            BrownoutMachines = 0; WorstFactor = 1f;
             bool active = Active;
             float dt = Time.deltaTime;
 
@@ -164,8 +167,13 @@ namespace Caveman
                 TotalGen += g; TotalDemand += d;
             }
 
-            // 4. Hand each consumer its network factor.
-            foreach (var kv in _consumerComp) _factor[kv.Key] = factorByComp[kv.Value];
+            // 4. Hand each consumer its network factor, and tally the ones running below full (browning out).
+            foreach (var kv in _consumerComp)
+            {
+                float f = factorByComp[kv.Value];
+                _factor[kv.Key] = f;
+                if (f < 0.999f && f > 0.001f) { BrownoutMachines++; if (f < WorstFactor) WorstFactor = f; }
+            }
 
             // 5. Tint wires by whether their network has any power source (live or stored).
             for (int i = 0; i < PowerWire.All.Count; i++)

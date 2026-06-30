@@ -76,7 +76,7 @@ namespace Caveman
         private bool _hasMonument;
         private readonly Dictionary<string, int> _trendSnap = new(); // chip values ~3s ago (for ▲/▼)
         private float _lastSnap = -999f;
-        private Rect _topRect, _miniRect, _objRect;
+        private Rect _topRect, _miniRect, _objRect, _powerRect;
         private readonly List<(string label, int value, string detail, Color color)> _chips = new();
         private int _topBarFrame = -1;              // frame the chip set + widths were last built (cache key)
         private readonly List<float> _chipWidths = new();
@@ -379,6 +379,7 @@ namespace Caveman
                 if (builder != null) DrawBuildMenu();
                 DrawMinimap();
                 DrawSelectedPanel();
+                if (!_showBuild) DrawPowerGridOverview(); // grid readout (bottom-left); yields to the build menu
                 DrawFooter();
             }
 
@@ -408,6 +409,7 @@ namespace Caveman
                                 || (_buildShown && _buildRect.Contains(m)) || (_selShown && _selRect.Contains(m))
                                 || (_flyoutShown && _flyoutRect.Contains(m))
                                 || _topRect.Contains(m) || _miniRect.Contains(m) || _objRect.Contains(m)
+                                || _powerRect.Contains(m)
                                 || (_ageCardT > 0f && _ageCardRect.Contains(m))
                                 || (_revealQueue.Count > 0 && _objRevealRect.Contains(m));
             }
@@ -1598,6 +1600,65 @@ namespace Caveman
             string mode = Economy.LocalProduction ? "<color=#fc8>Local logistics</color>" : "<color=#8cf>Global pool</color>";
             GUILayout.Label($"<size=11><color=#999>{sandbox}Speed x{_speed:0} · {mode} (F7) · F1–F5 sandbox</color></size>", _small);
             GUILayout.EndArea();
+        }
+
+        // ---- Power Grid overview (bottom-left): live generation vs demand, battery, and how many machines
+        //      are browning out — so an overloaded grid is FELT, not just guessed. Flashes red on overload. ----
+        private void DrawPowerGridOverview()
+        {
+            if (!PowerNet.Active) { _powerRect = default; return; }
+            PowerNet.EnsureFresh();
+            float gen = PowerNet.TotalGen, dem = PowerNet.TotalDemand, stored = PowerNet.TotalStored, cap = PowerNet.TotalCapacity;
+            if (gen <= 0.01f && dem <= 0.01f && cap <= 0.01f) { _powerRect = default; return; } // nothing wired yet
+            bool overloaded = dem > gen + 0.01f;
+
+            const float w = 246f;
+            float h = cap > 0.01f ? 110f : 84f;
+            var r = new Rect(12f, _vh - h - 46f, w, h);
+            _powerRect = r;
+            PanelBg(r);
+            // Red top/bottom edges that pulse while the grid is overloaded — a felt warning.
+            if (overloaded)
+            {
+                var rc = GUI.color;
+                GUI.color = new Color(1f, 0.32f, 0.26f, 0.45f + 0.3f * Mathf.Sin(Time.unscaledTime * 6f));
+                GUI.DrawTexture(new Rect(r.x, r.y, r.width, 3f), Texture2D.whiteTexture);
+                GUI.DrawTexture(new Rect(r.x, r.yMax - 3f, r.width, 3f), Texture2D.whiteTexture);
+                GUI.color = rc;
+            }
+
+            float x = r.x + 12f, y = r.y + 8f, iw = w - 24f;
+            GUI.Label(new Rect(x, y, iw, 20f), $"<b>⚡ Power Grid</b>{(overloaded ? "   <color=#f66>OVERLOADED</color>" : "")}", _small);
+            y += 21f;
+            GUI.Label(new Rect(x, y, iw, 18f), $"<size=12>Gen <b>{Mathf.RoundToInt(gen)}</b>   ·   Demand <b>{Mathf.RoundToInt(dem)}</b></size>", _small);
+            y += 18f;
+            float maxv = Mathf.Max(gen, dem, 1f);
+            GuiBar(new Rect(x, y, iw, 8f), new Color(0.18f, 0.18f, 0.22f));                                                  // track
+            GuiBar(new Rect(x, y, iw * Mathf.Clamp01(gen / maxv), 8f), overloaded ? new Color(0.9f, 0.42f, 0.3f) : new Color(0.4f, 0.85f, 0.46f)); // generation fill
+            float dmx = x + iw * Mathf.Clamp01(dem / maxv);
+            GuiBar(new Rect(dmx - 1f, y - 2f, 2f, 12f), Color.white);                                                        // demand marker
+            y += 15f;
+            if (cap > 0.01f)
+            {
+                float frac = Mathf.Clamp01(stored / cap);
+                GUI.Label(new Rect(x, y, iw, 18f), $"<size=12>🔋 {Mathf.RoundToInt(stored)} / {Mathf.RoundToInt(cap)}</size>", _small);
+                y += 18f;
+                GuiBar(new Rect(x, y, iw, 7f), new Color(0.18f, 0.18f, 0.22f));
+                GuiBar(new Rect(x, y, iw * frac, 7f), frac < 0.25f ? new Color(0.92f, 0.72f, 0.22f) : new Color(0.3f, 0.7f, 0.95f));
+                y += 12f;
+            }
+            if (PowerNet.BrownoutMachines > 0)
+                GUI.Label(new Rect(x, y, iw, 18f), $"<size=12><color=#fb6>⚠ {PowerNet.BrownoutMachines} machine{(PowerNet.BrownoutMachines == 1 ? "" : "s")} slowed (down to {Mathf.RoundToInt(PowerNet.WorstFactor * 100f)}%)</color></size>", _small);
+            else
+                GUI.Label(new Rect(x, y, iw, 18f), "<size=12><color=#7e7>all powered machines at full speed</color></size>", _small);
+        }
+
+        // A flat colour bar (track / fill), drawn with the white texture tinted via GUI.color.
+        private static void GuiBar(Rect r, Color c)
+        {
+            var old = GUI.color; GUI.color = c;
+            GUI.DrawTexture(r, Texture2D.whiteTexture);
+            GUI.color = old;
         }
 
         // ---- Victory banner (shown once the Monument is completed) ----
