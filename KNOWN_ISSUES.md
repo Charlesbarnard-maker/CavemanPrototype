@@ -6,7 +6,7 @@ A running record so progress/problems don't get lost. Newest first. Move items t
 ---
 ## 📌 NEW-THREAD HANDOFF — current state (2026-06-29, + a 15-ITEM POLISH BATCH on top of the electricity overhaul — committed & pushed)
 Pinned pointer so a fresh thread (incl. on a DIFFERENT PC) can continue. Everything below is committed and pushed to
-`origin/main` (HEAD = `46bd3ff`, working tree clean, in sync) — a clean clone has the whole game. Open the project,
+`origin/main` (HEAD = `fbf1836`, working tree clean, in sync) — a clean clone has the whole game. Open the project,
 Play, and continue. A full interactive PLAYTEST is the biggest owed item (user tests in the evenings) — all feedback
 batches compile clean (`Tools/compile-check.ps1` → COMPILE CLEAN) but have NOT been interactively played yet.
 
@@ -16,6 +16,14 @@ items). Belts now render ONE sprite per REAL item; density is real: `Belt.MinGap
 unchanged) so belts are fed densely. Two side effects to watch in playtest, both single constants: belt-tier caps
 doubled (~80/120/240/480 per min; tooltip numbers read ~2× low now) and the game paces ~2× faster (research/ages +
 finite-ore depletion). Dial `Economy.ProductionScale` (and `Belt.MinGap` toward 1.0 for sparser) to taste.
+
+**⚖️ PACING REBALANCE + LINE/BOAT FIXES (2026-06-29, commit `fbf1836`):** to offset the 2× production: research age
+costs DOUBLED (24/300/800/1600) + bigger gate counts, build `CostScale` 2.5→3.5, recipe INPUTS bumped ~×1.5 (gentle
+integer — single-input steps unchanged), starter kit topped up. All tunable knobs (`CostScale`, the `Scale15` recipe
+loop, the tech costs) — playtest and dial. Also: train/ship lines can now REVISIT a station (loops / there-and-back /
+via home); only the stop the line is currently ON is disallowed; finish a line with RIGHT-CLICK (not by clicking the
+first stop). And the boat no longer lets the player walk over MOUNTAINS (only water) — `PlayerController` + new
+`TerrainGrid.IsWater(Vector3)`.
 
 **✅ DONE THIS SESSION — 15-ITEM POLISH BATCH (2026-06-29):** commits `5447ae1`,`066f717`,`e000926`,`fd00a8c`,`e0b6a27`.
 - Objectives: first goal says "Click trees & rocks…" + a new "Run a conveyor Belt from the Wood Hut to the Woodpile"
