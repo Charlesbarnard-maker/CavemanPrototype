@@ -53,6 +53,11 @@ namespace Caveman
             var copper = MakeItem("copper", "Copper", new Color(0.85f, 0.55f, 0.35f));
             var bronzePlate = MakeItem("bronze_plate", "Bronze Plate", new Color(0.78f, 0.58f, 0.32f));
             var steel = MakeItem("steel", "Steel", new Color(0.58f, 0.62f, 0.70f));
+            // Deeper metal chains (more steps → bigger factories): Copper → Copper Plate → Bronze Plate; Iron → Iron Rod → Steel.
+            var copperPlate = MakeItem("copper_plate", "Copper Plate", new Color(0.90f, 0.60f, 0.34f));
+            copperPlate.description = "COPPER PLATE — the Basic Smelter rolls Copper into plates; the Advanced Smelter presses Plate + Bricks into Bronze Plate.";
+            var ironRod = MakeItem("iron_rod", "Iron Rod", new Color(0.72f, 0.74f, 0.80f));
+            ironRod.description = "IRON ROD — the Basic Smelter draws Iron into rods; the Advanced Smelter forges Rod + Charcoal into Steel.";
             // MECHANICAL CHAIN (the deeper late-game tree): bars/alloys -> shaped COMPONENTS (forged at the
             // Toolmaker) -> assembled ASSEMBLIES (built at the Engineering Lab) -> the final Engine. Each stage
             // combines more processed inputs than the last, so complexity scales with the age you reach.
@@ -120,8 +125,8 @@ namespace Caveman
             // look for now). Real per-item art drops in by adding Resources/art/<id> sprites later.
             foreach (var it in new[] { wood, planks }) it.sprite = SpriteDefinition.Of(PlaceholderShape.Triangle);              // woody
             foreach (var it in new[] { stone, ore, clay, bricks, stoneBlock, gems, charcoal }) it.sprite = SpriteDefinition.Of(PlaceholderShape.Hexagon); // mineral
-            foreach (var it in new[] { metal, tools, monument, cloth, clothes, pot, jewelry, ideaTablet, studyScroll, schematic, blueprint }) it.sprite = SpriteDefinition.Of(PlaceholderShape.Square); // manufactured
-            foreach (var it in new[] { wood, planks, stone, ore, clay, bricks, stoneBlock, gems, charcoal, metal, tools, monument, cloth, clothes, pot, jewelry, ideaTablet, studyScroll, schematic, blueprint })
+            foreach (var it in new[] { metal, tools, monument, cloth, clothes, pot, jewelry, ideaTablet, studyScroll, schematic, blueprint, copperPlate, ironRod }) it.sprite = SpriteDefinition.Of(PlaceholderShape.Square); // manufactured
+            foreach (var it in new[] { wood, planks, stone, ore, clay, bricks, stoneBlock, gems, charcoal, metal, tools, monument, cloth, clothes, pot, jewelry, ideaTablet, studyScroll, schematic, blueprint, copperPlate, ironRod })
                 it.icon = SpriteDatabase.ForItem(it);
             // food / cooked / meat / grain / flour / bread / fiber keep the default round dot.
 
@@ -430,17 +435,19 @@ namespace Caveman
             {
                 new Recipe(copper, 1, 4.0f, 1, new ItemAmount(copperOre, 1), new ItemAmount(charcoal, 1)), // 15/min — ore + charcoal both pile up: parallel smelters
                 new Recipe(metal,  1, 4.5f, 1, new ItemAmount(ore, 1),       new ItemAmount(charcoal, 1)),
+                new Recipe(copperPlate, 1, 3.5f, 2, new ItemAmount(copper, 1)), // Copper → Copper Plate (Bronze-age forming pass; feeds Bronze Plate)
+                new Recipe(ironRod,     1, 3.5f, 3, new ItemAmount(metal, 1)),  // Iron → Iron Rod (Iron-age drawing pass; feeds Steel)
             };
-            basicSmelter.description = "BASIC SMELTER — select its recipe: Copper Ore + Charcoal → Copper, or Iron Ore + Charcoal → Iron. One smelter for both basic metals (click it to switch). Charcoal is shared with the Kiln + Advanced Smelter — a key bottleneck.";
+            basicSmelter.description = "BASIC SMELTER — pick its recipe (click to switch): Copper Ore + Charcoal → Copper · Iron Ore + Charcoal → Iron · Copper → Copper Plate · Iron → Iron Rod. Plates/Rods feed the Advanced Smelter — build several. Charcoal is the shared bottleneck (Kiln + both smelters).";
             var advancedSmelter = MakeWorkshop("Advanced Smelter", bronzePlate, 1, 4.5f, 2, 12, new Color(0.66f, 0.60f, 0.52f),
                 new List<ItemAmount> { new ItemAmount(copper, 1), new ItemAmount(bricks, 1) },
                 new ItemAmount(bricks, 8), new ItemAmount(metal, 4)); advancedSmelter.unlockAge = 2;
             advancedSmelter.recipes = new List<Recipe>
             {
-                new Recipe(bronzePlate, 1, 4.5f, 2, new ItemAmount(copper, 1), new ItemAmount(bricks, 1)), // ~13/min — copper + bricks pile up
-                new Recipe(steel,       1, 5.0f, 3, new ItemAmount(metal, 1),  new ItemAmount(charcoal, 1)),
+                new Recipe(bronzePlate, 1, 4.5f, 2, new ItemAmount(copperPlate, 1), new ItemAmount(bricks, 1)), // Copper Plate + Bricks → Bronze Plate
+                new Recipe(steel,       1, 5.0f, 3, new ItemAmount(ironRod, 1),     new ItemAmount(charcoal, 1)), // Iron Rod + Charcoal → Steel
             };
-            advancedSmelter.description = "ADVANCED SMELTER — combines materials into alloy bars; select its recipe: Copper + Bricks → Bronze Plate, or Iron + Charcoal → Steel (Steel unlocks in the Iron Age). One furnace for both alloys (click it to switch).";
+            advancedSmelter.description = "ADVANCED SMELTER — presses parts into alloys; pick its recipe (click to switch): Copper Plate + Bricks → Bronze Plate · Iron Rod + Charcoal → Steel (Iron Age). Feed it Plates/Rods made by Basic Smelters.";
             // Smelters need POWER — they run only while connected to a powered network (a Generator,
             // extended by Power Poles). See the Wood Generator + Power Pole defs below.
             basicSmelter.requiresPower = true;
