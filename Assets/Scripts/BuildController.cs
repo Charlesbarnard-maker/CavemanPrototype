@@ -1216,6 +1216,7 @@ namespace Caveman
             foreach (var g in _planGhosts) if (g != null) Destroy(g);
             _planGhosts.Clear();
             _beltPlanDirty = false;
+            DragCostLabel = "";
         }
 
         // Sync the translucent blueprint previews to the planned cells (cyan = ok, red = blocked).
@@ -1231,7 +1232,8 @@ namespace Caveman
                 go.AddComponent<SpriteRenderer>().sortingOrder = 19;
                 _planGhosts.Add(go);
             }
-            int i = 0;
+            int budget = AffordableCellCount(def.cost); // how many cells you can actually pay for
+            int paid = 0, i = 0;
             foreach (var kv in _beltPlan)
             {
                 var go = _planGhosts[i++];
@@ -1241,11 +1243,45 @@ namespace Caveman
                 go.transform.localScale = Vector3.one; // match the placed belt (full cell)
                 var sr = go.GetComponent<SpriteRenderer>();
                 sr.sprite = SpriteDatabase.ForBelt(def.displayName, def.splitter, def.merger);
-                bool ok = Belt.At(kv.Key) == null && TerrainGrid.BeltAllowed(kv.Key)
+                bool terrainOk = Belt.At(kv.Key) == null && TerrainGrid.BeltAllowed(kv.Key)
                           && !SolidBuildingAt(new Vector3(kv.Key.x, kv.Key.y, 0f)) && !WorldGrid.IsReserved(kv.Key);
-                sr.color = ok ? new Color(0.4f, 0.9f, 1f, 0.45f) : new Color(1f, 0.35f, 0.35f, 0.5f);
+                if (!terrainOk) sr.color = new Color(1f, 0.35f, 0.35f, 0.5f);                     // blocked — red
+                else if (paid < budget) { sr.color = new Color(0.4f, 0.9f, 1f, 0.45f); paid++; } // affordable — cyan
+                else sr.color = new Color(1f, 0.55f, 0.12f, 0.55f);                               // can't afford — orange
             }
             for (int k = n; k < _planGhosts.Count; k++) if (_planGhosts[k].activeSelf) _planGhosts[k].SetActive(false);
+            DragCostLabel = BuildStretchCostLabel(def, n, budget);
+        }
+
+        public string DragCostLabel { get; private set; } = "";
+
+        // How many cells of a per-cell build (belt/rail) the player can currently afford.
+        private int AffordableCellCount(List<ItemAmount> cost)
+        {
+            if (Economy.FreeBuild || cost == null || cost.Count == 0) return int.MaxValue;
+            int min = int.MaxValue;
+            foreach (var c in cost)
+            {
+                if (c == null || c.item == null || c.amount <= 0) continue;
+                int can = Economy.Available(c.item, Carried) / c.amount;
+                if (can < min) min = can;
+            }
+            return min == int.MaxValue ? int.MaxValue : Mathf.Max(0, min);
+        }
+
+        // "Conveyor ×12 — 24 Planks, 12 Metal  (enough for 8)" — total stretch cost + how many you can pay for.
+        private string BuildStretchCostLabel(BuildingDefinition def, int n, int budget)
+        {
+            if (n <= 0) return "";
+            var sb = new System.Text.StringBuilder();
+            sb.Append($"{def.displayName} ×{n}");
+            if (def.cost != null && def.cost.Count > 0)
+            {
+                sb.Append(" — "); bool first = true;
+                foreach (var c in def.cost) { if (c == null || c.item == null) continue; if (!first) sb.Append(", "); sb.Append($"{c.amount * n} {c.item.displayName}"); first = false; }
+            }
+            if (budget != int.MaxValue && budget < n) sb.Append($"  (enough for {budget})");
+            return sb.ToString();
         }
 
         // Splitter/merger in/out ports on the ghost (parented to the rotated ghost, LOCAL dirs — so they
@@ -1599,6 +1635,7 @@ namespace Caveman
             _railPlanGhosts.Clear();
             _railPlanHinted = false;
             _railPlanDirty = false;
+            DragCostLabel = "";
         }
 
         private void RebuildRailPlanGhosts()
@@ -1615,6 +1652,9 @@ namespace Caveman
                 sr.sortingOrder = 19;
                 _railPlanGhosts.Add(go);
             }
+            var rdef = (PendingIndex >= 0 && PendingIndex < buildables.Count) ? buildables[PendingIndex] : null;
+            int budget = rdef != null ? AffordableCellCount(rdef.cost) : int.MaxValue;
+            int paid = 0;
             for (int i = 0; i < n; i++)
             {
                 var go = _railPlanGhosts[i];
@@ -1623,10 +1663,13 @@ namespace Caveman
                 go.transform.position = new Vector3(c.x, c.y, 0f);
                 var sr = go.GetComponent<SpriteRenderer>();
                 sr.sprite = PlaceholderArt.RailMask(GhostMaskAt(i, n)); // EXACT preview: only what will actually connect
-                sr.color = RailCellFree(c, elev) // elevated may cross belts, so a belt cell is still valid for it
-                    ? new Color(0.4f, 0.9f, 1f, 0.5f) : new Color(1f, 0.35f, 0.35f, 0.55f);
+                bool terrainOk = RailCellFree(c, elev); // elevated may cross belts, so a belt cell is still valid for it
+                if (!terrainOk) sr.color = new Color(1f, 0.35f, 0.35f, 0.55f);                    // blocked — red
+                else if (paid < budget) { sr.color = new Color(0.4f, 0.9f, 1f, 0.5f); paid++; }   // affordable — cyan
+                else sr.color = new Color(1f, 0.55f, 0.12f, 0.55f);                                // can't afford — orange
             }
             for (int k = n; k < _railPlanGhosts.Count; k++) if (_railPlanGhosts[k].activeSelf) _railPlanGhosts[k].SetActive(false);
+            DragCostLabel = rdef != null ? BuildStretchCostLabel(rdef, n, budget) : "";
         }
 
         // EXACT ghost mask for plan cell i — mirrors ApplyPathLinks, so the blueprint shows precisely what will

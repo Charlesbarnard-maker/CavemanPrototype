@@ -374,6 +374,7 @@ namespace Caveman
 
             DrawHoverInfo();
             DrawToasts();
+            DrawDragCost();
             DrawGatherPopups();
             if (!modal) DrawAgeCard();         // temporary "what changed" moment; yields if a mode panel is open
             if (!modal) DrawObjectiveReveal();  // centre-screen "new objectives" popup → OK → docks top-right
@@ -1709,6 +1710,20 @@ namespace Caveman
         }
 
         // ---- Toasts (centre) ----
+        // A small cost readout that follows the cursor while dragging a belt/track stretch (set by BuildController);
+        // the stretch's ghost also colours its unaffordable tail orange, so "looks buildable but isn't" is gone.
+        private void DrawDragCost()
+        {
+            if (builder == null || string.IsNullOrEmpty(builder.DragCostLabel)) return;
+            var content = new GUIContent($"<size=12>{builder.DragCostLabel}</size>");
+            var m = Event.current.mousePosition;
+            float w = Mathf.Min(380f, _small.CalcSize(content).x + 18f);
+            float h = _small.CalcHeight(content, w - 16f) + 10f;
+            var r = new Rect(Mathf.Clamp(m.x + 18f, 4f, _vw - w - 4f), Mathf.Clamp(m.y + 20f, 4f, _vh - h - 4f), w, h);
+            PanelBg(r);
+            GUI.Label(new Rect(r.x + 8, r.y + 5, r.width - 16, r.height - 10), content, _small);
+        }
+
         private void DrawToasts()
         {
             // Constrained-width, word-wrapped, multi-line so long tips aren't cut off. Each toast's
