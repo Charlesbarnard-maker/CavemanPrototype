@@ -39,6 +39,11 @@ namespace Caveman
             (def != null && def.upgrades != null && Tier < def.upgrades.Count) ? def.upgrades[Tier] : null;
         public bool UpgradeUnlocked
         { get { var u = PendingUpgrade; return u != null && (Colony.Instance == null || u.unlockAge <= Colony.Instance.Age); } }
+        /// <summary>True when an upgrade is available AND you can afford it right now — drives the world ⬆ badge.</summary>
+        public bool CanUpgradeNow
+        { get { var u = PendingUpgrade; return UpgradeUnlocked && u != null && Economy.CanAfford(u.cost, Colony.Instance != null ? Colony.Instance.carried : null); } }
+        /// <summary>How many upgrade tiers this building has in total (for the "tier X/Y" panel readout).</summary>
+        public int UpgradeTierCount => def != null && def.upgrades != null ? def.upgrades.Count : 0;
 
         /// <summary>Buy the next upgrade tier (paid from the carried pile) — speeds processing + recolours.
         /// Returns false if there's no tier available, it's age-locked, or unaffordable.</summary>
@@ -94,6 +99,7 @@ namespace Caveman
         private SpriteRenderer _sr;
         private Color _baseColor;
         private SpriteRenderer _statusDot;
+        private SpriteRenderer _upgradeBadge;
 
         public static WorkshopBuilding Spawn(BuildingDefinition def, Vector3 pos, Belt.Dir outputSide = Belt.Dir.E)
         {
@@ -456,6 +462,8 @@ namespace Caveman
         {
             if (_statusDot == null) _statusDot = Status.MakeDot(transform);
             Status.Apply(_statusDot, StatusColor);
+            if (_upgradeBadge == null) _upgradeBadge = Status.MakeUpgradeBadge(transform);
+            Status.ApplyUpgradeBadge(_upgradeBadge, CanUpgradeNow);
             if (!_powerHintShown && NoPower)
             {
                 _powerHintShown = true;

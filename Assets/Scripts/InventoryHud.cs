@@ -68,6 +68,7 @@ namespace Caveman
         private bool _revealConsume;                                           // set by the popup's OK; applied in Update (no mid-frame queue mutation)
         private bool _localTipShown; // one-time hint when a workshop first starves
         private bool _collectorTipShown; // one-time hint when a collector first backs up
+        private bool _upgradeHintShown; // one-time hint when an upgrade first becomes affordable
         private Texture2D _panelTex; // dark panel background for readability
         private Texture2D _accentTex, _btnTex, _btnHoverTex; // top accent bar + flat button skins
         private static Texture2D Solid(Color c) { var t = new Texture2D(1, 1); t.SetPixel(0, 0, c); t.Apply(); return t; }
@@ -243,6 +244,20 @@ namespace Caveman
                         Toast.Show("<color=#ffd24d>💡 Tip:</color> a collector's output piles up until something USES it. Easiest: place a workshop right NEXT TO it — machines pull from their neighbours, no belt needed. To stock a Storage (to build with, or feed a workshop), belt it in from the green output arrow.");
                         break;
                     }
+            }
+
+            // One-time hint the first time ANY building can be upgraded + afforded — teaches the upgrade
+            // mechanic at the moment it becomes actionable (and points at the new green ⬆ badge).
+            if (!_upgradeHintShown)
+            {
+                bool any = false;
+                foreach (var w in WorkshopBuilding.All) if (w != null && w.CanUpgradeNow) { any = true; break; }
+                if (!any) foreach (var p in ProductionBuilding.All) if (p != null && p.CanUpgradeNow) { any = true; break; }
+                if (any)
+                {
+                    _upgradeHintShown = true;
+                    Toast.Show("<color=#9f9>⬆ You can UPGRADE buildings!</color> Any building wearing the green <b>⬆</b> badge can be upgraded right now — <b>select it</b> and click the Upgrade button to make it faster (and tougher-looking). Each has a few tiers across the ages.");
+                }
             }
 
             // Celebrate reaching a new age.
@@ -1167,31 +1182,39 @@ namespace Caveman
                     { if (wb != null) wb.TogglePause(); if (pbSel != null) pbSel.TogglePause(); }
                 }
 
-                // Manual paid AGE UPGRADE — buy the next tier to speed this building up + change its look.
+                // Manual paid UPGRADE — buy the next tier to speed this building up + change its look. Always
+                // shown (with a clear "tier X/Y" header) for any upgradable building, so the option is obvious.
                 {
-                    var upTier = wb != null ? wb.PendingUpgrade : pbSel.PendingUpgrade;
-                    int curTier = wb != null ? wb.Tier : pbSel.Tier;
-                    if (upTier != null)
+                    int maxTier = wb != null ? wb.UpgradeTierCount : pbSel.UpgradeTierCount;
+                    if (maxTier > 0)
                     {
-                        bool unlocked = wb != null ? wb.UpgradeUnlocked : pbSel.UpgradeUnlocked;
-                        if (!unlocked)
-                        {
-                            string ageNm = upTier.unlockAge < Colony.AgeNames.Length ? Colony.AgeNames[upTier.unlockAge] : "a later age";
-                            GUILayout.Label($"<size=11><color=#888>⬆ Next: <b>{upTier.name}</b> — unlocks in {ageNm}</color></size>", _small);
-                        }
+                        var upTier = wb != null ? wb.PendingUpgrade : pbSel.PendingUpgrade;
+                        int curTier = wb != null ? wb.Tier : pbSel.Tier;
+                        GUILayout.Label($"<size=12><b><color=#cda>⚙ Upgrade</color></b>   <color=#999>tier {curTier} / {maxTier}</color></size>", _small);
+                        if (upTier == null)
+                            GUILayout.Label("<size=11><color=#9f9>✔ Fully upgraded — max tier reached.</color></size>", _small);
                         else
                         {
-                            var carriedU = gatherer != null ? gatherer.Inventory : null;
-                            string col = Economy.CanAfford(upTier.cost, carriedU) ? "#9f9" : "#f99";
-                            if (GUILayout.Button($"<size=12>⬆ Upgrade: <b>{upTier.name}</b> <color=#9cf>(×{upTier.speedMult:0.0} rate)</color>  <color={col}>{AmountsText(upTier.cost)}</color></size>", _btn))
+                            bool unlocked = wb != null ? wb.UpgradeUnlocked : pbSel.UpgradeUnlocked;
+                            if (!unlocked)
                             {
-                                bool ok = wb != null ? wb.TryUpgrade() : pbSel.TryUpgrade();
-                                Toast.Show(ok ? $"<color=#9f9>Upgraded to {upTier.name}.</color>" : "<color=#f99>Can't afford that upgrade.</color>");
+                                string ageNm = upTier.unlockAge < Colony.AgeNames.Length ? Colony.AgeNames[upTier.unlockAge] : "a later age";
+                                GUILayout.Label($"<size=11><color=#888>🔒 Next: <b>{upTier.name}</b> (×{upTier.speedMult:0.0} speed) — unlocks in the {ageNm}</color></size>", _small);
+                            }
+                            else
+                            {
+                                var carriedU = gatherer != null ? gatherer.Inventory : null;
+                                bool afford = Economy.CanAfford(upTier.cost, carriedU);
+                                string col = afford ? "#9f9" : "#f99";
+                                if (GUILayout.Button($"<size=12><color=#9f9>⬆</color> <b>{upTier.name}</b> — ×{upTier.speedMult:0.0} speed   <color={col}>{AmountsText(upTier.cost)}</color></size>", _btn))
+                                {
+                                    bool ok = wb != null ? wb.TryUpgrade() : pbSel.TryUpgrade();
+                                    Toast.Show(ok ? $"<color=#9f9>⬆ Upgraded to {upTier.name}!</color>" : "<color=#f99>Can't afford that upgrade yet.</color>");
+                                }
+                                if (!afford) GUILayout.Label("<size=10><color=#c98>(gather/produce the materials, then upgrade)</color></size>", _small);
                             }
                         }
                     }
-                    else if (curTier > 0)
-                        GUILayout.Label("<size=11><color=#9f9>✔ Fully upgraded</color></size>", _small);
                 }
 
                 // What this collector/workshop currently holds in its buffer.

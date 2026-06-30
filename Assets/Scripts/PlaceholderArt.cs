@@ -22,6 +22,38 @@ namespace Caveman
         private static Sprite[] _pipeTiles;            // 16 connection-pattern tubes (N=1,E=2,S=4,W=8)
         private static Sprite _pipeValveS, _pipeValveM; // junction pieces: splitter (teal) / merger (amber)
         private static Sprite _pipeDrop;               // animated flow droplet (direction + that fluid moves)
+        private static Sprite _upgradeArrow;           // green ⬆ badge — "this building can be upgraded now"
+
+        /// <summary>A green UP-ARROW badge floated over a building that can be upgraded right now.</summary>
+        public static Sprite UpgradeArrow()
+        {
+            if (_upgradeArrow != null) return _upgradeArrow;
+            const int s = 32;
+            var tex = NewTex(s);
+            var px = new Color[s * s];
+            var body = new Color(0.34f, 0.94f, 0.46f, 1f);
+            var edge = new Color(0.07f, 0.42f, 0.17f, 1f);
+            for (int y = 0; y < s; y++)
+                for (int x = 0; x < s; x++)
+                {
+                    float fx = x / (float)(s - 1), fy = y / (float)(s - 1);
+                    float ax = Mathf.Abs(fx - 0.5f);
+                    Color c = Clear;
+                    if (fy >= 0.50f && fy <= 0.94f)            // arrow head (apex at top)
+                    {
+                        float half = 0.42f * (0.94f - fy) / 0.44f;
+                        if (ax <= half) c = ax > half - 0.07f ? edge : body;
+                    }
+                    else if (fy >= 0.10f && fy < 0.50f)        // stem
+                    {
+                        if (ax <= 0.15f) c = ax > 0.10f ? edge : body;
+                    }
+                    px[y * s + x] = c;
+                }
+            tex.SetPixels(px); tex.Apply();
+            _upgradeArrow = Sprite.Create(tex, new Rect(0, 0, s, s), new Vector2(0.5f, 0.5f), s);
+            return _upgradeArrow;
+        }
         private static Material _lineMat;
 
         /// <summary>One SHARED material for every LineRenderer (wires, route lines, reach rings, previews).
