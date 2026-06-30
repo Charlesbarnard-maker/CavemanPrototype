@@ -1023,37 +1023,77 @@ namespace Caveman
             // Tooltip describing the hovered build entry — to the right of whichever panel is rightmost.
             if (!string.IsNullOrEmpty(GUI.tooltip))
             {
-                var tr = new Rect(tipAnchor.xMax + 6, tipAnchor.y, 280, 172);
+                const float tw = 304f;
+                var tip = new GUIContent($"<size=13>{GUI.tooltip}</size>");
+                float th = _small.CalcHeight(tip, tw - 18) + 14f;            // size to content — never clip the stat block
+                float ty = Mathf.Max(8f, Mathf.Min(tipAnchor.y, _vh - 8f - th)); // and keep the whole box on-screen
+                var tr = new Rect(tipAnchor.xMax + 6, ty, tw, th);
                 PanelBg(tr);
-                GUI.Label(new Rect(tr.x + 9, tr.y + 7, tr.width - 18, tr.height - 14), $"<size=13>{GUI.tooltip}</size>", _small);
+                GUI.Label(new Rect(tr.x + 9, tr.y + 7, tr.width - 18, th - 14), tip, _small);
             }
         }
 
+        // A Satisfactory-style entry: a prose body (hand-written if present, else synthesised from the kind)
+        // followed by a structured stat block — recipe, power, capacity, build cost, footprint, unlock age.
         private static string Describe(BuildingDefinition def)
         {
             if (def == null) return "";
-            // A hand-written description always wins; otherwise build a full one from data.
-            if (!string.IsNullOrEmpty(def.description)) return def.description;
+            string body = !string.IsNullOrEmpty(def.description) ? def.description : KindBody(def);
+            return body + StatBlock(def);
+        }
 
-            string age = (def.unlockAge > 0 && def.unlockAge < Colony.AgeNames.Length)
-                ? $"\n<i>Unlocks: {Colony.AgeNames[def.unlockAge]}.</i>" : "";
+        // The data-driven prose for kinds without a hand-written description.
+        private static string KindBody(BuildingDefinition def)
+        {
             switch (def.kind)
             {
                 case BuildingKind.Collector:
-                    return $"Auto-gathers {Name(def.item)} from a nearby {Name(def.item)} patch at a fixed rate once built (no workers). Place it next to the resource; it re-targets a fresh patch when one runs dry.{age}";
+                    return $"Auto-gathers {Name(def.item)} from a nearby patch at a fixed rate once built (no workers). Place it next to the resource; it re-targets a fresh patch when one runs dry.";
                 case BuildingKind.Workshop:
-                    return $"Recipe: {CostList(def.inputs)} → {def.outputPerCycle} {Name(def.item)}. Runs automatically once its inputs are DELIVERED here (belt, or an adjacent storage/machine). Red dot = missing input.{age}";
+                    return "Runs automatically once its inputs are DELIVERED here (belt, or an adjacent storage/machine). Red dot = a missing input.";
                 case BuildingKind.Storage:
                     return def.configurable
-                        ? $"Warehouse — stores ONE resource you pick (set it in its panel); good for Planks, Charcoal, etc. Holds {def.capacity}.{age}"
-                        : $"Stores {Name(def.item)} (up to {def.capacity}). Belt output here; if it fills up, production backs up.{age}";
+                        ? "Stores ONE resource you pick (set it in its panel) — Planks, Charcoal, etc. Belt output here."
+                        : $"Stores {Name(def.item)}. Belt output here; if it fills up, production backs up.";
                 case BuildingKind.Belt:
-                    return $"Conveyor — carries items one cell in the way it faces ({(def.interval <= 0.6f ? "fast tier" : "slow tier")}). Click/drag to lay a line, R to rotate. Feeds storage or workshop inputs.{age}";
+                    return $"Carries items one cell in the way it faces ({(def.interval <= 0.6f ? "fast tier" : "slow tier")}). Click/drag to lay a line, R to rotate.";
                 case BuildingKind.Depot:
-                    return $"Transport Station. Belt goods in, then SELECT it and add a route to another Station — a vehicle hauls goods across the map (load → travel → unload). Holds {def.capacity}.{age}";
+                    return "Transport Station. Belt goods in, then SELECT it and route to another Station — a vehicle hauls goods across the map (load → travel → unload).";
+                case BuildingKind.Power:
+                    return "Generates electricity for the grid. Wire it to poles or machines — you draw the wires, there is no radius.";
+                case BuildingKind.Pole:
+                    return "Relays power across the map. Wire poles together to extend the grid to distant machines.";
+                case BuildingKind.Battery:
+                    return "Stores surplus electricity and releases it when generation drops, smoothing the grid through quiet spells.";
+                case BuildingKind.Pump:
+                    return $"Draws {Name(def.item)} and feeds it into pipes/belts on its output side.";
+                case BuildingKind.Garage:
+                    return "Houses and maintains your vehicles.";
                 default:
                     return def.displayName;
             }
+        }
+
+        // The structured footer shown under every build-menu tooltip.
+        private static string StatBlock(BuildingDefinition def)
+        {
+            var sb = new System.Text.StringBuilder();
+            if (def.kind == BuildingKind.Workshop && def.inputs != null && def.inputs.Count > 0)
+                sb.Append($"\n\n<color=#cfe>Recipe:</color> {CostList(def.inputs)} → {def.outputPerCycle} {Name(def.item)}");
+            else if (def.kind == BuildingKind.Collector && def.item != null)
+                sb.Append($"\n\n<color=#cfe>Output:</color> {Name(def.item)}");
+            else sb.Append("\n");
+
+            if (def.powerOutput > 0) sb.Append($"\n<color=#9f9>⚡ Generates {def.powerOutput} power</color>");
+            else if (def.powerDraw > 0) sb.Append($"\n<color=#fd6>⚡ Uses {def.powerDraw} power</color>");
+            else if (def.requiresPower) sb.Append("\n<color=#fd6>⚡ Needs power</color>");
+
+            if (def.kind == BuildingKind.Storage && def.capacity > 0) sb.Append($"\n<color=#bcd>📦 Holds {def.capacity}</color>");
+            if (def.cost != null && def.cost.Count > 0) sb.Append($"\n<color=#cb9>🔨 {AmountsText(def.cost)}</color>");
+            if (def.FootW * def.FootH > 1) sb.Append($"\n<color=#999>📐 {def.FootW}×{def.FootH}</color>");
+            if (def.unlockAge > 0 && def.unlockAge < Colony.AgeNames.Length)
+                sb.Append($"\n<i><color=#999>Unlocks: {Colony.AgeNames[def.unlockAge]}</color></i>");
+            return sb.ToString();
         }
 
         // ---- Selected building manage panel (bottom-right) ----
