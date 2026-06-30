@@ -4,11 +4,18 @@ A running record so progress/problems don't get lost. Newest first. Move items t
 **Fixed** when done. Maintained alongside the code — see DESIGN.md for the roadmap.
 
 ---
-## 📌 NEW-THREAD HANDOFF — current state (2026-06-29, + a 15-ITEM POLISH BATCH on top of the electricity overhaul — committed & pushed)
+## 📌 NEW-THREAD HANDOFF — current state (2026-06-30: storage ports + power panels + Monument win-chain unblocked — committed & pushed)
 Pinned pointer so a fresh thread (incl. on a DIFFERENT PC) can continue. Everything below is committed and pushed to
-`origin/main` (HEAD = `fbf1836`, working tree clean, in sync) — a clean clone has the whole game. Open the project,
+`origin/main` (HEAD = `b0ead32`, working tree clean, in sync) — a clean clone has the whole game. Open the project,
 Play, and continue. A full interactive PLAYTEST is the biggest owed item (user tests in the evenings) — all feedback
 batches compile clean (`Tools/compile-check.ps1` → COMPILE CLEAN) but have NOT been interactively played yet.
+
+**✅ DONE THIS SESSION (2026-06-30) — STORAGE PORTS, POWER PANELS, MONUMENT WIN-CHAIN:** commits `915bfbd`, `1f85bc5`, `b0ead32`. Compile-clean, NOT yet playtested.
+- **Storage ports** (`915bfbd`): every BASIC pile is now 1-in/1-out (`MakeStorage` defaults `singlePort`; the Warehouse becomes the basic general store). New `BuildingDefinition.dualPort` = exactly 2 ports/side at the END cells (`Ports.PlaceSide`). Added **Large Stockpile** + **Large Warehouse** (Iron age, 3×3, 2-in/2-out, 10× capacity = 2000/3000) beside their basics in the menu. NOTE: ports are VISUAL only — belt delivery checks the cell + OutputSide direction, not the marker (so a Large store's middle edge-cell still accepts a belt).
+- **Power panels + notch + battery bar** (`1f85bc5`): generator info panel now shows status / power (now÷rated) / fuel buffer / consumption (renewables get a wind/daylight line); battery panel shows charge % + energy + ▲/▼ flow. Fuel intake notch is now placed PER-CELL (`PlacePorts singlePort`) so it lines up with the belt grid (was floating on the 2×2 cell seam). Battery draws a red→green charge BAR above it (`Battery._barFill` + `MakeBarSprite`, y≈0.6 — nudge if it floats).
+- **Belt-tier tooltip numbers** (`b0ead32`): corrected to the real `MinGap=0.5` caps — **80/120/240/480** per min (were 40/60/120/240, ~2× low). Updated all descriptions, dev comments, the 3 belt research blurbs, splitter/merger/underground. Wooden Belt narrative reframed — at 80/min it now slightly OUT-paces one 60/min collector (a balance shift to eyeball in playtest; left the intervals as-is).
+- **MONUMENT WIN-CHAIN UNBLOCKED** (`b0ead32`): the win needs Jewelry, but the **Jeweler + Gem Mine were missing from the build menu AND no Gem deposits ever spawned** — the game was unwinnable. Fixed: both added to the menu, a far/finite **Gem field** spawned beyond the Iron corridor (dist 168, new `PlaceholderArt.Gem()` sprite, cap 130 ×3 clusters), and the Monument descriptions corrected to the real recipe (Engine + Jewelry + 4 Bricks/block). Engine (Engineering Lab) + Bricks (Kiln) were already buildable. PLAYTEST: confirm the gem field is reachable on the Iron corridor and the full Gem→Jeweler→Monument chain closes.
+- **Open / still owed:** the full interactive PLAYTEST (everything above is unplayed); pacing tuning (post-playtest). Two carry-overs DEFERRED as too big/ambiguous for a pre-test cleanup pass — true in-place line editing (workaround stands: delete-✕-and-redo) and the world-scale-to-Half≈650 idea (would invalidate the zone distances above; needs a deliberate call, not a blind change).
 
 **⚙️ BELT FLOW REWORK (2026-06-29, commit `46bd3ff`):** the earlier 2-dot belt cluster was reverted (it double-counted
 items). Belts now render ONE sprite per REAL item; density is real: `Belt.MinGap = 0.5` (2 items/cell, packed) + a new
