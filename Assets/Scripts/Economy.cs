@@ -13,6 +13,11 @@ namespace Caveman
         /// <summary>Sandbox: building/age costs are free and instant.</summary>
         public static bool FreeBuild;
 
+        /// <summary>Global production-RATE multiplier on every collector + workshop cycle (recipe input/output
+        /// RATIOS are unchanged — cycles just run faster). Paired with the denser belts (Belt.MinGap=0.5) so belts
+        /// are fed enough to look full at the same belt speed. 2.0 = buildings produce twice as fast.</summary>
+        public static float ProductionScale = 2f;
+
         /// <summary>
         /// When true, a workshop may only consume inputs that are PHYSICALLY present —
         /// belt-delivered (its InBuffer) or in an adjacent storage/collector/workshop —

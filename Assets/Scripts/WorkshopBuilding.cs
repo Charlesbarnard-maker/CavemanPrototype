@@ -399,7 +399,7 @@ namespace Caveman
             {
                 float pt = processTime / Mathf.Max(0.1f, _speedMult); // upgrades shorten the process time
                 float pw = EffectivePowerFactor();
-                _timer += Time.deltaTime * pw; // fixed rate (no workers); slowed/stopped by the energy seam
+                _timer += Time.deltaTime * pw * Economy.ProductionScale; // fixed rate (no workers); energy seam + global production dial
                 if (_timer >= pt)
                 {
                     if (CanMake(carried))

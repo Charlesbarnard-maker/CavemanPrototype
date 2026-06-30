@@ -208,7 +208,7 @@ namespace Caveman
             if (working)
             {
                 float iv = interval / Mathf.Max(0.1f, _speedMult); // upgrades shorten the gather cadence
-                _timer += Time.deltaTime;
+                _timer += Time.deltaTime * Economy.ProductionScale; // global production-rate dial (feeds the denser belts)
                 if (_timer >= iv)
                 {
                     _timer -= iv;

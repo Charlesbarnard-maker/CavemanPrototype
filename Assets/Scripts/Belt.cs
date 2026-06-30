@@ -34,11 +34,12 @@ namespace Caveman
         // MinGap is the minimum spacing between successive items, measured in CELLS along the lane.
         // It is the SINGLE control over belt density AND throughput, because for a saturated belt:
         //     sustained throughput (items/sec) = speed / MinGap = (1/interval) / MinGap
-        // MinGap = 1.0 → exactly one item per cell → throughput = 1/interval, i.e. the historic
-        // 30/60/120/240-per-min caps and the current visual speed are PRESERVED (the conservative
-        // default). Lowering MinGap packs items denser (Factorio look) but multiplies every belt's
-        // throughput by 1/MinGap (e.g. 0.26 ≈ 4×) and would need an economy re-tune. One constant.
-        public const float MinGap = 1.0f;
+        // MinGap = 0.5 → up to TWO items per cell, packed at half-cell spacing → a dense, Factorio-style belt
+        // (real items, correct on-screen count), at the SAME visual speed (speed = 1/interval, independent of
+        // MinGap). It doubles each belt's saturated throughput (speed/MinGap); to keep belts FED densely (and the
+        // production-vs-belt balance intact) production is scaled to match — see Economy.ProductionScale. The
+        // belt-tier caps are now ~80/120/240/480 per min. Raise MinGap toward 1.0 for sparser belts.
+        public const float MinGap = 0.5f;
         // Hard safety cap on items per cell (spacing is the real limiter; this just bounds the list).
         public static int CellCapacity => Mathf.Max(2, Mathf.FloorToInt(1f / MinGap) + 1);
 
@@ -726,18 +727,14 @@ namespace Caveman
         // is a quadratic Bézier with its control point at the cell centre → a straight line on a
         // straight belt and a smooth ARC through a corner (entryEdge is per-item, so each item arcs
         // correctly). 0.5 offsets make one belt's exit == the next's entry (seamless hand-off).
-        // Render each LOGICAL item as a short 2-dot CLUSTER (chunkier sprites) so a saturated belt reads as
-        // PACKED and bottlenecks pop. This is PURELY VISUAL: it never touches _items, MinGap, the handoff or
-        // throughput — the sim is byte-identical, so nothing can get stuck and the economy balance is unchanged.
-        // (MinGap stays 1.0; LOWERING it would pack real items but multiply every belt's throughput by 1/MinGap.)
-        private const int DotsPerItem = 2;
-        private const float DotScale = 0.40f;   // chunkier than the old single 0.26 dot
-        private const float ClusterGap = 0.34f; // sub-dot spacing along the lane
+        // ONE sprite per REAL item, positioned at its exact lane position — smooth Factorio-style flow, and the
+        // on-screen count always matches the logical count (no double-rendering). Density comes from carrying more
+        // REAL items (lower MinGap) fed by higher production, NOT from drawing each item twice.
+        private const float DotScale = 0.36f; // a touch chunkier so close-packed items read as a full belt
         private void UpdateDots()
         {
             int n = _items.Count;
-            int need = n * DotsPerItem;
-            while (_dots.Count < need)
+            while (_dots.Count < n)
             {
                 var go = new GameObject("BeltItem");
                 var sr = go.AddComponent<SpriteRenderer>();
@@ -749,17 +746,15 @@ namespace Caveman
             {
                 var d = _dots[i];
                 if (d == null) continue;
-                int idx = i / DotsPerItem, sub = i % DotsPerItem;
-                bool on = idx < n;
+                bool on = i < n;
                 d.enabled = on;
                 if (!on) continue;
-                var it = _items[idx];
+                var it = _items[i];
                 d.sprite = SpriteDatabase.ForItem(it.def); // routed via SpriteDatabase (fallback Circle)
                 d.color = it.def.color;
                 Vector3 inE = new Vector3(Step(it.entryEdge).x, Step(it.entryEdge).y, 0f) * 0.5f;
                 Vector3 outE = new Vector3(Step(dir).x, Step(dir).y, 0f) * 0.5f;
-                float sp = Mathf.Clamp(it.p - sub * ClusterGap, 0f, 1f); // the item + a trailing companion, kept on the lane
-                d.transform.position = transform.position + PathPoint(sp, inE, outE);
+                d.transform.position = transform.position + PathPoint(it.p, inE, outE);
             }
         }
 
