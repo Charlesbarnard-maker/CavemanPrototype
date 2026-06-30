@@ -6,9 +6,16 @@ A running record so progress/problems don't get lost. Newest first. Move items t
 ---
 ## 📌 NEW-THREAD HANDOFF — current state (2026-06-29, + ELECTRICITY OVERHAUL on top of the feedback batches — committed & pushed)
 Pinned pointer so a fresh thread (incl. on a DIFFERENT PC) can continue. Everything below is committed and pushed to
-`origin/main` (HEAD = `f3109b0`, working tree clean, in sync) — a clean clone has the whole game. Open the project,
+`origin/main` (HEAD = `fb412d3`, working tree clean, in sync) — a clean clone has the whole game. Open the project,
 Play, and continue. A full interactive PLAYTEST is the biggest owed item (user tests in the evenings) — all feedback
 batches compile clean (`Tools/compile-check.ps1` → COMPILE CLEAN) but have NOT been interactively played yet.
+
+**✅ DONE THIS SESSION — UPGRADE UI DISCOVERABILITY (2026-06-29):** commit `fb412d3`. Building upgrades existed but were
+invisible. Now: a green ⬆ badge bobs over any building you can upgrade NOW (`WorkshopBuilding/ProductionBuilding.CanUpgradeNow`
++ `Status.MakeUpgradeBadge`/`ApplyUpgradeBadge` + `PlaceholderArt.UpgradeArrow`); a one-time hint toast on first affordable
+upgrade (`InventoryHud._upgradeHintShown`); and a clearer selected-panel section ("⚙ Upgrade — tier X/Y", next tier ×speed
++ cost, locked/affordability lines). Note: when you first hit Bronze with a stocked pile, MANY badges can appear at once
+(every affordable upgrade) — intended as a "go upgrade" prompt, but if it reads as noisy in playtest, gate it (e.g. selected-only).
 
 **✅ DONE THIS SESSION — ELECTRICITY OVERHAUL (2026-06-29, 4 batches, compile-clean, NOT yet played):** commits `8286d5b`,
 `0b2e344`, `f3109b0` (on top of the feedback batches). User wanted power to be CORE progression, not a skippable late gate.
