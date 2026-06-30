@@ -534,9 +534,9 @@ namespace Caveman
             windmill.renewable = true;
             windmill.description = "WINDMILL — fuel-free power, but its output GUSTS (the wind rises and falls, ~35–100%). Build several + Batteries to ride out the lulls. Costs Steel + Bronze Gears — a real investment, not a spam source. (Research: Renewable Power.)";
             var solar = MakePower("Solar Panel", 45, null, 1, 1f, 4, new Color(0.20f, 0.30f, 0.55f),
-                new ItemAmount(steel, 6), new ItemAmount(circuit, 6), new ItemAmount(bronzeGear, 4)); // solar panels ARE electronics — need Circuits
+                new ItemAmount(steel, 6), new ItemAmount(circuit, 3), new ItemAmount(bronzeGear, 4)); // solar panels ARE electronics — need Circuits
             solar.renewable = true; solar.solar = true;
-            solar.description = "SOLAR PANEL — silent, fuel-free power, but ONLY in daylight (full at midday, 0 through the night). Needs Steel + Bronze Gears + Machine Parts. Pair with Batteries to carry the night. (Research: Renewable Power.)";
+            solar.description = "SOLAR PANEL — silent, fuel-free power, but ONLY in daylight (full at midday, 0 through the night). Needs Steel + Circuits + Bronze Gears (solar cells are electronics). Pair with Batteries to carry the night. (Research: Renewable Power.)";
             // Endgame: the Monument (Industrial age). A long resource sink you pour the
             // top of every production chain into — completing it (10 blocks) is the win.
             var monumentBldg = MakeWorkshop("Monument", monument, 1, 6.0f, 3, 12, new Color(0.88f, 0.84f, 0.62f),
@@ -572,7 +572,7 @@ namespace Caveman
             campfire.description = "Food + Wood + Water → Cooked Food. Runs automatically once its inputs are delivered.";
             charcoalBurner.description = "Wood → Charcoal. Charcoal feeds the Kiln AND both Smelters (Basic & Advanced) — scaling one can starve the others. A key shared-bottleneck.";
             kiln.description = "Clay + Charcoal → Bricks. Charcoal is shared with the Smelters, so watch that bottleneck. Bricks build advanced structures.";
-            toolmaker.description = "Iron + Planks → Tools. Tools feed Blueprints (Industrial-age research) and the Monument.";
+            toolmaker.description = "FORGE / TOOLMAKER — shapes metal into mechanical COMPONENTS (click to switch recipe): Bronze Plate + Planks → Bronze Gear · Iron + Planks → Tools · Steel + Planks → Steel Beam · Steel Beam + Planks → Hull (the Steam Ship's body) · Copper → Copper Wiring (electronics). Build several to run them in parallel. Draws POWER.";
             mine.description = "Build ON a distant Iron Ore vein (the far Hills). Iron Ore is FINITE — veins deplete and vanish, so keep exploring outward and hauling it home.";
             gemMine.description = "Build ON a far Gem Deposit (the rarest, finite resource). Gems → Jewelry. Reaching them rewards exploration + good transport.";
             jeweler.description = "Gems → Jewelry, a high-value luxury good. Pairs with long-haul routes to bring distant gems home.";
@@ -614,7 +614,7 @@ namespace Caveman
                 new Recipe(blueprint,   1, 3.5f, 3, new ItemAmount(steel, 1),     new ItemAmount(machinePart, 1)),                            // Iron — the RESEARCH item, now deeper
                 new Recipe(engine,      1, 5.0f, 4, new ItemAmount(machinePart, 1), new ItemAmount(steel, 1), new ItemAmount(fuel, 1)),       // Industrial final product (needs Fuel)
             };
-            engineeringLab.description = "ENGINEERING LAB — ASSEMBLES components into the deepest products; pick its recipe (click to switch): Steel Beam + Bronze Gear + Tools → Machine Part; Steel + Machine Part → Blueprint (the Industrial RESEARCH item); or Machine Part + Steel + Fuel → Engine (the final product). Build several (one per recipe). Needs POWER.";
+            engineeringLab.description = "ENGINEERING LAB — ASSEMBLES components into the deepest products (click to switch recipe): Steel Beam + Bronze Gear + Tools → Machine Part · Steel Beam + Machine Part + Bronze Gear → Locomotive (the Wagon Train's engine) · Wiring + Copper Plate → Circuit (Cargo Drones + Solar) · Steel + Machine Part → Blueprint (research) · Machine Part + Steel + Fuel → Engine. Build several (one per recipe). Needs POWER.";
             engineeringLab.requiresPower = true; engineeringLab.powerDraw = 20; // Industrial machines draw power → a real use for the Oil chain's big generation
             // All five research buildings live under the dedicated RESEARCH build-menu tab. The four crafters
             // are Workshop-kind, so they need the menuCategory override to leave Production; the Lodge is
