@@ -590,6 +590,7 @@ namespace Caveman
             "Woodpile" => StoneWoodpile(),
             "Stone Stockpile" => OpenStockpile(),
             "Ore Stockpile" => OpenStockpile(),
+            "Stockpile" => OpenStockpile(),
             "Station" => StationPlatform(),
             "Harbour" => HarbourDock(),
             "Warehouse" => WarehouseShed(),

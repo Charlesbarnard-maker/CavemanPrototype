@@ -525,7 +525,7 @@ namespace Caveman
             // Storage, on its INPUT side (d == OutputSide). A configurable warehouse with no type yet
             // AUTO-REGISTERS the first item belted in (so goods aren't lost into an "unset" store).
             if (WorldGrid.Storages.TryGetValue(ahead, out var s) && s != null && d == s.OutputSide
-                && (s.accepts == def || (s.accepts == null && s.configurable && !def.noWarehouse))) // a warehouse won't adopt Stone/Ore
+                && (s.accepts == def || (s.accepts == null && s.configurable && s.CanAdopt(def)))) // Warehouse won't adopt raws; the raw Stockpile will
             {
                 if (s.def != null && s.Store.Total() >= s.def.capacity) return false;
                 if (s.accepts == null) s.accepts = def; // adopt the first delivered item's type

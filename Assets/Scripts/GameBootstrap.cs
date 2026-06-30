@@ -187,8 +187,8 @@ namespace Caveman
                 new ItemAmount(wood, 4), new ItemAmount(stone, 2));
             var woodStore = MakeStorage("Woodpile", wood, 100, new Color(0.62f, 0.40f, 0.20f),
                 new ItemAmount(wood, 8));
-            woodStore.footprintW = 1; woodStore.footprintH = 1; // a small pile — 1 belt in + 1 belt out
-            woodStore.description = "Resource-specific storage: holds Wood only. A small pile — one belt in, one belt out. (Each basic store is named for what it holds — Woodpile, Stone Stockpile, Granary, Water Barrel. The configurable 'Warehouse' is the ONE general store you assign yourself.)";
+            woodStore.singlePort = true; // 2×2 like the Wood Hut, but ONE belt in + ONE belt out
+            woodStore.description = "Resource-specific storage: holds Wood only. Same size as a Wood Hut, with one belt in and one belt out. (Each basic store is named for what it holds — Woodpile, Granary, Water Barrel. The configurable 'Warehouse' is the ONE general store you assign yourself.)";
             var stoneStore = MakeStorage("Stone Stockpile", stone, 160, new Color(0.66f, 0.67f, 0.70f),
                 new ItemAmount(wood, 8));
             var foodStore = MakeStorage("Granary", food, 100, new Color(0.70f, 0.45f, 0.35f),
@@ -396,6 +396,12 @@ namespace Caveman
             var oreStore = MakeStorage("Ore Stockpile", ore, 160, new Color(0.60f, 0.48f, 0.37f),
                 new ItemAmount(wood, 8)); oreStore.unlockAge = 1;
             oreStore.description = "ORE STOCKPILE — an OPEN-AIR heap for Iron Ore (no roof). Belt ore in, belt it out to a Smelter. Holds a big pile.";
+            // MERGED raw Stockpile (replaces the separate Stone + Ore stockpiles, which were confusing): ONE
+            // open-air heap you SET to hold Stone, Copper Ore or Iron Ore (click to cycle while empty).
+            var stockpile = MakeStorage("Stockpile", null, 200, new Color(0.60f, 0.55f, 0.48f),
+                new ItemAmount(wood, 8)); stockpile.configurable = true; stockpile.unlockAge = 0;
+            stockpile.stockpileWhitelist = new List<ItemDefinition> { stone, copperOre, ore };
+            stockpile.description = "STOCKPILE — an OPEN-AIR heap for a RAW material: set it to hold Stone, Copper Ore or Iron Ore (click it to cycle while empty). Belt the raw in, belt it out to a Smelter. Replaces the old separate Stone + Ore stockpiles.";
             stoneStore.description = "STONE STOCKPILE — an OPEN-AIR heap for Stone (no roof). Belt stone in and out. Cheap, holds a big pile — the natural home for raw Stone instead of a Warehouse.";
             // --- SMELTERS (configurable, multi-recipe). A BASIC smelter for ore→bar and an ADVANCED
             //     smelter that combines materials into alloy bars. Each replaces TWO old fixed-recipe
@@ -699,7 +705,7 @@ namespace Caveman
               pipe, pipeSplitter, pipeMerger, pump, booster, oilWell,
               // Storage — open-air piles for raw materials (Woodpile / Stone + Ore Stockpiles / Clay / Brick),
               // the big configurable Warehouse hub, and liquid tanks (Oil Tank / Water Barrel)
-              woodStore, stoneStore, oreStore, clayStore, brickStore, warehouse, oilTank, waterStore,
+              woodStore, stockpile, clayStore, brickStore, warehouse, oilTank, waterStore,
               // Infrastructure / power / endgame — Generators (Wood/Coal/Oil) + renewables (Windmill/Solar) + Poles + Battery
               woodGen, pole, battery, generator, oilGen, windmill, solar, monumentBldg,
               // Mounts — the Garage (buy/park your rides)

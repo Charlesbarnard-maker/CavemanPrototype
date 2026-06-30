@@ -23,12 +23,32 @@ namespace Caveman
         {
             if (!configurable || Store.Total() > 0) return;
             var items = new List<ItemDefinition>();
-            void Add(ItemDefinition i) { if (i != null && !i.noWarehouse && !items.Contains(i)) items.Add(i); } // Stone/Ore keep their own stockpiles
-            foreach (var p in ProductionBuilding.All) Add(p.produces);
-            foreach (var w in WorkshopBuilding.All) Add(w.output);
+            if (def != null && def.stockpileWhitelist != null && def.stockpileWhitelist.Count > 0)
+            {
+                // a restricted raw Stockpile cycles only its whitelist (Stone / Copper Ore / Iron Ore), even though
+                // those are noWarehouse items (so the generic Warehouse still excludes them).
+                foreach (var i in def.stockpileWhitelist) if (i != null && !items.Contains(i)) items.Add(i);
+            }
+            else
+            {
+                void Add(ItemDefinition i) { if (i != null && !i.noWarehouse && !items.Contains(i)) items.Add(i); } // Stone/Ore keep their own stockpile
+                foreach (var p in ProductionBuilding.All) Add(p.produces);
+                foreach (var w in WorkshopBuilding.All) Add(w.output);
+            }
             if (items.Count == 0) return;
             int idx = items.IndexOf(accepts);
             accepts = items[(idx + 1) % items.Count];
+        }
+
+        /// <summary>May this (configurable) store auto-adopt <paramref name="i"/> when it's first belted in? A
+        /// whitelist Stockpile takes only its listed raws (overriding noWarehouse); the generic Warehouse takes
+        /// any non-raw item.</summary>
+        public bool CanAdopt(ItemDefinition i)
+        {
+            if (i == null) return false;
+            if (def != null && def.stockpileWhitelist != null && def.stockpileWhitelist.Count > 0)
+                return def.stockpileWhitelist.Contains(i);
+            return !i.noWarehouse;
         }
 
         public static readonly List<StorageBuilding> All = new();
@@ -64,7 +84,7 @@ namespace Caveman
             sb.OutputSide = outputSide;
             sb._cells = Footprint.Cells(go.transform.position, def.FootW, def.FootH);
             foreach (var c in sb._cells) WorldGrid.Storages[c] = sb;
-            Ports.PlacePorts(go.transform, def.FootW, def.FootH, outputSide, true, true, singlePort: false); // a port PER edge cell → a 2×2 store has 2 in + 2 out, a 3×3 warehouse 3 + 3
+            Ports.PlacePorts(go.transform, def.FootW, def.FootH, outputSide, true, true, singlePort: def.singlePort); // per-edge-cell ports (2×2 → 2 in/2 out) unless singlePort (1 in/1 out, e.g. the Woodpile)
             return sb;
         }
 
