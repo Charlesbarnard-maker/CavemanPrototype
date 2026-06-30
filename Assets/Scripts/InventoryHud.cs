@@ -928,6 +928,13 @@ namespace Caveman
             GUILayout.Label("<b>Build</b>  <size=11>(open a category ▸ pick · then click the map)</size>", _small);
 
             int curAge = col != null ? col.Age : 0;
+            // The current objective's target building drives the guided highlight: flash its CATEGORY until you
+            // open it, then flash the BUILDING itself. Follows the LIVE objective, so it never sticks on a building
+            // you've already built (the old bug: it keyed off age + a static flag, not the active goal).
+            var guideQ = Objectives.Instance != null ? Objectives.Instance.CurrentStep() : null;
+            var guideTarget = guideQ != null ? guideQ.highlightBuilding : null;
+            string guideCat = null;
+            if (guideTarget != null) foreach (var gc in Cats) if (Belongs(guideTarget, gc)) { guideCat = gc.label; break; }
 
             // Draws one build entry: a pin star + the build button. Locked → greyed label.
             // Obsolete (unlocked ≥2 ages ago) is dimmed but still usable. Local fn so the
@@ -952,10 +959,11 @@ namespace Caveman
                 else
                 {
                     bool obsolete = curAge - def.unlockAge >= 2; // de-emphasise old-age tech
-                    bool guide = curAge == 0 && def.tutorialHighlight; // new-player highlight of the first buildings
+                    bool guide = guideTarget != null && def == guideTarget; // flash the CURRENT objective's target building
+                    bool blink = guide && Mathf.Sin(Time.unscaledTime * 5f) > 0f;
                     string costCol = builder.CanAfford(def) ? "#9f9" : "#f99";
                     string key = i < 9 ? (i + 1).ToString() : i == 9 ? "0" : "·";
-                    string nm = guide ? $"<color=#ffd24d>★ {def.displayName}</color>" : obsolete ? $"<color=#9a9a9a>{def.displayName}</color>" : def.displayName;
+                    string nm = guide ? $"<color=#ffd24d>{(blink ? "★" : "☆")} {def.displayName}</color>" : obsolete ? $"<color=#9a9a9a>{def.displayName}</color>" : def.displayName;
                     var label = new GUIContent($"<size=12>[{key}] {nm}  <color={costCol}>{CostText(def)}</color></size>", Describe(def));
                     if (GUILayout.Button(label, _btn)) builder.BeginPlacement(i);
                 }
@@ -990,8 +998,11 @@ namespace Caveman
             {
                 if (!CatHasAny(cat)) continue; // a category appears only once it has a buildable
                 bool active = _activeCat == cat.label;
-                string arrow = active ? "<color=#ffd24d>▸</color> " : "";
-                if (GUILayout.Button($"<size=12><b><color=#d8c8a0>{arrow}{cat.label}</color></b></size>", _btn))
+                bool catGuide = guideCat == cat.label && !active; // flash the category holding the objective's building
+                bool catBlink = catGuide && Mathf.Sin(Time.unscaledTime * 5f) > 0f;
+                string arrow = active ? "<color=#ffd24d>▸</color> " : catGuide ? (catBlink ? "<color=#ffd24d>★</color> " : "<color=#ffd24d>☆</color> ") : "";
+                string catCol = catBlink ? "#ffd24d" : "#d8c8a0";
+                if (GUILayout.Button($"<size=12><b><color={catCol}>{arrow}{cat.label}</color></b></size>", _btn))
                     _activeCat = active ? "" : cat.label; // open this one (closes the rest); click again to close
             }
 
