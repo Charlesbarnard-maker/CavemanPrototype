@@ -442,16 +442,40 @@ namespace Caveman
 
         /// <summary>Live status colour (green working / yellow output-full / red missing-input /
         /// grey paused) — also drives minimap dots.</summary>
-        // A powered machine not connected to a powered network → it can't run (surfaced to the player).
-        public bool NoPower => RequiresPower && PowerNet.Active && PowerNet.FactorOf(this) <= 0f;
+        // Why a powered machine isn't (fully) running — so the player can SEE the cause instead of a vague stall:
+        //   Unwired  = not connected to any grid (no wire at all);
+        //   GridDead = wired, but its network generates nothing;
+        //   Brownout = wired + some supply, but demand > generation so it runs SLOW (0 < factor < 1);
+        //   Ok       = full speed (or it doesn't need power yet).
+        public enum PowerState { Ok, Unwired, GridDead, Brownout }
+        private PowerNode _pnode;
+        private PowerNode Pnode => _pnode != null ? _pnode : (_pnode = GetComponent<PowerNode>());
+        public PowerState PowerStatus
+        {
+            get
+            {
+                if (!RequiresPower || !PowerNet.Active) return PowerState.Ok; // pre-Tribal / not a powered machine
+                float f = PowerNet.FactorOf(this);
+                bool wired = Pnode != null && Pnode.links.Count > 0;
+                if (!wired) return PowerState.Unwired;       // no wire → not on any grid
+                if (f <= 0f) return PowerState.GridDead;     // wired, but the network has zero generation
+                if (f < 0.999f) return PowerState.Brownout;  // running below full speed
+                return PowerState.Ok;
+            }
+        }
+        // A powered machine fully STALLED for lack of power (unwired or a dead grid). Brownout still runs (slow).
+        public bool NoPower => PowerStatus == PowerState.Unwired || PowerStatus == PowerState.GridDead;
         public Color StatusColor
         {
             get
             {
                 if (Paused) return Status.Idle;
-                if (NoPower) return new Color(0.40f, 0.62f, 1f); // blue — not connected to power
+                var ps = PowerStatus;
+                if (ps == PowerState.Unwired) return new Color(0.40f, 0.62f, 1f);  // blue — not wired to a grid
+                if (ps == PowerState.GridDead) return new Color(0.72f, 0.45f, 1f); // purple — grid has no power
                 if (Buffer.Total() >= Buffer.capacity) return Status.BackedUp;
                 if (_starved) return Status.Starved;
+                if (ps == PowerState.Brownout) return new Color(1f, 0.6f, 0.2f);   // orange — running slow (brownout)
                 return Status.Working;
             }
         }
@@ -467,7 +491,11 @@ namespace Caveman
             if (!_powerHintShown && NoPower)
             {
                 _powerHintShown = true;
-                Toast.Show($"<color=#6cf>⚡ {(def != null ? def.displayName : "This machine")} needs POWER now (electricity arrives in the Tribal age).</color> Build a Wood Generator, belt Wood into its fuel edge, then select it / a Power Pole to draw WIRES to the machine. Unwired powered machines stop (blue dot).");
+                string nm = def != null ? def.displayName : "This machine";
+                if (PowerStatus == PowerState.Unwired)
+                    Toast.Show($"<color=#6cf>⚡ {nm} needs POWER and isn't wired to the grid.</color> Build a Wood Generator (belt Wood into its fuel edge), then select the Generator or a Power Pole and draw a WIRE to this machine. Unwired powered machines stop (blue dot).");
+                else
+                    Toast.Show($"<color=#6cf>⚡ {nm} is wired, but the grid has NO POWER.</color> Its network's demand exceeds its generation — add or fuel a Generator, or add a Battery (purple dot).");
             }
         }
 

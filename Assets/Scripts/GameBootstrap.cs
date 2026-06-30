@@ -487,6 +487,23 @@ namespace Caveman
             pole.color = new Color(0.55f, 0.42f, 0.28f);
             pole.cost = new List<ItemAmount> { new ItemAmount(wood, 2) };
             pole.description = "POWER POLE — relays power across distance. Draw WIRES (up to 4 per pole) to Generators, Batteries, machines or other poles. Each wire reaches a limited distance, so chain poles to span big gaps.";
+            pole.color = Color.white; // keep the baked white pole art (specialised poles below tint themselves)
+            // POWER HUB — a fat junction pole with EIGHT wire slots, so one node can branch power to many
+            // machines instead of a forest of 4-slot poles.
+            var poleHub = ScriptableObject.CreateInstance<BuildingDefinition>();
+            poleHub.displayName = "Power Hub"; poleHub.kind = BuildingKind.Pole; poleHub.unlockAge = 2;
+            poleHub.color = new Color(0.52f, 0.52f, 0.60f);
+            poleHub.maxConnections = 8;
+            poleHub.cost = new List<ItemAmount> { new ItemAmount(planks, 4), new ItemAmount(metal, 2) };
+            poleHub.description = "POWER HUB — a heavy junction pole with EIGHT wire slots (vs a Power Pole's 4). Branch power to many machines from one spot instead of a row of poles.";
+            // TALL PYLON — a long-range relay: each of its wires reaches ~2× as far, so you bridge wide gaps
+            // with far fewer poles (a long-range pole at EITHER end of a wire extends that wire).
+            var poleLong = ScriptableObject.CreateInstance<BuildingDefinition>();
+            poleLong.displayName = "Tall Pylon"; poleLong.kind = BuildingKind.Pole; poleLong.unlockAge = 2;
+            poleLong.color = new Color(0.62f, 0.66f, 0.72f);
+            poleLong.wireReach = 18f; // vs the default 8 — long-haul backbone
+            poleLong.cost = new List<ItemAmount> { new ItemAmount(metal, 3), new ItemAmount(planks, 2) };
+            poleLong.description = "TALL PYLON — a long-range relay: its wires reach about 2× as far as a Power Pole, so you span wide gaps with far fewer poles. Wire two Pylons across a big distance.";
             // Battery (Tribal): a wired store that soaks surplus generation and covers demand spikes / generation
             // dips — smooths brownouts (and the gusty Windmill / day-cycle Solar later). Built from raw Tribal stock.
             var battery = ScriptableObject.CreateInstance<BuildingDefinition>();
@@ -687,7 +704,7 @@ namespace Caveman
             garage.displayName = "Garage"; garage.kind = BuildingKind.Garage; garage.unlockAge = 1;
             garage.footprintW = 2; garage.footprintH = 2;
             garage.capacity = 2;                 // parking slots (the "limited" garage)
-            garage.menuCategory = "Mounts";
+            garage.menuCategory = "Infrastructure"; // fold mounts into the Infrastructure tab (no separate Mounts tab)
             garage.color = new Color(0.60f, 0.50f, 0.38f);
             garage.cost = new List<ItemAmount> { new ItemAmount(planks, 6), new ItemAmount(stone, 4) };
             garage.description = "GARAGE — parks your travel MOUNTS. Build it, then BUY the age-gated mount (Horseback → Ox Cart → Wagon → Motorbike) from its panel and pick which to ride. Holds 2 mounts; build another Garage for more slots. On foot you always get a small per-age speed boost; the mount adds the full speed + the look.";
@@ -725,7 +742,7 @@ namespace Caveman
               // LARGE variants (10× capacity, 3×3, 2 in/2 out): Large Stockpile + Large Warehouse.
               woodStore, stockpile, largeStockpile, clayStore, brickStore, warehouse, largeWarehouse, oilTank, waterStore,
               // Infrastructure / power / endgame — Generators (Wood/Coal/Oil) + renewables (Windmill/Solar) + Poles + Battery
-              woodGen, pole, battery, generator, oilGen, windmill, solar, monumentBldg,
+              woodGen, pole, poleHub, poleLong, battery, generator, oilGen, windmill, solar, monumentBldg,
               // Mounts — the Garage (buy/park your rides)
               garage };
 
@@ -1042,7 +1059,7 @@ namespace Caveman
             def.outputPerCycle = output;
             def.interval = interval;
             def.maxWorkers = maxWorkers;
-            def.capacity = capacity;
+            def.capacity = Mathf.Max(50, capacity); // resource collectors hold a generous buffer (>=50, up from the legacy 12) so a brief belt backup doesn't instantly stall them
             def.color = color;
             def.footprintW = 2; def.footprintH = 2; // buildings are 2×2 — clearly bigger than 1-cell belts
             def.cost = new List<ItemAmount>(cost);

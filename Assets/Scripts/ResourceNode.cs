@@ -19,6 +19,11 @@ namespace Caveman
         [Tooltip("Seconds between each regeneration tick.")]
         public float regenInterval = 1.5f;
 
+        // Runtime: how many collectors currently target this node. Used to SPREAD collectors across a
+        // cluster — a node another collector already works is a worse pick — so they don't all hammer the
+        // same patch while fuller nodes sit unused nearby. Maintained by ProductionBuilding. Not serialized.
+        [System.NonSerialized] public int Claims;
+
         public static readonly List<ResourceNode> All = new();
         void OnEnable() => All.Add(this);
         void OnDisable() => All.Remove(this);

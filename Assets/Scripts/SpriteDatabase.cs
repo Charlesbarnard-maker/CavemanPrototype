@@ -86,6 +86,8 @@ namespace Caveman
         public static Sprite ForItem(ItemDefinition item)
         {
             if (item == null) return Procedural(PlaceholderShape.Circle);
+            var bespoke = PlaceholderArt.BespokeItem(item.id); // hand-authored per-item art wins (like BespokeBuilding)
+            if (bespoke != null) return bespoke;
             string name = Lookup(Item, item.id);
             if (name != null)
                 return Resolve(name, item.sprite != null ? item.sprite.fallback : PlaceholderShape.Circle);

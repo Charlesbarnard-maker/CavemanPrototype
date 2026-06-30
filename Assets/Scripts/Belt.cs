@@ -217,7 +217,12 @@ namespace Caveman
             if (isMerger) return true;
             var behind = _cell + Step(Opposite(dir));
             if (from._cell == behind) return true;   // inline / straight feeder — always allowed
-            if (At(behind) != null) return false;     // a straight feeder exists → side feeders blocked
+            // Only a REAL straight feeder — a belt behind us that actually POINTS INTO us (the SAME test the
+            // corner-sprite uses, FeedsInto) — reserves the inline slot and blocks side feeders. A belt merely
+            // SITTING in the cell behind (pointing elsewhere, or feeding something else) must NOT block a
+            // legitimate corner feeder. That was the bug: a belt dropped at a junction's "behind" cell froze the
+            // corner line turning into it — even though it still RENDERED as a working corner.
+            if (FeedsInto(Opposite(dir))) return false; // a real straight feeder exists → side feeders blocked
             // No straight feeder: allow the FIRST side-belt that points into me (deterministic), reject others.
             for (int di = 0; di < 4; di++)
             {
@@ -750,8 +755,10 @@ namespace Caveman
                 d.enabled = on;
                 if (!on) continue;
                 var it = _items[i];
-                d.sprite = SpriteDatabase.ForItem(it.def); // routed via SpriteDatabase (fallback Circle)
-                d.color = it.def.color;
+                d.sprite = SpriteDatabase.ForItem(it.def); // routed via SpriteDatabase (bespoke art, else fallback shape)
+                // Bespoke item sprites bake their own true colours, so render them UNTINTED; only the generic
+                // fallback shapes get tinted by the item's colour to stay distinguishable.
+                d.color = PlaceholderArt.BespokeItem(it.def.id) != null ? Color.white : it.def.color;
                 Vector3 inE = new Vector3(Step(it.entryEdge).x, Step(it.entryEdge).y, 0f) * 0.5f;
                 Vector3 outE = new Vector3(Step(dir).x, Step(dir).y, 0f) * 0.5f;
                 d.transform.position = transform.position + PathPoint(it.p, inE, outE);

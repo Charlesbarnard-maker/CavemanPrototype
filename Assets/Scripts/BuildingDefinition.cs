@@ -183,6 +183,10 @@ namespace Caveman
         public float batteryCapacity = 0f;
         [Tooltip("Battery: max power it can charge or discharge at once.")]
         public float batteryRate = 0f;
+        [Tooltip("Pole: number of wire slots on this node (0 = the role default of 4). A Power Hub raises this.")]
+        public int maxConnections = 0;
+        [Tooltip("Pole: how far ONE wire from this node may reach, in world units (0 = the default PowerNet.MaxWireLength). A Tall Pylon raises this for long-range backbones.")]
+        public float wireReach = 0f;
 
         [Header("Logistics")]
         [Tooltip("Route vehicles only: travel speed (cart < caravan < train < drone).")]

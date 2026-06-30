@@ -15,6 +15,7 @@ namespace Caveman
         public enum Role { Generator, Pole, Battery, Consumer }
         public Role role = Role.Pole;
         public int maxConnections = 4; // poles/generators/batteries 4; a consuming machine 1
+        public float wireReach = 0f;   // per-node wire reach override (0 = PowerNet.MaxWireLength); a Tall Pylon raises it
 
         // Back-refs (set by the owner's Spawn) so the solver can read output / demand / storage.
         public PowerPlant generator;
@@ -39,6 +40,8 @@ namespace Caveman
 
         public Vector2 Pos => transform.position;
         public bool CanLinkMore => links.Count < maxConnections;
+        /// <summary>How far one wire from this node may reach (its own override, else the global default).</summary>
+        public float Reach => wireReach > 0f ? wireReach : PowerNet.MaxWireLength;
         public string RoleLabel => role switch
         {
             Role.Generator => "Generator",
@@ -54,8 +57,8 @@ namespace Caveman
             if (links.Contains(other)) return "already wired together";
             if (!CanLinkMore) return $"this {RoleLabel} already has {maxConnections} wires";
             if (!other.CanLinkMore) return $"that {other.RoleLabel} already has {other.maxConnections} wires";
-            float max = PowerNet.MaxWireLength;
-            if ((Pos - other.Pos).sqrMagnitude > max * max) return "too far — place a Power Pole between them";
+            float max = Mathf.Max(Reach, other.Reach); // a long-range pole (Tall Pylon) at EITHER end extends the wire
+            if ((Pos - other.Pos).sqrMagnitude > max * max) return "too far — place a Power Pole (or a Tall Pylon) between them";
             return null;
         }
 
@@ -84,7 +87,7 @@ namespace Caveman
         /// drawing every wire. Machine hookups stay deliberate.</summary>
         public void AutoLinkBackbone(int max = 2)
         {
-            float maxSq = PowerNet.MaxWireLength * PowerNet.MaxWireLength;
+            float maxSq = Reach * Reach;
             var cands = new List<PowerNode>();
             foreach (var n in All)
             {

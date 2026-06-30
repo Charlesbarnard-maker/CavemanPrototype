@@ -108,7 +108,7 @@ namespace Caveman
             ("Trains",         new[] { BuildingKind.Depot, BuildingKind.Rail, BuildingKind.Signal }),
             ("Boats",          new BuildingKind[0]),  // tag-only (Harbour sets menuCategory="Boats")
             ("Planes",         new BuildingKind[0]),  // reserved — appears once it has a buildable
-            ("Mounts",         new[] { BuildingKind.Garage }),  // the Garage — buy/park your travel mounts
+            // (Mounts merged into Infrastructure — the Garage sets menuCategory="Infrastructure" to save a tab.)
             ("Storage",        new[] { BuildingKind.Storage }),
         };
         private static bool InGroup(BuildingKind[] kinds, BuildingKind k) => System.Array.IndexOf(kinds, k) >= 0;
@@ -1158,6 +1158,9 @@ namespace Caveman
                 bool isCollector = pbSel != null;
                 Color sc = wb != null ? wb.StatusColor : pbSel.StatusColor;
                 string st = paused ? "Paused"
+                    : (wb != null && wb.PowerStatus == WorkshopBuilding.PowerState.Unwired) ? "No power — not wired to the electricity grid"
+                    : (wb != null && wb.PowerStatus == WorkshopBuilding.PowerState.GridDead) ? "No power — the grid has no generation"
+                    : (wb != null && wb.PowerStatus == WorkshopBuilding.PowerState.Brownout) ? "Browning out — running slow (demand exceeds generation)"
                     : sc == Status.Working ? "Working"
                     : sc == Status.BackedUp ? (isCollector
                         ? "Output full — belt it to a Storage to use what it makes"
@@ -1242,9 +1245,17 @@ namespace Caveman
                     GUILayout.Label($"<size=12>Making: <b>{(wb.output != null ? wb.output.displayName : "?")}</b> <color=#888>from {string.Join(" + ", ins)}</color></size>", _small);
                     if (GUILayout.Button("<size=12>↻ Change recipe</size>", _btn)) wb.CycleRecipe();
                 }
-                // Powered machine not wired to a powered network → tell the player why it's stalled.
-                if (wb != null && wb.NoPower)
-                    GUILayout.Label("<size=12><color=#6cf>⚡ No power — wire this machine to a Generator, Pole or Battery (select it, then 'Connect wire')</color></size>", _small);
+                // Powered machine: spell out the SPECIFIC power problem + how to fix it.
+                if (wb != null && wb.RequiresPower)
+                {
+                    var ps = wb.PowerStatus;
+                    if (ps == WorkshopBuilding.PowerState.Unwired)
+                        GUILayout.Label("<size=12><color=#6cf>⚡ Not connected to the power grid</color> — select this machine (or a Power Pole) → <b>Connect wire</b> → click a Generator/Pole.</size>", _small);
+                    else if (ps == WorkshopBuilding.PowerState.GridDead)
+                        GUILayout.Label("<size=12><color=#c9f>⚡ Grid out of power</color> — it's wired, but the network generates nothing. Build/fuel a Generator, or add a Battery.</size>", _small);
+                    else if (ps == WorkshopBuilding.PowerState.Brownout)
+                        GUILayout.Label("<size=12><color=#fc6>⚡ Browning out — running slow</color> (demand exceeds generation). Add a Generator or a Battery to bring it to full speed.</size>", _small);
+                }
             }
             else if (sb != null)
             {
@@ -1495,9 +1506,26 @@ namespace Caveman
             {
                 if (GUILayout.Button("<size=12>🔌 Connect wire</size>", _btn)) builder.BeginWire(node);
             }
-            else GUILayout.Label("<size=11><color=#888>All wire slots used</color></size>", _small);
-            if (node.links.Count > 0 && GUILayout.Button("<size=12>✂ Disconnect wires</size>", _btn))
-                for (int i = node.links.Count - 1; i >= 0; i--) node.Disconnect(node.links[i]);
+            else GUILayout.Label("<size=11><color=#888>All wire slots used — delete a wire below to free a slot</color></size>", _small);
+            // Per-wire delete: each wire gets its own ✕ so you can free ONE specific slot (e.g. to re-route a
+            // pole) without dropping the node's whole wiring. Calls the symmetric PowerNode.Disconnect primitive.
+            if (node.links.Count > 0)
+            {
+                PowerNode cut = null;
+                for (int i = 0; i < node.links.Count; i++)
+                {
+                    var lk = node.links[i];
+                    if (lk == null) continue;
+                    float dist = (node.Pos - lk.Pos).magnitude;
+                    GUILayout.BeginHorizontal();
+                    GUILayout.Label($"<size=11><color=#9cf>● wire {i + 1}</color> → {lk.RoleLabel}  <color=#888>{dist:0.0}m</color></size>", _small);
+                    if (GUILayout.Button("<size=11><color=#f99>✕</color></size>", _btn, GUILayout.Width(28))) cut = lk;
+                    GUILayout.EndHorizontal();
+                }
+                if (cut != null) node.Disconnect(cut);
+                if (GUILayout.Button("<size=11>✂ Disconnect ALL wires</size>", _btn))
+                    for (int i = node.links.Count - 1; i >= 0; i--) node.Disconnect(node.links[i]);
+            }
         }
 
         // Empty a configurable warehouse so its type can be changed. Contents move into the

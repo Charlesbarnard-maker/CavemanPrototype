@@ -119,6 +119,9 @@ namespace Caveman
                     break;
                 case St.ToNode:
                     SetChop(0f);
+                    // Track the collector's CURRENT node live — if it rebound to a fuller / less-contested
+                    // patch mid-walk, head there instead of trekking to the now-stale spot it set out for.
+                    _target = StandBy(src.transform.position, home);
                     if (MoveToward(_target)) { _state = St.Gather; _wait = UnityEngine.Random.Range(0.8f, 1.5f); }
                     break;
                 case St.Gather:

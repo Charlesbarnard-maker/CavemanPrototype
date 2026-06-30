@@ -65,6 +65,7 @@ namespace Caveman
         void OnDisable()
         {
             All.Remove(this);
+            if (_source != null) { _source.Claims = Mathf.Max(0, _source.Claims - 1); _source = null; } // release our node claim
             if (_cells != null) foreach (var c in _cells) WorldGrid.Remove(WorldGrid.Collectors, c, this);
             if (_fx != null) Destroy(_fx.gameObject); // FX is a standalone object → clean it up on demolish
         }
@@ -148,7 +149,17 @@ namespace Caveman
                 n.regenInterval = 0.5f;
                 best = n;
             }
-            if (best != null) _source = best;
+            if (best != null) SetSource(best);
+        }
+
+        // Re-point our source while keeping each node's Claims count accurate, so collectors fan out across a
+        // cluster instead of all binding the same node. Releasing the old claim frees that node for others.
+        private void SetSource(ResourceNode n)
+        {
+            if (_source == n) return;
+            if (_source != null) _source.Claims = Mathf.Max(0, _source.Claims - 1);
+            _source = n;
+            if (_source != null) _source.Claims++;
         }
 
         // Nearest live node of our type within `range`. BOUNDED so it never becomes a map-wide
@@ -157,25 +168,32 @@ namespace Caveman
         // No pathfinding — just binds to the nearest patch. None found → returns null and the
         // collector idles in place (surfaced by its status dot).
         private const int LowNode = 5; // a node below this is "nearly tapped" — prefer a fuller one in reach
+        // Pick the best node of our type within `range`, preferring (in order): a HEALTHY amount (>= LowNode) so
+        // we don't lock onto a near-empty patch while a full one sits in reach; then FEWER OTHER collectors
+        // already on it, so a cluster's collectors fan OUT across its nodes instead of all hammering one (and
+        // workers stop trekking to a node that's about to be cleared); then NEARER. Bounded (squared-distance
+        // reject + a hard candidate cap) — never a map-wide scan.
         private ResourceNode FindNearestNode(float range)
         {
-            // Pass 1: the nearest node with a HEALTHY amount, so a collector doesn't lock onto a near-empty,
-            // barely-regrowing node while a full one sits in reach (the endless empty-node loop). Pass 2 falls
-            // back to ANY node with resource, so it never idles when supply still exists in range.
-            return NearestNode(range, LowNode) ?? NearestNode(range, 1);
-        }
-        private ResourceNode NearestNode(float range, int minAmount)
-        {
             ResourceNode best = null;
-            float bestSq = range * range;
+            bool bestHealthy = false;
+            int bestOther = int.MaxValue;
+            float bestSq = 0f;
+            float rangeSq = range * range;
             int examined = 0;
             foreach (var n in ResourceNode.All)
             {
-                if (n == null || n.yields != produces || n.Amount < minAmount) continue;
+                if (n == null || n.yields != produces || n.Amount < 1) continue;
                 float sq = ((Vector2)(n.transform.position - transform.position)).sqrMagnitude;
-                if (sq > bestSq) continue;                    // outside search radius — local, not global
-                if (++examined > MaxSearchCandidates) break;  // hard cap on candidates checked
-                bestSq = sq; best = n;                        // nearest-so-far
+                if (sq > rangeSq) continue;                       // outside search radius — local, not global
+                if (++examined > MaxSearchCandidates) break;      // hard cap on candidates checked
+                bool healthy = n.Amount >= LowNode;
+                int other = n.Claims - (n == _source ? 1 : 0);    // claims by OTHER collectors (ignore our own)
+                bool better = best == null
+                    || (healthy && !bestHealthy)                                       // healthy beats tapped-out
+                    || (healthy == bestHealthy && other < bestOther)                   // then fewer rivals on it
+                    || (healthy == bestHealthy && other == bestOther && sq < bestSq);  // then nearer
+                if (better) { best = n; bestHealthy = healthy; bestOther = other; bestSq = sq; }
             }
             return best;
         }

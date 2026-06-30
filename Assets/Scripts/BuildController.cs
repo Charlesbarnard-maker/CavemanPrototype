@@ -250,8 +250,8 @@ namespace Caveman
             Vector3 world = _cam.ScreenToWorldPoint(mouse.position.ReadValue());
             var cell = new Vector2Int(Mathf.RoundToInt(world.x), Mathf.RoundToInt(world.y));
             var p = new Vector3(cell.x, cell.y, 0f);
-            if ((WireFrom.Pos - (Vector2)p).sqrMagnitude > PowerNet.MaxWireLength * PowerNet.MaxWireLength)
-            { Toast.Show("<color=#f99>Too far for one wire — click closer; poles chain.</color>"); return false; }
+            if ((WireFrom.Pos - (Vector2)p).sqrMagnitude > WireFrom.Reach * WireFrom.Reach)
+            { Toast.Show("<color=#f99>Too far for one wire — click closer; poles chain (a Tall Pylon reaches further).</color>"); return false; }
             if (!PoleCellOk(cell)) { Toast.Show("<color=#f99>Can't place a pole there.</color>"); return false; }
             if (!Economy.CanAfford(def.cost, Carried)) { Toast.Show("<color=#f99>Can't afford a Power Pole.</color>"); return false; }
             Economy.Spend(def.cost, Carried);
@@ -282,7 +282,7 @@ namespace Caveman
             var node = go != null ? go.GetComponent<PowerNode>() : null;
             var cell = new Vector2Int(Mathf.RoundToInt(world.x), Mathf.RoundToInt(world.y));
             var cellW = new Vector3(cell.x, cell.y, 0f);
-            bool inRange = (WireFrom.Pos - (Vector2)cellW).sqrMagnitude <= PowerNet.MaxWireLength * PowerNet.MaxWireLength;
+            bool inRange = (WireFrom.Pos - (Vector2)cellW).sqrMagnitude <= WireFrom.Reach * WireFrom.Reach;
 
             if (_wirePreview == null)
             {
@@ -704,7 +704,11 @@ namespace Caveman
             // else must sit fully on land.
             bool harbourPlace = def.kind == BuildingKind.Depot && def.isHarbour;
             bool free = !FootprintBlocked(world, ew, eh)
-                        && (harbourPlace ? FootprintStraddlesShore(world, ew, eh) : FootprintOnLand(world, ew, eh));
+                        && (harbourPlace ? FootprintStraddlesShore(world, ew, eh) : FootprintOnLand(world, ew, eh))
+                        // Can't build ON TOP of a resource patch (tree/rock/ore/clay/gems/...) — except the Oil
+                        // Well, which is MEANT to sit on its oil deposit. Collectors bind from a radius, so they
+                        // just sit beside the patch.
+                        && (AllowedOnResource(def) || !FootprintOnResourceNode(world, ew, eh));
             PlacementValid = affordable && placeOk && free;
 
             // Clear green = OK, red = not OK (don't tint by the building's own colour,
@@ -856,6 +860,29 @@ namespace Caveman
                     if (!TerrainGrid.Buildable(new Vector2Int(a.x + i, a.y + j))) return false;
             return true;
         }
+
+        // True if ANY cell this footprint covers sits on a resource node (tree/rock/ore/clay/gems/oil/…).
+        // Resource nodes aren't "solid" (you walk/belt over them), so they don't show up in FootprintBlocked;
+        // this is the dedicated "don't bury a resource under a building" test. No per-cell node map exists, so
+        // scan ResourceNode.All by rounded cell — same idiom as HasMatchingNodeNear, and only runs while a
+        // placement ghost is active.
+        private static bool FootprintOnResourceNode(Vector3 center, int w, int h)
+        {
+            var a = Footprint.Anchor(center, w, h);
+            foreach (var nd in ResourceNode.All)
+            {
+                if (nd == null) continue;
+                int nx = Mathf.RoundToInt(nd.transform.position.x);
+                int ny = Mathf.RoundToInt(nd.transform.position.y);
+                if (nx >= a.x && nx < a.x + w && ny >= a.y && ny < a.y + h) return true;
+            }
+            return false;
+        }
+
+        // The one building allowed to sit ON its resource: the Oil Well — a non-booster Pump that draws a
+        // LIQUID (oil) from a deposit, so it must be placed right on the oil. Everything else keeps clear.
+        private static bool AllowedOnResource(BuildingDefinition def) =>
+            def.kind == BuildingKind.Pump && !def.booster && def.item != null && def.item.isLiquid && !def.fromWaterTerrain;
 
         // True if the footprint covers BOTH land and water cells — a harbour must straddle the shore so the
         // boat can dock on the water half while belts connect on the land half.
