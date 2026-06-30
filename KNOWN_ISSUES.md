@@ -4,11 +4,34 @@ A running record so progress/problems don't get lost. Newest first. Move items t
 **Fixed** when done. Maintained alongside the code — see DESIGN.md for the roadmap.
 
 ---
-## 📌 NEW-THREAD HANDOFF — current state (2026-06-29, + ELECTRICITY OVERHAUL on top of the feedback batches — committed & pushed)
+## 📌 NEW-THREAD HANDOFF — current state (2026-06-29, + a 15-ITEM POLISH BATCH on top of the electricity overhaul — committed & pushed)
 Pinned pointer so a fresh thread (incl. on a DIFFERENT PC) can continue. Everything below is committed and pushed to
-`origin/main` (HEAD = `fb412d3`, working tree clean, in sync) — a clean clone has the whole game. Open the project,
+`origin/main` (HEAD = `e0b6a27`, working tree clean, in sync) — a clean clone has the whole game. Open the project,
 Play, and continue. A full interactive PLAYTEST is the biggest owed item (user tests in the evenings) — all feedback
 batches compile clean (`Tools/compile-check.ps1` → COMPILE CLEAN) but have NOT been interactively played yet.
+
+**✅ DONE THIS SESSION — 15-ITEM POLISH BATCH (2026-06-29):** commits `5447ae1`,`066f717`,`e000926`,`fd00a8c`,`e0b6a27`.
+- Objectives: first goal says "Click trees & rocks…" + a new "Run a conveyor Belt from the Wood Hut to the Woodpile"
+  step (Wood Hut doesn't auto-store); live progress counters (Quest.progress → "7/15" in the box).
+- Build menu: Stone-age guide STARS (Wood Hut/Belt/Woodpile via tutorialHighlight); hover NAMES added for
+  rail/signal/battery/garage/route vehicles. Water Barrel moved to Bronze (unlockAge 2).
+- Art: corner-belt animation now scrolls input→output (was backwards); Copper nodes are a warm coppery boulder
+  (BakeOre body colours; iron unchanged) so they don't vanish into grey hills.
+- Trains/Boats are RESEARCH unlocks now: "rail_transport" (prereq Tribal → Station/Track/Signals), "boats"
+  (prereq Bronze → Harbour/Liquid Harbour). Land route vehicles HOLD (amber + toast) instead of teleporting over
+  land when no track route reaches the stop (`RouteVehicle` fallback, mirrors ships).
+- Storage: Woodpile is 2×2 like the Wood Hut but keeps 1 in/1 out (`BuildingDefinition.singlePort`); Stone+Ore
+  stockpiles MERGED into one configurable "Stockpile" (whitelist stone/copper/iron via `stockpileWhitelist` +
+  `StorageBuilding.CanAdopt`; old two dropped from the menu).
+- Rail laying snaps to STRAIGHT runs per drag stroke (BuildController PlanRailPath + _railCommitted); drag again to turn.
+- Collector gather loop FIXED: `FindNearestNode` prefers a healthy node (Amount≥5) and `MaybeRebind` releases a
+  depleting source, so a collector (and its worker) moves to a fuller reachable node instead of looping on near-empty.
+- Belts look PACKED: each item renders as a 2-dot cluster (UpdateDots **render-only** — sim/MinGap/throughput
+  byte-identical, so no stuck items, no balance change). Splitter→splitter no longer reads RED while flowing
+  (`LeadsToSink` is splitter-aware + counts generators); dropping a junction on a belt previews its flow direction.
+- **Open/next:** all UNPLAYED — needs the evening playtest. Watch: belt-cluster look + that nothing jams; the
+  corner-anim direction (eyeball both bend orientations — if one's still wrong, key the sign off `fromRight`);
+  the straight-rail tool feel; collector threshold (5) tuning; trains/boats research costs (18/40).
 
 **✅ DONE THIS SESSION — UPGRADE UI DISCOVERABILITY (2026-06-29):** commit `fb412d3`. Building upgrades existed but were
 invisible. Now: a green ⬆ badge bobs over any building you can upgrade NOW (`WorkshopBuilding/ProductionBuilding.CanUpgradeNow`
