@@ -1646,6 +1646,13 @@ namespace Caveman
         private Belt.Dir AutoBeltDir(Vector2Int cell)
         {
             for (int i = 0; i < 4; i++) { var d = (Belt.Dir)i; if (Belt.IsStorageCell(cell + Belt.Step(d))) return d; }
+            // Face an adjacent MERGER (it pulls from belts that point INTO it) — but NOT on its output side — so
+            // "connect a belt to a merger from the side" just works instead of laying a dead-end belt that reads red.
+            for (int i = 0; i < 4; i++)
+            {
+                var d = (Belt.Dir)i; var nb = Belt.At(cell + Belt.Step(d));
+                if (nb != null && nb.isMerger && nb.dir != Belt.Opposite(d)) return d; // d faces the merger; its output side is excluded
+            }
             for (int i = 0; i < 4; i++) { var d = (Belt.Dir)i; if (Belt.IsSourceCell(cell + Belt.Step(d))) return Belt.Opposite(d); }
             return BeltDir;
         }
