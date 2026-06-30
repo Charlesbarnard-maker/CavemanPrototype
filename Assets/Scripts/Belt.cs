@@ -217,7 +217,11 @@ namespace Caveman
             if (isMerger) return true;
             var behind = _cell + Step(Opposite(dir));
             if (from._cell == behind) return true;   // inline / straight feeder — always allowed
-            if (At(behind) != null) return false;     // a straight feeder exists → side feeders blocked
+            // Only a REAL straight feeder — a belt behind us that actually POINTS INTO us (the SAME test the
+            // corner-sprite uses, FeedsInto) — reserves the inline slot and blocks side feeders. A belt merely
+            // SITTING in the cell behind (pointing elsewhere) must NOT block a legitimate corner feeder. That was
+            // the bug: a belt dropped at a junction's "behind" cell froze the corner line turning into it.
+            if (FeedsInto(Opposite(dir))) return false; // a real straight feeder exists → side feeders blocked
             // No straight feeder: allow the FIRST side-belt that points into me (deterministic), reject others.
             for (int di = 0; di < 4; di++)
             {
