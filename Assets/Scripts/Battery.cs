@@ -24,6 +24,7 @@ namespace Caveman
 
         private SpriteRenderer _sr;
         private Color _base;
+        private SpriteRenderer _barFill; // the coloured fill of the charge bar (tracks Fraction)
 
         public float Fraction => capacity > 0f ? Mathf.Clamp01(Stored / capacity) : 0f;
 
@@ -47,11 +48,32 @@ namespace Caveman
             bat._sr = sr;
             bat._base = def.color;
 
+            // Charge BAR above the battery — a dark frame with a coloured fill that tracks how full it is
+            // (red when low → green when full), so you can read the state at a glance without selecting it.
+            MakeBarSprite(go.transform, new Vector3(0f, 0.6f, 0f), new Vector3(0.74f, 0.16f, 1f),
+                new Color(0.08f, 0.09f, 0.11f, 0.9f), 11);
+            bat._barFill = MakeBarSprite(go.transform, new Vector3(-0.35f, 0.6f, 0f), new Vector3(0.0001f, 0.12f, 1f),
+                new Color(0.4f, 0.95f, 0.55f), 12);
+
             var node = go.AddComponent<PowerNode>();
             node.role = PowerNode.Role.Battery;
             node.maxConnections = 4;
             node.battery = bat;
             return bat;
+        }
+
+        // A unit-square sprite used as a bar segment (the dark frame, or the coloured fill).
+        private static SpriteRenderer MakeBarSprite(Transform parent, Vector3 localPos, Vector3 localScale, Color col, int order)
+        {
+            var go = new GameObject("chargebar");
+            go.transform.SetParent(parent);
+            go.transform.localPosition = localPos;
+            go.transform.localScale = localScale;
+            var sr = go.AddComponent<SpriteRenderer>();
+            sr.sprite = PlaceholderArt.Square();
+            sr.color = col;
+            sr.sortingOrder = order;
+            return sr;
         }
 
         /// <summary>Discharge up to <paramref name="power"/> for this frame (limited by rate + stored).
@@ -88,6 +110,16 @@ namespace Caveman
             float f = Fraction;
             Color full = Color.Lerp(_base, new Color(0.4f, 1f, 0.6f), 0.35f);
             _sr.color = Color.Lerp(Color.Lerp(_base, Color.black, 0.5f), full, f);
+
+            // Drive the charge bar: a LEFT-anchored fill that grows with charge and shifts red→green.
+            if (_barFill != null)
+            {
+                float w = 0.70f * f; // inner width (frame is 0.74 wide)
+                _barFill.enabled = w > 0.001f;
+                _barFill.transform.localScale = new Vector3(Mathf.Max(0.0001f, w), 0.12f, 1f);
+                _barFill.transform.localPosition = new Vector3(-0.35f + 0.5f * w, 0.6f, 0f); // keep the left edge pinned
+                _barFill.color = Color.Lerp(new Color(0.92f, 0.42f, 0.34f), new Color(0.40f, 0.95f, 0.55f), f);
+            }
         }
     }
 }

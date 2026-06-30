@@ -80,7 +80,10 @@ namespace Caveman
             // Register the footprint so belts can deposit fuel on the input edge, and show the cyan notch.
             p._cells = Footprint.Cells(go.transform.position, def.FootW, def.FootH);
             foreach (var c in p._cells) WorldGrid.Generators[c] = p;
-            if (p.fuel != null) Ports.MakeInputNotch(go.transform, inputSide); // belts feed fuel here
+            // Single cyan fuel notch on the input edge, placed PER-CELL (centre cell of the side) like a
+            // workshop's input — so it lines up with the belt grid instead of floating on the cell seam.
+            if (p.fuel != null)
+                Ports.PlacePorts(go.transform, def.FootW, def.FootH, Belt.Opposite(inputSide), hasIn: true, hasOut: false, singlePort: true);
 
             // Wired-grid node: a generator links to up to 4 poles/batteries/machines (no radius — the
             // player draws the wires). See PowerNode / PowerNet.

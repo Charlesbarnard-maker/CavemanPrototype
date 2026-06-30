@@ -1367,6 +1367,45 @@ namespace Caveman
                 else
                     GUILayout.Label($"<size=15>Building… {(int)(cs.BuildFraction * 100)}%</size>", _small);
             }
+            else if (pwr != null)
+            {
+                // GENERATOR readout — status / power output / fuel buffer / consumption, so it's not a bare panel.
+                if (pwr.renewable)
+                {
+                    string src = pwr.solar ? "daylight" : "wind";
+                    GUILayout.Label($"<size=13><color=#9f9>● Generating</color>  <color=#bbb>(varies with {src})</color></size>", _small);
+                    GUILayout.Label($"<size=12>⚡ Power: <b>{pwr.CurrentOutput:0}</b> / {pwr.output}  <color=#888>(now / rated)</color></size>", _small);
+                    GUILayout.Label("<size=11><color=#bbb>Renewable — no fuel. Output rises and falls on its own, so lean on Batteries.</color></size>", _small);
+                }
+                else
+                {
+                    GUILayout.Label(pwr.Fueled
+                        ? "<size=13><color=#9f9>● Running</color></size>"
+                        : "<size=13><color=#f66>● No fuel — grid browning out</color></size>", _small);
+                    GUILayout.Label($"<size=12>⚡ Power: <b>{pwr.CurrentOutput:0}</b> / {pwr.output}  <color=#888>(supplied / rated)</color></size>", _small);
+                    if (pwr.fuel != null)
+                    {
+                        int cap = pwr.Buffer != null ? pwr.Buffer.capacity : 0;
+                        float perMin = pwr.interval > 0f ? pwr.fuelPerCycle * 60f / pwr.interval : 0f;
+                        string fcol = pwr.FuelStored <= 0 ? "#f66" : pwr.FuelStored < pwr.fuelPerCycle * 3 ? "#fd4" : "#9cf";
+                        GUILayout.Label($"<size=12>Fuel: <color={fcol}>{pwr.fuel.displayName} {pwr.FuelStored}/{cap}</color></size>", _small);
+                        GUILayout.Label($"<size=11><color=#bbb>Burns {pwr.fuelPerCycle} {pwr.fuel.displayName} every {pwr.interval:0.#}s  ≈ {perMin:0.#}/min</color></size>", _small);
+                        if (pwr.FuelStored <= 0)
+                            GUILayout.Label($"<size=11><color=#f66>⚠ Belt {pwr.fuel.displayName} into the cyan fuel edge (R aims it) to keep it running.</color></size>", _small);
+                    }
+                }
+            }
+            else if (bat != null)
+            {
+                // BATTERY readout — charge %, energy stored, and live charge/discharge flow.
+                int pct = Mathf.RoundToInt(bat.Fraction * 100f);
+                string fcol = bat.Fraction <= 0.05f ? "#f66" : bat.Fraction >= 0.95f ? "#9f9" : "#9cf";
+                GUILayout.Label($"<size=13>Charge: <color={fcol}><b>{pct}%</b></color>  <color=#888>{bat.Stored:0}/{bat.capacity:0}</color></size>", _small);
+                string flowStr = bat.Flow > 0.5f ? $"<color=#9f9>▲ charging {bat.Flow:0}</color>"
+                    : bat.Flow < -0.5f ? $"<color=#fc8>▼ discharging {-bat.Flow:0}</color>"
+                    : "<color=#888>idle</color>";
+                GUILayout.Label($"<size=12>{flowStr}  <color=#888>· max {bat.rate:0}/s</color></size>", _small);
+            }
 
             // Power wiring panel — shown for ANY wired node (generator / pole / battery / machine), so
             // it's additive to the branches above. Shows wire count + Connect/Disconnect controls.
