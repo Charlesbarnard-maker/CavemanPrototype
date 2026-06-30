@@ -66,6 +66,7 @@ namespace Caveman
         public Depot LinkFrom { get; private set; } // the Station we're drawing a route FROM (or null)
         private BuildingDefinition _linkTier;
         public PowerNode WireFrom { get; private set; } // the power node we're drawing a WIRE from (or null)
+        public bool WireCutMode { get; private set; }   // "cut a wire" mode — click a cable in the world to delete it
 
         /// <summary>Best vehicle tier the player can AFFORD right now (newest/biggest first). Falls
         /// back to the cheapest unlocked tier when nothing is affordable, so the panel still shows a
@@ -216,6 +217,31 @@ namespace Caveman
         }
 
         public void CancelWire() => WireFrom = null;
+
+        /// <summary>Enter "cut a wire" mode: click a cable in the world to delete just that wire. Esc / right-click exits.</summary>
+        public void BeginWireCut()
+        {
+            CancelPlacement();
+            CancelLink();
+            CancelWire();
+            WireCutMode = true;
+            Toast.Show("<color=#fc8>✂ Click a WIRE to cut it.</color>  <size=11>(Esc / right-click exits)</size>");
+        }
+        public void CancelWireCut() => WireCutMode = false;
+
+        // The PowerWire whose cable is under the cursor (for cut mode), or null — reuses the shared overlap buffer.
+        private PowerWire WireUnderCursor(Mouse mouse)
+        {
+            if (_cam == null || mouse == null) return null;
+            Vector3 world = _cam.ScreenToWorldPoint(mouse.position.ReadValue());
+            int n = Physics2D.OverlapPoint((Vector2)world, _solidFilter, _solidBuf);
+            for (int i = 0; i < n; i++)
+            {
+                var w = _solidBuf[i] != null ? _solidBuf[i].GetComponent<PowerWire>() : null;
+                if (w != null) return w;
+            }
+            return null;
+        }
 
         private void CompleteWire(PowerNode to)
         {
@@ -390,7 +416,8 @@ namespace Caveman
 
             if (kb.escapeKey.wasPressedThisFrame)
             {
-                if (WireFrom != null) CancelWire();
+                if (WireCutMode) CancelWireCut();
+                else if (WireFrom != null) CancelWire();
                 else if (LinkFrom != null) CancelLink();
                 else if (PendingIndex >= 0) CancelPlacement();
                 else Selected = null;
@@ -434,6 +461,19 @@ namespace Caveman
                     else TryBuildWirePole(mouse);              // empty ground → drop a pole + keep chaining (toasts if it can't)
                 }
                 if (mouse != null && mouse.rightButton.wasPressedThisFrame) CancelWire();
+                return;
+            }
+
+            // Wire-cut mode: click a cable to delete just that wire (frees a pole slot). Right-click / Esc exits.
+            if (WireCutMode)
+            {
+                if (mouse != null && mouse.leftButton.wasPressedThisFrame && !overUI)
+                {
+                    var w = WireUnderCursor(mouse);
+                    if (w != null && w.a != null && w.b != null) { w.a.Disconnect(w.b); Toast.Show("<color=#9f9>✂ Wire cut.</color>"); }
+                    else Toast.Show("<color=#f99>No wire there — click directly on a cable.</color>");
+                }
+                if (mouse != null && mouse.rightButton.wasPressedThisFrame) CancelWireCut();
                 return;
             }
 

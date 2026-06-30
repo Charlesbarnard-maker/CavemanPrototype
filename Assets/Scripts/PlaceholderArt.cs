@@ -594,6 +594,7 @@ namespace Caveman
             "Station" => StationPlatform(),
             "Harbour" => HarbourDock(),
             "Warehouse" => WarehouseShed(),
+            "Large Warehouse" => LargeWarehouse(),
             "Water Barrel" => WaterBarrel(),
             // --- Age 1 (Tribal) ---
             "Clay Pit" => TribalClayPit(),

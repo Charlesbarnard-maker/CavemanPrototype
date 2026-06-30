@@ -22,6 +22,8 @@ namespace Caveman
             "copper" => ItemCopper(),
             "bronze_plate" => ItemBronzePlate(),
             "steel" => ItemSteel(),
+            "copper_plate" => ItemCopperPlate(),
+            "iron_rod" => ItemIronRod(),
             // Wood & fibre
             "wood" => ItemWood(),
             "planks" => ItemPlanks(),

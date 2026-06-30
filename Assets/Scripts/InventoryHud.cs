@@ -1461,24 +1461,14 @@ namespace Caveman
             {
                 if (GUILayout.Button("<size=12>🔌 Connect wire</size>", _btn)) builder.BeginWire(node);
             }
-            else GUILayout.Label("<size=11><color=#888>All wire slots used — delete a wire below to free a slot</color></size>", _small);
-            // Per-wire delete: each wire gets its own ✕ so you can free ONE specific slot (e.g. to re-route a
-            // pole) without dropping the node's whole wiring. Calls the symmetric PowerNode.Disconnect primitive.
+            else GUILayout.Label("<size=11><color=#888>All wire slots used — cut a wire to free a slot</color></size>", _small);
+            // Delete a wire by CLICKING the cable in the world (you can see which is which) — not a list of identical rows.
             if (node.links.Count > 0)
             {
-                PowerNode cut = null;
-                for (int i = 0; i < node.links.Count; i++)
-                {
-                    var lk = node.links[i];
-                    if (lk == null) continue;
-                    float dist = (node.Pos - lk.Pos).magnitude;
-                    GUILayout.BeginHorizontal();
-                    GUILayout.Label($"<size=11><color=#9cf>● wire {i + 1}</color> → {lk.RoleLabel}  <color=#888>{dist:0.0}m</color></size>", _small);
-                    if (GUILayout.Button("<size=11><color=#f99>✕</color></size>", _btn, GUILayout.Width(28))) cut = lk;
-                    GUILayout.EndHorizontal();
-                }
-                if (cut != null) node.Disconnect(cut);
-                if (GUILayout.Button("<size=11>✂ Disconnect ALL wires</size>", _btn))
+                if (builder.WireCutMode)
+                    GUILayout.Label("<size=11><color=#fc8>✂ Click a wire in the world to cut it (Esc exits)</color></size>", _small);
+                else if (GUILayout.Button("<size=12>✂ Cut a wire</size>", _btn)) builder.BeginWireCut();
+                if (GUILayout.Button("<size=11>Disconnect ALL wires</size>", _btn))
                     for (int i = node.links.Count - 1; i >= 0; i--) node.Disconnect(node.links[i]);
             }
         }

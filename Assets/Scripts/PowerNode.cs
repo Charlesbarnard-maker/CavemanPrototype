@@ -111,6 +111,7 @@ namespace Caveman
         public PowerNode a, b;
         public static readonly List<PowerWire> All = new();
         private LineRenderer _lr;
+        private EdgeCollider2D _col; // a thin clickable hit-box along the cable (for click-to-delete a wire)
 
         public static readonly Color Powered = new Color(0.45f, 0.85f, 1f, 0.95f);   // live cable — cyan
         public static readonly Color Unpowered = new Color(0.55f, 0.55f, 0.60f, 0.7f); // no generation — grey
@@ -128,7 +129,11 @@ namespace Caveman
             lr.sortingOrder = 3; // above ground, below buildings (5)
             lr.positionCount = 2;
             w._lr = lr;
-            w.Refresh();
+            // Clickable cable: the GO sits at the origin so world == local. NOT in BuildController.SolidBuildingAt's
+            // component list, so this collider never blocks building placement — only the wire-cut mode reads it.
+            w._col = go.AddComponent<EdgeCollider2D>();
+            w._col.edgeRadius = 0.12f;
+            w.Refresh(); // sets the line AND the collider points
             w.SetColor(Powered);
             All.Add(w);
         }
@@ -157,6 +162,7 @@ namespace Caveman
             if (_lr == null || a == null || b == null) return;
             _lr.SetPosition(0, new Vector3(a.Pos.x, a.Pos.y, 0f));
             _lr.SetPosition(1, new Vector3(b.Pos.x, b.Pos.y, 0f));
+            if (_col != null) _col.points = new[] { a.Pos, b.Pos };
         }
     }
 }
