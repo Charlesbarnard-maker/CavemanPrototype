@@ -6,9 +6,16 @@ A running record so progress/problems don't get lost. Newest first. Move items t
 ---
 ## 📌 NEW-THREAD HANDOFF — current state (2026-06-29, + a 15-ITEM POLISH BATCH on top of the electricity overhaul — committed & pushed)
 Pinned pointer so a fresh thread (incl. on a DIFFERENT PC) can continue. Everything below is committed and pushed to
-`origin/main` (HEAD = `e0b6a27`, working tree clean, in sync) — a clean clone has the whole game. Open the project,
+`origin/main` (HEAD = `46bd3ff`, working tree clean, in sync) — a clean clone has the whole game. Open the project,
 Play, and continue. A full interactive PLAYTEST is the biggest owed item (user tests in the evenings) — all feedback
 batches compile clean (`Tools/compile-check.ps1` → COMPILE CLEAN) but have NOT been interactively played yet.
+
+**⚙️ BELT FLOW REWORK (2026-06-29, commit `46bd3ff`):** the earlier 2-dot belt cluster was reverted (it double-counted
+items). Belts now render ONE sprite per REAL item; density is real: `Belt.MinGap = 0.5` (2 items/cell, packed) + a new
+`Economy.ProductionScale = 2f` global dial on the collector + workshop timers (cycles run 2× faster, recipe ratios
+unchanged) so belts are fed densely. Two side effects to watch in playtest, both single constants: belt-tier caps
+doubled (~80/120/240/480 per min; tooltip numbers read ~2× low now) and the game paces ~2× faster (research/ages +
+finite-ore depletion). Dial `Economy.ProductionScale` (and `Belt.MinGap` toward 1.0 for sparser) to taste.
 
 **✅ DONE THIS SESSION — 15-ITEM POLISH BATCH (2026-06-29):** commits `5447ae1`,`066f717`,`e000926`,`fd00a8c`,`e0b6a27`.
 - Objectives: first goal says "Click trees & rocks…" + a new "Run a conveyor Belt from the Wood Hut to the Woodpile"
