@@ -833,6 +833,16 @@ namespace Caveman
                 : "<size=13><b>Water Pump</b>  <color=#bbb>water → pipes</color></size>";
             if (hit.GetComponent<Bridge>() != null) return "<size=13><b>Bridge</b></size>";
             if (hit.GetComponent<Pipe>() != null) return "<size=13><b>Pipe</b>  <color=#bbb>liquid network</color></size>";
+            var rt = hit.GetComponent<RailTile>();
+            if (rt != null) return $"<size=13><b>{(rt.def != null ? NameOf(rt.def) : "Track")}</b>  <color=#bbb>rail</color></size>";
+            var sg = hit.GetComponent<Signal>();
+            if (sg != null) return $"<size=13><b>{(sg.bothWays ? "Two-Way Signal" : "Signal")}</b>  <color=#bbb>rail block</color></size>";
+            var bat = hit.GetComponent<Battery>();
+            if (bat != null) return $"<size=13><b>{(bat.def != null ? NameOf(bat.def) : "Battery")}</b>  <color=#bbb>power storage</color></size>";
+            var gar = hit.GetComponent<Garage>();
+            if (gar != null) return $"<size=13><b>{(gar.def != null ? NameOf(gar.def) : "Garage")}</b>  <color=#bbb>mounts</color></size>";
+            var rv = hit.GetComponent<RouteVehicle>();
+            if (rv != null) return $"<size=13><b>{rv.VehicleName()}</b>  <color=#bbb>{rv.CargoSummary()}</color></size>";
             return null;
         }
 
@@ -1483,7 +1493,9 @@ namespace Caveman
             if (steps.Count == 0) lines.Add("<size=13><color=#9f9>All objectives complete! 🎉</color></size>");
             else
             {
-                lines.Add($"<size=14><color=#ffd24d>▸</color> <b>{steps[0].title}</b>"
+                string prog = "";
+                if (steps[0].progress != null) { var (c, n) = steps[0].progress(); prog = $"   <color=#9cf>{Mathf.Clamp(c, 0, n)}/{n}</color>"; }
+                lines.Add($"<size=14><color=#ffd24d>▸</color> <b>{steps[0].title}</b>{prog}"
                     + (string.IsNullOrEmpty(steps[0].rewardText) ? "" : $"  <size=11><color=#9c9>({steps[0].rewardText})</color></size>") + "</size>");
                 if (steps.Count > 1) lines.Add($"<size=12><color=#999>Up next: {steps[1].title}</color></size>");
             }

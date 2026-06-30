@@ -9,6 +9,7 @@ namespace Caveman
         public string title;
         public int age;          // the Age this goal belongs to — its whole set unlocks together when you reach it
         public System.Func<bool> done;
+        public System.Func<(int have, int need)> progress; // optional live counter for the HUD (e.g. 7/15); null = none
         public System.Action reward;
         public string rewardText;
         public bool claimed;

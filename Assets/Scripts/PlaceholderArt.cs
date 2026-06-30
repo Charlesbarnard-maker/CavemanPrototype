@@ -321,8 +321,8 @@ namespace Caveman
                     {
                         c = belt;
                         if (d < 0.17f || d > 0.83f) c = edge; // inner/outer rails (match the straight's inset)
-                        float ang = Mathf.Atan2(Mathf.Abs(dy), Mathf.Abs(dx)); // 0..π/2 along the curve
-                        if (Frac(ang / (Mathf.PI * 0.5f) * 3f - scroll) < 0.28f && d >= 0.24f && d <= 0.76f) c = dark; // scrolling chevron ticks
+                        float ang = Mathf.Atan2(Mathf.Abs(dy), Mathf.Abs(dx)); // π/2 at the input edge → 0 at the output edge
+                        if (Frac(ang / (Mathf.PI * 0.5f) * 3f + scroll) < 0.28f && d >= 0.24f && d <= 0.76f) c = dark; // chevrons scroll input→output (toward decreasing ang)
                     }
                     px[y * s + x] = c;
                 }
@@ -1441,18 +1441,18 @@ namespace Caveman
         }
 
         /// <summary>Copper ore — grey boulders shot with ORANGE mineral veins.</summary>
-        public static Sprite OreCopper() { if (_oreCopper == null) _oreCopper = BakeOre(new Color(0.92f, 0.56f, 0.20f)); return _oreCopper; }
+        public static Sprite OreCopper() { if (_oreCopper == null) _oreCopper = BakeOre(new Color(1.00f, 0.66f, 0.16f), new Color(0.50f, 0.34f, 0.18f), new Color(0.76f, 0.50f, 0.24f)); return _oreCopper; } // warm coppery boulder so it doesn't vanish into the grey hills
         /// <summary>Iron ore — grey boulders shot with RUSTY veins.</summary>
-        public static Sprite OreIron() { if (_oreIron == null) _oreIron = BakeOre(new Color(0.64f, 0.40f, 0.33f)); return _oreIron; }
+        public static Sprite OreIron() { if (_oreIron == null) _oreIron = BakeOre(new Color(0.64f, 0.40f, 0.33f), new Color(0.38f, 0.38f, 0.43f), new Color(0.54f, 0.54f, 0.59f)); return _oreIron; }
 
         // Grey boulders with coloured mineral veins (the vein colour distinguishes copper vs iron ore).
-        private static Sprite BakeOre(Color vein)
+        private static Sprite BakeOre(Color vein, Color bodyDark, Color bodyMid)
         {
             const int s = 64;
             var tex = NewTex(s);
             var px = new Color[s * s];
-            var d = new Color(0.38f, 0.38f, 0.43f, 1f);
-            var m = new Color(0.54f, 0.54f, 0.59f, 1f);
+            var d = bodyDark;
+            var m = bodyMid;
             for (int y = 0; y < s; y++)
                 for (int x = 0; x < s; x++)
                 {
