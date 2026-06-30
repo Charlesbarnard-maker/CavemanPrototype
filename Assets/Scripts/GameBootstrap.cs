@@ -67,6 +67,8 @@ namespace Caveman
             var engine     = MakeItem("engine",      "Engine",      new Color(0.36f, 0.42f, 0.50f)); // Industrial final product (needs Fuel)
             var locomotive = MakeItem("locomotive",  "Locomotive",  new Color(0.34f, 0.36f, 0.42f)); // Iron-age vehicle part — the Wagon Train's engine
             var hull       = MakeItem("hull",        "Hull",        new Color(0.46f, 0.52f, 0.58f)); // Iron-age vehicle part — the Steam Ship's body
+            var wiring     = MakeItem("wiring",      "Copper Wiring", new Color(0.86f, 0.52f, 0.26f)); // Electronics: Copper → Wiring
+            var circuit    = MakeItem("circuit",     "Circuit",     new Color(0.28f, 0.62f, 0.40f)); // Electronics: Wiring + Copper Plate → Circuit
             var monument = MakeItem("monument", "Monument Block", new Color(0.90f, 0.86f, 0.62f)); // endgame
             // Textiles + pottery — parallel comfort-good chains that deepen the demand sink.
             var fiber = MakeItem("fiber", "Plant Fiber", new Color(0.62f, 0.74f, 0.45f));
@@ -127,8 +129,8 @@ namespace Caveman
             // look for now). Real per-item art drops in by adding Resources/art/<id> sprites later.
             foreach (var it in new[] { wood, planks }) it.sprite = SpriteDefinition.Of(PlaceholderShape.Triangle);              // woody
             foreach (var it in new[] { stone, ore, clay, bricks, stoneBlock, gems, charcoal }) it.sprite = SpriteDefinition.Of(PlaceholderShape.Hexagon); // mineral
-            foreach (var it in new[] { metal, tools, monument, cloth, clothes, pot, jewelry, ideaTablet, studyScroll, schematic, blueprint, copperPlate, ironRod, locomotive, hull }) it.sprite = SpriteDefinition.Of(PlaceholderShape.Square); // manufactured
-            foreach (var it in new[] { wood, planks, stone, ore, clay, bricks, stoneBlock, gems, charcoal, metal, tools, monument, cloth, clothes, pot, jewelry, ideaTablet, studyScroll, schematic, blueprint, copperPlate, ironRod, locomotive, hull })
+            foreach (var it in new[] { metal, tools, monument, cloth, clothes, pot, jewelry, ideaTablet, studyScroll, schematic, blueprint, copperPlate, ironRod, locomotive, hull, wiring, circuit }) it.sprite = SpriteDefinition.Of(PlaceholderShape.Square); // manufactured
+            foreach (var it in new[] { wood, planks, stone, ore, clay, bricks, stoneBlock, gems, charcoal, metal, tools, monument, cloth, clothes, pot, jewelry, ideaTablet, studyScroll, schematic, blueprint, copperPlate, ironRod, locomotive, hull, wiring, circuit })
                 it.icon = SpriteDatabase.ForItem(it);
             // food / cooked / meat / grain / flour / bread / fiber keep the default round dot.
 
@@ -272,7 +274,7 @@ namespace Caveman
             var wagonTrain = MakeRoute("Wagon Train", 36, 6.5f, 3, new Color(0.45f, 0.45f, 0.52f),
                 new ItemAmount(locomotive, 1), new ItemAmount(steel, 4)); // a real TRAIN needs a Locomotive (Eng Lab)
             var cargoDrone = MakeRoute("Cargo Drone", 24, 12f, 4, new Color(0.50f, 0.70f, 0.85f),
-                new ItemAmount(engine, 1), new ItemAmount(machinePart, 2)); // a Cargo Drone needs an Engine + electronics (Circuit added with the Electronics chain)
+                new ItemAmount(engine, 1), new ItemAmount(circuit, 2)); // a Cargo Drone needs an Engine + Circuits (electronics)
             // Cargo SHIP tiers — run on HARBOUR lines (over water). Available from the start so boats are an
             // early option for crossing rivers/lakes; a bigger steam ship arrives in the Iron age.
             var cargoShip = MakeRoute("Cargo Ship", 40, 5.0f, 0, new Color(0.40f, 0.60f, 0.85f),
@@ -472,6 +474,7 @@ namespace Caveman
                 new Recipe(tools,      1, 5.0f, 3, new ItemAmount(metal, 1),       new ItemAmount(planks, 1)), // Iron age
                 new Recipe(steelBeam,  1, 5.0f, 3, new ItemAmount(steel, 1),       new ItemAmount(planks, 1)), // Iron age
                 new Recipe(hull,       1, 5.5f, 3, new ItemAmount(steelBeam, 1),   new ItemAmount(planks, 2)), // Iron age — a ship Hull (gates the Steam Ship)
+                new Recipe(wiring,     2, 3.0f, 3, new ItemAmount(copper, 1)),                                  // Iron age — draw Copper into Wiring (Electronics chain)
             };
             toolmaker.description = "FORGE / TOOLMAKER — shapes metal into mechanical COMPONENTS; pick its recipe (click to switch): Bronze Plate + Planks → Bronze Gear (Bronze age), Iron + Planks → Tools, or Steel + Planks → Steel Beam (both Iron age). One forge for the whole component tier; build more to run several at once. Draws POWER (a heavy forge).";
             toolmaker.requiresPower = true; toolmaker.powerDraw = 20;
@@ -531,7 +534,7 @@ namespace Caveman
             windmill.renewable = true;
             windmill.description = "WINDMILL — fuel-free power, but its output GUSTS (the wind rises and falls, ~35–100%). Build several + Batteries to ride out the lulls. Costs Steel + Bronze Gears — a real investment, not a spam source. (Research: Renewable Power.)";
             var solar = MakePower("Solar Panel", 45, null, 1, 1f, 4, new Color(0.20f, 0.30f, 0.55f),
-                new ItemAmount(steel, 6), new ItemAmount(bronzeGear, 6), new ItemAmount(machinePart, 4));
+                new ItemAmount(steel, 6), new ItemAmount(circuit, 6), new ItemAmount(bronzeGear, 4)); // solar panels ARE electronics — need Circuits
             solar.renewable = true; solar.solar = true;
             solar.description = "SOLAR PANEL — silent, fuel-free power, but ONLY in daylight (full at midday, 0 through the night). Needs Steel + Bronze Gears + Machine Parts. Pair with Batteries to carry the night. (Research: Renewable Power.)";
             // Endgame: the Monument (Industrial age). A long resource sink you pour the
@@ -607,6 +610,7 @@ namespace Caveman
             {
                 new Recipe(machinePart, 1, 4.0f, 3, new ItemAmount(steelBeam, 1), new ItemAmount(bronzeGear, 1), new ItemAmount(tools, 1)), // Iron — 3-input assembly
                 new Recipe(locomotive,  1, 6.0f, 3, new ItemAmount(steelBeam, 1), new ItemAmount(machinePart, 1), new ItemAmount(bronzeGear, 1)), // Iron — the TRAIN's engine (gates the Wagon Train)
+                new Recipe(circuit,     1, 4.0f, 3, new ItemAmount(wiring, 2),    new ItemAmount(copperPlate, 1)), // Iron — a Circuit board (gates Cargo Drones + Solar Panels)
                 new Recipe(blueprint,   1, 3.5f, 3, new ItemAmount(steel, 1),     new ItemAmount(machinePart, 1)),                            // Iron — the RESEARCH item, now deeper
                 new Recipe(engine,      1, 5.0f, 4, new ItemAmount(machinePart, 1), new ItemAmount(steel, 1), new ItemAmount(fuel, 1)),       // Industrial final product (needs Fuel)
             };
