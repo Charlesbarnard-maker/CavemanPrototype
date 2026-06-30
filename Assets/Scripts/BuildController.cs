@@ -106,7 +106,7 @@ namespace Caveman
             _lineStops.Add(from);
             LinkFrom = from; // the anchor (first stop)
             string what = harbour ? "Harbour" : "Station";
-            Toast.Show($"<color=#ffd24d>Building a {_linkTier.displayName} line.</color> Click the next {what} to add a stop; click the FIRST {what} (or right-click) to finish. The vehicle loops the stops, passing any it doesn't stop at. (Esc cancels.)");
+            Toast.Show($"<color=#ffd24d>Building a {_linkTier.displayName} line.</color> Click each {what} in visit order (you can revisit one to loop back home); <b>right-click to finish</b>. The vehicle loops the stops, passing any it doesn't stop at. (Esc cancels.)");
         }
 
         public void CancelLink() { LinkFrom = null; _linkTier = null; _lineStops.Clear(); }
@@ -142,13 +142,18 @@ namespace Caveman
             _linkPreview.SetPosition(n, cursor);
         }
 
-        // A click on `dst` while building a line: finish if it's the first stop (loop closed), else add it.
+        // A click on `dst` while building a line ADDS it as the next stop. You MAY pass the same station more than
+        // once (loops / there-and-back / via the home station) — the only thing disallowed is adding the stop the
+        // line is already ON (the last one), which would be a stop-to-itself. Finish the line with RIGHT-CLICK.
         private void OnLineClick(Depot dst)
         {
             if (LinkFrom == null || _linkTier == null) { CancelLink(); return; }
             if (dst == null) return; // clicked empty — keep the in-progress line
-            if (dst == _lineStops[0] && _lineStops.Count >= 2) { FinishLine(); return; }
-            if (_lineStops.Contains(dst)) return;
+            if (_lineStops.Count > 0 && dst == _lineStops[_lineStops.Count - 1])
+            {
+                Toast.Show("<color=#fc8>That's the stop the line is already on — pick a different station. (Right-click to finish the line.)</color>");
+                return;
+            }
 
             // A line is EITHER a Harbour (ship/water) line OR a Station (train/land) line — never mixed, so a
             // ship can't be routed to a Station over land. Within harbour lines, cargo and liquid docks don't mix.
@@ -181,7 +186,7 @@ namespace Caveman
             }
 
             _lineStops.Add(dst);
-            Toast.Show($"<color=#9cf>Stop {_lineStops.Count} added.</color> Click more, or the first {(lineHarbour ? "Harbour" : "Station")} / right-click to finish.");
+            Toast.Show($"<color=#9cf>Stop {_lineStops.Count} added.</color> Click more stops (you can revisit one to loop back), or <b>right-click to finish</b>.");
         }
 
         private void FinishLine()

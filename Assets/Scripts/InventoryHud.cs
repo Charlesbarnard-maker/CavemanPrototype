@@ -1326,7 +1326,7 @@ namespace Caveman
                 }
                 if (rcount > 5) GUILayout.Label($"<size=10><color=#888>+{rcount - 5} more line(s)</color></size>", _small);
                 if (toDelete != null) Destroy(toDelete.gameObject);
-                if (rcount == 0) GUILayout.Label("<size=11><color=#888>No line yet. Lay TRACK to other Stations, then '+ Add line' → click each stop in order → click this station again to close the loop. The vehicle visits the stops, passing any it doesn't stop at.</color></size>", _small);
+                if (rcount == 0) GUILayout.Label("<size=11><color=#888>No line yet. Lay TRACK to other Stations, then '+ Add line' → click each stop in visit order (you can revisit one to loop back) → RIGHT-CLICK to finish. The vehicle loops the stops, passing any it doesn't stop at. (Edit a line by deleting it with ✕ and re-adding.)</color></size>", _small);
 
                 if (builder.LinkFrom != null && builder.LineContains(dp))
                     GUILayout.Label($"<size=11><color=#ffd24d>▶ Building a line ({builder.LineStopCount} stops)… click more Stations, then the FIRST station / right-click to finish.</color></size>", _small);

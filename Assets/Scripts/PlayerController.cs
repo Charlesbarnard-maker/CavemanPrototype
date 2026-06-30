@@ -140,11 +140,14 @@ namespace Caveman
             Vector3 step = (Vector3)(dir.normalized * (speed * Time.deltaTime));
             Vector3 p = transform.position;
             bool insideBuilding = BuildController.SolidBuildingAt(p);
-            bool boat = HasBoat; // a boat lets you cross water (land stays walkable too)
+            // A boat lets you cross WATER only — Mountains stay impassable (Walkable already excludes both,
+            // so add water-passability explicitly rather than "boat || Walkable" which let you cross mountains too).
+            bool boat = HasBoat;
+            bool CanGo(Vector3 t) => TerrainGrid.Walkable(t) || (boat && TerrainGrid.IsWater(t));
             Vector3 tryX = new Vector3(p.x + step.x, p.y, 0f);
-            if ((boat || TerrainGrid.Walkable(tryX)) && (insideBuilding || !BuildController.SolidBuildingAt(tryX))) p = tryX;
+            if (CanGo(tryX) && (insideBuilding || !BuildController.SolidBuildingAt(tryX))) p = tryX;
             Vector3 tryY = new Vector3(p.x, p.y + step.y, 0f);
-            if ((boat || TerrainGrid.Walkable(tryY)) && (insideBuilding || !BuildController.SolidBuildingAt(tryY))) p = tryY;
+            if (CanGo(tryY) && (insideBuilding || !BuildController.SolidBuildingAt(tryY))) p = tryY;
             transform.position = p;
         }
     }

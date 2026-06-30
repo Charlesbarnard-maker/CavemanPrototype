@@ -228,6 +228,8 @@ namespace Caveman
         public static Terrain At(Vector2Int c) => At(c.x, c.y);
 
         public static bool IsWater(Vector2Int c) => At(c) == Terrain.Water;
+        public static bool IsWater(Vector3 world) =>
+            IsWater(new Vector2Int(Mathf.RoundToInt(world.x), Mathf.RoundToInt(world.y)));
 
         /// <summary>Normal buildings need flat, solid land — never water (even bridged; bridges carry belts/
         /// feet) and never a Mountain (an impassable barrier you build around).</summary>

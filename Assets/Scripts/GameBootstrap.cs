@@ -588,10 +588,10 @@ namespace Caveman
             // (#47-balance): 12 → 150 → 400 → 800 — roughly ~12 / 30 / 40 / 40 item deliveries per age, not 300+.
             Research.Tree = new List<Research.Tech>
             {
-                new Research.Tech { id = "tribal",     name = "Tribal Age",     cost = 12,  advanceToAge = 1, prereq = null,     desc = "Advance to the Tribal Age — Charcoal & Clay open up deeper production." },
-                new Research.Tech { id = "bronze",     name = "Bronze Age",     cost = 150,  advanceToAge = 2, prereq = "tribal", requiredBuildings = new List<BuildingDefinition>{ basicSmelter },    gateItem = studyScroll, gateItemCount = 8, desc = "Advance to the Bronze Age — but first BUILD a Basic Smelter (set it to Copper) and deliver Study Scrolls (Copper + Planks)." },
-                new Research.Tech { id = "iron",       name = "Iron Age",       cost = 400,  advanceToAge = 3, prereq = "bronze", requiredBuildings = new List<BuildingDefinition>{ advancedSmelter }, gateItem = schematic,   gateItemCount = 6, desc = "Advance to the Iron Age — but first BUILD an Advanced Smelter (set it to Bronze) and deliver Schematics (Bronze Plate + Pottery)." },
-                new Research.Tech { id = "industrial", name = "Industrial Age", cost = 800,  advanceToAge = 4, prereq = "iron",   requiredBuildings = new List<BuildingDefinition>{ advancedSmelter }, gateItem = blueprint,   gateItemCount = 5, desc = "Advance to the Industrial Age — but first deliver Blueprints (Steel + Machine Part) — the deepest chain." },
+                new Research.Tech { id = "tribal",     name = "Tribal Age",     cost = 24,  advanceToAge = 1, prereq = null,     desc = "Advance to the Tribal Age — Charcoal & Clay open up deeper production." },
+                new Research.Tech { id = "bronze",     name = "Bronze Age",     cost = 300,  advanceToAge = 2, prereq = "tribal", requiredBuildings = new List<BuildingDefinition>{ basicSmelter },    gateItem = studyScroll, gateItemCount = 10, desc = "Advance to the Bronze Age — but first BUILD a Basic Smelter (set it to Copper) and deliver Study Scrolls (Copper + Planks)." },
+                new Research.Tech { id = "iron",       name = "Iron Age",       cost = 800,  advanceToAge = 3, prereq = "bronze", requiredBuildings = new List<BuildingDefinition>{ advancedSmelter }, gateItem = schematic,   gateItemCount = 8, desc = "Advance to the Iron Age — but first BUILD an Advanced Smelter (set it to Bronze) and deliver Schematics (Bronze Plate + Pottery)." },
+                new Research.Tech { id = "industrial", name = "Industrial Age", cost = 1600,  advanceToAge = 4, prereq = "iron",   requiredBuildings = new List<BuildingDefinition>{ advancedSmelter }, gateItem = blueprint,   gateItemCount = 7, desc = "Advance to the Industrial Age — but first deliver Blueprints (Steel + Machine Part) — the deepest chain." },
                 new Research.Tech { id = "splitters",   name = "Splitters",     cost = 15,  prereq = "tribal", unlocks = new List<BuildingDefinition>{ splitter },   desc = "Unlocks the 1→3 Splitter — feed three machines from one supply line." },
                 // The belt-upgrade ladder: a cheap EARLY first rung (the wooden belt is deliberately
                 // slow), then deeper tiers gated by age so faster belts pace your factory's growth.
@@ -739,13 +739,24 @@ namespace Caveman
             foreach (var it in new[] { copper, metal, steel, bronzePlate, studyScroll, schematic, blueprint })
                 it.icon = SpriteDatabase.ForItem(it);
             // BUILD-COST SCALE: bump every building's build cost so placing things is a real resource
-            // decision (more reason to plan + collect, not spam). One knob — tune CostScale. (Recipe
-            // INPUT costs are untouched; this is the one-time placement cost only.)
-            const float CostScale = 2.5f;
+            // decision (more reason to plan + collect, not spam). One knob — tune CostScale.
+            const float CostScale = 3.5f; // up from 2.5 — production now runs 2× (Economy.ProductionScale), so things were too cheap
             foreach (var bd in builder.buildables)
                 if (bd != null && bd.cost != null)
                     foreach (var c in bd.cost)
                         if (c != null) c.amount = Mathf.Max(1, Mathf.CeilToInt(c.amount * CostScale));
+
+            // RECIPE REQUIREMENTS: production + belt throughput doubled, so the INPUT each cycle needs is bumped
+            // ~×1.5 (goods aren't too cheap, the higher belt capacity is actually consumed → deeper chains, fuller
+            // belts, slower effective progression). Gentle INTEGER scale — single-input recipes stay put so a
+            // 1-input step doesn't silently double; only bulk (2+) inputs grow.
+            int Scale15(int a) => a + a / 2; // 1→1, 2→3, 3→4, 4→6 …
+            foreach (var bd in builder.buildables)
+            {
+                if (bd == null) continue;
+                if (bd.inputs != null) foreach (var c in bd.inputs) if (c != null) c.amount = Mathf.Max(1, Scale15(c.amount));
+                if (bd.recipes != null) foreach (var r in bd.recipes) if (r != null && r.inputs != null) foreach (var c in r.inputs) if (c != null) c.amount = Mathf.Max(1, Scale15(c.amount));
+            }
 
             // Transport vehicles are NOT in the build menu — they're created from a Station's panel.
             builder.routeTiers = new List<BuildingDefinition> { caravan, oxCart, wagonTrain, cargoDrone };
@@ -767,8 +778,8 @@ namespace Caveman
             colony.carried = gatherer.Inventory;
             // FACTORY-FIRST: no food/water consumption, so no larder is needed. A small starter
             // kit of Wood + Stone lets you place your first hut/storage without a long gather grind.
-            gatherer.Inventory.Add(wood, 32);  // starter kit scaled with the higher build costs (CostScale)
-            gatherer.Inventory.Add(stone, 26);
+            gatherer.Inventory.Add(wood, 46);  // starter kit scaled with the higher build costs (CostScale 3.5)
+            gatherer.Inventory.Add(stone, 38);
             // Age advancement is driven entirely by RESEARCH (craft research items → deliver to a
             // Research Lodge → spend points). No comfort/happiness demand sink any more.
 
