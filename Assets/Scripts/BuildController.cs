@@ -39,6 +39,7 @@ namespace Caveman
         private readonly List<GameObject> _planGhosts = new();               // translucent previews (pooled)
         private bool _strokeActive, _strokeMoved;                            // current drag stroke state
         private Vector2Int _strokeStart, _strokeLast;
+        private int _railCommitted;                                          // rail-plan cells from PRIOR strokes (this stroke rebuilds after them)
         private bool _beltDragHinted; // one-time "drag to lay a line" hint (never reset by ClearBeltPlan)
         private bool _beltPlanDirty; // ghosts rebuilt only when the plan changes (not every frame)
         // --- Underground belt GUIDED placement: first click sets the ENTRANCE, second click the EXIT (snapped
@@ -1412,11 +1413,18 @@ namespace Caveman
 
             if (mouse.leftButton.wasPressedThisFrame && !overUI)
             {
-                _strokeActive = true; _strokeMoved = false; _strokeLast = cell;
+                _strokeActive = true; _strokeMoved = false; _strokeStart = cell; _strokeLast = cell;
+                _railCommitted = _railPlan.Count; // prior straight strokes stay; THIS stroke rebuilds after them
             }
             else if (_strokeActive && mouse.leftButton.isPressed)
             {
-                if (cell != _strokeLast) { _strokeMoved = true; PlanRailPath(_strokeLast, cell); _strokeLast = cell; }
+                if (cell != _strokeLast)
+                {
+                    _strokeMoved = true; _strokeLast = cell;
+                    // Rebuild this stroke as ONE straight segment from the press point → a clean line, no staircase.
+                    if (_railPlan.Count > _railCommitted) _railPlan.RemoveRange(_railCommitted, _railPlan.Count - _railCommitted);
+                    PlanRailPath(_strokeStart, cell);
+                }
             }
             else if (_strokeActive && mouse.leftButton.wasReleasedThisFrame)
             {
@@ -1452,15 +1460,16 @@ namespace Caveman
         }
 
         // ---- Rail blueprint helpers (90° L-paths only) -----------------------------------------
+        // A single STRAIGHT run from `from` to `to`, snapped to the DOMINANT axis (so one drag lays a clean line,
+        // not a staircase). Chain separate strokes to build an L deliberately.
         private void PlanRailPath(Vector2Int from, Vector2Int to)
         {
             int dx = to.x - from.x, dy = to.y - from.y;
-            int sx = dx > 0 ? 1 : dx < 0 ? -1 : 0, sy = dy > 0 ? 1 : dy < 0 ? -1 : 0;
             var c = from; PlanRailCell(c);
             if (Mathf.Abs(dx) >= Mathf.Abs(dy))
-            { for (int i = 0; i < Mathf.Abs(dx); i++) { c.x += sx; PlanRailCell(c); } for (int i = 0; i < Mathf.Abs(dy); i++) { c.y += sy; PlanRailCell(c); } }
+            { int sx = dx > 0 ? 1 : -1; for (int i = 0; i < Mathf.Abs(dx); i++) { c.x += sx; PlanRailCell(c); } }
             else
-            { for (int i = 0; i < Mathf.Abs(dy); i++) { c.y += sy; PlanRailCell(c); } for (int i = 0; i < Mathf.Abs(dx); i++) { c.x += sx; PlanRailCell(c); } }
+            { int sy = dy > 0 ? 1 : -1; for (int i = 0; i < Mathf.Abs(dy); i++) { c.y += sy; PlanRailCell(c); } }
         }
 
         private void PlanRailCell(Vector2Int cell)
@@ -1470,7 +1479,7 @@ namespace Caveman
             if (!_railPlanHinted)
             {
                 _railPlanHinted = true;
-                Toast.Show("<color=#9cf>Track blueprint:</color> drag to extend (90° only) · <color=#9f9>click to build</color> · right-click to cancel.");
+                Toast.Show("<color=#9cf>Track blueprint:</color> drag for a STRAIGHT run (snaps to one axis) · drag again to add a turn · <color=#9f9>click to build</color> · right-click to cancel.");
             }
         }
 

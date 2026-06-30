@@ -156,14 +156,22 @@ namespace Caveman
         // MaxSearchCandidates in-range nodes are examined (the window shrinks to the nearest).
         // No pathfinding — just binds to the nearest patch. None found → returns null and the
         // collector idles in place (surfaced by its status dot).
+        private const int LowNode = 5; // a node below this is "nearly tapped" — prefer a fuller one in reach
         private ResourceNode FindNearestNode(float range)
+        {
+            // Pass 1: the nearest node with a HEALTHY amount, so a collector doesn't lock onto a near-empty,
+            // barely-regrowing node while a full one sits in reach (the endless empty-node loop). Pass 2 falls
+            // back to ANY node with resource, so it never idles when supply still exists in range.
+            return NearestNode(range, LowNode) ?? NearestNode(range, 1);
+        }
+        private ResourceNode NearestNode(float range, int minAmount)
         {
             ResourceNode best = null;
             float bestSq = range * range;
             int examined = 0;
             foreach (var n in ResourceNode.All)
             {
-                if (n == null || n.yields != produces || !n.HasResource) continue;
+                if (n == null || n.yields != produces || n.Amount < minAmount) continue;
                 float sq = ((Vector2)(n.transform.position - transform.position)).sqrMagnitude;
                 if (sq > bestSq) continue;                    // outside search radius — local, not global
                 if (++examined > MaxSearchCandidates) break;  // hard cap on candidates checked
@@ -178,12 +186,14 @@ namespace Caveman
         private float _rebindT;
         private void MaybeRebind()
         {
-            if (_source != null && _source.HasResource) return;
+            // Re-scan not only when the source is GONE, but also when it's nearly tapped (Amount < LowNode) — so a
+            // depleting node RELEASES the collector to a fuller reachable one instead of looping on near-empty.
+            bool needsBetter = _source == null || !_source.HasResource || _source.Amount < LowNode;
+            if (!needsBetter) return;
             _rebindT += Time.deltaTime;
             if (_rebindT < 1f) return;
             _rebindT = 0f;
-            // Wider search than the placement bind: chase a fresh node within searchRadius.
-            if (_source == null || !_source.HasResource) Bind(searchRadius);
+            Bind(searchRadius); // FindNearestNode prefers a healthy node, falling back to any with resource
         }
 
         public void Pulse() { _flash = 0.25f; if (_fx != null) _fx.Strike(); } // flash + a dust/arm work pulse
