@@ -145,6 +145,8 @@ namespace Caveman
         public bool isLiquidHarbour = false;
         [Tooltip("Build-menu category override (e.g. \"Boats\"). Empty = categorised by kind. Lets a Harbour (a Depot) sit under Boats while a Station sits under Trains.")]
         public string menuCategory = "";
+        [Tooltip("New-player guide: STAR this in the build menu while in the Stone age (the first buildings to place — Wood Hut, Belt, Woodpile).")]
+        public bool tutorialHighlight = false;
 
         [Header("Progression")]
         [Tooltip("Age at which this becomes buildable (0 = Stone Age, available from the start).")]

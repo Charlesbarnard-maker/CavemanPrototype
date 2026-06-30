@@ -984,9 +984,10 @@ namespace Caveman
                 else
                 {
                     bool obsolete = curAge - def.unlockAge >= 2; // de-emphasise old-age tech
+                    bool guide = curAge == 0 && def.tutorialHighlight; // new-player highlight of the first buildings
                     string costCol = builder.CanAfford(def) ? "#9f9" : "#f99";
                     string key = i < 9 ? (i + 1).ToString() : i == 9 ? "0" : "·";
-                    string nm = obsolete ? $"<color=#9a9a9a>{def.displayName}</color>" : def.displayName;
+                    string nm = guide ? $"<color=#ffd24d>★ {def.displayName}</color>" : obsolete ? $"<color=#9a9a9a>{def.displayName}</color>" : def.displayName;
                     var label = new GUIContent($"<size=12>[{key}] {nm}  <color={costCol}>{CostText(def)}</color></size>", Describe(def));
                     if (GUILayout.Button(label, _btn)) { builder.BeginPlacement(i); RecordRecent(i); }
                 }

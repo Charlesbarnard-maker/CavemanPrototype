@@ -308,6 +308,8 @@ namespace Caveman
             woodBelt.color = new Color(0.60f, 0.50f, 0.35f);
             woodBelt.cost = new List<ItemAmount> { new ItemAmount(wood, 1) };
             woodBelt.description = "Carries items along its arrow at 40/min — a starter belt that lags a collector (60/min), so a single line backs up at full tilt. Research the cheap Conveyor (60/min) early to keep up, or run a 2nd line. Drag to lay; R rotates. RED = dead end, YELLOW = backed up.";
+            // New-player guide: STAR the three first buildings in the Stone-age menu (Wood Hut → Belt → Woodpile).
+            woodHut.tutorialHighlight = true; woodBelt.tutorialHighlight = true; woodStore.tutorialHighlight = true;
             var fastBelt = ScriptableObject.CreateInstance<BuildingDefinition>();
             fastBelt.displayName = "Conveyor Belt"; fastBelt.kind = BuildingKind.Belt; fastBelt.unlockAge = 0;
             fastBelt.interval = 1.0f; // 60 items/min — 2× wooden, a match for one collector
@@ -592,6 +594,8 @@ namespace Caveman
                 new Research.Tech { id = "steel_belts",  name = "Steel Belts",   cost = 80,  prereq = "iron",   unlocks = new List<BuildingDefinition>{ steelBelt },  desc = "The Steel Belt (240/min — the fastest tier) for the densest late-game lines." },
                 new Research.Tech { id = "smart_logistics", name = "Smart Logistics", cost = 30, prereq = "bronze", unlocks = new List<BuildingDefinition>{ undergroundBelt, filterBelt, prioritySplitter, conditionalGate, elevatedRail }, desc = "Mid-game logistics tools: the UNDERGROUND BELT + ELEVATED TRACK (cross belts and rail over/under each other), FILTER BELT (sort a mixed line by item), PRIORITY SPLITTER (overflow routing), and GATE BELT (stop over-filling a buffer)." },
                 new Research.Tech { id = "renewables", name = "Renewable Power", cost = 60, prereq = "iron", unlocks = new List<BuildingDefinition>{ windmill, solar }, requiredBuildings = new List<BuildingDefinition>{ advancedSmelter, toolmaker }, desc = "Unlock the WINDMILL (Iron) and SOLAR PANEL (Industrial) — fuel-free power, but their output VARIES (wind gusts, solar follows daylight), so lean on Batteries. Built from Steel + Gears (+ Machine Parts) — grow the lines first." },
+                new Research.Tech { id = "rail_transport", name = "Rail Transport", cost = 18, prereq = "tribal", unlocks = new List<BuildingDefinition>{ depot, rail, signal, twoWaySignal }, desc = "Unlock TRAINS: build Stations, lay Track + Signals, then run route vehicles (Donkey Cart → Ox Cart → … → Train) between Stations to haul goods across the map." },
+                new Research.Tech { id = "boats", name = "Boats", cost = 40, prereq = "bronze", unlocks = new List<BuildingDefinition>{ harbour, liquidHarbour }, desc = "Unlock BOATS: build Harbours on the shore and ship cargo — and a Liquid Harbour for fluids — across water between them." },
             };
             // Gate those buildings behind their Tech (and off the age gate, so the Tech IS the gate).
             splitter.requiredTech = "splitters";
@@ -600,6 +604,10 @@ namespace Caveman
             steelBelt.requiredTech = "steel_belts"; steelBelt.unlockAge = 0;
             windmill.requiredTech = "renewables"; // Iron-age + the tech (windmill.unlockAge=3 from MakePower)
             solar.requiredTech = "renewables";    // Industrial-age + the tech (solar.unlockAge=4)
+            // Trains: research-gated from the Tribal age. Boats: research-gated from the Bronze age.
+            depot.requiredTech = "rail_transport"; rail.requiredTech = "rail_transport";
+            signal.requiredTech = "rail_transport"; twoWaySignal.requiredTech = "rail_transport";
+            harbour.requiredTech = "boats"; liquidHarbour.requiredTech = "boats";
 
             // --- Camera (follows the player) ---
             var cam = Camera.main;
@@ -804,7 +812,7 @@ namespace Caveman
                 new Quest { age = 1, title = "Research the Bronze Age",                        done = () => AgeNow() >= 2,           reward = () => carriedInv.Add(stone, 30),  rewardText = "+30 Stone" },
                 // ── Bronze Age (2) ──
                 new Quest { age = 2, title = "Fire 15 Bricks (Clay + Charcoal → Kiln)",        done = () => Have(bricks) >= 15,      progress = () => (Have(bricks), 15),     reward = () => carriedInv.Add(clay, 20),   rewardText = "+20 Clay" },
-                new Quest { age = 2, title = "Build 2 Stations & add a transport route",       done = () => RouteVehicle.All.Count >= 1, reward = () => carriedInv.Add(wood, 30), rewardText = "+30 Wood" },
+                new Quest { age = 2, title = "Research Rail Transport, then build 2 Stations + a route", done = () => RouteVehicle.All.Count >= 1, reward = () => carriedInv.Add(wood, 30), rewardText = "+30 Wood" },
                 new Quest { age = 2, title = "Research the Iron Age",                          done = () => AgeNow() >= 3,           reward = () => carriedInv.Add(planks, 40), rewardText = "+40 Planks" },
                 // ── Iron Age (3) ──
                 new Quest { age = 3, title = "Explore far & mine 25 Iron Ore",                 done = () => Have(ore) >= 25,         progress = () => (Have(ore), 25),        reward = () => carriedInv.Add(stone, 40),  rewardText = "+40 Stone" },

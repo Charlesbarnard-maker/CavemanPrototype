@@ -104,6 +104,7 @@ namespace Caveman
         private const int Step = 1; // legs are always traversed forward (the path runs from→to)
         private bool _railDone;
         private bool _waiting;
+        private float _noRouteToastT = -99f; // rate-limit the "no track route" warning
         private static readonly Vector2Int NoCell = new Vector2Int(int.MinValue, int.MinValue);
         private Vector2Int _curCell = NoCell, _claimNext = NoCell;
 
@@ -484,8 +485,16 @@ namespace Caveman
 
             if (_railCells == null || _railCells.Count == 0)
             {
-                ReleaseHeld(); // flying straight (no track) → don't keep a stale cell claimed
-                return MoveTo(to.transform.position);
+                // No track route to this stop → HOLD (amber), don't teleport over land. The player must lay
+                // rail that actually connects the stops. A rate-limited toast tells them why it's parked.
+                ReleaseHeld();
+                _waiting = true;
+                if (Time.unscaledTime - _noRouteToastT > 6f && to != null)
+                {
+                    _noRouteToastT = Time.unscaledTime;
+                    Toast.Show($"<color=#fc8>🚂 No track route to {(to.def != null ? to.def.displayName : "the station")} — lay rail to connect the stops.</color>");
+                }
+                return false;
             }
 
             if (_railDone) // all track cells passed → pull into the station, KEEPING its platform cell
