@@ -4,11 +4,32 @@ A running record so progress/problems don't get lost. Newest first. Move items t
 **Fixed** when done. Maintained alongside the code — see DESIGN.md for the roadmap.
 
 ---
-## 📌 NEW-THREAD HANDOFF — current state (2026-06-29, + 2 FEEDBACK BATCHES: liquids/harbour/objectives/mounts/research + storage/tabs/power — committed & pushed)
+## 📌 NEW-THREAD HANDOFF — current state (2026-06-29, + ELECTRICITY OVERHAUL on top of the feedback batches — committed & pushed)
 Pinned pointer so a fresh thread (incl. on a DIFFERENT PC) can continue. Everything below is committed and pushed to
-`origin/main` (HEAD = `9ff393d`, working tree clean, in sync) — a clean clone has the whole game. Open the project,
+`origin/main` (HEAD = `f3109b0`, working tree clean, in sync) — a clean clone has the whole game. Open the project,
 Play, and continue. A full interactive PLAYTEST is the biggest owed item (user tests in the evenings) — all feedback
 batches compile clean (`Tools/compile-check.ps1` → COMPILE CLEAN) but have NOT been interactively played yet.
+
+**✅ DONE THIS SESSION — ELECTRICITY OVERHAUL (2026-06-29, 4 batches, compile-clean, NOT yet played):** commits `8286d5b`,
+`0b2e344`, `f3109b0` (on top of the feedback batches). User wanted power to be CORE progression, not a skippable late gate.
+- **Power on from TRIBAL** (`PowerNet.PowerAge=1`, was Bronze/2). Only Stone runs free. Wood Generator + Pole + Battery
+  backdated to Tribal (Battery re-costed to planks+stone). Power first BITES at the Basic Smelter (Tribal, the core
+  metal/advance machine) — Charcoal Burner + mines stay free so the player gets a base going first.
+- **More powered machines:** added requiresPower to Toolmaker (20), Drafting Table (15), Monument (40), on top of the
+  existing Smelters/Kiln/Potter/Engineering Lab. **HARSH** grid: BrownoutFloor 0.35→0.15; `Colony.DemandScalar` age-ramp
+  (Tribal 1.0 → Bronze 1.15 → Iron 1.3 → Industrial 1.5), applied in `PowerNet.Rebuild` demand sum.
+- **Windmill + Solar** (NEW, research-gated behind "renewables" tech, prereq Iron + Advanced Smelter & Toolmaker built):
+  fuel-free, VARIABLE output (`BuildingDefinition.renewable/solar`, `PowerPlant.CurrentOutput`). Windmill GUSTS (Perlin
+  0.35–1.0); Solar follows `Colony.Daylight` (day/night sine, ~3-min day, 0 at night). Built from Steel+Gears(+Machine
+  Parts). Procedural art `PlaceholderArt.Windmill/SolarPanel`. Variable output flows through PowerNet untouched (reads
+  CurrentOutput each frame) → Batteries carry the lulls.
+- **Grid overview readout:** bottom-left `⚡ Power Grid` panel (`InventoryHud.DrawPowerGridOverview`) — gen-vs-demand bar
+  + demand marker, battery bar, "N machines slowed (down to X%)" line; edges pulse red on overload. `PowerNet.BrownoutMachines`
+  + `WorstFactor` counters drive it. (One-line power chip in the status bar kept as the glance summary.)
+- **Open/next for power:** all four batches are compile-clean but UNPLAYED — the numbers (draws, DemandScalar ramp, day
+  length 180s, brownout floor 0.15) are first-pass and want playtest tuning. Collectors still don't draw power (chose
+  workshops-only); revisit if demand feels too low. Monument recipe still needs `jewelry` (jeweler isn't in the build
+  menu) — pre-existing, unrelated to power, but it blocks the win — worth a look separately.
 
 **✅ DONE THIS SESSION — BATCH 2b (2026-06-29 — objectives pacing + text-clip fix):** commit `9ff393d`.
 - Objectives are now **sequential** (one step at a time: wood → stone → …), not a whole age's set at once. The centre
