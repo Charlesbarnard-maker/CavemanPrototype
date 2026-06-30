@@ -14,13 +14,13 @@ namespace Caveman
     /// </summary>
     public static class PowerNet
     {
-        public const float BrownoutFloor = 0.35f; // most a network slows an oversubscribed machine
-        public const int BronzeAge = 2; // electricity arrives in the Bronze age — before it, machines run free
+        public const float BrownoutFloor = 0.15f; // HARSH: an oversubscribed grid crawls to 15% — you feel it
+        public const int PowerAge = 1; // electricity arrives in the TRIBAL age — only the Stone age runs free
         public const float MaxWireLength = 8f; // a single wire's reach; chain Power Poles to go further
 
-        /// <summary>Is the power requirement in effect yet? Power is a Bronze-age mechanic; in the
-        /// Stone/Tribal ages requiresPower machines run normally (no wiring needed).</summary>
-        public static bool Active => Colony.Instance != null && Colony.Instance.Age >= BronzeAge;
+        /// <summary>Is the power requirement in effect yet? Power switches on in the TRIBAL age; only the
+        /// Stone age runs free (so the player gets a base going before wiring matters).</summary>
+        public static bool Active => Colony.Instance != null && Colony.Instance.Age >= PowerAge;
 
         private static int _frame = -1;
         private static readonly Dictionary<WorkshopBuilding, float> _factor = new();
@@ -128,7 +128,7 @@ namespace Caveman
                     case PowerNode.Role.Consumer:
                         if (n.consumer != null && active)
                         {
-                            demand[c] += n.consumer.CurrentDraw;
+                            demand[c] += n.consumer.CurrentDraw * Colony.DemandScalar; // late ages strain the grid harder
                             _consumerComp[n.consumer] = c;
                         }
                         break;

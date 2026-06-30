@@ -33,6 +33,17 @@ namespace Caveman
             if (targetAge > Age && targetAge < AgeNames.Length) Age = targetAge;
         }
 
+        // --- Power demand scaling: bigger/later factories strain the grid HARDER (harsh ramp). Read by PowerNet
+        //     when summing demand, so the same machines pull more as the age advances — generation must keep pace. ---
+        public static float DemandScalar => Instance == null ? 1f
+            : Instance.Age >= 4 ? 1.5f : Instance.Age >= 3 ? 1.3f : Instance.Age >= 2 ? 1.15f : 1f;
+
+        // --- Day/night cycle (drives Solar panels: 0 at night → 1 at midday). A ~3-minute day; starts at midday. ---
+        public const float DayLength = 180f;
+        private float _dayClock = DayLength * 0.25f; // begin near midday so a freshly-built panel reads as working
+        /// <summary>0 (night) … 1 (midday) — the sun's strength right now, for Solar Panel output.</summary>
+        public static float Daylight { get; private set; } = 1f;
+
         // --- Debug / sandbox ---
         public void DebugAdvanceAge() { if (Age + 1 < AgeNames.Length) Age++; }
 
@@ -74,6 +85,10 @@ namespace Caveman
         void Update()
         {
             float dt = Time.deltaTime;
+
+            // Advance the day/night clock → Solar output (clamped sine: full at midday, 0 through the night).
+            _dayClock += dt;
+            Daylight = Mathf.Clamp01(Mathf.Sin(_dayClock * (Mathf.PI * 2f / DayLength)));
 
             // FACTORY-FIRST: no survival/comfort — we only keep the automation SCORE + rank.
             _prosperityT += dt;

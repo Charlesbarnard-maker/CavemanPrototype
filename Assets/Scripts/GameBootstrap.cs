@@ -437,7 +437,8 @@ namespace Caveman
                 new Recipe(tools,      1, 5.0f, 3, new ItemAmount(metal, 1),       new ItemAmount(planks, 1)), // Iron age
                 new Recipe(steelBeam,  1, 5.0f, 3, new ItemAmount(steel, 1),       new ItemAmount(planks, 1)), // Iron age
             };
-            toolmaker.description = "FORGE / TOOLMAKER — shapes metal into mechanical COMPONENTS; pick its recipe (click to switch): Bronze Plate + Planks → Bronze Gear (Bronze age), Iron + Planks → Tools, or Steel + Planks → Steel Beam (both Iron age). One forge for the whole component tier; build more to run several at once.";
+            toolmaker.description = "FORGE / TOOLMAKER — shapes metal into mechanical COMPONENTS; pick its recipe (click to switch): Bronze Plate + Planks → Bronze Gear (Bronze age), Iron + Planks → Tools, or Steel + Planks → Steel Beam (both Iron age). One forge for the whole component tier; build more to run several at once. Draws POWER (a heavy forge).";
+            toolmaker.requiresPower = true; toolmaker.powerDraw = 20;
             // --- DEEPER METAL TREE (ore split): copper (Bronze chain) + iron (Iron chain). The ores
             //     have their own mines; both basic metals + both alloys are made in the configurable
             //     Basic / Advanced Smelters defined above (no separate per-metal smelter buildings). ---
@@ -450,24 +451,25 @@ namespace Caveman
             var generator = MakePower("Coal Generator", 60, charcoal, 1, 3f, 3, new Color(0.30f, 0.30f, 0.34f),
                 new ItemAmount(bricks, 12), new ItemAmount(metal, 6));
             generator.description = "Burns Charcoal to supply Power to the grid — a bigger, steadier source than the Wood Generator for a large powered base. You MUST belt Charcoal into its cyan fuel edge (R aims it) — no fuel, no power. Wire it (up to 4 cables) to poles, batteries or machines. Too little generation and wired machines brown out (slow down).";
-            // BRONZE-AGE POWER: electricity is introduced in the Bronze age. A Wood Generator feeds the
-            // grid; you draw WIRES from it to Poles/Batteries/machines (no radius). From Bronze,
-            // requiresPower machines must be WIRED to a powered network to run (before Bronze they run free).
-            var woodGen = MakePower("Wood Generator", 40, wood, 1, 2.5f, 2, new Color(0.55f, 0.40f, 0.25f),
+            // TRIBAL-AGE POWER: electricity switches on in the Tribal age (the Stone age runs free). The Wood
+            // Generator is the bootstrap source — buildable the moment power matters (your first Basic Smelter),
+            // from raw Wood + Stone. You draw WIRES from it to Poles/Batteries/machines (no radius). From Tribal,
+            // requiresPower machines must be WIRED to a powered network to run.
+            var woodGen = MakePower("Wood Generator", 40, wood, 1, 2.5f, 1, new Color(0.55f, 0.40f, 0.25f),
                 new ItemAmount(wood, 6), new ItemAmount(stone, 4));
-            woodGen.description = "WOOD GENERATOR — burns Wood to supply POWER (introduced in the Bronze age). You MUST belt Wood into its cyan fuel edge (R aims it) — no fuel, no power. Select it and 'Connect wire' to a machine, Battery or Power Pole (up to 4 wires). Wired machines run; unwired ones stop. Powers ~4 machines.";
+            woodGen.description = "WOOD GENERATOR — burns Wood to supply POWER (electricity arrives in the Tribal age). You MUST belt Wood into its cyan fuel edge (R aims it) — no fuel, no power. Select it and 'Connect wire' to a machine, Battery or Power Pole (up to 4 wires). Wired machines run; unwired ones stop. Powers ~4 machines.";
             var pole = ScriptableObject.CreateInstance<BuildingDefinition>();
-            pole.displayName = "Power Pole"; pole.kind = BuildingKind.Pole; pole.unlockAge = 2;
+            pole.displayName = "Power Pole"; pole.kind = BuildingKind.Pole; pole.unlockAge = 1;
             pole.color = new Color(0.55f, 0.42f, 0.28f);
             pole.cost = new List<ItemAmount> { new ItemAmount(wood, 2) };
             pole.description = "POWER POLE — relays power across distance. Draw WIRES (up to 4 per pole) to Generators, Batteries, machines or other poles. Each wire reaches a limited distance, so chain poles to span big gaps.";
-            // Battery (Bronze): a wired store that soaks surplus generation and covers demand spikes /
-            // generation dips — smooths brownouts so a small generator can cover a peaky base.
+            // Battery (Tribal): a wired store that soaks surplus generation and covers demand spikes / generation
+            // dips — smooths brownouts (and the gusty Windmill / day-cycle Solar later). Built from raw Tribal stock.
             var battery = ScriptableObject.CreateInstance<BuildingDefinition>();
-            battery.displayName = "Battery"; battery.kind = BuildingKind.Battery; battery.unlockAge = 2;
+            battery.displayName = "Battery"; battery.kind = BuildingKind.Battery; battery.unlockAge = 1;
             battery.batteryCapacity = 200f; battery.batteryRate = 30f;
             battery.color = new Color(0.32f, 0.62f, 0.50f);
-            battery.cost = new List<ItemAmount> { new ItemAmount(copper, 6), new ItemAmount(bricks, 4) };
+            battery.cost = new List<ItemAmount> { new ItemAmount(planks, 4), new ItemAmount(stone, 6) };
             battery.description = "BATTERY — stores surplus power and releases it when the grid runs short (a demand spike or a generator running dry). Wire it in like a pole (up to 4 wires). Charges when generation > demand, discharges when it's less.";
             // Endgame: the Monument (Industrial age). A long resource sink you pour the
             // top of every production chain into — completing it (10 blocks) is the win.
@@ -475,6 +477,7 @@ namespace Caveman
                 new List<ItemAmount> { new ItemAmount(engine, 1), new ItemAmount(jewelry, 1), new ItemAmount(bricks, 4) },
                 new ItemAmount(bricks, 20), new ItemAmount(metal, 15), new ItemAmount(tools, 8)); monumentBldg.unlockAge = 4;
             monumentBldg.footprintW = 3; monumentBldg.footprintH = 3; // the endgame monument is the biggest structure
+            monumentBldg.requiresPower = true; monumentBldg.powerDraw = 40; // a megadraw — the endgame should strain the grid hard
 
             // --- Textiles & pottery chains (comfort goods) ---
             // Pottery (Bronze): Clay -> Pottery. Reuses the clay you already mine.
@@ -530,7 +533,8 @@ namespace Caveman
             var draftingTable = MakeWorkshop("Drafting Table", schematic, 1, 2.5f, 2, 12, new Color(0.52f, 0.66f, 0.82f),
                 new List<ItemAmount> { new ItemAmount(bronzePlate, 1), new ItemAmount(pot, 1) },
                 new ItemAmount(planks, 6), new ItemAmount(bricks, 4)); draftingTable.unlockAge = 2;
-            draftingTable.description = "Bronze Plate + Pottery → Schematic (a RESEARCH item) to research the Iron Age. Needs an Advanced Smelter set to Bronze (Copper + Bricks) feeding it — a deeper multi-stage chain.";
+            draftingTable.description = "Bronze Plate + Pottery → Schematic (a RESEARCH item) to research the Iron Age. Needs an Advanced Smelter set to Bronze (Copper + Bricks) feeding it — a deeper multi-stage chain. Draws POWER.";
+            draftingTable.requiresPower = true; draftingTable.powerDraw = 15;
             var engineeringLab = MakeWorkshop("Engineering Lab", machinePart, 1, 4.0f, 2, 12, new Color(0.40f, 0.56f, 0.82f),
                 new List<ItemAmount> { new ItemAmount(steelBeam, 1), new ItemAmount(bronzeGear, 1), new ItemAmount(tools, 1) },
                 new ItemAmount(planks, 8), new ItemAmount(metal, 4)); engineeringLab.unlockAge = 3;

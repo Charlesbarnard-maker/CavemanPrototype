@@ -459,7 +459,7 @@ namespace Caveman
             if (!_powerHintShown && NoPower)
             {
                 _powerHintShown = true;
-                Toast.Show($"<color=#6cf>⚡ {(def != null ? def.displayName : "This machine")} needs POWER now (Bronze age).</color> Build a Generator (e.g. Wood Generator), then select it / a Power Pole to draw WIRES to the machine. Unwired powered machines stop (blue dot).");
+                Toast.Show($"<color=#6cf>⚡ {(def != null ? def.displayName : "This machine")} needs POWER now (electricity arrives in the Tribal age).</color> Build a Wood Generator, belt Wood into its fuel edge, then select it / a Power Pole to draw WIRES to the machine. Unwired powered machines stop (blue dot).");
             }
         }
 
