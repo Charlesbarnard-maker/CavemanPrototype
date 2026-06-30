@@ -7,6 +7,7 @@ namespace Caveman
     {
         public static readonly Color Working = new Color(0.40f, 0.90f, 0.40f); // green
         public static readonly Color BackedUp = new Color(1.00f, 0.80f, 0.20f); // yellow — output full
+        public static readonly Color Waiting = new Color(0.98f, 0.66f, 0.13f); // amber — waiting on recipe inputs (not broken)
         public static readonly Color Starved = new Color(0.92f, 0.30f, 0.30f); // red — no input
         public static readonly Color Idle = new Color(0.55f, 0.55f, 0.55f); // grey — no worker
         public static readonly Color NoPower = new Color(0.98f, 0.15f, 0.15f); // bright RED — powered machine with no power
@@ -15,24 +16,26 @@ namespace Caveman
         {
             var go = new GameObject("status");
             go.transform.SetParent(parent);
-            go.transform.localPosition = new Vector3(0f, 0.7f, 0f);
-            go.transform.localScale = Vector3.one * 0.28f;
+            go.transform.localPosition = new Vector3(0f, 0.72f, 0f);
+            go.transform.localScale = Vector3.one * 0.32f;
             var sr = go.AddComponent<SpriteRenderer>();
-            sr.sprite = PlaceholderArt.Circle();
+            sr.sprite = PlaceholderArt.Triangle(); // a clean caution triangle (tinted by state) — nicer than a big dot
             sr.sortingOrder = 11;
             return sr;
         }
 
-        /// <summary>Set the dot colour, and make PROBLEM states (starved/backed-up) clearly
-        /// bigger AND pulsing so bottlenecks jump out at a glance — not a subtle tint.</summary>
+        /// <summary>Show the caution glyph ONLY for problem states — no clutter over healthy or paused
+        /// buildings. RED states (no resource / no power) pulse to grab the eye; amber supply states sit calm.</summary>
         public static void Apply(SpriteRenderer dot, Color col)
         {
             if (dot == null) return;
+            bool show = col != Working && col != Idle;   // hide when healthy or deliberately paused
+            dot.enabled = show;
+            if (!show) return;
             dot.color = col;
-            bool problem = col == Starved || col == BackedUp || col == NoPower;
-            float baseScale = problem ? 0.44f : 0.30f;                       // problems noticeably larger
-            float pulse = problem ? 1f + 0.30f * Mathf.Sin(Time.unscaledTime * 6f) : 1f;
-            dot.transform.localScale = Vector3.one * (baseScale * pulse);
+            bool urgent = col == Starved || col == NoPower;
+            float pulse = urgent ? 1f + 0.18f * Mathf.Sin(Time.unscaledTime * 6f) : 1f;
+            dot.transform.localScale = Vector3.one * (0.32f * pulse);
         }
 
         // ---- "Can upgrade now" badge: a green ⬆ that bobs over a building you can afford to upgrade. ----

@@ -70,7 +70,7 @@ namespace Caveman
         private Texture2D _accentTex, _btnTex, _btnHoverTex; // top accent bar + flat button skins
         private static Texture2D Solid(Color c) { var t = new Texture2D(1, 1); t.SetPixel(0, 0, c); t.Apply(); return t; }
         private Dictionary<ItemDefinition, int> _totals;
-        private int _starvedCount, _backedCount; // bottleneck counts, cached once/frame in Update
+        private int _starvedCount, _waitingCount, _backedCount; // bottleneck counts, cached once/frame in Update
         private bool _hasMonument;
         private readonly Dictionary<string, int> _trendSnap = new(); // chip values ~3s ago (for ▲/▼)
         private float _lastSnap = -999f;
@@ -198,13 +198,13 @@ namespace Caveman
             if (gatherer != null) _totals = Economy.Totals(gatherer.Inventory);
 
             // Cache the bottleneck/monument scan once per frame too (DrawStatus runs every OnGUI pass).
-            _starvedCount = 0; _backedCount = 0; _hasMonument = false;
+            _starvedCount = 0; _waitingCount = 0; _backedCount = 0; _hasMonument = false;
             foreach (var pb in ProductionBuilding.All)
-            { if (pb == null) continue; var sc = pb.StatusColor; if (sc == Status.Starved) _starvedCount++; else if (sc == Status.BackedUp) _backedCount++; }
+            { if (pb == null) continue; var sc = pb.StatusColor; if (sc == Status.Starved) _starvedCount++; else if (sc == Status.Waiting) _waitingCount++; else if (sc == Status.BackedUp) _backedCount++; }
             foreach (var wkb in WorkshopBuilding.All)
             {
                 if (wkb == null) continue;
-                var sc = wkb.StatusColor; if (sc == Status.Starved) _starvedCount++; else if (sc == Status.BackedUp) _backedCount++;
+                var sc = wkb.StatusColor; if (sc == Status.Starved) _starvedCount++; else if (sc == Status.Waiting) _waitingCount++; else if (sc == Status.BackedUp) _backedCount++;
                 if (monumentItem != null && wkb.output == monumentItem) _hasMonument = true;
             }
 
@@ -711,12 +711,13 @@ namespace Caveman
             {
                 // Bottleneck summary — starved / backed-up machine counts (cached once/frame in Update;
                 // this pairs with the minimap dots so you can find & fix the problem).
-                int starved = _starvedCount, backed = _backedCount;
+                int starved = _starvedCount, waiting = _waitingCount, backed = _backedCount;
                 // Stay quiet early (Factorio focus): only show production FAILURE (starved) until the
                 // base is actually going; non-critical states appear once established.
                 bool established = c.Age >= 1 || c.PeakProsperity >= 100;
                 string bottleneck = "";
-                if (starved > 0) bottleneck += $"   <color=#f66>⚠ {starved} starved (no input)</color>";
+                if (starved > 0) bottleneck += $"   <color=#f66>⚠ {starved} out of resource</color>";
+                if (established && waiting > 0) bottleneck += $"   <color=#fc3>◷ {waiting} waiting on inputs</color>";
                 if (established && backed > 0) bottleneck += $"   <color=#fd4>⏸ {backed} backed-up (output full)</color>";
 
                 // Monument progress (endgame): shown once a Monument exists or blocks are held.
@@ -1161,8 +1162,9 @@ namespace Caveman
                     : sc == Status.BackedUp ? (isCollector
                         ? "Output full — belt it to a Storage to use what it makes"
                         : "Output full — belt the output away (it's blocked)")
+                    : sc == Status.Waiting ? "Waiting — an input isn't arriving yet (belt it in)"
                     : sc == Status.Starved ? (isCollector
-                        ? "Starved — its resource patch ran dry; move or expand"
+                        ? "Out of resource — its patch ran dry; move or expand"
                         : "Starved — an input isn't arriving")
                     : "Idle";
                 GUILayout.Label($"<size=13><color=#{ColorUtility.ToHtmlStringRGB(sc)}>● {st}</color></size>", _small);

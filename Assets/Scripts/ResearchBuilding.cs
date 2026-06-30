@@ -144,7 +144,7 @@ namespace Caveman
             {
                 if (Research.AllResearched) return Status.Idle;     // every tech bought — truly done
                 if (InBuffer.Total() > 0) return Status.Working;    // has items to convert
-                return Status.Starved;                              // waiting for research items
+                return Status.Waiting;                              // amber — waiting for research items to arrive
             }
         }
 

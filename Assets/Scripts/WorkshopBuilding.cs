@@ -474,7 +474,7 @@ namespace Caveman
                 if (ps == PowerState.Unwired) return Status.NoPower;  // RED — not wired to a grid
                 if (ps == PowerState.GridDead) return Status.NoPower; // RED — grid generates nothing
                 if (Buffer.Total() >= Buffer.capacity) return Status.BackedUp;
-                if (_starved) return Status.Starved;
+                if (_starved) return Status.Waiting; // amber — just waiting on belt-delivered inputs, not broken
                 if (ps == PowerState.Brownout) return new Color(1f, 0.6f, 0.2f);   // orange — running slow (brownout)
                 return Status.Working;
             }
