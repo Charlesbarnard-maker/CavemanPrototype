@@ -28,6 +28,7 @@ namespace Caveman
         public static float TotalDemand { get; private set; }
         public static float TotalStored { get; private set; }   // battery charge across the whole grid
         public static float TotalCapacity { get; private set; } // battery capacity across the whole grid
+        public static float TotalMaxDemand { get; private set; } // ceiling: full draw if every wired machine ran flat-out
         public static int BrownoutMachines { get; private set; } // wired machines running BELOW full speed right now
         public static float WorstFactor { get; private set; } = 1f; // the slowest such machine's supply factor (1 = none)
 
@@ -78,7 +79,7 @@ namespace Caveman
         private static void Rebuild()
         {
             _factor.Clear(); _comp.Clear(); _consumerComp.Clear();
-            TotalGen = TotalDemand = TotalStored = TotalCapacity = 0f;
+            TotalGen = TotalDemand = TotalStored = TotalCapacity = TotalMaxDemand = 0f;
             BrownoutMachines = 0; WorstFactor = 1f;
             bool active = Active;
             float dt = Time.deltaTime;
@@ -132,6 +133,7 @@ namespace Caveman
                         if (n.consumer != null && active)
                         {
                             demand[c] += n.consumer.CurrentDraw * Colony.DemandScalar; // late ages strain the grid harder
+                            TotalMaxDemand += n.consumer.PowerDraw * Colony.DemandScalar; // its FULL draw → the consumption ceiling
                             _consumerComp[n.consumer] = c;
                         }
                         break;

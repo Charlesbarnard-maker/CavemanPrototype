@@ -471,8 +471,8 @@ namespace Caveman
             {
                 if (Paused) return Status.Idle;
                 var ps = PowerStatus;
-                if (ps == PowerState.Unwired) return new Color(0.40f, 0.62f, 1f);  // blue — not wired to a grid
-                if (ps == PowerState.GridDead) return new Color(0.72f, 0.45f, 1f); // purple — grid has no power
+                if (ps == PowerState.Unwired) return Status.NoPower;  // RED — not wired to a grid
+                if (ps == PowerState.GridDead) return Status.NoPower; // RED — grid generates nothing
                 if (Buffer.Total() >= Buffer.capacity) return Status.BackedUp;
                 if (_starved) return Status.Starved;
                 if (ps == PowerState.Brownout) return new Color(1f, 0.6f, 0.2f);   // orange — running slow (brownout)
@@ -507,6 +507,13 @@ namespace Caveman
             {
                 _flash -= Time.deltaTime;
                 shown = Color.Lerp(shown, Color.white, Mathf.Clamp01(_flash / 0.25f));
+            }
+            // No-power "electric cut" blink — the whole body pulses toward red so you can spot a powerless
+            // machine across the map without selecting it.
+            if (NoPower)
+            {
+                float blink = 0.5f + 0.5f * Mathf.Sin(Time.unscaledTime * 7f);
+                shown = Color.Lerp(Color.Lerp(_baseColor, Color.black, 0.5f), new Color(0.95f, 0.12f, 0.12f), blink);
             }
             _sr.color = shown;
         }

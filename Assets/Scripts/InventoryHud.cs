@@ -737,7 +737,7 @@ namespace Caveman
                     string pc = brown ? "#f99" : "#9f9";
                     string batt = PowerNet.TotalCapacity > 0
                         ? $" <color=#8df>🔋 {Mathf.RoundToInt(PowerNet.TotalStored)}/{Mathf.RoundToInt(PowerNet.TotalCapacity)}</color>" : "";
-                    power = $"   <color={pc}>⚡ {Mathf.RoundToInt(PowerNet.TotalGen)}/{Mathf.RoundToInt(PowerNet.TotalDemand)}{(brown ? " OVERLOADED" : "")}</color>{batt}";
+                    power = $"   <color={pc}>⚡ {Mathf.RoundToInt(PowerNet.TotalGen)} made · {Mathf.RoundToInt(PowerNet.TotalDemand)}/{Mathf.RoundToInt(PowerNet.TotalMaxDemand)} used{(brown ? " — OVERLOADED" : "")}</color>{batt}";
                 }
 
                 string research = $"   <color=#9cf>🔬 {Research.Points} pts <size=11>(T)</size></color>";
