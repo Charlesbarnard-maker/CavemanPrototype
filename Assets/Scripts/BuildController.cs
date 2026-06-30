@@ -1654,7 +1654,7 @@ namespace Caveman
             }
             var rdef = (PendingIndex >= 0 && PendingIndex < buildables.Count) ? buildables[PendingIndex] : null;
             int budget = rdef != null ? AffordableCellCount(rdef.cost) : int.MaxValue;
-            int paid = 0;
+            int paid = 0, buildable = 0;
             for (int i = 0; i < n; i++)
             {
                 var go = _railPlanGhosts[i];
@@ -1663,13 +1663,13 @@ namespace Caveman
                 go.transform.position = new Vector3(c.x, c.y, 0f);
                 var sr = go.GetComponent<SpriteRenderer>();
                 sr.sprite = PlaceholderArt.RailMask(GhostMaskAt(i, n)); // EXACT preview: only what will actually connect
-                bool terrainOk = RailCellFree(c, elev); // elevated may cross belts, so a belt cell is still valid for it
-                if (!terrainOk) sr.color = new Color(1f, 0.35f, 0.35f, 0.55f);                    // blocked — red
-                else if (paid < budget) { sr.color = new Color(0.4f, 0.9f, 1f, 0.5f); paid++; }   // affordable — cyan
-                else sr.color = new Color(1f, 0.55f, 0.12f, 0.55f);                                // can't afford — orange
+                bool already = RailTile.At(c) != null; // an existing tile we'll just LINK to — not a conflict, and free
+                if (already) sr.color = new Color(0.45f, 0.95f, 0.55f, 0.45f);                     // already here — will connect (green)
+                else if (!RailCellFree(c, elev)) sr.color = new Color(1f, 0.35f, 0.35f, 0.55f);    // blocked — red
+                else { buildable++; if (paid < budget) { sr.color = new Color(0.4f, 0.9f, 1f, 0.5f); paid++; } else sr.color = new Color(1f, 0.55f, 0.12f, 0.55f); }
             }
             for (int k = n; k < _railPlanGhosts.Count; k++) if (_railPlanGhosts[k].activeSelf) _railPlanGhosts[k].SetActive(false);
-            DragCostLabel = rdef != null ? BuildStretchCostLabel(rdef, n, budget) : "";
+            DragCostLabel = rdef != null ? BuildStretchCostLabel(rdef, buildable, budget) : "";
         }
 
         // EXACT ghost mask for plan cell i — mirrors ApplyPathLinks, so the blueprint shows precisely what will
