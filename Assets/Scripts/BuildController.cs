@@ -914,7 +914,10 @@ namespace Caveman
             if (def.underground) { UpdateUndergroundPlacement(mouse, def, cell); return; }
 
             // Cursor-cell direction: along the active sketch stroke, else auto-oriented toward a sink.
-            Belt.Dir dir = singleClick ? BeltDir
+            // A SPLITTER/MERGER over an existing belt previews that belt's FLOW (matching the convert-in-place
+            // outcome), so the junction visibly aligns to your line instead of the last manual rotation.
+            var beltHere = isJunction ? Belt.At(cell) : null;
+            Belt.Dir dir = singleClick ? (beltHere != null ? beltHere.dir : BeltDir)
                          : (_strokeActive && Adjacent(cell, _strokeLast)) ? Belt.FromTo(_strokeLast, cell)
                          : AutoBeltDir(cell);
 

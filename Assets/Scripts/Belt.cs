@@ -625,17 +625,34 @@ namespace Caveman
             return 1_000_000;
         }
 
-        // Walk the belt chain forward; true if it reaches any storage/workshop/depot/research.
-        // Bounded (no visited set) so a closed loop simply returns false after the cap.
+        // Walk the belt chain forward; true if it reaches any sink. SPLITTER-AWARE: at a splitter it branches into
+        // all THREE outputs (forward + both sides), so a line that reaches a sink via a splitter's SIDE output is
+        // correctly seen as connected — fixing splitter→splitter (and splitter→side→sink) reading RED while it
+        // actually flows. A visited-splitter set keeps junction cycles loop-safe. Also counts a Generator's fuel
+        // intake as a sink, so a belt CHAIN feeding a generator no longer reads red.
+        private static readonly System.Collections.Generic.HashSet<Vector2Int> _sinkVisited = new();
         private static bool LeadsToSink(Vector2Int cell, Dir dir)
+        {
+            _sinkVisited.Clear();
+            return LeadsToSinkRec(cell, dir);
+        }
+        private static bool LeadsToSinkRec(Vector2Int cell, Dir dir)
         {
             for (int i = 0; i < 256; i++)
             {
                 var ahead = cell + Step(dir);
                 if (WorldGrid.Storages.ContainsKey(ahead) || WorldGrid.Workshops.ContainsKey(ahead)
-                    || WorldGrid.Depots.ContainsKey(ahead) || WorldGrid.Research.ContainsKey(ahead)) return true;
+                    || WorldGrid.Depots.ContainsKey(ahead) || WorldGrid.Research.ContainsKey(ahead)
+                    || WorldGrid.Generators.ContainsKey(ahead)) return true;
                 var nb = At(ahead);
                 if (nb == null) return false;
+                if (nb.isSplitter)
+                {
+                    if (!_sinkVisited.Add(ahead)) return false; // this splitter is already on the current walk → don't loop
+                    return LeadsToSinkRec(ahead, nb.dir)
+                        || LeadsToSinkRec(ahead, RotateCW(nb.dir))
+                        || LeadsToSinkRec(ahead, RotateCCW(nb.dir));
+                }
                 cell = ahead; dir = nb.dir;
             }
             return false;
@@ -709,30 +726,40 @@ namespace Caveman
         // is a quadratic Bézier with its control point at the cell centre → a straight line on a
         // straight belt and a smooth ARC through a corner (entryEdge is per-item, so each item arcs
         // correctly). 0.5 offsets make one belt's exit == the next's entry (seamless hand-off).
+        // Render each LOGICAL item as a short 2-dot CLUSTER (chunkier sprites) so a saturated belt reads as
+        // PACKED and bottlenecks pop. This is PURELY VISUAL: it never touches _items, MinGap, the handoff or
+        // throughput — the sim is byte-identical, so nothing can get stuck and the economy balance is unchanged.
+        // (MinGap stays 1.0; LOWERING it would pack real items but multiply every belt's throughput by 1/MinGap.)
+        private const int DotsPerItem = 2;
+        private const float DotScale = 0.40f;   // chunkier than the old single 0.26 dot
+        private const float ClusterGap = 0.34f; // sub-dot spacing along the lane
         private void UpdateDots()
         {
             int n = _items.Count;
-            while (_dots.Count < n)
+            int need = n * DotsPerItem;
+            while (_dots.Count < need)
             {
                 var go = new GameObject("BeltItem");
                 var sr = go.AddComponent<SpriteRenderer>();
                 sr.sortingOrder = 2;
-                go.transform.localScale = Vector3.one * 0.26f;
+                go.transform.localScale = Vector3.one * DotScale;
                 _dots.Add(sr);
             }
             for (int i = 0; i < _dots.Count; i++)
             {
                 var d = _dots[i];
                 if (d == null) continue;
-                bool on = i < n;
+                int idx = i / DotsPerItem, sub = i % DotsPerItem;
+                bool on = idx < n;
                 d.enabled = on;
                 if (!on) continue;
-                var it = _items[i];
+                var it = _items[idx];
                 d.sprite = SpriteDatabase.ForItem(it.def); // routed via SpriteDatabase (fallback Circle)
                 d.color = it.def.color;
                 Vector3 inE = new Vector3(Step(it.entryEdge).x, Step(it.entryEdge).y, 0f) * 0.5f;
                 Vector3 outE = new Vector3(Step(dir).x, Step(dir).y, 0f) * 0.5f;
-                d.transform.position = transform.position + PathPoint(it.p, inE, outE);
+                float sp = Mathf.Clamp(it.p - sub * ClusterGap, 0f, 1f); // the item + a trailing companion, kept on the lane
+                d.transform.position = transform.position + PathPoint(sp, inE, outE);
             }
         }
 
