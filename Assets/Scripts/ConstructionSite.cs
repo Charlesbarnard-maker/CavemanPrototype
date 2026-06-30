@@ -98,6 +98,34 @@ namespace Caveman
             int area = Mathf.Max(1, def.FootW * def.FootH);
             site.buildTime = Mathf.Clamp(3f + 0.22f * costUnits + 1.5f * (area - 1), 3f, 60f);
             site.CreateFx(w, h, sb);
+
+            // Preview the finished building's I/O slots ON the blueprint, so you can orient before it exists —
+            // mirrors each kind's own PlacePorts call (e.g. a Large Warehouse shows its 2 in + 2 out). Kinds that
+            // don't route belt items on a fixed edge (poles, batteries, pumps, garages, depots, generators) show none.
+            switch (def.kind)
+            {
+                case BuildingKind.Storage:
+                    Ports.PlacePorts(go.transform, w, h, outDir, true, true, singlePort: def.singlePort, dualPort: def.dualPort);
+                    break;
+                case BuildingKind.Workshop:
+                    Ports.PlacePorts(go.transform, w, h, outDir,
+                        def.inputs != null && def.inputs.Count > 0, true,
+                        def.inputs != null && def.inputs.Count > 1, singlePort: true);
+                    break;
+                case BuildingKind.Research:
+                    Ports.PlacePorts(go.transform, w, h, outDir, true, false, singlePort: true); // input notch only
+                    break;
+                case BuildingKind.Depot:
+                case BuildingKind.Power:
+                case BuildingKind.Pole:
+                case BuildingKind.Battery:
+                case BuildingKind.Pump:
+                case BuildingKind.Garage:
+                    break; // no fixed belt I/O edge to preview
+                default: // Collector & friends → output arrow only
+                    Ports.PlacePorts(go.transform, w, h, outDir, false, true, singlePort: true);
+                    break;
+            }
             return site;
         }
 
