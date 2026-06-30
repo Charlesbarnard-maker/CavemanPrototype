@@ -139,15 +139,16 @@ namespace Caveman
             // a building (e.g. one was just built on you), don't block movement — let yourself out.
             Vector3 step = (Vector3)(dir.normalized * (speed * Time.deltaTime));
             Vector3 p = transform.position;
-            bool insideBuilding = BuildController.SolidBuildingAt(p);
+            // Poles are excluded from movement (includePoles:false) — they block PLACEMENT but you walk THROUGH a post.
+            bool insideBuilding = BuildController.SolidBuildingAt(p, includePoles: false);
             // A boat lets you cross WATER only — Mountains stay impassable (Walkable already excludes both,
             // so add water-passability explicitly rather than "boat || Walkable" which let you cross mountains too).
             bool boat = HasBoat;
             bool CanGo(Vector3 t) => TerrainGrid.Walkable(t) || (boat && TerrainGrid.IsWater(t));
             Vector3 tryX = new Vector3(p.x + step.x, p.y, 0f);
-            if (CanGo(tryX) && (insideBuilding || !BuildController.SolidBuildingAt(tryX))) p = tryX;
+            if (CanGo(tryX) && (insideBuilding || !BuildController.SolidBuildingAt(tryX, includePoles: false))) p = tryX;
             Vector3 tryY = new Vector3(p.x, p.y + step.y, 0f);
-            if (CanGo(tryY) && (insideBuilding || !BuildController.SolidBuildingAt(tryY))) p = tryY;
+            if (CanGo(tryY) && (insideBuilding || !BuildController.SolidBuildingAt(tryY, includePoles: false))) p = tryY;
             transform.position = p;
         }
     }

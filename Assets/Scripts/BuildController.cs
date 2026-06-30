@@ -946,7 +946,9 @@ namespace Caveman
         // doesn't allocate a Collider2D[] each call.
         private static readonly Collider2D[] _solidBuf = new Collider2D[24];
         private static readonly ContactFilter2D _solidFilter = new ContactFilter2D { useTriggers = true, useLayerMask = false };
-        public static bool SolidBuildingAt(Vector3 world)
+        // includePoles: poles count as solid for PLACEMENT (so you can't build on a pole), but NOT for player
+        // movement — you walk through a thin post (the player passes includePoles:false).
+        public static bool SolidBuildingAt(Vector3 world, bool includePoles = true)
         {
             int n = Physics2D.OverlapPoint((Vector2)world, _solidFilter, _solidBuf);
             for (int i = 0; i < n; i++)
@@ -956,7 +958,7 @@ namespace Caveman
                 if (h.GetComponent<ProductionBuilding>() || h.GetComponent<StorageBuilding>()
                     || h.GetComponent<WorkshopBuilding>() || h.GetComponent<Depot>()
                     || h.GetComponent<PowerPlant>() || h.GetComponent<WaterPump>() || h.GetComponent<Battery>()
-                    || h.GetComponent<PowerPole>()   // poles are solid — you can no longer build on top of a pole
+                    || (includePoles && h.GetComponent<PowerPole>() != null) // poles block placement, not movement
                     || h.GetComponent<ResearchBuilding>() || h.GetComponent<Garage>() || h.GetComponent<ConstructionSite>()) return true;
             }
             return false;
