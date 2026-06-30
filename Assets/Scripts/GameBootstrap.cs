@@ -199,9 +199,16 @@ namespace Caveman
             // Generic warehouse: the player picks what it stores (e.g. Planks, Cooked Food).
             var warehouse = MakeStorage("Warehouse", null, 300, new Color(0.55f, 0.52f, 0.45f),
                 new ItemAmount(wood, 14), new ItemAmount(stone, 6)); warehouse.configurable = true;
-            // 2×2 → 2 belts in + 2 belts out. A big-capacity general store you assign yourself (but not Stone/Ore —
-            // those keep their own stockpiles).
+            // 2×2, 1 belt in + 1 belt out. The general store you assign yourself (but not Stone/Ore —
+            // those keep their own Stockpile). For a bulk hub, research up to the Iron-age Large Warehouse.
             // (Construction is INSTANT now — no Construction Yard / builders.)
+            // LARGE WAREHOUSE — the Iron-age bulk hub: 10× the Warehouse's capacity on a 3×3 footprint, with
+            // TWO belts in + TWO belts out so two lines can feed/drain it at once.
+            var largeWarehouse = MakeStorage("Large Warehouse", null, 3000, new Color(0.52f, 0.49f, 0.42f),
+                new ItemAmount(planks, 20), new ItemAmount(metal, 12)); largeWarehouse.configurable = true;
+            largeWarehouse.footprintW = 3; largeWarehouse.footprintH = 3;
+            largeWarehouse.singlePort = false; largeWarehouse.dualPort = true; largeWarehouse.unlockAge = 3;
+            largeWarehouse.description = "LARGE WAREHOUSE — the big general store (Iron Age): holds 3000 of any non-raw item you assign, on a 3×3 footprint with TWO belts in + TWO belts out. The bulk hub for when one Warehouse line isn't enough.";
             // Long-distance logistics: depots + caravan routes (replaces the old haulers).
             var depot = ScriptableObject.CreateInstance<BuildingDefinition>();
             depot.displayName = "Station"; depot.kind = BuildingKind.Depot; depot.unlockAge = 0;
@@ -402,6 +409,14 @@ namespace Caveman
                 new ItemAmount(wood, 8)); stockpile.configurable = true; stockpile.unlockAge = 0;
             stockpile.stockpileWhitelist = new List<ItemDefinition> { stone, copperOre, ore };
             stockpile.description = "STOCKPILE — an OPEN-AIR heap for a RAW material: set it to hold Stone, Copper Ore or Iron Ore (click it to cycle while empty). Belt the raw in, belt it out to a Smelter. Replaces the old separate Stone + Ore stockpiles.";
+            // LARGE STOCKPILE — the Iron-age raw heap: 10× the Stockpile's capacity on a 3×3 footprint, with
+            // TWO belts in + TWO belts out. Set it (while empty) to Stone, Copper Ore or Iron Ore like the basic one.
+            var largeStockpile = MakeStorage("Large Stockpile", null, 2000, new Color(0.58f, 0.53f, 0.46f),
+                new ItemAmount(planks, 16), new ItemAmount(metal, 8)); largeStockpile.configurable = true;
+            largeStockpile.stockpileWhitelist = new List<ItemDefinition> { stone, copperOre, ore };
+            largeStockpile.footprintW = 3; largeStockpile.footprintH = 3;
+            largeStockpile.singlePort = false; largeStockpile.dualPort = true; largeStockpile.unlockAge = 3;
+            largeStockpile.description = "LARGE STOCKPILE — a big open-air raw heap (Iron Age): holds 2000 of Stone, Copper Ore or Iron Ore (click to set while empty), on a 3×3 footprint with TWO belts in + TWO belts out. Replaces a row of basic Stockpiles for a busy Smelter feed.";
             stoneStore.description = "STONE STOCKPILE — an OPEN-AIR heap for Stone (no roof). Belt stone in and out. Cheap, holds a big pile — the natural home for raw Stone instead of a Warehouse.";
             // --- SMELTERS (configurable, multi-recipe). A BASIC smelter for ore→bar and an ADVANCED
             //     smelter that combines materials into alloy bars. Each replaces TWO old fixed-recipe
@@ -703,9 +718,10 @@ namespace Caveman
               undergroundBelt, filterBelt, prioritySplitter, conditionalGate, depot, rail, elevatedRail, signal, twoWaySignal, bridge, harbour, liquidHarbour,
               // Liquids — pipes carry oil/water (never belts); splitter/merger junctions; Oil Well pumps oil, Water Pump pumps water, Booster relays pressure
               pipe, pipeSplitter, pipeMerger, pump, booster, oilWell,
-              // Storage — open-air piles for raw materials (Woodpile / Stone + Ore Stockpiles / Clay / Brick),
-              // the big configurable Warehouse hub, and liquid tanks (Oil Tank / Water Barrel)
-              woodStore, stockpile, clayStore, brickStore, warehouse, oilTank, waterStore,
+              // Storage — basic open-air piles (1 in/1 out) for raws (Woodpile / Stockpile / Clay / Brick),
+              // the configurable Warehouse hub, liquid tanks (Oil Tank / Water Barrel), and the Iron-age
+              // LARGE variants (10× capacity, 3×3, 2 in/2 out): Large Stockpile + Large Warehouse.
+              woodStore, stockpile, largeStockpile, clayStore, brickStore, warehouse, largeWarehouse, oilTank, waterStore,
               // Infrastructure / power / endgame — Generators (Wood/Coal/Oil) + renewables (Windmill/Solar) + Poles + Battery
               woodGen, pole, battery, generator, oilGen, windmill, solar, monumentBldg,
               // Mounts — the Garage (buy/park your rides)
@@ -1031,6 +1047,7 @@ namespace Caveman
             def.capacity = capacity;
             def.color = color;
             def.footprintW = 2; def.footprintH = 2;
+            def.singlePort = true; // basic piles are 1 belt-in / 1 belt-out; the Large variants override to dualPort
             def.cost = new List<ItemAmount>(cost);
             return def;
         }

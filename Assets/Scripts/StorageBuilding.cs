@@ -84,7 +84,7 @@ namespace Caveman
             sb.OutputSide = outputSide;
             sb._cells = Footprint.Cells(go.transform.position, def.FootW, def.FootH);
             foreach (var c in sb._cells) WorldGrid.Storages[c] = sb;
-            Ports.PlacePorts(go.transform, def.FootW, def.FootH, outputSide, true, true, singlePort: def.singlePort); // per-edge-cell ports (2×2 → 2 in/2 out) unless singlePort (1 in/1 out, e.g. the Woodpile)
+            Ports.PlacePorts(go.transform, def.FootW, def.FootH, outputSide, true, true, singlePort: def.singlePort, dualPort: def.dualPort); // singlePort → 1 in/1 out (basic piles); dualPort → 2 in/2 out spread on a bigger footprint (Large stores)
             return sb;
         }
 

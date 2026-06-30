@@ -115,8 +115,10 @@ namespace Caveman
         public int capacity = 10;
         [Tooltip("Storage: player chooses which resource it holds (a generic warehouse).")]
         public bool configurable = false;
-        [Tooltip("Storage: ONE belt-in + ONE belt-out slot (centred per side), even on a bigger footprint (e.g. a 2×2 Woodpile that keeps 1 in / 1 out).")]
+        [Tooltip("Storage: ONE belt-in + ONE belt-out slot (centred per side), even on a bigger footprint (e.g. a 2×2 Woodpile that keeps 1 in / 1 out). The default for basic piles.")]
         public bool singlePort = false;
+        [Tooltip("Storage: exactly TWO belt-in + TWO belt-out slots (spread to the END cells of each side) on a bigger footprint — the LARGE stores (Large Stockpile / Large Warehouse). Ignored when singlePort is set.")]
+        public bool dualPort = false;
         [Tooltip("Configurable storage: restrict the choices to THIS whitelist (e.g. a raw Stockpile cycling Stone / Copper Ore / Iron Ore). Empty = any produced item (the generic Warehouse).")]
         public List<ItemDefinition> stockpileWhitelist = new();
         [Tooltip("Collector: draws its resource from adjacent WATER terrain (not a node) — e.g. Water Hole.")]
