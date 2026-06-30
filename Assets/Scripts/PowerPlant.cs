@@ -35,9 +35,16 @@ namespace Caveman
         private bool _fueled;
         private SpriteRenderer _sr;
         private Color _baseColor;
+        public bool renewable; // fuel-free, VARIABLE output (windmill/solar)
+        public bool solar;     // a solar panel — output follows daylight
+        private float _windSeed; // per-windmill phase so they don't all gust in unison
 
-        /// <summary>Power supplied right now (0 when out of fuel).</summary>
-        public float CurrentOutput => _fueled ? output : 0f;
+        /// <summary>Power supplied right now. Fuel burners: full when fuelled, else 0. Renewables: no fuel but
+        /// VARIABLE — a Windmill GUSTS (Perlin 0.35→1.0), a Solar panel follows DAYLIGHT (0 at night → 1 midday).</summary>
+        public float CurrentOutput => renewable
+            ? output * (solar ? Colony.Daylight : WindFactor())
+            : (_fueled ? output : 0f);
+        private float WindFactor() => 0.35f + 0.65f * Mathf.PerlinNoise(Time.time * 0.16f + _windSeed, _windSeed);
         public bool Fueled => _fueled;
         /// <summary>Fuel currently buffered (belt-fed), for the panel readout.</summary>
         public int FuelStored => fuel != null && Buffer != null ? Buffer.Count(fuel) : 0;
@@ -66,6 +73,9 @@ namespace Caveman
             p.Buffer = new Inventory { capacity = 20 };
             p._sr = sr;
             p._baseColor = def.color;
+            p.renewable = def.renewable || def.solar;
+            p.solar = def.solar;
+            p._windSeed = Random.value * 100f; // each windmill gusts on its own phase
 
             // Register the footprint so belts can deposit fuel on the input edge, and show the cyan notch.
             p._cells = Footprint.Cells(go.transform.position, def.FootW, def.FootH);

@@ -591,8 +591,86 @@ namespace Caveman
             "Oil Generator" => IronOilGenerator(),
             // --- Age 4 (Industrial) ---
             "Monument" => IndustrialMonument(),
+            // --- Renewables (Iron/Industrial) ---
+            "Windmill" => Windmill(),
+            "Solar Panel" => SolarPanel(),
             _ => null,
         };
+
+        private static Sprite _windmill, _solar;
+
+        /// <summary>A wind turbine: a tapered tower + a hub with four blades (reads as renewable power).</summary>
+        public static Sprite Windmill()
+        {
+            if (_windmill != null) return _windmill;
+            const int s = 64;
+            var tex = NewTex(s);
+            var px = new Color[s * s];
+            var tower = new Color(0.82f, 0.82f, 0.85f, 1f);
+            var towerEdge = new Color(0.58f, 0.58f, 0.62f, 1f);
+            var blade = new Color(0.95f, 0.96f, 0.99f, 1f);
+            var hub = new Color(0.42f, 0.44f, 0.50f, 1f);
+            const float hubx = 0.5f, huby = 0.66f;
+            for (int y = 0; y < s; y++)
+                for (int x = 0; x < s; x++)
+                {
+                    float fx = x / (float)(s - 1), fy = y / (float)(s - 1);
+                    Color c = Clear;
+                    float towerHalf = Mathf.Lerp(0.075f, 0.03f, Mathf.InverseLerp(0.05f, huby, fy));
+                    if (fy >= 0.05f && fy <= huby && Mathf.Abs(fx - 0.5f) <= towerHalf)
+                        c = Mathf.Abs(fx - 0.5f) > towerHalf - 0.013f ? towerEdge : tower;
+                    float dx = fx - hubx, dy = fy - huby;
+                    float r = Mathf.Sqrt(dx * dx + dy * dy);
+                    if (r <= 0.30f && r > 0.045f)
+                    {
+                        float d1 = Mathf.Abs(dx - dy) * 0.7071f; // the two diagonal blade lines through the hub
+                        float d2 = Mathf.Abs(dx + dy) * 0.7071f;
+                        if (d1 < 0.022f || d2 < 0.022f) c = blade;
+                    }
+                    if (r <= 0.05f) c = hub;
+                    px[y * s + x] = c;
+                }
+            tex.SetPixels(px); tex.Apply();
+            _windmill = Sprite.Create(tex, new Rect(0, 0, s, s), new Vector2(0.5f, 0.5f), s);
+            return _windmill;
+        }
+
+        /// <summary>A solar panel: a blue grid of cells in a metal frame on two legs.</summary>
+        public static Sprite SolarPanel()
+        {
+            if (_solar != null) return _solar;
+            const int s = 64;
+            var tex = NewTex(s);
+            var px = new Color[s * s];
+            var frame = new Color(0.55f, 0.57f, 0.62f, 1f);
+            var cell = new Color(0.16f, 0.28f, 0.55f, 1f);
+            var cellHi = new Color(0.34f, 0.52f, 0.82f, 1f);
+            var leg = new Color(0.45f, 0.47f, 0.52f, 1f);
+            const float px0 = 0.12f, px1 = 0.88f, py0 = 0.34f, py1 = 0.86f;
+            for (int y = 0; y < s; y++)
+                for (int x = 0; x < s; x++)
+                {
+                    float fx = x / (float)(s - 1), fy = y / (float)(s - 1);
+                    Color c = Clear;
+                    if (fx >= px0 && fx <= px1 && fy >= py0 && fy <= py1)
+                    {
+                        bool border = fx < px0 + 0.03f || fx > px1 - 0.03f || fy < py0 + 0.03f || fy > py1 - 0.03f;
+                        if (border) c = frame;
+                        else
+                        {
+                            float u = Mathf.InverseLerp(px0, px1, fx) * 4f;
+                            float v = Mathf.InverseLerp(py0, py1, fy) * 3f;
+                            bool gap = (u - Mathf.Floor(u)) < 0.08f || (v - Mathf.Floor(v)) < 0.08f;
+                            c = gap ? frame : (((int)Mathf.Floor(u) + (int)Mathf.Floor(v)) % 2 == 0 ? cell : cellHi);
+                        }
+                    }
+                    if (fy < py0 && fy >= 0.10f && (Mathf.Abs(fx - 0.34f) < 0.025f || Mathf.Abs(fx - 0.66f) < 0.025f)) c = leg;
+                    px[y * s + x] = c;
+                }
+            tex.SetPixels(px); tex.Apply();
+            _solar = Sprite.Create(tex, new Rect(0, 0, s, s), new Vector2(0.5f, 0.5f), s);
+            return _solar;
+        }
 
         private static System.Collections.Generic.Dictionary<string, Sprite> _bldgByName;
         public static Sprite BuildingSprite(BuildingDefinition def)

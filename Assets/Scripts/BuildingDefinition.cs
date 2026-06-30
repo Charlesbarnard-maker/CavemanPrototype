@@ -159,6 +159,10 @@ namespace Caveman
         public int powerDraw = 0;
         [Tooltip("Power plant: electrical power supplied while fuelled.")]
         public int powerOutput = 0;
+        [Tooltip("Power plant: RENEWABLE — no fuel, but VARIABLE output (a Windmill gusts; a Solar panel follows daylight).")]
+        public bool renewable = false;
+        [Tooltip("Power plant: a SOLAR panel — renewable, output follows the day/night cycle (0 at night). Implies renewable.")]
+        public bool solar = false;
 
         [Header("Energy — power network")]
         [Tooltip("Legacy (unused): the wired grid has no radius — connections are player-drawn wires.")]

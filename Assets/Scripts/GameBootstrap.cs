@@ -470,7 +470,17 @@ namespace Caveman
             battery.batteryCapacity = 200f; battery.batteryRate = 30f;
             battery.color = new Color(0.32f, 0.62f, 0.50f);
             battery.cost = new List<ItemAmount> { new ItemAmount(planks, 4), new ItemAmount(stone, 6) };
-            battery.description = "BATTERY — stores surplus power and releases it when the grid runs short (a demand spike or a generator running dry). Wire it in like a pole (up to 4 wires). Charges when generation > demand, discharges when it's less.";
+            battery.description = "BATTERY — stores surplus power and releases it when the grid runs short (a demand spike or a generator running dry). Wire it in like a pole (up to 4 wires). Charges when generation > demand, discharges when it's less. Essential once you run the gusty Windmill / day-cycle Solar.";
+            // RENEWABLE power (research-gated, advanced materials) — no fuel, but VARIABLE output, so you LEAN ON
+            // BATTERIES. Steep recipes (Steel + Gears + Machine Parts) mean you grow special lines, not spam them.
+            var windmill = MakePower("Windmill", 50, null, 1, 1f, 3, new Color(0.85f, 0.86f, 0.88f),
+                new ItemAmount(steel, 8), new ItemAmount(bronzeGear, 4));
+            windmill.renewable = true;
+            windmill.description = "WINDMILL — fuel-free power, but its output GUSTS (the wind rises and falls, ~35–100%). Build several + Batteries to ride out the lulls. Costs Steel + Bronze Gears — a real investment, not a spam source. (Research: Renewable Power.)";
+            var solar = MakePower("Solar Panel", 45, null, 1, 1f, 4, new Color(0.20f, 0.30f, 0.55f),
+                new ItemAmount(steel, 6), new ItemAmount(bronzeGear, 6), new ItemAmount(machinePart, 4));
+            solar.renewable = true; solar.solar = true;
+            solar.description = "SOLAR PANEL — silent, fuel-free power, but ONLY in daylight (full at midday, 0 through the night). Needs Steel + Bronze Gears + Machine Parts. Pair with Batteries to carry the night. (Research: Renewable Power.)";
             // Endgame: the Monument (Industrial age). A long resource sink you pour the
             // top of every production chain into — completing it (10 blocks) is the win.
             var monumentBldg = MakeWorkshop("Monument", monument, 1, 6.0f, 3, 12, new Color(0.88f, 0.84f, 0.62f),
@@ -580,12 +590,15 @@ namespace Caveman
                 new Research.Tech { id = "geared_belts", name = "Geared Belts",  cost = 40,  prereq = "bronze", unlocks = new List<BuildingDefinition>{ gearedBelt }, desc = "The Geared Belt (120/min — 2× a Conveyor) for high-throughput lines." },
                 new Research.Tech { id = "steel_belts",  name = "Steel Belts",   cost = 80,  prereq = "iron",   unlocks = new List<BuildingDefinition>{ steelBelt },  desc = "The Steel Belt (240/min — the fastest tier) for the densest late-game lines." },
                 new Research.Tech { id = "smart_logistics", name = "Smart Logistics", cost = 30, prereq = "bronze", unlocks = new List<BuildingDefinition>{ undergroundBelt, filterBelt, prioritySplitter, conditionalGate, elevatedRail }, desc = "Mid-game logistics tools: the UNDERGROUND BELT + ELEVATED TRACK (cross belts and rail over/under each other), FILTER BELT (sort a mixed line by item), PRIORITY SPLITTER (overflow routing), and GATE BELT (stop over-filling a buffer)." },
+                new Research.Tech { id = "renewables", name = "Renewable Power", cost = 60, prereq = "iron", unlocks = new List<BuildingDefinition>{ windmill, solar }, requiredBuildings = new List<BuildingDefinition>{ advancedSmelter, toolmaker }, desc = "Unlock the WINDMILL (Iron) and SOLAR PANEL (Industrial) — fuel-free power, but their output VARIES (wind gusts, solar follows daylight), so lean on Batteries. Built from Steel + Gears (+ Machine Parts) — grow the lines first." },
             };
             // Gate those buildings behind their Tech (and off the age gate, so the Tech IS the gate).
             splitter.requiredTech = "splitters";
             fastBelt.requiredTech = "conveyors"; fastBelt.unlockAge = 0;
             gearedBelt.requiredTech = "geared_belts"; gearedBelt.unlockAge = 0;
             steelBelt.requiredTech = "steel_belts"; steelBelt.unlockAge = 0;
+            windmill.requiredTech = "renewables"; // Iron-age + the tech (windmill.unlockAge=3 from MakePower)
+            solar.requiredTech = "renewables";    // Industrial-age + the tech (solar.unlockAge=4)
 
             // --- Camera (follows the player) ---
             var cam = Camera.main;
@@ -678,8 +691,8 @@ namespace Caveman
               // Storage — open-air piles for raw materials (Woodpile / Stone + Ore Stockpiles / Clay / Brick),
               // the big configurable Warehouse hub, and liquid tanks (Oil Tank / Water Barrel)
               woodStore, stoneStore, oreStore, clayStore, brickStore, warehouse, oilTank, waterStore,
-              // Infrastructure / power / endgame — Wood/Coal/Oil Generators + Power Poles + Battery
-              woodGen, pole, battery, generator, oilGen, monumentBldg,
+              // Infrastructure / power / endgame — Generators (Wood/Coal/Oil) + renewables (Windmill/Solar) + Poles + Battery
+              woodGen, pole, battery, generator, oilGen, windmill, solar, monumentBldg,
               // Mounts — the Garage (buy/park your rides)
               garage };
 
