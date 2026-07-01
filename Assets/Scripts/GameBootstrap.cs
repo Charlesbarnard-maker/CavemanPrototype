@@ -1029,6 +1029,11 @@ namespace Caveman
             clouds.target = player.transform;                       // soft shadows drift over the ground
             var shimmer = new GameObject("WaterShimmer").AddComponent<WaterShimmer>();
             shimmer.target = player.transform;                      // glints twinkle on the water
+
+            // --- Audio + the game shell (main menu / pause / settings) — created LAST, after the world exists.
+            //     GameMenu opens the main menu and pauses (Time.timeScale = 0) until the player picks New Game. ---
+            AudioManager.Ensure();
+            GameMenu.Ensure();
         }
 
         // Spawn `clusterCount` natural clusters in an AREA (areaCenter ± areaSpread), each a tight

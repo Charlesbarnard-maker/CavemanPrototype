@@ -46,6 +46,51 @@ namespace Caveman
             catch { return ""; }
         }
 
+        // ============================== SELF-TEST ==============================
+        /// <summary>In-game validation (F10): fingerprint the live world, save to a scratch slot, load it back,
+        /// and compare. PASS means the save/load round-trip is faithful on the CURRENT game state. The load does
+        /// rebuild the world, so if it PASSES the game is identical; if it FAILS the console shows what differs.</summary>
+        public static bool SelfTest()
+        {
+            string before = Fingerprint();
+            if (!Save(97)) { Toast.Show("<color=#f99>Self-test: save failed.</color>"); return false; }
+            if (!Load(97)) { Toast.Show("<color=#f99>Self-test: load failed.</color>"); return false; }
+            string after = Fingerprint();
+            bool ok = before == after;
+            Debug.Log($"[SaveSystem.SelfTest] {(ok ? "PASS" : "FAIL")}\n  before: {before}\n  after:  {after}");
+            Toast.Show(ok ? "<color=#9f9>✔ Save/load self-test PASSED — round-trip is faithful.</color>"
+                          : "<color=#f99>✖ Save/load self-test FAILED — see console (before/after differ).</color>");
+            return ok;
+        }
+
+        /// <summary>A compact fingerprint of everything a save must preserve (entity counts + all inventory
+        /// totals + progress). Used by the self-test and handy for debugging.</summary>
+        public static string Fingerprint()
+        {
+            var sb = new System.Text.StringBuilder();
+            int nodes = 0, nodeAmt = 0;
+            foreach (var n in ResourceNode.All) if (n != null && n.transform.parent == null) { nodes++; nodeAmt += n.Amount; }
+            sb.Append($"col={ProductionBuilding.All.Count} sto={StorageBuilding.All.Count} wsp={WorkshopBuilding.All.Count} ");
+            sb.Append($"res={ResearchBuilding.All.Count} dep={Depot.All.Count} pow={PowerPlant.All.Count} bat={Battery.All.Count} pole={PowerPole.All.Count} ");
+            sb.Append($"pump={WaterPump.All.Count} rail={RailTile.All.Count} sig={Signal.All.Count} pipe={PipeNet.Count} belt={Belt.Count} route={RouteVehicle.All.Count} ");
+            sb.Append($"node={nodes}/{nodeAmt} pts={Research.Points} tot={Research.TotalDelivered} age={(Colony.Instance != null ? Colony.Instance.Age : -1)} ");
+
+            var totals = new SortedDictionary<string, int>();
+            void Add(Inventory inv) { if (inv == null) return; foreach (var kv in inv.Items) if (kv.Key != null && kv.Value != 0) { totals.TryGetValue(kv.Key.id, out int v); totals[kv.Key.id] = v + kv.Value; } }
+            var gb = GameBootstrap.Instance;
+            if (gb != null && gb.Gatherer != null) Add(gb.Gatherer.Inventory);
+            foreach (var p in ProductionBuilding.All) if (p != null) Add(p.Buffer);
+            foreach (var s in StorageBuilding.All) if (s != null) Add(s.Store);
+            foreach (var w in WorkshopBuilding.All) if (w != null) { Add(w.Buffer); Add(w.InBuffer); }
+            foreach (var rb in ResearchBuilding.All) if (rb != null) Add(rb.InBuffer);
+            foreach (var d in Depot.All) if (d != null) Add(d.store);
+            foreach (var pp in PowerPlant.All) if (pp != null) Add(pp.Buffer);
+            sb.Append("inv[");
+            foreach (var kv in totals) sb.Append($"{kv.Key}:{kv.Value} ");
+            sb.Append("]");
+            return sb.ToString();
+        }
+
         // ============================== SAVE ==============================
         public static bool Save(int slot)
         {

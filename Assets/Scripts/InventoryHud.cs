@@ -119,7 +119,9 @@ namespace Caveman
         // focuses on a single system. The minimap is a world overlay, not a context panel,
         // so it's exempt. ---
         private enum Panel { Build, Research, Guide, Help, Map, Lines, Objectives }
-        private void CloseAllPanels() { _showBuild = _showResearch = _showGuide = _showHelp = _showMap = _showLines = _showObjectives = false; }
+        public void CloseAllPanels() { _showBuild = _showResearch = _showGuide = _showHelp = _showMap = _showLines = _showObjectives = false; }
+        /// <summary>True while any full-screen HUD panel is open — GameMenu checks this to route the Esc key.</summary>
+        public bool AnyPanelOpen => ModalOpen;
         private void TogglePanel(Panel p)
         {
             bool wasOpen = p == Panel.Build ? _showBuild
@@ -154,6 +156,7 @@ namespace Caveman
 
             var kb = Keyboard.current;
             if (kb == null) return;
+            if (GameMenu.MenuOpen) return; // a menu screen is up — it owns input while the game is paused
             if (kb.spaceKey.wasPressedThisFrame)
             {
                 _paused = !_paused;
@@ -163,13 +166,11 @@ namespace Caveman
             if (kb.bKey.wasPressedThisFrame) TogglePanel(Panel.Build);
             if (kb.nKey.wasPressedThisFrame) _showMinimap = !_showMinimap;
             if (kb.mKey.wasPressedThisFrame) TogglePanel(Panel.Map);   // full-screen pan/zoom world map
-            if (_showMap && kb.escapeKey.wasPressedThisFrame) _showMap = false;
             if (kb.gKey.wasPressedThisFrame) TogglePanel(Panel.Guide);
             if (kb.tKey.wasPressedThisFrame) TogglePanel(Panel.Research);
             if (kb.lKey.wasPressedThisFrame) TogglePanel(Panel.Lines); // global transport-line overview
-            if (_showLines && kb.escapeKey.wasPressedThisFrame) _showLines = false;
             if (kb.jKey.wasPressedThisFrame) TogglePanel(Panel.Objectives); // the quest journal (multiple goals at once)
-            if (_showObjectives && kb.escapeKey.wasPressedThisFrame) _showObjectives = false;
+            // Esc-to-close panels is now handled centrally by GameMenu (so Esc can also open the pause menu).
 
             // QoL: one-time "research available" toast when a tree node first becomes affordable.
             if (Research.Tree != null)
@@ -189,6 +190,7 @@ namespace Caveman
             if (kb.f7Key.wasPressedThisFrame) Economy.LocalProduction = !Economy.LocalProduction;
             if (kb.f8Key.wasPressedThisFrame && FogOfWar.Instance != null) FogOfWar.Instance.RevealAll();
             if (kb.f9Key.wasPressedThisFrame) Economy.StoredOnly = !Economy.StoredOnly;
+            if (kb.f10Key.wasPressedThisFrame) SaveSystem.SelfTest(); // dev: save→load→compare the live game
             if (kb.f5Key.wasPressedThisFrame)
             {
                 _speed = _speed >= 4f ? 1f : _speed * 2f;
@@ -245,6 +247,7 @@ namespace Caveman
 
         private void AnnounceAge(int age)
         {
+            AudioManager.Chime(); // a positive flourish when a new age is reached
             var names = new List<string>();
             if (builder != null)
                 foreach (var d in builder.buildables)
