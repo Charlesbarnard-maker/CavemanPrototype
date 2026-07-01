@@ -4,6 +4,32 @@ A running record so progress/problems don't get lost. Newest first. Move items t
 **Fixed** when done. Maintained alongside the code — see DESIGN.md for the roadmap.
 
 ---
+## 📌 SAVE/LOAD + GAME SHELL (2026-07-01 — branch `feature/save-load-and-shell`)
+Adds the whole missing "shell": **SAVE/LOAD**, a **MAIN MENU + PAUSE MENU**, **SETTINGS**, and **AUDIO** — so the game
+can be played across sessions for a full playthrough. Branched off `feature/depot-rail-research-polish` (= main + the
+depot/rail/research work). **Compile-clean** (`Tools/compile-check.ps1`); headless terrain round-trip verified; but the
+full building round-trip is only verified IN-GAME — **press F10 while playing (`SaveSystem.SelfTest`) → PLAYTEST it**.
+- **Save/load** (`SaveSystem.cs` + `SaveRegistry.cs`): full-snapshot binary save under `Application.persistentDataPath/saves`.
+  World-gen is NOT seed-reproducible, so it stores the whole terrain biome map (run-length encoded, ~5KB), every resource
+  node (pos/type/remaining amount), and every placed building/belt/pipe/rail/signal/route + all inventories, plus
+  research/age/objectives/player/camera. Load tears down the world entities (player/HUD/Colony/camera singletons persist)
+  and rebuilds through the REAL spawn paths. Definitions are code (rebuilt each launch) so saves reference them by id
+  (`item.id` / `building.displayName`) via `SaveRegistry`. `LoadRestore` accessors sit on the stateful classes.
+  **Scoping:** items mid-flight on belts are kept; a train's EXACT position along a route is not (it resumes from a
+  stop, re-accumulates cargo in seconds). Underground-belt pairing on load is best-effort.
+- **Menu / settings / audio** (`GameMenu.cs`, `GameSettings.cs`, `AudioManager.cs`): IMGUI main menu (New Game /
+  Continue / Settings / Quit), shown PAUSED at startup; **Esc** = pause menu with 3 save+load slots, Settings, Restart,
+  Quit. While a menu is up the game is paused and `InventoryHud` yields input (`GameMenu.MenuOpen`). Settings = volume
+  sliders + fullscreen (PlayerPrefs). Audio is fully PROCEDURAL — no asset files to ship/break: soft UI clicks, an
+  age-up chime, a gentle ambient bed, all behind the sliders (music defaults low). GameBootstrap creates them last.
+- **Verify:** `Caveman.SaveLoadAudit.Run` (headless, edit-mode) = terrain RLE round-trip **PASS**. In play, **F10** =
+  `SaveSystem.SelfTest` (fingerprint → save → load → compare the LIVE game, PASS/FAIL toast) — the way to validate a
+  deep late-game save with routes/power/pipes, which the headless test can't reach.
+- **Open / owed:** the interactive PLAYTEST (run F10 on a big save); the niche splitter-side-output → merger stall from
+  the prior handoff was LEFT untouched (belt-sim core — needs a live repro to verify). "Restart (new world)" uses
+  `SceneManager.LoadScene` — if it doesn't reload, add `Assets/UnitySave.unity` to Build Settings.
+
+---
 ## 📌 NEW-THREAD HANDOFF — current state (2026-06-30: storage ports + power panels + Monument win-chain unblocked — committed & pushed)
 Pinned pointer so a fresh thread (incl. on a DIFFERENT PC) can continue. Everything below is committed and pushed to
 `origin/main` (HEAD = `b0ead32`, working tree clean, in sync) — a clean clone has the whole game. Open the project,
