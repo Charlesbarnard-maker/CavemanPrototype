@@ -41,6 +41,19 @@ namespace Caveman
         public bool HasResource => _amount > 0;
         public int Amount => _amount;
 
+        // --- Save/load accessors (position/scale/yields/capacity/regen are public or set at create) ---
+        internal float RegenTimerForSave => _regenTimer;
+        internal Color BaseColorForSave => _baseColor;
+        internal float BaseScaleForSave => _baseScale.x;
+        /// <summary>Load: force the remaining amount + regen phase (Awake set _amount = capacity for a fresh
+        /// node; a loaded node overrides it here). Re-applies the depletion scale/tint.</summary>
+        internal void SetAmountForLoad(int amount, float regenTimer)
+        {
+            _amount = Mathf.Clamp(amount, 0, capacity);
+            _regenTimer = regenTimer;
+            if (_sr != null) ApplyScale();
+        }
+
         void Awake()
         {
             _sr = GetComponent<SpriteRenderer>();

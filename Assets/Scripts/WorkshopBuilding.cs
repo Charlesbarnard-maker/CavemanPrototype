@@ -24,6 +24,23 @@ namespace Caveman
         private int _recipeIndex = -1;
         public bool HasRecipeChoice => recipes != null && recipes.Count > 1;
         public Recipe ActiveRecipe => (recipes != null && _recipeIndex >= 0 && _recipeIndex < recipes.Count) ? recipes[_recipeIndex] : null;
+        /// <summary>Save: the selected recipe index (-1 = single fixed recipe).</summary>
+        internal int RecipeIndexForSave => _recipeIndex;
+
+        /// <summary>Save/load: restore the selected recipe, upgrade tier (rate + tint) and paused flag.</summary>
+        internal void LoadRestore(int tier, bool paused, int recipeIndex)
+        {
+            if (recipes != null && recipeIndex >= 0 && recipeIndex < recipes.Count) ApplyRecipe(recipeIndex);
+            Paused = paused;
+            if (def != null && def.upgrades != null && tier > 0 && tier <= def.upgrades.Count)
+            {
+                Tier = tier;
+                var u = def.upgrades[tier - 1];
+                _speedMult = Mathf.Max(0.1f, u.speedMult);
+                _baseColor = u.tint;
+                if (_sr != null) _sr.color = _baseColor;
+            }
+        }
 
         public Inventory Buffer { get; private set; }      // finished output
         public Inventory InBuffer { get; private set; }     // inputs delivered by belts

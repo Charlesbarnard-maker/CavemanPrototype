@@ -99,6 +99,16 @@ namespace Caveman
         {
             get { foreach (var q in quests) if (!q.claimed) return false; return true; }
         }
+
+        /// <summary>Save/load: restore each quest's claimed flag (by index — the quest list is rebuilt in the
+        /// same order every launch) and the win flag. Suppresses re-popping objective reveals for seen ages.</summary>
+        internal void LoadRestore(bool[] claimed, bool won)
+        {
+            if (claimed != null)
+                for (int i = 0; i < quests.Count && i < claimed.Length; i++) quests[i].claimed = claimed[i];
+            Won = won;
+            _poppedForAge = int.MaxValue; // don't re-pop centre-screen reveals for ages already progressed past
+        }
     }
 
     /// <summary>Transient on-screen messages (objective complete, age reached, …).</summary>

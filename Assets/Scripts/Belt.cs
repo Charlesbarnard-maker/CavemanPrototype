@@ -93,11 +93,32 @@ namespace Caveman
         private static readonly Dictionary<Vector2Int, Belt> Grid = new();
 
         public static int Count => Grid.Count;
+        /// <summary>Every placed belt (save/load + teardown). Snapshot to a list before mutating.</summary>
+        public static IEnumerable<Belt> AllBelts => Grid.Values;
         public Vector2Int Cell => _cell;
         public int ItemCount => _items.Count;
         // Compatibility shims for the old (item, count) bucket model — read-only views over the list.
         public ItemDefinition item => _items.Count > 0 ? _items[0].def : null; // lead item TYPE
         public int count => _items.Count;
+
+        // --- Save/load: the raw params below (dir, interval, DisplayName, junction flags, undergroundExit,
+        //     filterItems) are already public; these expose the private pieces the save system also needs. ---
+        internal IReadOnlyList<BeltItem> ItemsForSave => _items;
+        internal Color BaseColorForSave => _baseColor;
+
+        /// <summary>Save/load: restore the underground entrance/exit role, the filter whitelist, and the items
+        /// currently riding this belt (kept lead-first). Sprites (_dots) rebuild themselves on the next tick.</summary>
+        internal void LoadRestore(bool undergroundExitFlag, List<ItemDefinition> filters, List<BeltItem> items)
+        {
+            undergroundExit = undergroundExitFlag;
+            if (filters != null) { filterItems.Clear(); foreach (var f in filters) if (f != null) filterItems.Add(f); }
+            if (items != null)
+            {
+                _items.Clear();
+                foreach (var it in items) if (it != null && it.def != null) _items.Add(it);
+                _items.Sort((a, b) => b.p.CompareTo(a.p)); // lead-first: highest progress at index 0
+            }
+        }
 
         public static Vector2Int CellOf(Vector3 p) => new Vector2Int(Mathf.RoundToInt(p.x), Mathf.RoundToInt(p.y));
         public static Belt At(Vector2Int c) => Grid.TryGetValue(c, out var b) ? b : null;

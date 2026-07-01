@@ -47,6 +47,14 @@ namespace Caveman
         // --- Debug / sandbox ---
         public void DebugAdvanceAge() { if (Age + 1 < AgeNames.Length) Age++; }
 
+        /// <summary>Save/load: force the age + peak-prosperity to saved values (both are otherwise private-set).</summary>
+        internal void LoadRestore(int age, int peak)
+        {
+            Age = Mathf.Clamp(age, 0, AgeNames.Length - 1);
+            PeakProsperity = Mathf.Max(0, peak);
+            if (Prosperity < PeakProsperity) Prosperity = PeakProsperity;
+        }
+
         private float _prosperityT;
 
         /// <summary>A climbing score rewarding tech age + automation (systems running for you) —

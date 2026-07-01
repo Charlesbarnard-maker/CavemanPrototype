@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace Caveman
@@ -16,9 +17,10 @@ namespace Caveman
         public int slots = 2;
 
         public static int BuiltCount;   // how many garages exist (0 = can't buy mounts yet)
+        public static readonly List<Garage> All = new();
 
-        void OnEnable()  { BuiltCount++; PlayerController.RecomputeGarageSlots(); }
-        void OnDisable() { BuiltCount = Mathf.Max(0, BuiltCount - 1); PlayerController.RecomputeGarageSlots(); }
+        void OnEnable()  { if (!All.Contains(this)) All.Add(this); BuiltCount++; PlayerController.RecomputeGarageSlots(); }
+        void OnDisable() { All.Remove(this); BuiltCount = Mathf.Max(0, BuiltCount - 1); PlayerController.RecomputeGarageSlots(); }
 
         public static Garage Spawn(BuildingDefinition def, Vector3 pos)
         {

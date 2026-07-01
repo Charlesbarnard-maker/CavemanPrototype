@@ -76,5 +76,13 @@ namespace Caveman
             _items.TryGetValue(item, out int c);
             return c;
         }
+
+        /// <summary>Empty everything (used by save/load when restoring a fresh set of contents).</summary>
+        public void Clear()
+        {
+            if (_items.Count == 0) return;
+            _items.Clear();
+            Changed?.Invoke();
+        }
     }
 }

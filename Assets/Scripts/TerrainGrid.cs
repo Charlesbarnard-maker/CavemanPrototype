@@ -429,6 +429,50 @@ namespace Caveman
             go.transform.position = Vector3.zero;
         }
 
+        // --- Save/load: world-gen isn't seed-reproducible, so the biome map is serialized WHOLE (run-length
+        //     encoded — long contiguous biome runs shrink to a few KB). Bridges are NOT written here; the Bridge
+        //     buildings re-register them on load. ---
+        public static void SerializeTo(System.IO.BinaryWriter w)
+        {
+            w.Write(Half);
+            int n = _map != null ? _map.Length : 0;
+            w.Write(n);
+            int i = 0;
+            while (i < n)
+            {
+                byte v = (byte)_map[i];
+                int run = 1;
+                while (i + run < n && (byte)_map[i + run] == v) run++;
+                w.Write(v); w.Write(run);
+                i += run;
+            }
+        }
+
+        public static void DeserializeFrom(System.IO.BinaryReader r)
+        {
+            Half = r.ReadInt32();
+            _size = Half * 2 + 1;
+            int n = r.ReadInt32();
+            _map = new Terrain[n];
+            _bridges.Clear();
+            int i = 0;
+            while (i < n)
+            {
+                byte v = r.ReadByte();
+                int run = r.ReadInt32();
+                for (int k = 0; k < run && i < n; k++, i++) _map[i] = (Terrain)v;
+            }
+        }
+
+        /// <summary>Destroy the existing baked terrain sprite and re-bake from the current map — used after a
+        /// load replaces the biome map, so the visual matches the restored world.</summary>
+        public static void RebuildRenderer()
+        {
+            var old = GameObject.Find("Terrain");
+            if (old != null) Object.Destroy(old);
+            SpawnRenderer();
+        }
+
         // First 4-neighbour that is a DIFFERENT land biome (for edge dithering); else `self`.
         private static Terrain NeighbourLand(int gx, int gy, Terrain self)
         {

@@ -216,6 +216,10 @@ namespace Caveman
 
         public float FillFraction => def != null && def.capacity > 0 ? (float)store.Total() / def.capacity : 0f;
 
+        /// <summary>Save/load: the facing to pass back to Spawn. Only vertical-vs-horizontal matters for a
+        /// station (harbours re-derive their I/O from the shore), so N (vertical) / E (horizontal) suffices.</summary>
+        internal Belt.Dir FaceForSave => (_maxY - _minY) > (_maxX - _minX) ? Belt.Dir.N : Belt.Dir.E;
+
         /// <summary>Subtle validation note ("" = fine): nothing to send, a full stop, or no resource set —
         /// the lightweight "is this stop working?" check. Shown small, never flashed.</summary>
         public string Issue()

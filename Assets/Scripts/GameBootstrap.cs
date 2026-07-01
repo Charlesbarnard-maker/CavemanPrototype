@@ -11,8 +11,18 @@ namespace Caveman
     /// </summary>
     public class GameBootstrap : MonoBehaviour
     {
+        // Session-wide handles the save/load system reads (assigned in Start). Content/definitions are
+        // recreated every launch, so these point at the live player / build / camera objects.
+        public static GameBootstrap Instance { get; private set; }
+        [System.NonSerialized] public BuildController Builder;
+        [System.NonSerialized] public PlayerGatherer Gatherer;
+        [System.NonSerialized] public GameObject PlayerGO;
+        [System.NonSerialized] public Camera Cam;
+
         void Start()
         {
+            Instance = this;
+            SaveRegistry.Reset(); // fresh content refs (re-registered below as items/buildings are created)
             // Wipe runtime rail state so a fresh game can't inherit phantom occupancy / station lanes from
             // a previous Play session (Unity keeps statics alive when domain-reload-on-play is disabled).
             RailGraph.Reset();
@@ -692,6 +702,7 @@ namespace Caveman
             var builder = player.AddComponent<BuildController>();
             builder.gatherer = gatherer;
             builder.placeNodeRange = 6f;
+            Builder = builder; Gatherer = gatherer; PlayerGO = player; Cam = cam; // save/load handles
 
             // --- LIQUIDS chain: an Oil Well pumps Oil into PIPES → an Oil Tank / a Refinery (Oil + Water →
             //     Fuel) → Fuel belts → an Oil Generator (lots of Power). The Water Pump + Booster + Pipe
@@ -813,6 +824,7 @@ namespace Caveman
             // Transport vehicles are NOT in the build menu — they're created from a Station's panel.
             builder.routeTiers = new List<BuildingDefinition> { caravan, oxCart, wagonTrain, cargoDrone };
             builder.shipTiers = new List<BuildingDefinition> { cargoShip, steamShip }; // harbour (boat) lines
+            SaveRegistry.RegisterBuildings(builder.buildables); // durable displayName → def for save/load
 
             var follow = cam.GetComponent<CameraFollow>();
             if (follow == null) follow = cam.gameObject.AddComponent<CameraFollow>();
@@ -1069,6 +1081,7 @@ namespace Caveman
             item.id = id;
             item.displayName = name;
             item.color = color;
+            SaveRegistry.RegisterItem(item); // durable id → item for save/load
             return item;
         }
 

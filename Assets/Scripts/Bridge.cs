@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace Caveman
@@ -10,7 +11,13 @@ namespace Caveman
     /// </summary>
     public class Bridge : MonoBehaviour
     {
+        public BuildingDefinition def;
+        public Vector2Int Cell => _cell;
         private Vector2Int _cell;
+
+        public static readonly List<Bridge> All = new();
+        void OnEnable() { if (!All.Contains(this)) All.Add(this); }
+        void OnDisable() { All.Remove(this); }
 
         public static Bridge Spawn(BuildingDefinition def, Vector3 pos)
         {
@@ -27,6 +34,7 @@ namespace Caveman
             go.AddComponent<BoxCollider2D>(); // clickable to demolish
 
             var b = go.AddComponent<Bridge>();
+            b.def = def;
             b._cell = cell;
             TerrainGrid.RegisterBridge(cell);
             return b;

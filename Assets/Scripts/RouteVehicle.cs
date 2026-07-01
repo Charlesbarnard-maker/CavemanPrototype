@@ -208,6 +208,15 @@ namespace Caveman
         public int StopModeOf(Depot d) => d != null && stopMode.TryGetValue(d, out var m) ? m : 0;
         public void CycleStopMode(Depot d) { if (d != null) stopMode[d] = (StopModeOf(d) + 1) % 3; }
 
+        // --- Save/load: a line is reconstructed via Spawn(stops, capacity, speed, color) + its stop modes.
+        //     Cargo in transit and exact position along the route are intentionally not persisted (the line
+        //     resumes from its first stop and re-accumulates cargo within seconds). ---
+        internal int CapacityForSave => capacity;
+        internal float SpeedForSave => speed;
+        internal Color ColorForSave => _baseColor;
+        internal IReadOnlyList<Depot> StopsForSave => stops;
+        internal void SetStopMode(Depot d, int mode) { if (d != null) stopMode[d] = mode; }
+
         /// <summary>A plain-language problem with this line's stop MODES ("" = fine), shown in the Lines panel —
         /// catches the silent "my line does nothing" setups: every stop unload-only (nothing is ever loaded, so
         /// the consist runs empty) or every stop load-only (nothing is ever delivered).</summary>

@@ -216,6 +216,21 @@ namespace Caveman
 
         public void Pulse() { _flash = 0.25f; if (_fx != null) _fx.Strike(); } // flash + a dust/arm work pulse
 
+        /// <summary>Save/load: restore the upgrade tier (rate + tint) and paused flag. The bound source node
+        /// is NOT restored — the collector re-binds to the nearest live node of its type after load.</summary>
+        internal void LoadRestore(int tier, bool paused)
+        {
+            Paused = paused;
+            if (def != null && def.upgrades != null && tier > 0 && tier <= def.upgrades.Count)
+            {
+                Tier = tier;
+                var u = def.upgrades[tier - 1];
+                _speedMult = Mathf.Max(0.1f, u.speedMult);
+                _baseColor = u.tint;
+                if (_sr != null) _sr.color = _baseColor;
+            }
+        }
+
         void Update()
         {
             MaybeRebind(); // chase fresh patches as nearby ones deplete
