@@ -30,6 +30,7 @@ namespace Caveman
         private Camera _cam;
         private GameObject _ghost;
         private SpriteRenderer _ghostSr;
+        private readonly List<GameObject> _depotGhostTiles = new(); // per-cell blueprint tiles for 3×1 depots
         private bool _dragging;
         private Vector2Int _dragLast;
 
@@ -682,6 +683,7 @@ namespace Caveman
             _strokeActive = false;
             _ugAwaitingExit = false;  // a pending underground tunnel shouldn't carry into a new tool
             HideUndergroundGuides();
+            HideDepotGhost();         // leftover depot blueprint tiles shouldn't carry into a new tool
             EnsureGhost();
         }
 
@@ -694,6 +696,7 @@ namespace Caveman
                 _ghostSr.sprite = PlaceholderArt.Square();
                 _ghostSr.sortingOrder = 20;
             }
+            if (_ghostSr != null) _ghostSr.enabled = true; // a depot tool disables this; restore for the next tool
             _ghost.SetActive(true);
         }
 
@@ -720,9 +723,18 @@ namespace Caveman
             world.z = 0f;
             _ghost.transform.position = world;
             _ghost.transform.rotation = Quaternion.identity;
-            _ghostSr.sprite = SpriteDatabase.ForBuilding(def); // ghost matches the building's resolved sprite
-            float gb = def.kind == BuildingKind.Collector ? 0.9f : 1.0f;
-            _ghost.transform.localScale = new Vector3(ew * gb, eh * gb, 1f);
+            // A DEPOT (3×1 platform) previews as one deck tile PER cell — matching what actually gets built —
+            // instead of a single square sprite stretched 3:1 (which also flipped when rotated vertical). The
+            // main square ghost is hidden for depots; the per-cell tiles are laid + tinted below, once validity
+            // is known. Everything else keeps the single scaled ghost.
+            bool isDepot = def.kind == BuildingKind.Depot;
+            _ghostSr.enabled = !isDepot;
+            if (!isDepot)
+            {
+                _ghostSr.sprite = SpriteDatabase.ForBuilding(def); // ghost matches the building's resolved sprite
+                float gb = def.kind == BuildingKind.Collector ? 0.9f : 1.0f;
+                _ghost.transform.localScale = new Vector3(ew * gb, eh * gb, 1f);
+            }
             UpdateGhostPorts(world, def);
 
             // Water buildings must sit on LAND in a cell ADJACENT to water (not just "nearby"):
@@ -752,9 +764,12 @@ namespace Caveman
 
             // Clear green = OK, red = not OK (don't tint by the building's own colour,
             // which can look like the red "invalid" state — that was the confusion).
-            _ghostSr.color = PlacementValid
+            Color validTint = PlacementValid
                 ? new Color(0.35f, 1f, 0.4f, 0.55f)
                 : new Color(1f, 0.3f, 0.3f, 0.5f);
+            _ghostSr.color = validTint;
+            if (isDepot) UpdateDepotGhost(def, world, ew, eh, BuildDir == Belt.Dir.N || BuildDir == Belt.Dir.S, validTint);
+            else HideDepotGhost();
 
             // Intentional placement: ONE building per deliberate click (no hold-drag spam —
             // that's reserved for belts/mass infrastructure). Stays in placement mode so you
@@ -778,6 +793,40 @@ namespace Caveman
                 }
             }
             if (mouse.rightButton.wasPressedThisFrame) CancelPlacement();
+        }
+
+        // Lay the depot BLUEPRINT as one deck tile per footprint cell (rotated to the lane), tinted by validity —
+        // a WYSIWYG preview of the tiled platform that gets built, so it no longer stretches/flips like the old
+        // single square ghost. Tiles are pooled + reused, and surplus ones are deactivated.
+        private void UpdateDepotGhost(BuildingDefinition def, Vector3 center, int w, int h, bool vertical, Color tint)
+        {
+            var sprite = def.isHarbour ? PlaceholderArt.HarbourDeckTile() : PlaceholderArt.StationDeckTile();
+            float rot = vertical ? 90f : 0f; // deck art is authored for a horizontal (E–W) lane
+            var cells = Footprint.Cells(center, w, h);
+            int i = 0;
+            for (; i < cells.Count; i++)
+            {
+                if (i >= _depotGhostTiles.Count)
+                {
+                    var g = new GameObject("DepotGhostTile");
+                    g.AddComponent<SpriteRenderer>().sortingOrder = 20;
+                    _depotGhostTiles.Add(g);
+                }
+                var go = _depotGhostTiles[i];
+                if (!go.activeSelf) go.SetActive(true);
+                go.transform.position = new Vector3(cells[i].x, cells[i].y, 0f);
+                go.transform.rotation = Quaternion.Euler(0f, 0f, rot);
+                var sr = go.GetComponent<SpriteRenderer>();
+                sr.sprite = sprite;
+                sr.color = tint;
+            }
+            for (; i < _depotGhostTiles.Count; i++) if (_depotGhostTiles[i].activeSelf) _depotGhostTiles[i].SetActive(false);
+        }
+
+        private void HideDepotGhost()
+        {
+            for (int i = 0; i < _depotGhostTiles.Count; i++)
+                if (_depotGhostTiles[i] != null && _depotGhostTiles[i].activeSelf) _depotGhostTiles[i].SetActive(false);
         }
 
         // Show the ghost's I/O markers PER EDGE CELL (so a 2×2 warehouse previews 2 outputs +
@@ -923,8 +972,10 @@ namespace Caveman
         private static bool AllowedOnResource(BuildingDefinition def) =>
             def.kind == BuildingKind.Pump && !def.booster && def.item != null && def.item.isLiquid && !def.fromWaterTerrain;
 
-        // True if the footprint covers BOTH land and water cells — a harbour must straddle the shore so the
-        // boat can dock on the water half while belts connect on the land half.
+        // True if the footprint covers BOTH water and BUILDABLE land — a harbour must straddle the shore so the
+        // boat can dock on the water half while belts connect on the land half. A dry cell that's NOT buildable
+        // (a Mountain) fails the whole placement: a harbour dropped against a cliff would land its "land" half on
+        // impassable rock that no belt can reach — a dead building. So we reject any Mountain cell outright.
         private bool FootprintStraddlesShore(Vector3 center, int w, int h)
         {
             var a = Footprint.Anchor(center, w, h);
@@ -932,7 +983,10 @@ namespace Caveman
             for (int i = 0; i < w; i++)
                 for (int j = 0; j < h; j++)
                 {
-                    if (TerrainGrid.IsWater(new Vector2Int(a.x + i, a.y + j))) water = true; else land = true;
+                    var cell = new Vector2Int(a.x + i, a.y + j);
+                    if (TerrainGrid.IsWater(cell)) water = true;
+                    else if (TerrainGrid.Buildable(cell)) land = true; // dry AND buildable (excludes Mountain)
+                    else return false;                                 // dry but unbuildable (Mountain) — no harbour on rock
                 }
             return land && water;
         }
@@ -1034,7 +1088,7 @@ namespace Caveman
             }
             else if (_strokeActive && mouse.leftButton.isPressed)
             {
-                // Belts lay as a STRAIGHT run along the dominant drag axis (turn by doing a second drag),
+                // Belts lay as a clean single-corner L that REACHES the cursor cell (long leg + one turn),
                 // replanned from the stroke start each move so the preview tracks the cursor.
                 if (cell != _strokeLast) { _strokeMoved = true; _strokeLast = cell; ReplanStraight(_strokeStart, cell); }
             }
@@ -1174,26 +1228,33 @@ namespace Caveman
         }
 
         // ---- Belt blueprint helpers (plan, preview, build) ------------------------------------
-        // Re-plan the run as a single STRAIGHT line from `start` to `end` along the DOMINANT axis (so a
-        // drag always gives a clean straight belt; to turn, do a second drag). Replaces the plan each move.
+        // Re-plan the run from `start` to `end` as a clean single-corner L: the LONG leg runs along the dominant
+        // axis, then the belt turns ONCE and the short leg finishes on `end`, so the run always REACHES the cursor
+        // cell (each cell FLOWS toward the next, and the corner cell turns) instead of snapping to one axis and
+        // stopping short. When start and end share a row/column the minor leg is empty → a clean straight belt.
         private void ReplanStraight(Vector2Int start, Vector2Int end)
         {
             _beltPlan.Clear();
             foreach (var kv in _committed) _beltPlan[kv.Key] = kv.Value; // keep earlier strokes
             _beltPlanDirty = true;
             int dx = end.x - start.x, dy = end.y - start.y;
+            int sx = dx >= 0 ? 1 : -1, sy = dy >= 0 ? 1 : -1;
+            Belt.Dir dirX = dx >= 0 ? Belt.Dir.E : Belt.Dir.W;
+            Belt.Dir dirY = dy >= 0 ? Belt.Dir.N : Belt.Dir.S;
             var c = start;
             if (Mathf.Abs(dx) >= Mathf.Abs(dy))
             {
-                Belt.Dir d = dx >= 0 ? Belt.Dir.E : Belt.Dir.W; int sx = dx >= 0 ? 1 : -1;
-                PlanCell(c, d);
-                for (int i = 0; i < Mathf.Abs(dx); i++) { c.x += sx; PlanCell(c, d); }
+                bool turn = Mathf.Abs(dy) > 0; // the last long-leg cell turns toward the minor leg
+                PlanCell(c, dirX);
+                for (int i = 0; i < Mathf.Abs(dx); i++) { c.x += sx; PlanCell(c, (turn && i == Mathf.Abs(dx) - 1) ? dirY : dirX); }
+                for (int i = 0; i < Mathf.Abs(dy); i++) { c.y += sy; PlanCell(c, dirY); }
             }
             else
             {
-                Belt.Dir d = dy >= 0 ? Belt.Dir.N : Belt.Dir.S; int sy = dy >= 0 ? 1 : -1;
-                PlanCell(c, d);
-                for (int i = 0; i < Mathf.Abs(dy); i++) { c.y += sy; PlanCell(c, d); }
+                bool turn = Mathf.Abs(dx) > 0;
+                PlanCell(c, dirY);
+                for (int i = 0; i < Mathf.Abs(dy); i++) { c.y += sy; PlanCell(c, (turn && i == Mathf.Abs(dy) - 1) ? dirX : dirY); }
+                for (int i = 0; i < Mathf.Abs(dx); i++) { c.x += sx; PlanCell(c, dirX); }
             }
         }
 
@@ -1440,16 +1501,44 @@ namespace Caveman
                 if (_pipeClash && Time.unscaledTime - _pipeClashToastT > 1.5f)
                 { Toast.Show($"<color=#ffb24d>⛔ {_pipeClashMsg}</color>"); _pipeClashToastT = Time.unscaledTime; }
 
-                if (ok && (!_dragging || cell != _dragLast))
-                {
-                    Economy.Spend(def.cost, Carried);
-                    Pipe.Spawn(def, new Vector3(cell.x, cell.y, 0f));
-                    BuildingsPlaced++;
-                    _dragging = true;
-                    _dragLast = cell;
-                }
+                // Drag paves a CONTINUOUS pipe: drop one cell on the first press, then fill the orthogonal path
+                // between the last laid cell and the cursor each move — so a fast drag can't skip cells and leave
+                // a broken line (belts/rails already plan a continuous run; this brings pipes in line).
+                if (!_dragging) { TryLayPipe(cell, def); _dragging = true; _dragLast = cell; }
+                else if (cell != _dragLast) { PavePipeLine(_dragLast, cell, def); _dragLast = cell; }
             }
             if (mouse.rightButton.wasPressedThisFrame) CancelPlacement();
+        }
+
+        // Fill the orthogonal L from `from` (exclusive) to `to` (inclusive), laying a pipe on every cell that's
+        // free + affordable — so a fast drag between two cells leaves a connected line, not a gapped one.
+        private void PavePipeLine(Vector2Int from, Vector2Int to, BuildingDefinition def)
+        {
+            int dx = to.x - from.x, dy = to.y - from.y;
+            int sx = dx >= 0 ? 1 : -1, sy = dy >= 0 ? 1 : -1;
+            var c = from;
+            if (Mathf.Abs(dx) >= Mathf.Abs(dy))
+            {
+                for (int i = 0; i < Mathf.Abs(dx); i++) { c.x += sx; TryLayPipe(c, def); }
+                for (int i = 0; i < Mathf.Abs(dy); i++) { c.y += sy; TryLayPipe(c, def); }
+            }
+            else
+            {
+                for (int i = 0; i < Mathf.Abs(dy); i++) { c.y += sy; TryLayPipe(c, def); }
+                for (int i = 0; i < Mathf.Abs(dx); i++) { c.x += sx; TryLayPipe(c, def); }
+            }
+        }
+
+        // Lay one pipe if the cell is clear, buildable, not on a building, affordable, and wouldn't merge two
+        // different fluids. No-op otherwise (same gates as the single-cell placement above).
+        private void TryLayPipe(Vector2Int cell, BuildingDefinition def)
+        {
+            if (PipeNet.At(cell) != null || !TerrainGrid.BeltAllowed(cell)
+                || SolidBuildingAt(new Vector3(cell.x, cell.y, 0f))
+                || !Economy.CanAfford(def.cost, Carried) || PipeFluidClash(cell, out _)) return;
+            Economy.Spend(def.cost, Carried);
+            Pipe.Spawn(def, new Vector3(cell.x, cell.y, 0f));
+            BuildingsPlaced++;
         }
 
         // True if placing a pipe at `cell` would JOIN two different fluids — an existing line of one fluid meeting
@@ -1573,16 +1662,26 @@ namespace Caveman
         }
 
         // ---- Rail blueprint helpers (90° L-paths only) -----------------------------------------
-        // A single STRAIGHT run from `from` to `to`, snapped to the DOMINANT axis (so one drag lays a clean line,
-        // not a staircase). Chain separate strokes to build an L deliberately.
+        // A clean single-corner L from `from` to `to`: the LONG leg runs along the dominant axis, then the run
+        // turns ONCE and the short leg finishes on the minor axis so it lands EXACTLY on `to`. Landing on the
+        // cursor cell (rather than snapping to one axis and dropping the other) is what lets a drag up to an
+        // existing track actually MEET it — the old dominant-axis-only snap stopped short and left a gap. When
+        // `from` and `to` share a row or column the minor leg is empty, so it degenerates to a clean straight run.
         private void PlanRailPath(Vector2Int from, Vector2Int to)
         {
             int dx = to.x - from.x, dy = to.y - from.y;
+            int sx = dx > 0 ? 1 : -1, sy = dy > 0 ? 1 : -1;
             var c = from; PlanRailCell(c);
             if (Mathf.Abs(dx) >= Mathf.Abs(dy))
-            { int sx = dx > 0 ? 1 : -1; for (int i = 0; i < Mathf.Abs(dx); i++) { c.x += sx; PlanRailCell(c); } }
+            {
+                for (int i = 0; i < Mathf.Abs(dx); i++) { c.x += sx; PlanRailCell(c); }
+                for (int i = 0; i < Mathf.Abs(dy); i++) { c.y += sy; PlanRailCell(c); }
+            }
             else
-            { int sy = dy > 0 ? 1 : -1; for (int i = 0; i < Mathf.Abs(dy); i++) { c.y += sy; PlanRailCell(c); } }
+            {
+                for (int i = 0; i < Mathf.Abs(dy); i++) { c.y += sy; PlanRailCell(c); }
+                for (int i = 0; i < Mathf.Abs(dx); i++) { c.x += sx; PlanRailCell(c); }
+            }
         }
 
         private void PlanRailCell(Vector2Int cell)
@@ -1592,7 +1691,7 @@ namespace Caveman
             if (!_railPlanHinted)
             {
                 _railPlanHinted = true;
-                Toast.Show("<color=#9cf>Track blueprint:</color> drag for a STRAIGHT run (snaps to one axis) · drag again to add a turn · <color=#9f9>click to build</color> · right-click to cancel.");
+                Toast.Show("<color=#9cf>Track blueprint:</color> drag to run track (turns ONE corner to reach the cursor) · drag again to add another turn · <color=#9f9>click to build</color> · right-click to cancel.");
             }
         }
 
@@ -1756,6 +1855,7 @@ namespace Caveman
             ClearGhostJunctionPorts();
             if (_ghost != null) _ghost.SetActive(false);
             HideGhostPorts();
+            HideDepotGhost();
         }
 
         public bool CanAfford(BuildingDefinition def) => def != null && Economy.CanAfford(def.cost, Carried);

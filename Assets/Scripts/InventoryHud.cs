@@ -31,6 +31,7 @@ namespace Caveman
         void Awake() => Instance = this;
 
         private GUIStyle _s, _small, _big, _btn;
+        private GUIStyle _techNode; // research-tree node style (centred rich-text button)
         private bool _paused;
         private bool _showHelp;
         private Vector2 _buildScroll;
@@ -1815,76 +1816,182 @@ namespace Caveman
 
         // ---- Victory banner (shown once the Monument is completed) ----
         // ---- Research tree (T): spend research points on age advances + building unlocks ----
+        // Research tree layout constants — a horizontal AGE SPINE (Stone→Tribal→…→Industrial) with each age's
+        // optional unlocks BRANCHING below it, so the tree reads as connected branches instead of a flat list.
+        private const float RTColW = 170f, RTNodeW = 150f, RTNodeH = 48f, RTRowPitch = 66f, RTIndent = 18f, RTTopY = 6f;
+
         private void DrawResearchPanel()
         {
             // A dedicated MODE, not a sidebar: a large centred panel over the dimmed world.
-            float w = Mathf.Min(560f, _vw - 40f);
-            float h = Mathf.Min(_vh - 120f, 580f);
-            var r = new Rect(_vw / 2f - w / 2f, 70f, w, h);
+            float w = Mathf.Min(940f, _vw - 32f);
+            float h = Mathf.Min(_vh - 70f, 660f);
+            var r = new Rect(_vw / 2f - w / 2f, 56f, w, h);
             _researchRect = r;
             PanelBg(r);
-            GUILayout.BeginArea(new Rect(r.x + 16, r.y + 14, r.width - 32, r.height - 28));
 
-            GUILayout.Label($"<size=20><b>🔬 Research</b></size>   <color=#9cf><b>{Research.Points} pts</b></color>", _s);
-            GUILayout.Label("<size=12><color=#bbb>Craft research items → deliver to a Research Lodge to earn points → spend them here.  (T or Close to exit)</color></size>", _small);
+            _techNode ??= new GUIStyle(GUI.skin.button) { richText = true, fontSize = 12, alignment = TextAnchor.MiddleCenter, wordWrap = true };
+            const float pad = 16f;
 
-            // CURRENT GOAL — the one thing to aim at, called out at the top.
+            // ---- Header: title, points, current goal, legend ----
+            GUI.Label(new Rect(r.x + pad, r.y + 8, r.width - 2 * pad, 26),
+                $"<size=20><b>🔬 Research Tree</b></size>   <color=#9cf><b>{Research.Points} pts</b></color>", _s);
             var goalTech = Research.NextAgeTech; var goalTier = Research.CurrentTier;
-            GUILayout.Space(4);
+            string goal;
             if (goalTech != null)
             {
-                int filled = Mathf.RoundToInt(Research.Fraction * 16f);
-                string bar = new string('█', Mathf.Clamp(filled, 0, 16)) + new string('░', Mathf.Clamp(16 - filled, 0, 16));
-                GUILayout.Label($"<size=13><color=#ffd24d>⭐ Current goal: <b>{goalTech.name}</b></color>  <color=#9cf>[{bar}]</color> {Research.Points}/{goalTech.cost}</size>", _small);
+                int filled = Mathf.RoundToInt(Research.Fraction * 14f);
+                string bar = new string('█', Mathf.Clamp(filled, 0, 14)) + new string('░', Mathf.Clamp(14 - filled, 0, 14));
+                goal = $"<color=#ffd24d>⭐ Goal: <b>{goalTech.name}</b></color>  <color=#9cf>[{bar}]</color> {Research.Points}/{goalTech.cost}";
                 if (goalTier != null && goalTier.item != null)
-                    GUILayout.Label($"<size=12><color=#bcd>→ craft <b>{goalTier.item.displayName}</b> ({goalTier.pointsPerItem} pt each) and deliver it to a Research Lodge.</color></size>", _small);
+                    goal += $"   <color=#bcd>· craft <b>{goalTier.item.displayName}</b> → a Research Lodge ({goalTier.pointsPerItem} pt)</color>";
             }
-            else GUILayout.Label("<size=13><color=#9f9>⭐ All ages researched — spend leftover points on upgrades below.</color></size>", _small);
-            GUILayout.Space(6);
+            else goal = "<color=#9f9>⭐ All ages researched — spend leftover points on the upgrades below.</color>";
+            GUI.Label(new Rect(r.x + pad, r.y + 36, r.width - 2 * pad, 20), $"<size=12>{goal}</size>", _small);
+            GUI.Label(new Rect(r.x + pad, r.y + 56, r.width - 2 * pad, 18),
+                "<size=11><color=#9f9>✔ researched</color>   <color=#8cf>✦ ready</color>   <color=#fc8>needs a building/item</color>   <color=#f99>short on points</color>   <color=#888>🔒 locked</color>   ·  hover a node for detail</size>", _small);
 
-            // Render one tree node (used by both sections below).
-            void RenderNode(Research.Tech n)
+            // ---- Build the column/row layout from the tree (each Tech has ≤1 prereq → a clean forest) ----
+            var tree = Research.Tree;
+            int maxCol = 1;
+            if (tree != null) foreach (var n in tree) if (n != null) maxCol = Mathf.Max(maxCol, ColOf(n));
+            var backbone = new Research.Tech[maxCol + 1];   // the age node that heads each column (null at col 0 = Stone)
+            var branchList = new List<Research.Tech>[maxCol + 1];
+            for (int i = 0; i <= maxCol; i++) branchList[i] = new List<Research.Tech>();
+            if (tree != null)
+                foreach (var n in tree)
+                {
+                    if (n == null) continue;
+                    if (n.advanceToAge >= 0 && n.advanceToAge <= maxCol) backbone[n.advanceToAge] = n; // age spine
+                    else branchList[ColOf(n)].Add(n);                                                  // optional branch
+                }
+
+            float contentW = maxCol * RTColW + RTNodeW + RTIndent + 24f;
+            int maxRows = 1;
+            for (int c = 0; c <= maxCol; c++) maxRows = Mathf.Max(maxRows, 1 + branchList[c].Count);
+            float contentH = RTTopY + maxRows * RTRowPitch + 8f;
+
+            var view = new Rect(r.x + pad, r.y + 80, r.width - 2 * pad, r.height - 80 - 78);
+            var content = new Rect(0, 0, Mathf.Max(contentW, view.width - 16f), Mathf.Max(contentH, view.height - 4f));
+            _researchScroll = GUI.BeginScrollView(view, _researchScroll, content);
+
+            // Faint band behind the age column you're currently IN, so the tree orients "you are here".
+            int curAge = Colony.Instance != null ? Mathf.Clamp(Colony.Instance.Age, 0, maxCol) : 0;
+            var bandC = GUI.color; GUI.color = new Color(0.95f, 0.82f, 0.35f, 0.09f);
+            GUI.DrawTexture(new Rect(curAge * RTColW - 6f, 0f, RTNodeW + 12f, content.height), Texture2D.whiteTexture);
+            GUI.color = bandC;
+
+            var spineCol = new Color(0.95f, 0.82f, 0.35f, 0.55f); // amber age spine
+            var branchCol = new Color(0.50f, 0.70f, 0.95f, 0.45f); // blue branch lines
+            Rect stone = NodeRect(0, 0, true);
+
+            // Connectors first (behind the nodes): horizontal age spine + vertical branch buses.
+            for (int c = 1; c <= maxCol; c++)
             {
-                if (n == null) return;
-                GUILayout.Space(3);
-                if (n.purchased)
-                    GUILayout.Label($"<size=13><color=#9f9>✔ {n.name}</color></size>", _small);
-                else if (!Research.PrereqMet(n))
-                {
-                    var pre = Research.Node(n.prereq);
-                    GUILayout.Label($"<size=13><color=#888>🔒 {n.name} — {n.cost} pts <i>(needs {(pre != null ? pre.name : n.prereq)})</i></color></size>", _small);
-                }
-                else if (!Research.RequirementsMet(n)) // prereq + points may be fine, but the new chain isn't built/run yet
-                {
-                    GUILayout.Label($"<size=13><color=#fc8>🔒 {n.name} — {n.cost} pts <i>({Research.MissingRequirementsText(n)})</i></color></size>", _small);
-                }
-                else if (Research.CanBuy(n))
-                {
-                    if (GUILayout.Button($"<size=13><b>{n.name}</b> — {n.cost} pts  <color=#9f9>✦ Research</color></size>", _btn))
-                        Research.Buy(n);
-                }
-                else // prereq met, not enough points yet
-                    GUILayout.Label($"<size=13>{n.name} — <color=#f99>{n.cost} pts</color> <color=#888>(need {n.cost - Research.Points} more)</color></size>", _small);
-
-                if (!string.IsNullOrEmpty(n.desc))
-                    GUILayout.Label($"<size=11><color=#bbb>{n.desc}</color></size>", _small);
+                if (backbone[c] == null) continue;
+                Rect a = backbone[c - 1] != null ? NodeRect(c - 1, 0, true) : stone;
+                Rect b = NodeRect(c, 0, true);
+                HLine(a.xMax, b.xMin, a.center.y, spineCol);
             }
-
-            _researchScroll = GUILayout.BeginScrollView(_researchScroll);
-            if (Research.Tree != null)
+            for (int c = 0; c <= maxCol; c++)
             {
-                // Section 1 — AGES: the progression spine (locked ones read as future ages).
-                GUILayout.Label("<size=13><b><color=#cda>── Ages (progression) ──</color></b></size>", _small);
-                foreach (var n in Research.Tree) if (n != null && n.advanceToAge >= 0) RenderNode(n);
-
-                // Section 2 — UPGRADES: optional building unlocks you choose to spend on.
-                GUILayout.Space(8);
-                GUILayout.Label("<size=13><b><color=#cda>── Upgrades (optional unlocks) ──</color></b></size>", _small);
-                foreach (var n in Research.Tree) if (n != null && n.advanceToAge < 0) RenderNode(n);
+                if (branchList[c].Count == 0) continue;
+                Rect head = backbone[c] != null ? NodeRect(c, 0, true) : stone;
+                float busX = head.xMin + 11f;
+                Rect last = NodeRect(c, branchList[c].Count, false);
+                VLine(busX, head.yMax, last.center.y, branchCol);
+                for (int k = 0; k < branchList[c].Count; k++)
+                { Rect up = NodeRect(c, k + 1, false); HLine(busX, up.xMin, up.center.y, branchCol); }
             }
-            GUILayout.EndScrollView();
-            if (GUILayout.Button("<size=12>Close (T)</size>", _btn)) _showResearch = false;
-            GUILayout.EndArea();
+
+            // Nodes: the synthetic Stone start marker, then each column's spine node + its branches.
+            var bc = GUI.backgroundColor;
+            GUI.backgroundColor = new Color(0.30f, 0.34f, 0.24f);
+            GUI.Box(stone, new GUIContent("<b>Stone Age</b>\n<size=10><color=#9f9>✔ you start here</color></size>"), _techNode);
+            GUI.backgroundColor = bc;
+            for (int c = 0; c <= maxCol; c++)
+            {
+                if (backbone[c] != null) DrawTechNode(backbone[c], NodeRect(c, 0, true), true);
+                for (int k = 0; k < branchList[c].Count; k++) DrawTechNode(branchList[c][k], NodeRect(c, k + 1, false), false);
+            }
+
+            GUI.EndScrollView();
+
+            // Hover detail (the node's description) + close.
+            if (!string.IsNullOrEmpty(GUI.tooltip))
+                GUI.Label(new Rect(r.x + pad, r.y + r.height - 74, r.width - 2 * pad, 42), $"<size=12><color=#cde>{GUI.tooltip}</color></size>", _small);
+            if (GUI.Button(new Rect(r.x + r.width / 2f - 60, r.y + r.height - 30, 120, 24), "<size=12>Close (T)</size>", _btn)) _showResearch = false;
+        }
+
+        // Which column a node sits in: an age node uses its own target age; an optional unlock uses the target
+        // age of its nearest AGE ancestor (walking prereqs), so it hangs under the age that unlocks it. Col 0 = Stone.
+        private int ColOf(Research.Tech n)
+        {
+            if (n == null) return 0;
+            if (n.advanceToAge >= 0) return n.advanceToAge;
+            var p = Research.Node(n.prereq); int guard = 0;
+            while (p != null && p.advanceToAge < 0 && guard++ < 32) p = Research.Node(p.prereq);
+            return p != null ? p.advanceToAge : 0;
+        }
+
+        // Node rectangle in scroll-content space. Spine (age) nodes head their column; branch nodes are indented.
+        private Rect NodeRect(int col, int row, bool spine)
+        {
+            float x = col * RTColW + (spine ? 0f : RTIndent);
+            float y = RTTopY + row * RTRowPitch;
+            return new Rect(x, y, spine ? RTNodeW : RTNodeW - RTIndent, RTNodeH);
+        }
+
+        private void DrawTechNode(Research.Tech n, Rect rect, bool spine)
+        {
+            Color bg; string status; int state; // 0 done · 1 ready · 2 needs build/item · 3 short points · 4 locked
+            if (n.purchased) { bg = new Color(0.15f, 0.33f, 0.20f); status = "<color=#9f9>✔ researched</color>"; state = 0; }
+            else if (!Research.PrereqMet(n))
+            { var pre = Research.Node(n.prereq); bg = new Color(0.13f, 0.14f, 0.17f); status = $"<color=#888>🔒 {n.cost} · needs {(pre != null ? pre.name : n.prereq)}</color>"; state = 4; }
+            else if (!Research.RequirementsMet(n))
+            { bg = new Color(0.32f, 0.23f, 0.11f); status = $"<color=#fc8>{n.cost} · {Research.MissingRequirementsText(n)}</color>"; state = 2; }
+            else if (Research.CanBuy(n))
+            { bg = new Color(0.16f, 0.30f, 0.48f); status = $"<color=#9f9>✦ {n.cost} pts — research</color>"; state = 1; }
+            else { bg = new Color(0.17f, 0.19f, 0.23f); status = $"<color=#f99>{n.cost} pts</color> <color=#888>(+{n.cost - Research.Points})</color>"; state = 3; }
+
+            // Hover detail = the tech's description plus what it unlocks, so you know what you're buying.
+            string tip = n.desc ?? "";
+            if (n.unlocks != null && n.unlocks.Count > 0)
+            {
+                var names = new List<string>();
+                foreach (var u in n.unlocks) if (u != null && !string.IsNullOrEmpty(u.displayName)) names.Add(u.displayName);
+                if (names.Count > 0) tip = (tip.Length > 0 ? tip + "\n" : "") + $"<color=#8fe0a0>Unlocks: {string.Join(", ", names)}</color>";
+            }
+            var content = new GUIContent($"<b>{n.name}</b>\n<size=10>{status}</size>", tip);
+            var bc = GUI.backgroundColor;
+            GUI.backgroundColor = bg;
+            bool clicked = GUI.Button(rect, content, _techNode);
+            GUI.backgroundColor = bc;
+            if (spine) // amber cap stripe marks the age spine
+            {
+                var cc = GUI.color; GUI.color = new Color(0.95f, 0.82f, 0.35f, 0.95f);
+                GUI.DrawTexture(new Rect(rect.x, rect.y, rect.width, 3f), Texture2D.whiteTexture); GUI.color = cc;
+            }
+            if (clicked)
+            {
+                if (state == 1) Research.Buy(n);
+                else if (state == 4) Toast.Show($"<color=#9cf>🔒 {n.name}</color> needs <b>{(Research.Node(n.prereq)?.name ?? n.prereq)}</b> first.");
+                else if (state == 2) Toast.Show($"<color=#ffb24d>🔒 {n.name}:</color> {Research.MissingRequirementsText(n)}.");
+                else if (state == 3) Toast.Show($"<color=#f99>{n.name}</color> needs <b>{n.cost - Research.Points}</b> more research pts.");
+            }
+        }
+
+        // A horizontal / vertical connector line (a tinted 3px strip) drawn during Repaint.
+        private void HLine(float x0, float x1, float y, Color col)
+        {
+            if (x1 < x0) { var t = x0; x0 = x1; x1 = t; }
+            var c = GUI.color; GUI.color = col;
+            GUI.DrawTexture(new Rect(x0, y - 1.5f, x1 - x0, 3f), Texture2D.whiteTexture); GUI.color = c;
+        }
+        private void VLine(float x, float y0, float y1, Color col)
+        {
+            if (y1 < y0) { var t = y0; y0 = y1; y1 = t; }
+            var c = GUI.color; GUI.color = col;
+            GUI.DrawTexture(new Rect(x - 1.5f, y0, 3f, y1 - y0), Texture2D.whiteTexture); GUI.color = c;
         }
 
         private void DrawWin()
@@ -1922,6 +2029,8 @@ namespace Caveman
                 string holds = rv.IsShip ? "1 hold" : $"{rv.WagonCount} wagon{(rv.WagonCount == 1 ? "" : "s")}";
                 GUILayout.Label($"<size=16><b>{rv.VehicleName()}</b></size>  <size=12><color=#9cf>{holds} · {rv.StopCount} stops · {Mathf.RoundToInt(frac * 100f)}% full ({rv.CurrentLoad}/{rv.LoadCapacity})</color></size>", _small);
                 GUILayout.Label($"<size=13>Cargo: {rv.CargoSummary()}</size>", _small);
+                string lineWarn = rv.LineWarning();
+                if (!string.IsNullOrEmpty(lineWarn)) GUILayout.Label($"<size=12><color=#ffb24d>⚠ {lineWarn}</color></size>", _small);
 
                 GUILayout.Label("<size=12><color=#cfcfcf>Stops</color>  <size=10><color=#888>(click a mode to make a stop pickup-only or drop-only)</color></size></size>", _small);
                 foreach (var st in rv.stops)

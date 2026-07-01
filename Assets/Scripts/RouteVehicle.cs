@@ -208,6 +208,25 @@ namespace Caveman
         public int StopModeOf(Depot d) => d != null && stopMode.TryGetValue(d, out var m) ? m : 0;
         public void CycleStopMode(Depot d) { if (d != null) stopMode[d] = (StopModeOf(d) + 1) % 3; }
 
+        /// <summary>A plain-language problem with this line's stop MODES ("" = fine), shown in the Lines panel —
+        /// catches the silent "my line does nothing" setups: every stop unload-only (nothing is ever loaded, so
+        /// the consist runs empty) or every stop load-only (nothing is ever delivered).</summary>
+        public string LineWarning()
+        {
+            if (stops == null || stops.Count < 2) return "";
+            bool anyLoad = false, anyUnload = false;
+            foreach (var s in stops)
+            {
+                if (s == null) continue;
+                int m = StopModeOf(s);
+                if (m != 1) anyUnload = true; // mode 0 or 2 can unload
+                if (m != 2) anyLoad = true;   // mode 0 or 1 can load
+            }
+            if (!anyLoad) return "no stop LOADS — every stop is unload-only, so the vehicle runs empty. Set a source stop to Load.";
+            if (!anyUnload) return "no stop UNLOADS — every stop is load-only, so cargo is never delivered. Set a destination to Unload.";
+            return "";
+        }
+
         // Service a stop. The consist UNLOADS every wagon carrying this stop's resource (delivering into its
         // store), then LOADS this stop's surplus into a free/matching wagon — unless we just delivered that
         // resource here (so a destination doesn't immediately re-export what it received). Each stop thus acts
@@ -512,6 +531,17 @@ namespace Caveman
 
             var nc = _railCells[_cellIdx];
             if (nc == _curCell) { AdvanceCell(); return false; }
+
+            // The leg route is built ONCE; if track on it was demolished or unlinked since, the next cell may no
+            // longer be rail (or no longer connect from here). Re-path from the current position (BuildLegRoute
+            // uses live rail state) instead of gliding over the gap — upholding "trains follow track". If no route
+            // remains, the empty-route branch above parks the train amber next frame and prompts for track.
+            if (!RailNet.IsRail(nc) || (_curCell != NoCell && !RailNet.Linked(_curCell, nc)))
+            {
+                _legBuilt = -1; // force a rebuild next frame
+                _waiting = true;
+                return false;
+            }
 
             if (!CanEnter(_cellIdx)) { _waiting = true; return false; }
             _waiting = false;

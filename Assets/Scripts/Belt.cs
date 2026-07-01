@@ -457,20 +457,20 @@ namespace Caveman
             Dir need = Opposite(side);
             if (WorldGrid.Collectors.TryGetValue(c, out var p) && p != null && p.produces != null && !p.produces.isLiquid
                 && p.OutputSide == need && FilterAccepts(p.produces) && (isFilter || item == null || item == p.produces) && p.Buffer.Count(p.produces) > 0)
-            { if (p.Buffer.RemoveUpTo(p.produces, 1) > 0) { ReceiveItem(p.produces, side, 0f); return true; } }
+            { if (p.Buffer.RemoveUpTo(p.produces, 1) > 0) { if (ReceiveItem(p.produces, side, 0f)) return true; p.Buffer.Add(p.produces, 1); } } // put it back if the belt refused it
 
             if (WorldGrid.Workshops.TryGetValue(c, out var w) && w != null && w.output != null && !w.output.isLiquid
                 && w.OutputSide == need && FilterAccepts(w.output) && (isFilter || item == null || item == w.output) && w.Buffer.Count(w.output) > 0)
-            { if (w.Buffer.RemoveUpTo(w.output, 1) > 0) { ReceiveItem(w.output, side, 0f); return true; } }
+            { if (w.Buffer.RemoveUpTo(w.output, 1) > 0) { if (ReceiveItem(w.output, side, 0f)) return true; w.Buffer.Add(w.output, 1); } }
 
             // Storages have an OUTPUT side too — belt FROM a warehouse to a workshop (e.g. warehouse → sawmill).
             if (WorldGrid.Storages.TryGetValue(c, out var st) && st != null && st.accepts != null && !st.accepts.isLiquid
                 && st.OutputSide == need && FilterAccepts(st.accepts) && (isFilter || item == null || item == st.accepts) && st.Store.Count(st.accepts) > 0)
-            { if (st.Store.RemoveUpTo(st.accepts, 1) > 0) { ReceiveItem(st.accepts, side, 0f); return true; } }
+            { if (st.Store.RemoveUpTo(st.accepts, 1) > 0) { if (ReceiveItem(st.accepts, side, 0f)) return true; st.Store.Add(st.accepts, 1); } }
 
             if (WorldGrid.Depots.TryGetValue(c, out var dp) && dp != null && dp.item != null && !dp.item.isLiquid
                 && dp.IsOutputPull(c, side) && FilterAccepts(dp.item) && (isFilter || item == null || item == dp.item) && dp.store.Count(dp.item) > 0)
-            { if (dp.store.RemoveUpTo(dp.item, 1) > 0) { ReceiveItem(dp.item, side, 0f); return true; } }
+            { if (dp.store.RemoveUpTo(dp.item, 1) > 0) { if (ReceiveItem(dp.item, side, 0f)) return true; dp.store.Add(dp.item, 1); } }
 
             return false;
         }

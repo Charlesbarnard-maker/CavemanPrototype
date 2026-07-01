@@ -57,7 +57,7 @@ namespace Caveman
         public static readonly List<Depot> All = new();
         private List<Vector2Int> _cells; // every grid cell this building occupies
         private readonly List<GameObject> _decor = new(); // track sprites laid over the platform lane
-        private SpriteRenderer _sr;
+        private readonly List<SpriteRenderer> _deckSrs = new(); // per-cell deck tiles (fill-tinted together)
         private Color _baseColor;
 
         public static Depot Spawn(BuildingDefinition def, Vector3 pos, Belt.Dir face = Belt.Dir.E)
@@ -73,17 +73,10 @@ namespace Caveman
 
             var go = new GameObject(def.displayName);
             go.transform.position = new Vector3(pos.x, pos.y, 0f);
-            // Root stays UNIFORM (scale 1) so child port markers / track sprites aren't distorted; the
-            // platform deck is a child stretched to the footprint, and the collider is sized explicitly.
-            var platform = new GameObject("platform");
-            platform.transform.SetParent(go.transform);
-            platform.transform.localPosition = Vector3.zero;
-            platform.transform.localScale = new Vector3(w, h, 1f);
-            var sr = platform.AddComponent<SpriteRenderer>();
-            sr.sprite = SpriteDatabase.ForBuilding(def); // bespoke deck: Harbour dock / Station platform (track runs over it)
-            sr.color = def.color;
-            sr.sortingOrder = 4;
-
+            // Root stays UNIFORM (scale 1) so the per-cell deck tiles, port markers and track sprites all render
+            // at world scale and never distort. The deck is laid as ONE seamless tile PER footprint cell (rotated
+            // to the lane axis) instead of a single square sprite stretched 3:1 — so a 3×1 platform reads cleanly
+            // and turns WITH the lane rather than squishing when it's placed vertically. Collider sized explicitly.
             var col = go.AddComponent<BoxCollider2D>();
             col.size = new Vector2(w, h);
 
@@ -91,10 +84,10 @@ namespace Caveman
             d.def = def;
             d.item = def.item; // usually null (configurable)
             d.store = new Inventory { capacity = Mathf.Max(1, def.capacity) };
-            d._sr = sr;
             d._baseColor = def.color;
             d._outSide = outSide; d._inSide = inSide;
             bool harbour = def != null && def.isHarbour;
+            d.BuildDeck(w, h, vertical, harbour); // per-cell tiled deck + a centre-cell landmark accent
             d._cells = Footprint.Cells(go.transform.position, w, h);
             d._minX = int.MaxValue; d._maxX = int.MinValue; d._minY = int.MaxValue; d._maxY = int.MinValue;
             // A Station's footprint IS a TRACK LANE (registered as rail so trains route through it). A HARBOUR
@@ -142,14 +135,58 @@ namespace Caveman
         void OnDisable()
         {
             All.Remove(this);
+            bool harbour = def != null && def.isHarbour;
             if (_cells != null)
-                foreach (var c in _cells) { WorldGrid.Remove(WorldGrid.Depots, c, this); RailNet.StationLane.Remove(c); RailGraph.Clear(c); }
+                foreach (var c in _cells)
+                {
+                    WorldGrid.Remove(WorldGrid.Depots, c, this); RailNet.StationLane.Remove(c); RailGraph.Clear(c);
+                    // Drop the link bits this station stamped INTO adjacent rail tiles (Spawn pointed each existing
+                    // neighbour into the lane) so demolishing it leaves no dangling half-connection to the empty cell.
+                    if (!harbour)
+                        foreach (var dir in RailTile.Four)
+                        {
+                            var t = RailTile.At(c + Belt.Step(dir));
+                            if (t != null) t.links &= ~RailTile.DirBit(Belt.Opposite(dir));
+                        }
+                }
             foreach (var g in _decor) if (g != null) Destroy(g);
             _decor.Clear();
         }
 
+        // Lay the platform DECK as one seamless tile per footprint cell (each rotated to the lane axis), plus a
+        // single landmark ACCENT (station shelter / harbour crane) on the centre cell. All children of the
+        // UNIFORM root, so nothing is stretched — this is what replaced the single square sprite that squashed
+        // 3:1 and flipped on rotate. Deck tiles are collected so Update can fill-tint them together.
+        private void BuildDeck(int w, int h, bool vertical, bool harbour)
+        {
+            Vector3 center = transform.position;
+            float deckRot = vertical ? 90f : 0f; // deck art is authored for a horizontal (E–W) lane
+            var deckSprite = harbour ? PlaceholderArt.HarbourDeckTile() : PlaceholderArt.StationDeckTile();
+            foreach (var c in Footprint.Cells(center, w, h))
+            {
+                var t = new GameObject("deck");
+                t.transform.SetParent(transform);
+                t.transform.localPosition = new Vector3(c.x - center.x, c.y - center.y, 0f);
+                t.transform.localRotation = Quaternion.Euler(0f, 0f, deckRot);
+                var sr = t.AddComponent<SpriteRenderer>();
+                sr.sprite = deckSprite;
+                sr.color = _baseColor;      // the body's identity tint (fill-lerped in Update)
+                sr.sortingOrder = 4;
+                _deckSrs.Add(sr);
+            }
+            // Landmark on the centre cell (a 3×1 footprint centres on a real cell). Kept UPRIGHT so it always
+            // reads, in its authored colours (white tint), drawn above the deck (4) and any track lane (6).
+            var accent = new GameObject(harbour ? "crane" : "shelter");
+            accent.transform.SetParent(transform);
+            accent.transform.localPosition = Vector3.zero;
+            var asr = accent.AddComponent<SpriteRenderer>();
+            asr.sprite = harbour ? PlaceholderArt.HarbourCrane() : PlaceholderArt.StationShelter();
+            asr.color = Color.white;
+            asr.sortingOrder = 7;
+        }
+
         // Lay a visible TRACK across every lane cell, over the platform deck, so it's obvious the rail runs
-        // through the station. Unparented (the platform's non-uniform scale would distort them). The lane
+        // through the station. Unparented (kept out of the root so lifecycle is explicit). The lane
         // runs along the platform's long axis — east–west when horizontal, north–south when rotated.
         private void AddTrackLane(bool vertical)
         {
@@ -204,10 +241,11 @@ namespace Caveman
 
         void Update()
         {
-            if (_sr == null || def == null) return;
+            if (def == null) return;
             float f = def.capacity > 0 ? (float)store.Total() / def.capacity : 0f;
             Color empty = Color.Lerp(_baseColor, Color.black, 0.5f);
-            _sr.color = Color.Lerp(empty, _baseColor, Mathf.Clamp01(0.2f + 0.8f * f));
+            Color lit = Color.Lerp(empty, _baseColor, Mathf.Clamp01(0.2f + 0.8f * f)); // darker when empty, lit when full
+            for (int i = 0; i < _deckSrs.Count; i++) if (_deckSrs[i] != null) _deckSrs[i].color = lit;
 
             // A train-fed liquid DESTINATION pushes its cargo onward through the pipe network (throttled).
             if (item != null && item.isLiquid && trainFedAt > pumpFedAt)

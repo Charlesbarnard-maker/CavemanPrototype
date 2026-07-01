@@ -4,9 +4,10 @@ using UnityEngine;
 namespace Caveman
 {
     /// <summary>
-    /// Factory-first: construction is INSTANT, so this is now just the static <see cref="SpawnFinished"/>
-    /// dispatcher that maps a BuildingKind to its concrete Spawn (called by BuildController on placement).
-    /// The MonoBehaviour body (materials / build progress) is legacy and no longer instantiated.
+    /// Self-construction: on placement BuildController calls <see cref="Spawn"/>, which drops a timed site that
+    /// assembles itself over <see cref="buildTime"/> (cost paid up front — no builder hauling) while showing
+    /// scaffold + builders + a progress bar, then calls <see cref="SpawnFinished"/> to swap in the real building.
+    /// <see cref="SpawnFinished"/> is also the static BuildingKind→concrete-Spawn dispatcher.
     /// </summary>
     public class ConstructionSite : MonoBehaviour
     {
@@ -98,6 +99,7 @@ namespace Caveman
             int area = Mathf.Max(1, def.FootW * def.FootH);
             site.buildTime = Mathf.Clamp(3f + 0.22f * costUnits + 1.5f * (area - 1), 3f, 60f);
             site.CreateFx(w, h, sb);
+            if (def.kind == BuildingKind.Depot) site.AddDepotDeckPreview(w, h, outDir); // tiled deck, not a stretched square
 
             // Preview the finished building's I/O slots ON the blueprint, so you can orient before it exists —
             // mirrors each kind's own PlacePorts call (e.g. a Large Warehouse shows its 2 in + 2 out). Kinds that
@@ -187,6 +189,33 @@ namespace Caveman
             sr.color = color;
             sr.sortingOrder = order;
             return go.transform;
+        }
+
+        // While a DEPOT builds, preview its platform as the SAME per-cell tiled deck the finished building uses
+        // (parented to the counter-scaled FX root, so each tile renders at world scale) instead of the base
+        // square sprite stretched 3:1 and flipped on rotate. The stretched base renderer is hidden; the scaffold
+        // + builders still read as "under construction". Matches Depot.BuildDeck's rotation convention exactly.
+        private void AddDepotDeckPreview(int w, int h, Belt.Dir face)
+        {
+            if (_sr != null) _sr.enabled = false; // hide the stretched square; the tiles stand in for it
+            bool vertical = face == Belt.Dir.N || face == Belt.Dir.S;
+            bool harbour = def != null && def.isHarbour;
+            var sprite = harbour ? PlaceholderArt.HarbourDeckTile() : PlaceholderArt.StationDeckTile();
+            float rot = vertical ? 90f : 0f; // deck art is authored for a horizontal (E–W) lane
+            Vector3 center = transform.position;
+            Color tint = def != null ? new Color(def.color.r, def.color.g, def.color.b, 0.9f) : Color.white;
+            int order = (_sr != null ? _sr.sortingOrder : 2) + 1; // above the base, below the scaffold (+4)
+            foreach (var c in Footprint.Cells(center, w, h))
+            {
+                var t = new GameObject("deckPreview");
+                t.transform.SetParent(_fxRoot, false);
+                t.transform.localPosition = new Vector3(c.x - center.x, c.y - center.y, 0f);
+                t.transform.localRotation = Quaternion.Euler(0f, 0f, rot);
+                var sr = t.AddComponent<SpriteRenderer>();
+                sr.sprite = sprite;
+                sr.color = tint;
+                sr.sortingOrder = order;
+            }
         }
 
         // Animate the FX each frame: grow the progress bar, cycle the builders' work frames + a hammering bob,
