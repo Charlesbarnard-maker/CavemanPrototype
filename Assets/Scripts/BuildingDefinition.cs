@@ -123,8 +123,6 @@ namespace Caveman
         public List<ItemDefinition> stockpileWhitelist = new();
         [Tooltip("Collector: draws its resource from adjacent WATER terrain (not a node) — e.g. Water Hole.")]
         public bool fromWaterTerrain = false;
-        [Tooltip("Collector: its worker CARRIES output to the nearest matching storage (no belt needed) — the early SURVIVAL collectors (Forager Hut, Water Hole) so food/water reach storage before the player learns belts.")]
-        public bool autoStore = false;
         [Tooltip("Collector: when its node runs dry, how far (world units) it will look for a fresh node of the same type. 0 = use the default. Bounded + candidate-capped, so no map-wide scan.")]
         public float searchRadius = 0f;
         [Tooltip("Pump: a BOOSTER (no water source) — re-pressurises a pipe network to extend its range.")]
@@ -173,10 +171,6 @@ namespace Caveman
         public bool solar = false;
 
         [Header("Energy — power network")]
-        [Tooltip("Legacy (unused): the wired grid has no radius — connections are player-drawn wires.")]
-        public float connectRange = 0f;
-        [Tooltip("Legacy (unused): the wired grid has no radius — connections are player-drawn wires.")]
-        public float supplyRange = 0f;
         [Tooltip("Workshop: needs a power connection to run — STOPS if not wired to a powered network.")]
         public bool requiresPower = false;
         [Tooltip("Battery: stored-energy capacity (power × seconds).")]

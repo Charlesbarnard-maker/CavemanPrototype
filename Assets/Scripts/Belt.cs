@@ -452,9 +452,15 @@ namespace Caveman
             else
             {
                 // Not truly "blocked" if a Merger ahead is going to PULL from us this step (it just
-                // hasn't yet) — only show backed-up when the forward target genuinely has no room.
-                var fwd = At(_cell + Step(dir));
-                _blocked = !(fwd != null && fwd.isMerger && fwd.CanAccept(lead.def));
+                // hasn't yet) — only show backed-up when no output lane has a merger with room. A
+                // SPLITTER checks all three of its output lanes (a merger on a SIDE lane counts too).
+                bool mergerPending = false;
+                for (int k = 0; k < (isSplitter ? 3 : 1) && !mergerPending; k++)
+                {
+                    var nb = At(_cell + Step(isSplitter ? SplitDir(k) : dir));
+                    mergerPending = nb != null && nb.isMerger && nb.CanAccept(lead.def);
+                }
+                _blocked = !mergerPending;
             }
         }
 
@@ -511,11 +517,21 @@ namespace Caveman
                 int idx = (_mergeNext + k) % 3;
                 Dir side = MergeInputDir(idx);
                 var f = At(_cell + Step(side));
-                if (f != null && f != this && f._cell + Step(f.dir) == _cell && f._items.Count > 0)
+                // A feeder counts if it can genuinely OUTPUT toward us: a plain belt only via its forward
+                // dir, but a SPLITTER via any of its three output lanes (forward/right/left — everything
+                // except its back/input edge). Without the splitter case, a splitter whose SIDE output
+                // faced a merger could neither push (TryDepositTo refuses mergers) nor be pulled (the
+                // old forward-only check skipped it) — the "splitter side-output into merger" stall.
+                if (f != null && f != this && f._items.Count > 0)
                 {
-                    var lead = f._items[0];
-                    if (lead.p >= 1f - 1e-3f && (item == null || item == lead.def) && ReceiveItem(lead.def, side, 0f))
-                    { f._items.RemoveAt(0); _mergeNext = (idx + 1) % 3; return true; }
+                    Dir toMe = FromTo(f._cell, _cell);
+                    bool feedsMe = f.isSplitter ? toMe != Opposite(f.dir) : toMe == f.dir;
+                    if (feedsMe)
+                    {
+                        var lead = f._items[0];
+                        if (lead.p >= 1f - 1e-3f && (item == null || item == lead.def) && ReceiveItem(lead.def, side, 0f))
+                        { f._items.RemoveAt(0); _mergeNext = (idx + 1) % 3; return true; }
+                    }
                 }
                 if (PullBuildingFrom(side)) { _mergeNext = (idx + 1) % 3; return true; }
             }

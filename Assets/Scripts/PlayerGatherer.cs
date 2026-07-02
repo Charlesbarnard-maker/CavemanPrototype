@@ -16,6 +16,11 @@ namespace Caveman
 
         public Inventory Inventory { get; } = new Inventory();
 
+        /// <summary>Lifetime units gathered BY HAND this game — drives the first tutorial quest (the carried
+        /// pile can't: the starter kit pre-fills it, which made "gather 12 wood" self-complete at spawn).
+        /// Static (statics persist with domain-reload off) — reset by GameBootstrap on a new game.</summary>
+        public static int HandGathered;
+
         private Camera _cam;
         private ResourceNode _highlighted;
         private bool _minedHintShown;   // one-time "click to mine" nudge
@@ -67,6 +72,7 @@ namespace Caveman
                 {
                     if (node.Harvest(Inventory))
                     {
+                        HandGathered++; // tutorial progress: units mined by hand (not the pre-filled kit)
                         node.Nudge(); // chop recoil wobble — makes the manual hit feel responsive
                         if (node.yields != null)
                             GatherPopup.Show(node.transform.position, $"+1 {node.yields.displayName}", node.yields.color);

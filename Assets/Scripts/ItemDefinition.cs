@@ -16,8 +16,6 @@ namespace Caveman
         [Tooltip("Placeholder tint until we have real art.")]
         public Color color = Color.gray;
         public int maxStack = 999;
-        [Tooltip("Nourishment per unit when eaten (0 = not food). Cooked food is worth more.")]
-        public int foodValue = 0;
         [Tooltip("Liquid (e.g. water): moves only via pipes / carrying, NEVER on belts.")]
         public bool isLiquid = false;
         [Tooltip("Bulk raw with its own dedicated stockpile (Stone/Ore): the configurable Warehouse won't hold it.")]

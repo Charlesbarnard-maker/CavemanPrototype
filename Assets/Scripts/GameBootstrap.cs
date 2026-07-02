@@ -31,24 +31,17 @@ namespace Caveman
             PlayerController.ResetMounts();    // fresh game: on foot, no mounts owned
             Garage.BuiltCount = 0; PlayerController.RecomputeGarageSlots();
             WorkshopBuilding.ResetPowerHint();
+            PlayerGatherer.HandGathered = 0; // fresh game: the hand-mining tutorial counter starts at zero
 
             // --- Items ---
-            var stone = MakeItem("stone", "Stone", new Color(0.55f, 0.55f, 0.62f)); stone.noWarehouse = true; // has its own Stone Stockpile
+            var stone = MakeItem("stone", "Stone", new Color(0.55f, 0.55f, 0.62f)); stone.noWarehouse = true; // has its own raw Stockpile
             var wood = MakeItem("wood", "Wood", new Color(0.52f, 0.34f, 0.16f));
-            var food = MakeItem("food", "Food", new Color(0.85f, 0.35f, 0.35f));
-            food.foodValue = 1;
             var planks = MakeItem("planks", "Planks", new Color(0.74f, 0.58f, 0.34f));
-            var cookedFood = MakeItem("cooked", "Cooked Food", new Color(0.92f, 0.56f, 0.30f));
-            cookedFood.foodValue = 3; // cooking turns 2 raw food into 1 cooked worth 3 — a real gain
-            var water = MakeItem("water", "Water", new Color(0.30f, 0.55f, 0.85f)); // survival + crafting
-            water.isLiquid = true; // liquid: moves via pipes/carrying, never on belts
-            var meat = MakeItem("meat", "Meat", new Color(0.72f, 0.30f, 0.30f)); meat.foodValue = 2;
+            var water = MakeItem("water", "Water", new Color(0.30f, 0.55f, 0.85f)); // crafting liquid (Refinery input)
+            water.isLiquid = true; // liquid: moves via pipes, never on belts
             var clay = MakeItem("clay", "Clay", new Color(0.70f, 0.45f, 0.35f));
             var charcoal = MakeItem("charcoal", "Charcoal", new Color(0.24f, 0.24f, 0.27f));
             var bricks = MakeItem("bricks", "Bricks", new Color(0.74f, 0.40f, 0.32f));
-            var grain = MakeItem("grain", "Grain", new Color(0.86f, 0.76f, 0.36f));
-            var flour = MakeItem("flour", "Flour", new Color(0.90f, 0.86f, 0.72f));
-            var bread = MakeItem("bread", "Bread", new Color(0.80f, 0.58f, 0.30f)); bread.foodValue = 4;
             var ore = MakeItem("ore", "Iron Ore", new Color(0.62f, 0.58f, 0.42f)); ore.noWarehouse = true; // FINITE — far in the hills (Iron age); has its own Ore Stockpile
             var metal = MakeItem("metal", "Iron", new Color(0.66f, 0.68f, 0.74f)); // smelted from Iron Ore
             var tools = MakeItem("tools", "Tools", new Color(0.55f, 0.60f, 0.68f));
@@ -80,16 +73,11 @@ namespace Caveman
             var wiring     = MakeItem("wiring",      "Copper Wiring", new Color(0.86f, 0.52f, 0.26f)); // Electronics: Copper → Wiring
             var circuit    = MakeItem("circuit",     "Circuit",     new Color(0.28f, 0.62f, 0.40f)); // Electronics: Wiring + Copper Plate → Circuit
             var monument = MakeItem("monument", "Monument Block", new Color(0.90f, 0.86f, 0.62f)); // endgame
-            // Textiles + pottery — parallel comfort-good chains that deepen the demand sink.
-            var fiber = MakeItem("fiber", "Plant Fiber", new Color(0.62f, 0.74f, 0.45f));
-            var cloth = MakeItem("cloth", "Cloth", new Color(0.86f, 0.84f, 0.78f));
-            var clothes = MakeItem("clothes", "Clothes", new Color(0.45f, 0.55f, 0.78f));
+            // Pottery — feeds the Drafting Table (Iron-age research chain).
             var pot = MakeItem("pot", "Pottery", new Color(0.74f, 0.48f, 0.36f));
             // Exploration payoff: gems (rare, far) -> jewelry, a required Monument ingredient.
             var gems = MakeItem("gems", "Gems", new Color(0.55f, 0.85f, 0.80f));
             var jewelry = MakeItem("jewelry", "Jewelry", new Color(0.90f, 0.80f, 0.40f));
-            // Masonry: gives Stone its own processing chain (like Wood -> Planks).
-            var stoneBlock = MakeItem("stoneblock", "Stone Block", new Color(0.58f, 0.60f, 0.66f));
             // RESEARCH ITEMS — crafted (never gathered) multi-input products delivered to a Research
             // Lodge to earn research points → the ONLY way to advance an age. Each tier needs a
             // deeper production chain than the last (see the Research system + GAME_DESIGN).
@@ -105,17 +93,11 @@ namespace Caveman
             // --- Item descriptions (shown in the in-game Guide, key G) ---
             wood.description = "The starter resource — chop it from trees. Used by nearly every building, and refined into Planks and Charcoal.";
             stone.description = "Basic building material — mine it from rocks. Used in most early buildings and recipes (and to research the Tribal Age).";
-            food.description = "Berries gathered from bushes (Forager Hut). Keeps people alive; cook it for far more nourishment.";
-            water.description = "Drawn from lakes (Water Hole). People drink it every day; also needed for cooking, farming and baking.";
+            water.description = "A LIQUID pumped from rivers/lakes by a Water Pump and moved through PIPES (never belts). The Refinery needs it to crack Oil into Fuel.";
             planks.description = "A Sawmill turns Wood into Planks — a core material used by advanced machines and many recipes.";
-            cookedFood.description = "A Campfire cooks Food (+Wood +Water). More nourishing than raw, and your people's first comfort good (Tribal).";
-            meat.description = "Hunted from animal herds (Hunter's Hut). A nourishing food; keep it in a Smokehouse.";
             clay.description = "Dug from clay deposits (Clay Pit). Fired into Bricks, and shaped into Pottery.";
             charcoal.description = "A Charcoal Burner turns Wood into Charcoal. It fuels the Kiln AND both Smelters (Basic & Advanced) — a key shared bottleneck.";
             bricks.description = "A Kiln fires Clay + Charcoal into Bricks — a sturdy material for advanced buildings.";
-            grain.description = "A Farm grows Grain from Water. Milled into Flour.";
-            flour.description = "A Mill grinds Grain into Flour. Baked into Bread.";
-            bread.description = "A Bakery bakes Flour + Water into Bread — high nourishment, and a Bronze comfort good.";
             ore.description = "IRON ORE — mined from FINITE veins far in the hills. Smelted into Iron. Its scarcity drives Iron-age exploration.";
             metal.description = "IRON — the Basic Smelter melts Iron Ore + Charcoal into Iron. The backbone of Tools, Steel and the Monument.";
             tools.description = "A Toolmaker crafts Iron + Planks into Tools — needed for Blueprints (Industrial-Age research) and the Monument.";
@@ -124,13 +106,9 @@ namespace Caveman
             copper.description = "COPPER — the Basic Smelter melts Copper Ore + Charcoal into Copper. Feeds Study Scrolls (Bronze research) and Bronze Plates.";
             bronzePlate.description = "BRONZE PLATE — the Advanced Smelter presses Copper + Bricks into a plate. A deeper part needed to research the Iron Age (Schematics).";
             steel.description = "STEEL — the Advanced Smelter (set to Steel) forges Iron + Charcoal into Steel. The hardest metal; needed to research the Industrial Age (Blueprints).";
-            fiber.description = "Plant Fiber harvested from Cotton fields (Cotton Farm). Woven into Cloth.";
-            cloth.description = "A Weaver turns Fiber into Cloth. Tailored into Clothes.";
-            clothes.description = "A Tailor sews Cloth into Clothes — an Industrial luxury comfort good.";
-            pot.description = "A Potter shapes Clay into Pottery — combined with Bricks at a Drafting Table to make Schematics (Iron-Age research).";
+            pot.description = "A Potter shapes Clay into Pottery — combined with Bronze Plate at a Drafting Table to make Schematics (Iron-Age research).";
             gems.description = "The rarest resource, in FINITE deposits far out in the map. Cut into Jewelry; reaching them rewards exploration.";
             jewelry.description = "A Jeweler crafts Gems into Jewelry — a high-value luxury good.";
-            stoneBlock.description = "A Mason cuts Stone into Stone Blocks — used to build the sturdy Stone House.";
 
             // --- Belt icons (placeholder shapes by material family, so items are distinguishable
             //     on conveyors; real per-item art drops into ItemDefinition.icon later). ---
@@ -138,26 +116,18 @@ namespace Caveman
             // then resolve its icon (external sprite if one exists, else the procedural shape — identical
             // look for now). Real per-item art drops in by adding Resources/art/<id> sprites later.
             foreach (var it in new[] { wood, planks }) it.sprite = SpriteDefinition.Of(PlaceholderShape.Triangle);              // woody
-            foreach (var it in new[] { stone, ore, clay, bricks, stoneBlock, gems, charcoal }) it.sprite = SpriteDefinition.Of(PlaceholderShape.Hexagon); // mineral
-            foreach (var it in new[] { metal, tools, monument, cloth, clothes, pot, jewelry, ideaTablet, studyScroll, schematic, blueprint, copperPlate, ironRod, locomotive, hull, wiring, circuit }) it.sprite = SpriteDefinition.Of(PlaceholderShape.Square); // manufactured
-            foreach (var it in new[] { wood, planks, stone, ore, clay, bricks, stoneBlock, gems, charcoal, metal, tools, monument, cloth, clothes, pot, jewelry, ideaTablet, studyScroll, schematic, blueprint, copperPlate, ironRod, locomotive, hull, wiring, circuit })
+            foreach (var it in new[] { stone, ore, clay, bricks, gems, charcoal }) it.sprite = SpriteDefinition.Of(PlaceholderShape.Hexagon); // mineral
+            foreach (var it in new[] { metal, tools, monument, pot, jewelry, ideaTablet, studyScroll, schematic, blueprint, copperPlate, ironRod, locomotive, hull, wiring, circuit }) it.sprite = SpriteDefinition.Of(PlaceholderShape.Square); // manufactured
+            foreach (var it in new[] { wood, planks, stone, ore, clay, bricks, gems, charcoal, metal, tools, monument, pot, jewelry, ideaTablet, studyScroll, schematic, blueprint, copperPlate, ironRod, locomotive, hull, wiring, circuit })
                 it.icon = SpriteDatabase.ForItem(it);
-            // food / cooked / meat / grain / flour / bread / fiber keep the default round dot.
 
             // --- Buildings ---
             var woodHut = MakeCollector("Wood Hut", wood, 1, 2.0f, 2, 12, new Color(0.80f, 0.52f, 0.25f),
                 new ItemAmount(wood, 5), new ItemAmount(stone, 3));
             var stonePit = MakeCollector("Stone Pit", stone, 1, 2.0f, 2, 12, new Color(0.45f, 0.52f, 0.62f),
                 new ItemAmount(wood, 5), new ItemAmount(stone, 5));
-            var foragerHut = MakeCollector("Forager Hut", food, 1, 2.0f, 2, 12, new Color(0.78f, 0.40f, 0.40f),
-                new ItemAmount(wood, 4));
-            foragerHut.autoStore = true; // SURVIVAL: its worker carries Food to the nearest Granary (no belt needed)
-            foragerHut.description = "Auto-gathers berries from a nearby bush at a fixed rate (no workers). Belt or place a Granary next to it to store the Food.";
-            var waterHole = MakeCollector("Water Hole", water, 1, 2.0f, 2, 12, new Color(0.40f, 0.62f, 0.85f),
-                new ItemAmount(wood, 4));
-            waterHole.fromWaterTerrain = true; // must sit next to real water terrain (river/lake)
-            waterHole.autoStore = true; // SURVIVAL: its worker carries Water to the nearest Water Barrel (no belt/pipe needed)
-            waterHole.description = "Auto-draws Water from adjacent water terrain at a fixed rate (no workers). Adjacent buildings can use it directly; pipes (Bronze) move it further.";
+            // (Survival-era collectors — Forager Hut, Water Hole — deleted with the factory-first pivot.
+            //  Water enters the economy via the Water Pump + pipes; nothing hand-carries any more.)
             // Bridge: plank tile placed on water; makes it passable for feet + belts. Core
             // logistics infrastructure — strategic chokepoints across rivers.
             var bridge = ScriptableObject.CreateInstance<BuildingDefinition>();
@@ -189,7 +159,7 @@ namespace Caveman
             pump.displayName = "Water Pump"; pump.kind = BuildingKind.Pump; pump.item = water; pump.unlockAge = 2;
             pump.color = new Color(0.30f, 0.55f, 0.78f);
             pump.cost = new List<ItemAmount> { new ItemAmount(planks, 4), new ItemAmount(stone, 4) };
-            pump.description = "Place next to water (river/lake) and connect pipes: it pushes water through the network into reachable Water Barrels AND directly into adjacent water-using buildings (Campfire/Farm/Bakery) — no workers carrying it. Pressure fades over distance — far consumers starve unless you add a Booster Pump. The Bronze-age evolution of the Water Hole.";
+            pump.description = "Place next to water (river/lake) and connect pipes: it pushes water through the network into reachable Water Barrels and water-using machines (the Refinery needs it for Fuel). Pressure fades over distance — far consumers starve unless you add a Booster Pump.";
             // Booster Pump: re-pressurises a pipe network so it reaches further (the solution to
             // the distance/pressure problem). No water source needed — place it on a long run.
             var booster = ScriptableObject.CreateInstance<BuildingDefinition>();
@@ -200,18 +170,10 @@ namespace Caveman
             var sawmill = MakeWorkshop("Sawmill", planks, 1, 5.0f, 2, 12, new Color(0.66f, 0.50f, 0.30f),
                 new List<ItemAmount> { new ItemAmount(wood, 2) }, // 2 wood -> 1 plank / 5s = 24 wood/min — BELOW a wooden belt (40), so wood PILES UP: build more Sawmills
                 new ItemAmount(wood, 6), new ItemAmount(stone, 4));
-            // Campfire: needs Wood as fuel and Water to cook, plus the raw Food.
-            var campfire = MakeWorkshop("Campfire", cookedFood, 1, 3.0f, 2, 12, new Color(0.85f, 0.45f, 0.25f),
-                new List<ItemAmount> { new ItemAmount(food, 2), new ItemAmount(wood, 1), new ItemAmount(water, 1) },
-                new ItemAmount(wood, 4), new ItemAmount(stone, 2));
             var woodStore = MakeStorage("Woodpile", wood, 100, new Color(0.62f, 0.40f, 0.20f),
                 new ItemAmount(wood, 8));
             woodStore.singlePort = true; // 2×2 like the Wood Hut, but ONE belt in + ONE belt out
             woodStore.description = "Resource-specific storage: holds Wood only. Same size as a Wood Hut, with one belt in and one belt out. (Each basic store is named for what it holds — Woodpile, Granary, Water Barrel. The configurable 'Warehouse' is the ONE general store you assign yourself.)";
-            var stoneStore = MakeStorage("Stone Stockpile", stone, 160, new Color(0.66f, 0.67f, 0.70f),
-                new ItemAmount(wood, 8));
-            var foodStore = MakeStorage("Granary", food, 100, new Color(0.70f, 0.45f, 0.35f),
-                new ItemAmount(wood, 8));
             var waterStore = MakeStorage("Water Barrel", water, 100, new Color(0.35f, 0.50f, 0.72f),
                 new ItemAmount(wood, 8));
             waterStore.unlockAge = 2; // water/pipes are a Bronze-age system — no use in the Stone age, so keep it out of the early menu
@@ -277,33 +239,35 @@ namespace Caveman
             twoWaySignal.description = "TWO-WAY RAIL SIGNAL — like a Signal, but trains may pass in EITHER direction along the track (R aims its axis). It still enforces ONE train per block (green = clear, red = occupied), so it protects a shared bidirectional stretch without forcing a one-way route. Pair with passing loops so opposing trains don't deadlock head-on.";
             // Route vehicle tiers — each links two depots; bigger/faster as ages advance (the
             // donkey → train upgrade path). Existing routes upgrade in place on age-up.
+            // Route costs are authored at the SAME ×3.5 scale as buildings (they're set after the CostScale
+            // pass, so the scale is baked in here): a vehicle is a real purchase, not spare change next to
+            // its Station. Flagship components (Locomotive / Engine / Hull) stay ×1 — the chain IS the cost.
             var caravan = MakeRoute("Donkey Cart", 12, 3.5f, 0, new Color(0.62f, 0.48f, 0.34f),
-                new ItemAmount(wood, 8));
+                new ItemAmount(wood, 28));
             var oxCart = MakeRoute("Ox Cart", 18, 4.5f, 1, new Color(0.60f, 0.45f, 0.30f),
-                new ItemAmount(wood, 10), new ItemAmount(planks, 4));
+                new ItemAmount(wood, 35), new ItemAmount(planks, 14));
             var wagonTrain = MakeRoute("Wagon Train", 36, 6.5f, 3, new Color(0.45f, 0.45f, 0.52f),
-                new ItemAmount(locomotive, 1), new ItemAmount(steel, 4)); // a real TRAIN needs a Locomotive (Eng Lab)
+                new ItemAmount(locomotive, 1), new ItemAmount(steel, 14)); // a real TRAIN needs a Locomotive (Eng Lab)
             var cargoDrone = MakeRoute("Cargo Drone", 24, 12f, 4, new Color(0.50f, 0.70f, 0.85f),
-                new ItemAmount(engine, 1), new ItemAmount(circuit, 2)); // a Cargo Drone needs an Engine + Circuits (electronics)
+                new ItemAmount(engine, 1), new ItemAmount(circuit, 7)); // a Cargo Drone needs an Engine + Circuits (electronics)
             // Cargo SHIP tiers — run on HARBOUR lines (over water). Available from the start so boats are an
             // early option for crossing rivers/lakes; a bigger steam ship arrives in the Iron age.
             var cargoShip = MakeRoute("Cargo Ship", 40, 5.0f, 0, new Color(0.40f, 0.60f, 0.85f),
-                new ItemAmount(wood, 12), new ItemAmount(planks, 4));
+                new ItemAmount(wood, 42), new ItemAmount(planks, 14));
             var steamShip = MakeRoute("Steam Ship", 80, 7.5f, 3, new Color(0.45f, 0.55f, 0.70f),
-                new ItemAmount(hull, 1), new ItemAmount(steel, 4)); // a Steam Ship needs a steel Hull (Toolmaker)
+                new ItemAmount(hull, 1), new ItemAmount(steel, 14)); // a Steam Ship needs a steel Hull (Toolmaker)
 
             // --- Age 1: Tribal ---
-            var hunter = MakeCollector("Hunter's Hut", meat, 1, 2.0f, 2, 12, new Color(0.66f, 0.34f, 0.34f),
-                new ItemAmount(wood, 6)); hunter.unlockAge = 1;
             var clayPit = MakeCollector("Clay Pit", clay, 1, 2.0f, 2, 12, new Color(0.68f, 0.46f, 0.36f),
                 new ItemAmount(wood, 5)); clayPit.unlockAge = 1;
-            var charcoalBurner = MakeWorkshop("Charcoal Burner", charcoal, 2, 4.0f, 2, 12, new Color(0.62f, 0.58f, 0.54f),
+            // Feed-rate rule: every machine is feedable by its OWN age's belt (wooden = 80/min).
+            // 4 wood / 4s (effective) = 60 wood/min in → 30 charcoal/min out; late-game charcoal demand
+            // (~125/min across Kiln + Smelters + Coal Gen) means you build SEVERAL — the shared bottleneck.
+            var charcoalBurner = MakeWorkshop("Charcoal Burner", charcoal, 2, 8.0f, 2, 12, new Color(0.62f, 0.58f, 0.54f),
                 new List<ItemAmount> { new ItemAmount(wood, 3) },
-                new ItemAmount(wood, 6), new ItemAmount(stone, 4)); charcoalBurner.unlockAge = 1; // 2 charcoal / 4s = 30/min; Kiln+both Smelters want ~57/min → you need SEVERAL — the shared bottleneck
+                new ItemAmount(wood, 6), new ItemAmount(stone, 4)); charcoalBurner.unlockAge = 1;
             var clayStore = MakeStorage("Clay Pile", clay, 100, new Color(0.60f, 0.42f, 0.34f),
                 new ItemAmount(wood, 8)); clayStore.unlockAge = 1;
-            var smokehouse = MakeStorage("Smokehouse", meat, 100, new Color(0.55f, 0.32f, 0.30f),
-                new ItemAmount(wood, 8), new ItemAmount(stone, 2)); smokehouse.unlockAge = 1;
 
             // --- Age 2: Bronze ---
             // Kiln + Brick Yard sit in the TRIBAL age (1): clay is useful early and the Tribal research chain is
@@ -311,25 +275,11 @@ namespace Caveman
             var kiln = MakeWorkshop("Kiln", bricks, 1, 5.0f, 2, 12, new Color(0.70f, 0.42f, 0.34f),
                 new List<ItemAmount> { new ItemAmount(clay, 2), new ItemAmount(charcoal, 1) }, // 1 brick / 5s — clay piles up: build more Kilns
                 new ItemAmount(wood, 8), new ItemAmount(stone, 6)); kiln.unlockAge = 1;
-            var farm = MakeWorkshop("Farm", grain, 2, 3.0f, 3, 16, new Color(0.80f, 0.72f, 0.38f),
-                new List<ItemAmount> { new ItemAmount(water, 1) },
-                new ItemAmount(wood, 8)); farm.unlockAge = 2;
-            var mill = MakeWorkshop("Mill", flour, 1, 2.5f, 2, 12, new Color(0.85f, 0.80f, 0.65f),
-                new List<ItemAmount> { new ItemAmount(grain, 2) },
-                new ItemAmount(wood, 8), new ItemAmount(planks, 4)); mill.unlockAge = 2;
-            var bakery = MakeWorkshop("Bakery", bread, 1, 3.5f, 2, 12, new Color(0.82f, 0.60f, 0.34f),
-                new List<ItemAmount> { new ItemAmount(flour, 1), new ItemAmount(water, 1) },
-                new ItemAmount(planks, 5), new ItemAmount(bricks, 4)); bakery.unlockAge = 2;
             var brickStore = MakeStorage("Brick Yard", bricks, 100, new Color(0.66f, 0.40f, 0.34f),
                 new ItemAmount(wood, 8)); brickStore.unlockAge = 1; // bricks are a Tribal material now (clay → Kiln → bricks)
-            // Masonry: Stone -> Stone Blocks, used for sturdy housing.
-            var mason = MakeWorkshop("Mason", stoneBlock, 1, 3.0f, 2, 12, new Color(0.58f, 0.60f, 0.66f),
-                new List<ItemAmount> { new ItemAmount(stone, 2) },
-                new ItemAmount(wood, 6), new ItemAmount(stone, 4)); mason.unlockAge = 2;
             // BELT TIER LADDER (each ~2× the last; overlay a faster tier on a slower belt to upgrade
-            // in place — no need to delete). Wooden is a deliberately SLOW starter (½ a collector's
-            // output) so upgrading belts is an early, meaningful goal: Wooden 30 → Conveyor 60 →
-            // Geared 120 → Steel 240. Splitters/Mergers run at the top rate so they never throttle.
+            // in place — no need to delete): Wooden 80 → Conveyor 120 → Geared 240 → Steel 480 per min
+            // (with Belt.MinGap = 0.5). Splitters/Mergers run at the top rate so they never throttle.
             var woodBelt = ScriptableObject.CreateInstance<BuildingDefinition>();
             woodBelt.displayName = "Wooden Belt"; woodBelt.kind = BuildingKind.Belt; woodBelt.unlockAge = 0;
             woodBelt.interval = 1.5f; // 80 items/min cap (speed 1/interval ÷ MinGap 0.5) — just above one collector's 60/min
@@ -421,9 +371,6 @@ namespace Caveman
             // required to reach the Iron Age.
             var mine = MakeCollector("Iron Mine", ore, 1, 2.5f, 2, 12, new Color(0.50f, 0.48f, 0.40f),
                 new ItemAmount(wood, 6), new ItemAmount(stone, 4)); mine.unlockAge = 1;
-            var oreStore = MakeStorage("Ore Stockpile", ore, 160, new Color(0.60f, 0.48f, 0.37f),
-                new ItemAmount(wood, 8)); oreStore.unlockAge = 1;
-            oreStore.description = "ORE STOCKPILE — an OPEN-AIR heap for Iron Ore (no roof). Belt ore in, belt it out to a Smelter. Holds a big pile.";
             // MERGED raw Stockpile (replaces the separate Stone + Ore stockpiles, which were confusing): ONE
             // open-air heap you SET to hold Stone, Copper Ore or Iron Ore (click to cycle while empty).
             var stockpile = MakeStorage("Stockpile", null, 200, new Color(0.60f, 0.55f, 0.48f),
@@ -438,7 +385,6 @@ namespace Caveman
             largeStockpile.footprintW = 3; largeStockpile.footprintH = 3;
             largeStockpile.singlePort = false; largeStockpile.dualPort = true; largeStockpile.unlockAge = 3;
             largeStockpile.description = "LARGE STOCKPILE — a big open-air raw heap (Iron Age): holds 2000 of Stone, Copper Ore or Iron Ore (click to set while empty), on a 3×3 footprint with TWO belts in + TWO belts out. Replaces a row of basic Stockpiles for a busy Smelter feed.";
-            stoneStore.description = "STONE STOCKPILE — an OPEN-AIR heap for Stone (no roof). Belt stone in and out. Cheap, holds a big pile — the natural home for raw Stone instead of a Warehouse.";
             // --- SMELTERS (configurable, multi-recipe). A BASIC smelter for ore→bar and an ADVANCED
             //     smelter that combines materials into alloy bars. Each replaces TWO old fixed-recipe
             //     buildings (Iron+Copper Smelters → Basic; Bronzeworks+Steel Foundry → Advanced). Click
@@ -555,39 +501,30 @@ namespace Caveman
             monumentBldg.footprintW = 3; monumentBldg.footprintH = 3; // the endgame monument is the biggest structure
             monumentBldg.requiresPower = true; monumentBldg.powerDraw = 40; // a megadraw — the endgame should strain the grid hard
 
-            // --- Textiles & pottery chains (comfort goods) ---
-            // Pottery (Bronze): Clay -> Pottery. Reuses the clay you already mine.
-            var potter = MakeWorkshop("Potter", pot, 1, 3.0f, 2, 12, new Color(0.72f, 0.50f, 0.40f),
+            // Pottery (Bronze): Clay -> Pottery — feeds the Drafting Table's Schematic recipe.
+            // 3 clay / 3s (effective) = 60 clay/min in (feedable by one wooden belt), 20 pots/min out.
+            var potter = MakeWorkshop("Potter", pot, 1, 6.0f, 2, 12, new Color(0.72f, 0.50f, 0.40f),
                 new List<ItemAmount> { new ItemAmount(clay, 2) },
                 new ItemAmount(wood, 6), new ItemAmount(stone, 4)); potter.unlockAge = 2; potter.requiresPower = true;
-            // Textiles: Cotton -> Fiber -> Cloth -> Clothes (an Industrial luxury).
-            var cottonFarm = MakeCollector("Cotton Farm", fiber, 1, 2.0f, 2, 12, new Color(0.70f, 0.78f, 0.55f),
-                new ItemAmount(wood, 6)); cottonFarm.unlockAge = 2;
-            var weaver = MakeWorkshop("Weaver", cloth, 1, 3.5f, 2, 12, new Color(0.80f, 0.78f, 0.70f),
-                new List<ItemAmount> { new ItemAmount(fiber, 2) },
-                new ItemAmount(wood, 8), new ItemAmount(planks, 4)); weaver.unlockAge = 3;
-            var tailor = MakeWorkshop("Tailor", clothes, 1, 4.0f, 2, 12, new Color(0.50f, 0.58f, 0.80f),
-                new List<ItemAmount> { new ItemAmount(cloth, 2) },
-                new ItemAmount(planks, 6), new ItemAmount(bricks, 4)); tailor.unlockAge = 4;
             // Gems (Iron, mined from distant deposits) -> Jewelry (Industrial) for the Monument.
             var gemMine = MakeCollector("Gem Mine", gems, 1, 2.5f, 2, 10, new Color(0.45f, 0.70f, 0.66f),
                 new ItemAmount(wood, 8), new ItemAmount(stone, 6)); gemMine.unlockAge = 3;
-            var jeweler = MakeWorkshop("Jeweler", jewelry, 1, 4.5f, 2, 10, new Color(0.85f, 0.78f, 0.45f),
+            // 3 gems / 3s (effective) = 60 gems/min in (one wooden belt), 20 jewelry/min out — matches
+            // the Monument's 20/min jewelry draw at full tilt.
+            var jeweler = MakeWorkshop("Jeweler", jewelry, 1, 6.0f, 2, 10, new Color(0.85f, 0.78f, 0.45f),
                 new List<ItemAmount> { new ItemAmount(gems, 2) },
                 new ItemAmount(planks, 8), new ItemAmount(metal, 4)); jeweler.unlockAge = 4;
 
             // --- Hand-written descriptions for buildings that need strategic context
             //     (everything else auto-generates a full tooltip from its data). ---
-            sawmill.description = "Wood → Planks. Runs automatically once fed. A Sawmill wants ~40 Wood/min — MORE than one slow Wooden Belt carries (30/min), so it can't run flat-out on wooden belts. Research the Conveyor (60/min) and overlay it to feed the Sawmill fully, or run a 2nd Wood line. Scaling planks = scaling belts + Sawmills.";
-            campfire.description = "Food + Wood + Water → Cooked Food. Runs automatically once its inputs are delivered.";
-            charcoalBurner.description = "Wood → Charcoal. Charcoal feeds the Kiln AND both Smelters (Basic & Advanced) — scaling one can starve the others. A key shared-bottleneck.";
+            sawmill.description = "Wood → Planks. Runs automatically once fed. A Sawmill eats ~72 Wood/min — nearly a full Wooden Belt (80/min) — so ONE fed sawmill saturates a wood line. Scaling planks = more Wood Huts, more belts, more Sawmills.";
+            charcoalBurner.description = "Wood → Charcoal (~60 Wood/min in → 30 Charcoal/min out). Charcoal feeds the Kiln AND both Smelters (Basic & Advanced) — scaling one can starve the others. Build several: it's the key shared bottleneck.";
             kiln.description = "Clay + Charcoal → Bricks. Charcoal is shared with the Smelters, so watch that bottleneck. Bricks build advanced structures.";
             toolmaker.description = "FORGE / TOOLMAKER — shapes metal into mechanical COMPONENTS (click to switch recipe): Bronze Plate + Planks → Bronze Gear · Iron + Planks → Tools · Steel + Planks → Steel Beam · Steel Beam + Planks → Hull (the Steam Ship's body) · Copper → Copper Wiring (electronics). Build several to run them in parallel. Draws POWER.";
             mine.description = "Build ON a distant Iron Ore vein (the far Hills). Iron Ore is FINITE — veins deplete and vanish, so keep exploring outward and hauling it home.";
             gemMine.description = "Build ON a far Gem Deposit (the rarest, finite resource). Gems → Jewelry. Reaching them rewards exploration + good transport.";
             jeweler.description = "Gems → Jewelry, a high-value luxury good. Pairs with long-haul routes to bring distant gems home.";
-            monumentBldg.description = "ENDGAME: feed an Engine + Jewelry + 4 Bricks per Monument Block (it draws on your deepest chains — the Engineering Lab and the Jeweler). Make 10 to WIN. Needs Power — a 40-draw megasink that strains the grid.";
-            mason.description = "Stone → Stone Blocks (Stone's own processing chain). Stone Blocks build the sturdy Stone House.";
+            monumentBldg.description = "ENDGAME: feed an Engine + Jewelry + 6 Bricks per Monument Block (it draws on your deepest chains — the Engineering Lab and the Jeweler). Make 10 to WIN. Needs Power — a 40-draw megasink that strains the grid.";
             warehouse.description = "Warehouse — stores ONE resource of your choice (Stone, Ore, Planks, anything). It adopts the first item a belt delivers, or pick it in the panel. This one building replaces a separate store per resource.";
 
             // --- RESEARCH SYSTEM: the progression spine. Each age is unlocked by crafting that
@@ -620,7 +557,7 @@ namespace Caveman
             {
                 new Recipe(machinePart, 1, 4.0f, 3, new ItemAmount(steelBeam, 1), new ItemAmount(bronzeGear, 1), new ItemAmount(tools, 1)), // Iron — 3-input assembly
                 new Recipe(locomotive,  1, 6.0f, 3, new ItemAmount(steelBeam, 1), new ItemAmount(machinePart, 1), new ItemAmount(bronzeGear, 1)), // Iron — the TRAIN's engine (gates the Wagon Train)
-                new Recipe(circuit,     1, 4.0f, 3, new ItemAmount(wiring, 2),    new ItemAmount(copperPlate, 1)), // Iron — a Circuit board (gates Cargo Drones + Solar Panels)
+                new Recipe(circuit,     1, 6.0f, 3, new ItemAmount(wiring, 2),    new ItemAmount(copperPlate, 1)), // Iron — a Circuit board (gates Drones + Solar). 3 wiring / 3s eff = 60/min in — one wooden belt feeds it
                 new Recipe(blueprint,   1, 3.5f, 3, new ItemAmount(steel, 1),     new ItemAmount(machinePart, 1)),                            // Iron — the RESEARCH item, now deeper
                 new Recipe(engine,      1, 5.0f, 4, new ItemAmount(machinePart, 1), new ItemAmount(steel, 1), new ItemAmount(fuel, 1)),       // Industrial final product (needs Fuel)
             };
@@ -643,8 +580,9 @@ namespace Caveman
                 new Research.Tier { targetAge = 4, item = blueprint,   pointsPerItem = 20 },  // craft at Iron (now needs a Machine Part)
             };
             // The spendable research TREE (press T to open). Age spine (each needs the prior) + a few
-            // building-unlock branches you CHOOSE to spend points on. Age costs RETUNED to a smoother curve
-            // (#47-balance): 12 → 150 → 400 → 800 — roughly ~12 / 30 / 40 / 40 item deliveries per age, not 300+.
+            // building-unlock branches you CHOOSE to spend points on. Age costs: 24 → 300 → 800 → 1600
+            // (doubled with the 2× ProductionScale so wall-clock pacing held) = ~24 / 60 / 80 / 80 item
+            // deliveries per age at the tier point values above. THE key pacing knob — tune from playtests.
             Research.Tree = new List<Research.Tech>
             {
                 new Research.Tech { id = "tribal",     name = "Tribal Age",     cost = 24,  advanceToAge = 1, prereq = null,     desc = "Advance to the Tribal Age — Charcoal & Clay open up deeper production." },
@@ -748,8 +686,8 @@ namespace Caveman
                 new List<ItemAmount> { new ItemAmount(steel, 8),   new ItemAmount(fuel, 6) },   // Motorbike
             };
             // FACTORY-FIRST build menu: gathering → processing → research → logistics → storage →
-            // power/endgame. Survival/comfort buildings (forager, water hole, granary, campfire,
-            // farm/mill/bakery, hunter, housing, textiles, masonry) are intentionally NOT offered —
+            // power/endgame. (The old survival/comfort buildings were fully DELETED with the
+            // factory-first pivot — see GAME_DESIGN.md —
             // the game is now a pure production/automation loop. The Gem Mine → Jeweler chain IS
             // offered, though: Jewelry is a required Monument ingredient (the win).
             builder.buildables = new List<BuildingDefinition>
@@ -786,9 +724,10 @@ namespace Caveman
                     new UpgradeTier(n3, 4, 3.5f, new Color(0.55f, 0.80f, 0.95f), new ItemAmount(steel, 4),  new ItemAmount(tools, 3)),
                 };
             }
-            foreach (var c in new[] { woodHut, stonePit, clayPit, copperMine, mine })
+            foreach (var c in new[] { woodHut, stonePit, clayPit, copperMine, mine, gemMine })
                 AddUpgrades(c, "Bronze Tools", "Iron Tools", "Powered Machine");
-            foreach (var wbDef in new[] { sawmill, charcoalBurner, kiln, potter, basicSmelter, advancedSmelter, toolmaker })
+            foreach (var wbDef in new[] { sawmill, charcoalBurner, kiln, potter, basicSmelter, advancedSmelter, toolmaker,
+                                          refinery, jeweler, engineeringLab, ideaBench, scrollMaker, draftingTable })
                 AddUpgrades(wbDef, "Geared Parts", "Reinforced Frame", "Automation");
 
             // Central sprite-name table: pre-fill the building/belt/resource maps with expected names
@@ -869,6 +808,10 @@ namespace Caveman
             bool HasWorkshopOf(ItemDefinition i) { foreach (var w in WorkshopBuilding.All) if (w != null && w.output == i) return true; return false; }
             bool HasStorageOf(ItemDefinition i) { foreach (var s in StorageBuilding.All) if (s != null && s.accepts == i) return true; return false; }
             int AgeNow() => Colony.Instance != null ? Colony.Instance.Age : 0;
+            // A generator that's actually WIRED into a grid (the electricity quests teach wiring, not just placing).
+            bool AnyGenWired() { foreach (var n in PowerNode.All) if (n != null && n.role == PowerNode.Role.Generator && n.links.Count > 0) return true; return false; }
+            // Industrial-age power: an Oil Generator (high output) or a renewable (Windmill / Solar).
+            bool AnyAdvancedPower() { foreach (var pp in PowerPlant.All) if (pp != null && (pp.renewable || pp.output >= 100)) return true; return false; }
             var objectives = new GameObject("Objectives").AddComponent<Objectives>();
             // FACTORY-FIRST objective ladder: gather → store → process → component → research →
             // automate → advance ages → Monument. No survival/population/comfort goals.
@@ -878,12 +821,12 @@ namespace Caveman
             objectives.quests = new List<Quest>
             {
                 // ── Stone Age (0) ──
-                new Quest { age = 0, title = "Click trees & rocks to gather 12 Wood by hand",  done = () => Have(wood) >= 12,        progress = () => (Have(wood), 12),       reward = () => carriedInv.Add(stone, 8),   rewardText = "+8 Stone", highlightBuilding = woodHut },
+                new Quest { age = 0, title = "Click trees & rocks to hand-gather 12 resources", done = () => PlayerGatherer.HandGathered >= 12, progress = () => (PlayerGatherer.HandGathered, 12), reward = () => carriedInv.Add(stone, 8), rewardText = "+8 Stone", highlightBuilding = woodHut },
                 new Quest { age = 0, title = "Build a Wood Hut to gather Wood automatically",   done = () => HasCollectorOf(wood),    reward = () => carriedInv.Add(wood, 12),   rewardText = "+12 Wood", highlightBuilding = woodHut },
                 new Quest { age = 0, title = "Build a Woodpile to store the Wood",              done = () => HasStorageOf(wood),      reward = () => carriedInv.Add(planks, 4),  rewardText = "+4 Planks", highlightBuilding = woodStore },
                 new Quest { age = 0, title = "Run a conveyor Belt from the Wood Hut to the Woodpile", done = () => Belt.Count >= 1,   progress = () => (Belt.Count, 1),        reward = () => carriedInv.Add(planks, 6),  rewardText = "+6 Planks", highlightBuilding = woodBelt },
                 new Quest { age = 0, title = "Build a Stone Pit to gather Stone",               done = () => HasCollectorOf(stone),   reward = () => carriedInv.Add(stone, 12),  rewardText = "+12 Stone", highlightBuilding = stonePit },
-                new Quest { age = 0, title = "Build a Stone Stockpile + belt the Pit into it",  done = () => HasStorageOf(stone) && Belt.Count >= 2, reward = () => carriedInv.Add(stone, 12), rewardText = "+12 Stone", highlightBuilding = stoneStore },
+                new Quest { age = 0, title = "Build a Stockpile (set to Stone) + belt the Pit into it", done = () => HasStorageOf(stone) && Belt.Count >= 2, reward = () => carriedInv.Add(stone, 12), rewardText = "+12 Stone", highlightBuilding = stockpile },
                 new Quest { age = 0, title = "Build a Sawmill to turn Wood into Planks",         done = () => HasWorkshopOf(planks),   reward = () => carriedInv.Add(planks, 10), rewardText = "+10 Planks", highlightBuilding = sawmill },
                 new Quest { age = 0, title = "Build an Idea Bench (Planks + Stone → Idea Tablet)", done = () => HasWorkshopOf(ideaTablet), reward = () => carriedInv.Add(stone, 10), rewardText = "+10 Stone", highlightBuilding = ideaBench },
                 new Quest { age = 0, title = "Build a Research Lodge to spend research",        done = () => ResearchBuilding.All.Count > 0, reward = () => carriedInv.Add(stone, 8), rewardText = "+8 Stone", highlightBuilding = researchLodge },
@@ -894,7 +837,7 @@ namespace Caveman
                 new Quest { age = 1, title = "Make 10 Charcoal (build a Charcoal Burner)",     done = () => Have(charcoal) >= 10,    progress = () => (Have(charcoal), 10),   reward = () => carriedInv.Add(planks, 10), rewardText = "+10 Planks", highlightBuilding = charcoalBurner },
                 new Quest { age = 1, title = "Build a Clay Pit to gather Clay",                done = () => HasCollectorOf(clay),   reward = () => carriedInv.Add(planks, 6),  rewardText = "+6 Planks", highlightBuilding = clayPit },
                 new Quest { age = 1, title = "Build a Kiln and fire 15 Bricks (Clay + Charcoal)", done = () => Have(bricks) >= 15, progress = () => (Have(bricks), 15), reward = () => carriedInv.Add(clay, 20), rewardText = "+20 Clay", highlightBuilding = kiln },
-                new Quest { age = 1, title = "Electricity! Build a Wood Generator and wire it to a machine", done = () => PowerPlant.All.Count >= 1, reward = () => carriedInv.Add(planks, 12), rewardText = "+12 Planks", highlightBuilding = woodGen },
+                new Quest { age = 1, title = "Electricity! Build a Wood Generator and wire it to a machine", done = () => AnyGenWired(), reward = () => carriedInv.Add(planks, 12), rewardText = "+12 Planks", highlightBuilding = woodGen },
                 new Quest { age = 1, title = "Make a Study Scroll (Bricks + Planks → Scroll Maker)", done = () => Have(studyScroll) >= 1 || AgeNow() >= 2, reward = () => carriedInv.Add(planks, 12), rewardText = "+12 Planks", highlightBuilding = scrollMaker },
                 new Quest { age = 1, title = "Research the Bronze Age",                        done = () => AgeNow() >= 2,           reward = () => carriedInv.Add(stone, 30),  rewardText = "+30 Stone" },
                 // ── Bronze Age (2) ──  (now the metal age: copper + smelting)
@@ -907,8 +850,8 @@ namespace Caveman
                 new Quest { age = 3, title = "Craft 10 Tools (Iron + Planks → Toolmaker)",     done = () => Have(tools) >= 10,       progress = () => (Have(tools), 10),      reward = () => carriedInv.Add(planks, 30), rewardText = "+30 Planks" },
                 new Quest { age = 3, title = "Research the Industrial Age",                    done = () => AgeNow() >= 4,           reward = () => carriedInv.Add(planks, 50), rewardText = "+50 Planks" },
                 // ── Industrial Age (4) ──
-                new Quest { age = 4, title = "Power up: build a Generator + connect a smelter",  done = () => PowerPlant.All.Count >= 1, reward = () => carriedInv.Add(metal, 10), rewardText = "+10 Metal" },
-                new Quest { age = 4, title = "Reach 600 Industry (automation score)",          done = () => Colony.Instance != null && Colony.Instance.PeakProsperity >= 600, progress = () => (Colony.Instance != null ? Colony.Instance.PeakProsperity : 0, 600), reward = () => carriedInv.Add(tools, 10), rewardText = "+10 Tools" },
+                new Quest { age = 4, title = "Industrial power: build an Oil Generator, Windmill or Solar Panel", done = () => AnyAdvancedPower(), reward = () => carriedInv.Add(metal, 10), rewardText = "+10 Metal", highlightBuilding = oilGen },
+                new Quest { age = 4, title = "Reach 1000 Industry (automation score)",         done = () => Colony.Instance != null && Colony.Instance.PeakProsperity >= 1000, progress = () => (Colony.Instance != null ? Colony.Instance.PeakProsperity : 0, 1000), reward = () => carriedInv.Add(tools, 10), rewardText = "+10 Tools" },
                 new Quest { age = 4, title = "Begin your legacy: build the Monument",          done = () => HasWorkshopOf(monument), reward = () => carriedInv.Add(planks, 40), rewardText = "+40 Planks" },
                 new Quest { age = 4, title = "🏆 Complete the Monument — 10 Blocks. YOU WIN!", done = () => Have(monument) >= 10, progress = () => (Have(monument), 10), isWin = true },
             };

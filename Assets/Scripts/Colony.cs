@@ -12,11 +12,6 @@ namespace Caveman
 
         [System.NonSerialized] public Inventory carried; // set at runtime; not a serialized field
 
-        // FACTORY-FIRST: survival pressure removed. These remain as inert API (always false) so
-        // existing HUD/economy references keep compiling — there is no starvation/thirst loop.
-        public bool Starving => false;
-        public bool Thirsty => false;
-
         // --- Ages / progression ---
         public int Age { get; private set; }
         public static readonly string[] AgeNames =
