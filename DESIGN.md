@@ -6,6 +6,14 @@
 > the detail. Headline rule it establishes: *"stored, not summoned"* — resources are only usable
 > once logistics delivers them; nothing teleports.
 
+> **⚠️ PARTLY SUPERSEDED (2026-07-02):** everything below that assumes SURVIVAL mechanics —
+> population, workers, food/water/cooking, comfort goods, happiness, housing, builder hauling —
+> was **deleted** by the factory-first pivot (GAME_DESIGN.md, 2026-06-26) and later **removed from
+> the code entirely** (2026-07-02 dead-content purge: the food/textile/masonry chains no longer
+> exist). The game is a pure Factorio-style automation loop with age progression: gather →
+> automate (belts/rails/ships/pipes/power) → craft research items → advance ages → Monument win.
+> Sections on logistics, ages, belts, terrain and the planning layer remain valid direction.
+
 A 2D PC automation/factory game (Unity 6, URP) where you start as a caveman doing
 everything by hand and evolve across historical ages into self-running, factory-like
 systems. Inspirations: **Factorio** (production chains), **Satisfactory** (factory

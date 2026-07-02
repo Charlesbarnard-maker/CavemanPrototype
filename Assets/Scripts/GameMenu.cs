@@ -16,7 +16,12 @@ namespace Caveman
         public enum Screen { None, Main, Pause, Settings }
         private Screen _screen = Screen.Main;
         private Screen _settingsReturn = Screen.Main;
-        private const int SlotCount = 3;
+        private const int SlotCount = 3;      // manual slots 0..2
+        public const int AutoSlot = 3;        // rolling autosave (load-only in the UI)
+        private const float AutosaveEvery = 300f; // seconds of unpaused play between autosaves
+        private float _autosaveT;
+        private int _confirmSlot = -1;        // slot armed for overwrite-confirm
+        private float _confirmAt;             // when it was armed (times out)
 
         private GUIStyle _title, _sub, _btn, _row, _box;
         private bool _styles;
@@ -42,6 +47,15 @@ namespace Caveman
 
         void Update()
         {
+            // Rolling autosave while actually playing (no menu up, not paused) — one crash or power cut
+            // should never cost more than a few minutes. Written to its own slot; manual slots untouched.
+            if (_screen == Screen.None && Time.timeScale > 0f)
+            {
+                _autosaveT += Time.unscaledDeltaTime;
+                if (_autosaveT >= AutosaveEvery) { _autosaveT = 0f; SaveSystem.Save(AutoSlot); }
+            }
+            if (_confirmSlot >= 0 && Time.unscaledTime - _confirmAt > 3f) _confirmSlot = -1; // confirm times out
+
             var kb = Keyboard.current;
             if (kb == null || !kb.escapeKey.wasPressedThisFrame) return;
             switch (_screen)
@@ -118,6 +132,7 @@ namespace Caveman
             GUILayout.Space(10);
             GUILayout.Label("Save / Load", _sub);
             for (int i = 0; i < SlotCount; i++) DrawSlotRow(i);
+            DrawAutoRow();
             GUILayout.Space(10);
             if (GUILayout.Button("Settings", _btn)) { AudioManager.Click(); _settingsReturn = Screen.Pause; _screen = Screen.Settings; }
             GUILayout.Space(6);
@@ -132,9 +147,30 @@ namespace Caveman
             GUILayout.BeginHorizontal();
             string info = SaveSystem.SlotInfo(i);
             GUILayout.Label($"Slot {i + 1}:  {(string.IsNullOrEmpty(info) ? "<empty>" : info)}", _row, GUILayout.Width(300));
-            if (GUILayout.Button("Save", _row, GUILayout.Width(70))) { if (SaveSystem.Save(i)) AudioManager.Chime(); }
+            // Overwriting an existing save takes TWO clicks (arm → "Sure?"), so a mis-click can't eat a run.
+            bool armed = _confirmSlot == i;
+            if (GUILayout.Button(armed ? "Sure?" : "Save", _row, GUILayout.Width(70)))
+            {
+                if (!SaveSystem.HasSave(i) || armed)
+                { _confirmSlot = -1; if (SaveSystem.Save(i)) AudioManager.Chime(); }
+                else { _confirmSlot = i; _confirmAt = Time.unscaledTime; AudioManager.Click(); }
+            }
             GUI.enabled = SaveSystem.HasSave(i);
             if (GUILayout.Button("Load", _row, GUILayout.Width(70))) { if (SaveSystem.Load(i)) { AudioManager.Chime(); Resume(); } }
+            GUI.enabled = true;
+            GUILayout.EndHorizontal();
+            GUILayout.Space(3);
+        }
+
+        // The rolling autosave slot: load-only (the game writes it every few minutes + on quit).
+        private void DrawAutoRow()
+        {
+            GUILayout.BeginHorizontal();
+            string info = SaveSystem.SlotInfo(AutoSlot);
+            GUILayout.Label($"Auto:  {(string.IsNullOrEmpty(info) ? "<empty>" : info)}", _row, GUILayout.Width(300));
+            GUILayout.Label("(saves every 5 min)", _row, GUILayout.Width(70));
+            GUI.enabled = SaveSystem.HasSave(AutoSlot);
+            if (GUILayout.Button("Load", _row, GUILayout.Width(70))) { if (SaveSystem.Load(AutoSlot)) { AudioManager.Chime(); Resume(); } }
             GUI.enabled = true;
             GUILayout.EndHorizontal();
             GUILayout.Space(3);
@@ -171,14 +207,11 @@ namespace Caveman
         }
 
         // ---------------- actions ----------------
-        private static bool AnySave()
-        {
-            for (int i = 0; i < SlotCount; i++) if (SaveSystem.HasSave(i)) return true;
-            return false;
-        }
+        private static bool AnySave() => SaveSystem.NewestSlot() >= 0;
         private void LoadNewest()
         {
-            for (int i = 0; i < SlotCount; i++) if (SaveSystem.HasSave(i)) { if (SaveSystem.Load(i)) { AudioManager.Chime(); Resume(); } return; }
+            int slot = SaveSystem.NewestSlot(); // the freshest save wins — including the autosave
+            if (slot >= 0 && SaveSystem.Load(slot)) { AudioManager.Chime(); Resume(); }
         }
         private void Restart()
         {
@@ -188,6 +221,8 @@ namespace Caveman
         }
         private void Quit()
         {
+            // Quitting from the PAUSE menu means a game is in progress — autosave it so nothing is lost.
+            if (_screen == Screen.Pause) SaveSystem.Save(AutoSlot);
 #if UNITY_EDITOR
             UnityEditor.EditorApplication.isPlaying = false;
 #else

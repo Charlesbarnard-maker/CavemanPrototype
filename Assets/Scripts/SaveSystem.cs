@@ -17,7 +17,21 @@ namespace Caveman
     /// </summary>
     public static class SaveSystem
     {
-        public const int Version = 2; // v2 adds the fog-of-war explored mask (v1 saves load without it)
+        public const int Version = 3; // v2 added the fog mask; v3 adds in-progress construction sites
+
+        /// <summary>The most recently written save slot in [0, maxSlots), or -1 if none — drives Continue
+        /// (which should prefer the freshest save, including the autosave slot).</summary>
+        public static int NewestSlot(int maxSlots = 4)
+        {
+            int best = -1; System.DateTime bestT = System.DateTime.MinValue;
+            for (int i = 0; i < maxSlots; i++)
+            {
+                if (!HasSave(i)) continue;
+                var t = File.GetLastWriteTime(SlotPath(i));
+                if (t > bestT) { bestT = t; best = i; }
+            }
+            return best;
+        }
         private const uint Magic = 0x56535643; // 'CVSV'
 
         public static string SaveDir => Path.Combine(Application.persistentDataPath, "saves");
@@ -152,6 +166,7 @@ namespace Caveman
             WriteBelts(w);
             WriteRoutes(w, depotIndex);
             WritePowerWires(w);
+            WriteSites(w); // v3: buildings still under construction (they'd silently vanish otherwise)
         }
 
         // ============================== LOAD ==============================
@@ -202,6 +217,7 @@ namespace Caveman
                 ReadBelts(r);
                 ReadRoutes(r);
                 ReadPowerWires(r);
+                if (ver >= 3) ReadSites(r); // v2 saves simply had no site data
 
                 PlayerController.RecomputeGarageSlots();
                 Debug.Log($"[SaveSystem] Loaded slot {slot}.");
@@ -220,6 +236,7 @@ namespace Caveman
         // (which unregisters from the All lists + grids) runs synchronously before we respawn.
         private static void TeardownWorld()
         {
+            DestroyComps(ConstructionSite.All);
             DestroyComps(RouteVehicle.All);
             DestroyComps(ProductionBuilding.All);
             DestroyComps(WorkshopBuilding.All);
@@ -932,6 +949,34 @@ namespace Caveman
                 if (rv == null) continue;
                 foreach (var (idx, mode) in modes)
                     if (idx >= 0 && idx < _loadDepots.Count && _loadDepots[idx] != null) rv.SetStopMode(_loadDepots[idx], mode);
+            }
+        }
+
+        // ---------------- construction sites (v3) ----------------
+        private static void WriteSites(BinaryWriter w)
+        {
+            var list = ConstructionSite.All;
+            w.Write(list.Count);
+            foreach (var s in list)
+            {
+                w.Write(s != null && s.def != null ? s.def.displayName : "");
+                WVec(w, s != null ? s.transform.position : Vector3.zero);
+                WDir(w, s != null ? s.outDir : Belt.Dir.E);
+                w.Write(s != null ? s.buildProgress : 0f);
+            }
+        }
+        private static void ReadSites(BinaryReader r)
+        {
+            int n = r.ReadInt32();
+            for (int i = 0; i < n; i++)
+            {
+                var def = SaveRegistry.Building(r.ReadString());
+                var pos = RVec(r);
+                var dir = RDir(r);
+                float progress = r.ReadSingle();
+                if (def == null) continue;
+                var site = ConstructionSite.Spawn(def, pos, dir); // cost was already paid pre-save
+                if (site != null) site.buildProgress = progress;  // resume where the build left off
             }
         }
 

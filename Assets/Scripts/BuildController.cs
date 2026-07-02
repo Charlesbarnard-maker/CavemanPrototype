@@ -790,7 +790,12 @@ namespace Caveman
                     Economy.Spend(def.cost, Carried);
                     ConstructionSite.Spawn(def, world, BuildDir);
                     BuildingsPlaced++;
+                    AudioManager.Place(); // placement thunk — the click landed
                 }
+            }
+            else if (mouse.leftButton.wasPressedThisFrame && !PlacementValid && !InventoryHud.PointerOverUI)
+            {
+                AudioManager.Deny(); // clicked an invalid spot — audible "no" to match the red ghost
             }
             if (mouse.rightButton.wasPressedThisFrame) CancelPlacement();
         }
@@ -1430,6 +1435,7 @@ namespace Caveman
             Economy.Spend(def.cost, Carried);
             Belt.Spawn(cell, d, def.interval, def.splitter, def.merger, def.color, def.displayName,
                        def.underground, def.filter, def.priority, def.gate);
+            AudioManager.Place(); // one thunk per laid segment
             BuildingsPlaced++;
         }
 
