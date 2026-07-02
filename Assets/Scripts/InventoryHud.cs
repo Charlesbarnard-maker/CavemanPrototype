@@ -731,7 +731,11 @@ namespace Caveman
                 string hex = ColorUtility.ToHtmlStringRGB(g.color);
                 var prev = GUI.color;
                 GUI.color = new Color(1f, 1f, 1f, Mathf.Clamp01(life * 1.5f)); // hold, then fade near the end
-                GUI.Label(new Rect(x - 60f, y - 38f, 120f, 22f), $"<color=#{hex}>{g.text}</color>", _gatherStyle);
+                // Size the box to the TEXT (the old fixed 120px clipped anything longer than "+1 Wood",
+                // e.g. the "Too far — move closer" warning).
+                var content = new GUIContent($"<color=#{hex}>{g.text}</color>");
+                float bw = Mathf.Max(120f, _gatherStyle.CalcSize(content).x + 14f);
+                GUI.Label(new Rect(x - bw / 2f, y - 38f, bw, 22f), content, _gatherStyle);
                 GUI.color = prev;
             }
         }
@@ -1798,12 +1802,19 @@ namespace Caveman
         private void DrawFooter()
         {
             if (builder != null && builder.PendingIndex >= 0) return;
-            float w = Mathf.Min(760f, _vw - 24f);
-            GUILayout.BeginArea(new Rect(_vw / 2f - w / 2f, _vh - 40f, w, 38f));
-            GUILayout.Label($"<size=13><color=#bbb>B build · <color=#9cf>T research</color> · <color=#ffd24d>J goals</color> · G guide · H help · M map · L lines · N minimap {(_showMinimap ? "on" : "off")} · Space pause</color></size>", _small);
+            float w = Mathf.Min(900f, _vw - 24f);
+            const float h = 44f;
+            var r = new Rect(_vw / 2f - w / 2f, _vh - h - 6f, w, h); // fully on-screen (row 2 used to hang off the bottom)
+            // Readability strip: the hints used to sit bare over the terrain and vanished on light ground.
+            var prevCol = GUI.color;
+            GUI.color = new Color(0f, 0f, 0f, 0.55f);
+            GUI.DrawTexture(new Rect(r.x - 10f, r.y - 4f, r.width + 20f, r.height + 8f), Texture2D.whiteTexture);
+            GUI.color = prevCol;
+            GUILayout.BeginArea(r);
+            GUILayout.Label($"<size=13><color=#e8e8e8>B build · <color=#9cf>T research</color> · <color=#ffd24d>J goals</color> · <color=#9f9>P stats</color> · <color=#fa9>K alerts</color> · G guide · H help · M map · L lines · N minimap {(_showMinimap ? "on" : "off")} · Space pause</color></size>", _small);
             string sandbox = Economy.FreeBuild ? "<color=#9f9>SANDBOX</color> · " : "";
             string mode = Economy.LocalProduction ? "<color=#fc8>Local logistics</color>" : "<color=#8cf>Global pool</color>";
-            GUILayout.Label($"<size=11><color=#999>{sandbox}Speed x{_speed:0} · {mode} (F7) · F1–F5 sandbox</color></size>", _small);
+            GUILayout.Label($"<size=11><color=#cfcfcf>Q pipette · X demolish · {sandbox}Speed x{_speed:0} · {mode} (F7) · F1–F5 sandbox</color></size>", _small);
             GUILayout.EndArea();
         }
 
