@@ -10,7 +10,7 @@ namespace Caveman
     /// BackedUp signal that you need to haul output out). When its node runs dry it auto-rebinds to
     /// the nearest live node within searchRadius (never a map-wide scan).
     /// </summary>
-    public class ProductionBuilding : MonoBehaviour
+    public class ProductionBuilding : MonoBehaviour, IPowerConsumer
     {
         public BuildingDefinition def;
         public ItemDefinition produces;
@@ -26,8 +26,38 @@ namespace Caveman
         public bool Paused { get; private set; }            // player can halt it (priorities)
         public void TogglePause() => Paused = !Paused;
         public ResourceNode Source => _source;
+
+        // ---- DRILL (geological extractor): placed ON its deposit, mines ONLY the pockets its footprint
+        //      (+1 ring) covers, rate scaled by how many it covers, STOPS when they're gone — no wandering
+        //      re-bind, no worker crew. Organic collectors (wood/stone/clay) keep the crew system. ----
+        public bool IsDrill => def != null && def.drill;
+        private readonly List<ResourceNode> _covered = new(); // the deposit pockets under/adjacent to the footprint
+        private float _richness = 1f;                          // rate multiplier from coverage (see RichnessFor)
+        private int _drillNext;                                // round-robin pocket index (even depletion)
+        public int CoveredPockets { get { PruneCovered(); return _covered.Count; } }
+        public float Richness => _richness;
+        public int CoveredRemaining { get { PruneCovered(); int t = 0; foreach (var n in _covered) if (n != null) t += n.Amount; return t; } }
+        /// <summary>Coverage → rate: 1 pocket ×0.8, 2 ×1.0 (the "standard" patch — matches the old flat rate),
+        /// 3 ×1.2, 4 ×1.4, 5+ ×1.6. Placement quality matters, but never more than ±60%.</summary>
+        public static float RichnessFor(int pockets) => pockets <= 0 ? 0f : Mathf.Min(1.6f, 0.6f + 0.2f * pockets);
+
+        // ---- Drill power (IPowerConsumer): a drill with a powerDraw is a grid customer. Unpowered it
+        //      still runs at HALF speed (slowed, never walled) — wiring it buys the other half. ----
+        public int PowerDraw => def != null ? def.powerDraw : 0;
+        public float CurrentDraw
+        {
+            get
+            {
+                if (!IsDrill || PowerDraw <= 0 || Paused || !PowerNet.Active) return 0f;
+                return Working ? PowerDraw : PowerDraw * 0.1f; // idle trickle while stalled, like workshops
+            }
+        }
+        /// <summary>0..1 grid factor for a powered drill (1 when power doesn't apply). HUD readout.</summary>
+        public float DrillPowerFactor => (IsDrill && PowerDraw > 0 && PowerNet.Active) ? PowerNet.FactorOf(this) : 1f;
+
         /// <summary>True while this collector is actively gathering — drives the visible worker units.</summary>
-        public bool Working => !Paused && _source != null && _source.HasResource && Buffer.Total() < Buffer.capacity;
+        public bool Working => !Paused && Buffer.Total() < Buffer.capacity
+                               && (IsDrill ? AnyCoveredResource() : _source != null && _source.HasResource);
 
         // ---- Manual paid age-upgrade (stone tools → metal → machines): faster gather rate + a look change. ----
         public int Tier { get; private set; }
@@ -66,6 +96,8 @@ namespace Caveman
         {
             All.Remove(this);
             if (_source != null) { _source.Claims = Mathf.Max(0, _source.Claims - 1); _source = null; } // release our node claim
+            foreach (var n in _covered) if (n != null) n.Claims = Mathf.Max(0, n.Claims - 1); // drill: release pocket claims
+            _covered.Clear();
             if (_cells != null) foreach (var c in _cells) WorldGrid.Remove(WorldGrid.Collectors, c, this);
             if (_fx != null) Destroy(_fx.gameObject); // FX is a standalone object → clean it up on demolish
         }
@@ -110,9 +142,25 @@ namespace Caveman
             foreach (var c in pb._cells) WorldGrid.Collectors[c] = pb;
             Ports.PlacePorts(go.transform, def.FootW, def.FootH, outputSide, false, true, singlePort: true);
             pb.Bind();
-            // Visible GATHERERS: little caveman workers walk out to the node and back (replaces the old
-            // machine-arm FX). Cosmetic — the gather timer above does the real work.
-            WorkerUnit.SpawnForCollector(pb, Mathf.Clamp(def.maxWorkers, 1, 3));
+            if (def.drill)
+            {
+                // DRILL: a machine, not a crew — the mechanical arm/dust FX reads as industrial extraction.
+                pb._fx = MachineWorkFX.Attach(go.transform.position);
+                // A powered drill is a wired grid CONSUMER (1 wire, like other machines). Unpowered = half speed.
+                if (def.powerDraw > 0)
+                {
+                    var node = go.AddComponent<PowerNode>();
+                    node.role = PowerNode.Role.Consumer;
+                    node.maxConnections = 1;
+                    node.consumer = pb;
+                }
+            }
+            else
+            {
+                // Visible GATHERERS: little caveman workers walk out to the node and back. Cosmetic —
+                // the gather timer above does the real work. (The organic-collector charm; keep it.)
+                WorkerUnit.SpawnForCollector(pb, Mathf.Clamp(def.maxWorkers, 1, 3));
+            }
             // Upgrade machinery overlay — grows with the building's tier (gear → +piston → +smokestack/glow).
             MachineUpgradeFX.Attach(go.transform, () => pb != null ? pb.Tier : 0);
             return pb;
@@ -127,9 +175,12 @@ namespace Caveman
         public void Bind() => Bind(sourceRange);
 
         /// <summary>Bind to the nearest live node of our type within `range`. Used at placement
-        /// (sourceRange) and when chasing a fresh patch after depletion (searchRadius).</summary>
+        /// (sourceRange) and when chasing a fresh patch after depletion (searchRadius).
+        /// A DRILL instead claims exactly the pockets its footprint (+1 ring) covers — extraction is
+        /// physically tied to placement, and it never re-binds elsewhere.</summary>
         public void Bind(float range)
         {
+            if (IsDrill) { BindCoverage(); return; }
             ResourceNode best = FindNearestNode(range);
             // Water collectors draw from adjacent WATER TERRAIN, not a pre-placed node: create
             // an infinite, invisible source at the nearest water cell (location-dependent
@@ -150,6 +201,58 @@ namespace Caveman
                 best = n;
             }
             if (best != null) SetSource(best);
+        }
+
+        // ---- Drill coverage: claim every matching pocket under the footprint + a 1-cell ring. The ring
+        //      forgives node-vs-grid rounding so a drill visibly ON a patch never reads as missing it. ----
+        private void BindCoverage()
+        {
+            foreach (var n in _covered) if (n != null) n.Claims = Mathf.Max(0, n.Claims - 1);
+            _covered.Clear();
+            if (_cells == null || produces == null) return;
+            int minX = int.MaxValue, minY = int.MaxValue, maxX = int.MinValue, maxY = int.MinValue;
+            foreach (var c in _cells)
+            { minX = Mathf.Min(minX, c.x); maxX = Mathf.Max(maxX, c.x); minY = Mathf.Min(minY, c.y); maxY = Mathf.Max(maxY, c.y); }
+            foreach (var n in ResourceNode.All)
+            {
+                if (n == null || n.yields != produces || n.transform.parent != null) continue;
+                int nx = Mathf.RoundToInt(n.transform.position.x), ny = Mathf.RoundToInt(n.transform.position.y);
+                if (nx >= minX - 1 && nx <= maxX + 1 && ny >= minY - 1 && ny <= maxY + 1) { _covered.Add(n); n.Claims++; }
+            }
+            _richness = RichnessFor(_covered.Count);
+        }
+
+        // Drop pockets that were destroyed (finite veins vanish at 0) and re-derive richness — a dying
+        // deposit slows the drill down naturally before it stops.
+        private void PruneCovered()
+        {
+            bool changed = false;
+            for (int i = _covered.Count - 1; i >= 0; i--)
+                if (_covered[i] == null) { _covered.RemoveAt(i); changed = true; }
+            if (changed) _richness = RichnessFor(_covered.Count);
+        }
+
+        private bool AnyCoveredResource()
+        {
+            PruneCovered();
+            foreach (var n in _covered) if (n != null && n.HasResource) return true;
+            return false;
+        }
+
+        // Round-robin extraction across the covered pockets, so the deposit visibly depletes evenly
+        // under the drill instead of eating one boulder at a time.
+        private int DrillExtract(int amount)
+        {
+            PruneCovered();
+            int got = 0;
+            for (int k = 0; k < _covered.Count && got < amount; k++)
+            {
+                var n = _covered[(_drillNext + k) % _covered.Count];
+                if (n == null || !n.HasResource) continue;
+                got += n.Extract(amount - got);
+                _drillNext = (_drillNext + k + 1) % Mathf.Max(1, _covered.Count);
+            }
+            return got;
         }
 
         // Re-point our source while keeping each node's Claims count accurate, so collectors fan out across a
@@ -204,6 +307,7 @@ namespace Caveman
         private float _rebindT;
         private void MaybeRebind()
         {
+            if (IsDrill) return; // a drill NEVER wanders — it mines what it sits on, then stops (move it deliberately)
             // Re-scan not only when the source is GONE, but also when it's nearly tapped (Amount < LowNode) — so a
             // depleting node RELEASES the collector to a fuller reachable one instead of looping on near-empty.
             bool needsBetter = _source == null || !_source.HasResource || _source.Amount < LowNode;
@@ -235,23 +339,28 @@ namespace Caveman
         {
             MaybeRebind(); // chase fresh patches as nearby ones deplete
 
-            // Fully automated gather: pull GatherPerCycle from the bound node into the Buffer each
-            // interval (no worker NPC). Backs up if the Buffer is full → the BackedUp signal.
-            bool working = !Paused && _source != null && _source.HasResource && Buffer.Total() < Buffer.capacity;
+            // Fully automated gather: pull GatherPerCycle from the bound node (or, for a DRILL, the covered
+            // pockets) into the Buffer each interval. Backs up if the Buffer is full → the BackedUp signal.
+            bool working = Working;
             if (working)
             {
                 float iv = interval / Mathf.Max(0.1f, _speedMult); // upgrades shorten the gather cadence
-                _timer += Time.deltaTime * Economy.ProductionScale; // global production-rate dial (feeds the denser belts)
+                if (IsDrill) iv /= Mathf.Max(0.1f, _richness);      // coverage scales a drill's rate (±60%)
+                float pw = 1f;
+                if (IsDrill && PowerDraw > 0 && PowerNet.Active)
+                    pw = 0.5f + 0.5f * PowerNet.FactorOf(this);      // wired+powered = full; unwired/dead grid = half
+                _timer += Time.deltaTime * pw * Economy.ProductionScale; // global production-rate dial (feeds the denser belts)
                 if (_timer >= iv)
                 {
                     _timer -= iv;
-                    int got = _source.Extract(GatherPerCycle * Mathf.Max(1, outputPerCycle)); // honour the def's per-cycle yield (was ignored)
+                    int want = GatherPerCycle * Mathf.Max(1, outputPerCycle); // honour the def's per-cycle yield
+                    int got = IsDrill ? DrillExtract(want) : _source.Extract(want);
                     if (got > 0)
                     {
                         int accepted = Buffer.Add(produces, got);
                         if (accepted > 0) { RecordProduced(accepted); Pulse(); }
                     }
-                    _source.Nudge();
+                    if (!IsDrill) _source.Nudge();
                 }
             }
             else _timer = 0f;
@@ -271,7 +380,12 @@ namespace Caveman
             if (_fx != null)
             {
                 _fx.SetWorking(working);
-                if (_source != null) _fx.SetTarget(_source.transform.position);
+                if (IsDrill)
+                {
+                    foreach (var n in _covered)
+                        if (n != null && n.HasResource) { _fx.SetTarget(n.transform.position); break; }
+                }
+                else if (_source != null) _fx.SetTarget(_source.transform.position);
             }
         }
 
@@ -283,7 +397,7 @@ namespace Caveman
             {
                 if (Paused) return Status.Idle;
                 if (Buffer.Total() >= Buffer.capacity) return Status.BackedUp;
-                if (_source == null || !_source.HasResource) return Status.Starved;
+                if (IsDrill ? !AnyCoveredResource() : _source == null || !_source.HasResource) return Status.Starved;
                 return Status.Working;
             }
         }

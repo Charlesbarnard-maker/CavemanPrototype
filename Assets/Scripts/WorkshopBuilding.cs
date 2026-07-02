@@ -9,7 +9,7 @@ namespace Caveman
     /// adjacent storage/machines) and adds the output to its Buffer. A full output Buffer or missing
     /// inputs stall it (the BackedUp / Starved signals). The engine for all production chains.
     /// </summary>
-    public class WorkshopBuilding : MonoBehaviour
+    public class WorkshopBuilding : MonoBehaviour, IPowerConsumer
     {
         public BuildingDefinition def;
         public ItemDefinition output;

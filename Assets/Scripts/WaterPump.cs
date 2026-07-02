@@ -150,7 +150,18 @@ namespace Caveman
             if (_q.Count == 0) return false; // no connected pipe → nothing to pump (and don't waste finite oil)
 
             int budget = flowPerTick;
-            if (node != null) { budget = node.Extract(flowPerTick); if (budget <= 0) return false; } // finite deposit
+            if (node != null)
+            {
+                // OIL PRESSURE: a deposit's flow scales with how full it still is (down to a 25% trickle)
+                // and the well NEVER takes the last unit — so a tapped-out field decays to a slow but
+                // permanent seep (its slow regen sets the long-run rate) instead of vanishing. This kills
+                // the soft-lock where all oil could be destroyed before the Monument needs Fuel.
+                float frac = node.capacity > 0 ? (float)node.Amount / node.capacity : 1f;
+                int want = Mathf.Max(1, Mathf.RoundToInt(flowPerTick * Mathf.Max(0.25f, frac)));
+                want = Mathf.Min(want, node.Amount - 1);
+                budget = want > 0 ? node.Extract(want) : 0;
+                if (budget <= 0) return false;
+            }
             bool delivered = false;
             int guard = 0;
             while (_q.Count > 0 && guard++ < 4096)

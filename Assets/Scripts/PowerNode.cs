@@ -3,6 +3,15 @@ using UnityEngine;
 
 namespace Caveman
 {
+    /// <summary>A machine that draws grid power. CurrentDraw = what it pulls right now (0 when off,
+    /// full while working, a trickle while stalled); PowerDraw = its full-tilt draw (the demand ceiling).
+    /// Implemented by WorkshopBuilding (powered machines) and ProductionBuilding (drills).</summary>
+    public interface IPowerConsumer
+    {
+        float CurrentDraw { get; }
+        int PowerDraw { get; }
+    }
+
     /// <summary>
     /// A node on the WIRED power grid. Every power participant carries one — Generators, Power Poles,
     /// Batteries, and the machines that consume power. Nodes are joined by WIRES the player draws (see
@@ -20,7 +29,7 @@ namespace Caveman
         // Back-refs (set by the owner's Spawn) so the solver can read output / demand / storage.
         public PowerPlant generator;
         public Battery battery;
-        public WorkshopBuilding consumer;
+        public IPowerConsumer consumer; // WorkshopBuilding (powered machine) or ProductionBuilding (drill)
 
         public static readonly List<PowerNode> All = new();
         // Adjacency — the nodes this one is wired to (kept symmetric with the other end).

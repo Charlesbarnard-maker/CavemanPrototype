@@ -23,7 +23,7 @@ namespace Caveman
         public static bool Active => Colony.Instance != null && Colony.Instance.Age >= PowerAge;
 
         private static int _frame = -1;
-        private static readonly Dictionary<WorkshopBuilding, float> _factor = new();
+        private static readonly Dictionary<IPowerConsumer, float> _factor = new();
         public static float TotalGen { get; private set; }
         public static float TotalDemand { get; private set; }
         public static float TotalStored { get; private set; }   // battery charge across the whole grid
@@ -34,7 +34,7 @@ namespace Caveman
 
         /// <summary>Power factor for a consumer: 1 connected with enough supply, &lt;1 if its network is
         /// oversubscribed, 0 if it has no power / isn't wired in. Drives the machine's run speed.</summary>
-        public static float FactorOf(WorkshopBuilding w)
+        public static float FactorOf(IPowerConsumer w)
         {
             EnsureFresh();
             return (w != null && _factor.TryGetValue(w, out var f)) ? f : 0f;
@@ -49,7 +49,7 @@ namespace Caveman
 
         // Reused scratch (cleared each rebuild) to keep the per-frame allocation small.
         private static readonly Dictionary<PowerNode, int> _comp = new();          // node → network id
-        private static readonly Dictionary<WorkshopBuilding, int> _consumerComp = new();
+        private static readonly Dictionary<IPowerConsumer, int> _consumerComp = new();
         private static readonly Stack<PowerNode> _stack = new();
         // Per-component scratch, grown to a high-water mark so Rebuild (every frame) doesn't re-alloc.
         private static float[] _gen = System.Array.Empty<float>();

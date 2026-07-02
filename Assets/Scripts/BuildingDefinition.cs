@@ -123,6 +123,8 @@ namespace Caveman
         public List<ItemDefinition> stockpileWhitelist = new();
         [Tooltip("Collector: draws its resource from adjacent WATER terrain (not a node) — e.g. Water Hole.")]
         public bool fromWaterTerrain = false;
+        [Tooltip("Collector: a DRILL — must be placed ON its deposit (footprint overlapping the ore pockets). It mines only what it covers (coverage scales its rate), STOPS when those pockets run dry (no wandering re-bind), and runs as a machine — no worker crew.")]
+        public bool drill = false;
         [Tooltip("Collector: when its node runs dry, how far (world units) it will look for a fresh node of the same type. 0 = use the default. Bounded + candidate-capped, so no map-wide scan.")]
         public float searchRadius = 0f;
         [Tooltip("Pump: a BOOSTER (no water source) — re-pressurises a pipe network to extend its range.")]

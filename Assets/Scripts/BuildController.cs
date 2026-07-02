@@ -575,9 +575,9 @@ namespace Caveman
             // Placing a collector → show its harvest reach at the ghost, so you can tell the range
             // BEFORE committing (the node glow during placement is handled by SetResourceHighlight).
             var pd = PendingDef;
-            if (pd != null && pd.kind == BuildingKind.Collector && _ghost != null && _ghost.activeSelf)
+            if (pd != null && pd.kind == BuildingKind.Collector && !pd.drill && _ghost != null && _ghost.activeSelf)
             {
-                ClearRangeLit();
+                ClearRangeLit(); // (a drill has no gather radius — it mines its footprint, so no ring)
                 DrawRing(_ghost.transform.position, placeNodeRange);
                 return;
             }
@@ -751,7 +751,9 @@ namespace Caveman
             const float waterAdj = 1.6f; // reaches an orthogonally/diagonally adjacent water cell
             bool affordable = Economy.CanAfford(def.cost, Carried);
             bool placeOk;
-            if (def.kind == BuildingKind.Collector)
+            if (def.kind == BuildingKind.Collector && def.drill)
+                placeOk = DepositUnderFootprint(world, ew, eh, def.item); // a DRILL must sit ON its deposit
+            else if (def.kind == BuildingKind.Collector)
                 placeOk = HasMatchingNodeNear(world, def.item, placeNodeRange)
                           || (def.fromWaterTerrain && TerrainGrid.HasWaterNear(world, waterAdj));
             else if (def.kind == BuildingKind.Pump)
@@ -983,10 +985,28 @@ namespace Caveman
             return false;
         }
 
-        // The one building allowed to sit ON its resource: the Oil Well — a non-booster Pump that draws a
-        // LIQUID (oil) from a deposit, so it must be placed right on the oil. Everything else keeps clear.
+        // Buildings allowed to sit ON their resource: the Oil Well (a non-booster liquid Pump on its
+        // deposit) and DRILLS (geological extractors that mine exactly what their footprint covers).
+        // Everything else keeps clear of resource patches.
         private static bool AllowedOnResource(BuildingDefinition def) =>
-            def.kind == BuildingKind.Pump && !def.booster && def.item != null && def.item.isLiquid && !def.fromWaterTerrain;
+            def.drill
+            || (def.kind == BuildingKind.Pump && !def.booster && def.item != null && def.item.isLiquid && !def.fromWaterTerrain);
+
+        // A matching pocket under the footprint + a 1-cell ring (mirrors ProductionBuilding.BindCoverage,
+        // so the placement test and what the drill will actually mine can never disagree).
+        private static bool DepositUnderFootprint(Vector3 center, int w, int h, ItemDefinition item)
+        {
+            if (item == null) return false;
+            var a = Footprint.Anchor(center, w, h);
+            foreach (var nd in ResourceNode.All)
+            {
+                if (nd == null || nd.yields != item || nd.transform.parent != null) continue;
+                int nx = Mathf.RoundToInt(nd.transform.position.x);
+                int ny = Mathf.RoundToInt(nd.transform.position.y);
+                if (nx >= a.x - 1 && nx < a.x + w + 1 && ny >= a.y - 1 && ny < a.y + h + 1) return true;
+            }
+            return false;
+        }
 
         // True if the footprint covers BOTH water and BUILDABLE land — a harbour must straddle the shore so the
         // boat can dock on the water half while belts connect on the land half. A dry cell that's NOT buildable

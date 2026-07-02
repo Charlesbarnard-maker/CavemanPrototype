@@ -372,6 +372,8 @@ namespace Caveman
             // required to reach the Iron Age.
             var mine = MakeCollector("Iron Mine", ore, 1, 2.5f, 2, 12, new Color(0.50f, 0.48f, 0.40f),
                 new ItemAmount(wood, 6), new ItemAmount(stone, 4)); mine.unlockAge = 1;
+            mine.drill = true; // geological: drill-on-deposit, no crew
+            mine.powerDraw = 15;
             // MERGED raw Stockpile (replaces the separate Stone + Ore stockpiles, which were confusing): ONE
             // open-air heap you SET to hold Stone, Copper Ore or Iron Ore (click to cycle while empty).
             var stockpile = MakeStorage("Stockpile", null, 200, new Color(0.60f, 0.55f, 0.48f),
@@ -440,7 +442,9 @@ namespace Caveman
             //     Basic / Advanced Smelters defined above (no separate per-metal smelter buildings). ---
             var copperMine = MakeCollector("Copper Mine", copperOre, 1, 2.5f, 2, 12, new Color(0.78f, 0.52f, 0.32f),
                 new ItemAmount(wood, 6), new ItemAmount(stone, 4)); copperMine.unlockAge = 2; // Bronze age — copper starts the Bronze metal chain, not Tribal
-            copperMine.description = "Build ON a Copper Deposit (in the nearest expansion region). Copper Ore is FINITE — the start of the metal chain, and the key to the Bronze Age.";
+            copperMine.drill = true; // geological: a DRILL placed on the deposit, not a gathering crew
+            copperMine.powerDraw = 10; // wired = full speed, unwired = half — power's first real customer outside workshops
+            copperMine.description = "A DRILL — place it ON a Copper Deposit (footprint over the ore). It mines only the pockets it covers: more pockets under it = faster. When those pockets run dry it STOPS — demolish and move outward. Copper Ore is FINITE, and the key to the Bronze Age.";
             // Power: the Industrial age's new constraint. The Coal Generator burns Charcoal
             // to supply electrical power; from the Industrial age machines need it (or they
             // brown out and slow down). Unlocks in Iron so you can prepare before it bites.
@@ -510,6 +514,8 @@ namespace Caveman
             // Gems (Iron, mined from distant deposits) -> Jewelry (Industrial) for the Monument.
             var gemMine = MakeCollector("Gem Mine", gems, 1, 2.5f, 2, 10, new Color(0.45f, 0.70f, 0.66f),
                 new ItemAmount(wood, 8), new ItemAmount(stone, 6)); gemMine.unlockAge = 3;
+            gemMine.drill = true; // geological: drill-on-deposit, no crew
+            gemMine.powerDraw = 15;
             // 3 gems / 3s (effective) = 60 gems/min in (one wooden belt), 20 jewelry/min out — matches
             // the Monument's 20/min jewelry draw at full tilt.
             var jeweler = MakeWorkshop("Jeweler", jewelry, 1, 6.0f, 2, 10, new Color(0.85f, 0.78f, 0.45f),
@@ -522,8 +528,8 @@ namespace Caveman
             charcoalBurner.description = "Wood → Charcoal (~60 Wood/min in → 30 Charcoal/min out). Charcoal feeds the Kiln AND both Smelters (Basic & Advanced) — scaling one can starve the others. Build several: it's the key shared bottleneck.";
             kiln.description = "Clay + Charcoal → Bricks. Charcoal is shared with the Smelters, so watch that bottleneck. Bricks build advanced structures.";
             toolmaker.description = "FORGE / TOOLMAKER — shapes metal into mechanical COMPONENTS (click to switch recipe): Bronze Plate + Planks → Bronze Gear · Iron + Planks → Tools · Steel + Planks → Steel Beam · Steel Beam + Planks → Hull (the Steam Ship's body) · Copper → Copper Wiring (electronics). Build several to run them in parallel. Draws POWER.";
-            mine.description = "Build ON a distant Iron Ore vein (the far Hills). Iron Ore is FINITE — veins deplete and vanish, so keep exploring outward and hauling it home.";
-            gemMine.description = "Build ON a far Gem Deposit (the rarest, finite resource). Gems → Jewelry. Reaching them rewards exploration + good transport.";
+            mine.description = "A DRILL — place it ON a distant Iron Ore vein (the far Hills), footprint over the ore. It mines only the pockets it covers (more covered = faster) and STOPS when they're exhausted — veins deplete and vanish, so keep pushing outward and hauling it home.";
+            gemMine.description = "A DRILL — place it ON a far Gem Deposit (the rarest, finite resource), footprint over the gems. Mines only what it covers; stops when the pocket is out. Gems → Jewelry. Reaching them rewards exploration + good transport.";
             jeweler.description = "Gems → Jewelry, a high-value luxury good. Pairs with long-haul routes to bring distant gems home.";
             monumentBldg.description = "ENDGAME: feed an Engine + Jewelry + 6 Bricks per Monument Block (it draws on your deepest chains — the Engineering Lab and the Jeweler). Make 10 to WIN. Needs Power — a 40-draw megasink that strains the grid.";
             warehouse.description = "Warehouse — stores ONE resource of your choice (Stone, Ore, Planks, anything). It adopts the first item a belt delivers, or pick it in the panel. This one building replaces a separate store per resource.";
@@ -921,7 +927,9 @@ namespace Caveman
                 float oa = TerrainGrid.CorridorAngle(0, ZoneCount);
                 var oc = new Vector2(Mathf.Cos(oa) * 80f, Mathf.Sin(oa) * 80f);
                 TerrainGrid.Paint(new Vector3(oc.x, oc.y, 0f), 14f, Terrain.Plains);
-                SpawnClusters("Oil Field", oil, Color.white, PlaceholderArt.OilPatch(), oc, 8f, 4, 4, 6, 3.0f, new Vector2(1.2f, 1.8f), 200, 0, 0f);
+                // regen 1: an oil field never dies — pumped down, it seeps back slowly, so a drained field
+                // yields a permanent TRICKLE (the well's pressure model scales flow with remaining amount).
+                SpawnClusters("Oil Field", oil, Color.white, PlaceholderArt.OilPatch(), oc, 8f, 4, 4, 6, 3.0f, new Vector2(1.2f, 1.8f), 200, 1, 0f);
             }
 
             // Gem field — the RAREST resource: finite, far out BEYOND the Iron Ore field on the same

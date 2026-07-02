@@ -369,6 +369,29 @@ namespace Caveman
             if (_map == null) return;
             int ss = _size > 900 ? 2 : 4; // SUPERSAMPLE: bake several texels per cell so fine grain is crisp (POINT-filtered, sharp) rather than a blurry 1px-per-cell smear. Lower for huge worlds.
 
+            // DEPOSIT GROUND-STAINS: tint the ground under ore/oil clusters so a deposit reads as one
+            // contiguous FIELD (the thing a drill is placed on), not loose boulders. Nodes exist by bake
+            // time (bootstrap bakes after spawning; a load bakes after restoring nodes). Headless audits
+            // with no nodes simply get no stains.
+            var stains = new Dictionary<int, Color>();
+            foreach (var n in ResourceNode.All)
+            {
+                if (n == null || n.yields == null || n.transform.parent != null) continue;
+                string id = n.yields.id;
+                if (id != "copper_ore" && id != "ore" && id != "gems" && id != "oil") continue;
+                var sc = n.yields.color;
+                var stain = new Color(sc.r * 0.5f, sc.g * 0.5f, sc.b * 0.5f);
+                int cx = Mathf.RoundToInt(n.transform.position.x), cy = Mathf.RoundToInt(n.transform.position.y);
+                for (int dy = -2; dy <= 2; dy++)
+                    for (int dx = -2; dx <= 2; dx++)
+                    {
+                        if (dx * dx + dy * dy > 5) continue; // rounded blob, ~2-cell radius per pocket
+                        int gx = cx + dx + Half, gy = cy + dy + Half;
+                        if (gx < 0 || gy < 0 || gx >= _size || gy >= _size) continue;
+                        stains[gy * _size + gx] = stain;
+                    }
+            }
+
             // Pass 1 — per-cell base colour: warm biome palette, sandy COASTLINE rim, dithered biome EDGES.
             var cellCol = new Color[_map.Length];
             for (int gy = 0; gy < _size; gy++)
@@ -390,6 +413,7 @@ namespace Caveman
                                    || MapAt(gx, gy - 1) == Terrain.Water || MapAt(gx, gy + 1) == Terrain.Water;
                         if (coast) c = Color.Lerp(c, Sand, 0.6f);
                         else { Terrain nb = NeighbourLand(gx, gy, t); if (nb != t && CellHash(gx, gy, 2) < 0.30f) c = ColorOf(nb); }
+                        if (stains.TryGetValue(idx, out var stain)) c = Color.Lerp(c, stain, 0.42f); // mineral field under a deposit
                     }
                     cellCol[idx] = c;
                 }

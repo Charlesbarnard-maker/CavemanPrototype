@@ -194,8 +194,8 @@ namespace Caveman
 
                 // world
                 TerrainGrid.DeserializeFrom(r);
-                TerrainGrid.RebuildRenderer();
                 ReadNodes(r);
+                TerrainGrid.RebuildRenderer(); // AFTER nodes: the bake stains the ground under restored deposits
                 if (ver >= 2) FogOfWar.LoadFrom(r); // restore exactly what was explored (v1 saves had no fog data)
 
                 // buildings

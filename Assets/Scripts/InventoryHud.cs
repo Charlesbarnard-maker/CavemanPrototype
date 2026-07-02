@@ -909,10 +909,14 @@ namespace Caveman
                 else
                 {
                     bool isColl = def.kind == BuildingKind.Collector;
-                    string bad = isColl ? $"<color=#f99>move onto a glowing {Name(def.item)} patch</color>" : "<color=#f99>move to a clear spot</color>";
+                    string bad = isColl ? $"<color=#f99>{(def.drill ? $"place it ON the {Name(def.item)} deposit" : $"move onto a glowing {Name(def.item)} patch")}</color>" : "<color=#f99>move to a clear spot</color>";
                     string ok = builder.PlacementValid ? "<color=#9f9>green = click to place</color>" : bad;
                     GUILayout.Label($"<b>Placing {def.displayName}</b> — {ok}", _s);
-                    string hint = isColl ? $"<color=#cda>Must sit next to a {Name(def.item)} source — the {Name(def.item)} patches are glowing.</color>  " : "";
+                    string hint = isColl
+                        ? (def.drill
+                            ? $"<color=#cda>A DRILL mines only what its footprint covers — more {Name(def.item)} pockets under it = faster.</color>  "
+                            : $"<color=#cda>Must sit next to a {Name(def.item)} source — the {Name(def.item)} patches are glowing.</color>  ")
+                        : "";
                     bool hasPorts = def.kind == BuildingKind.Collector || def.kind == BuildingKind.Workshop;
                     string rot = hasPorts ? $"<color=#6f6>R rotates output ▸ {builder.BuildDir}</color> (belts pull from there) · "
                                : def.kind == BuildingKind.Depot ? "<color=#6f6>R rotates the platform + track lane</color> · "
@@ -1221,6 +1225,29 @@ namespace Caveman
                         : "Starved — an input isn't arriving")
                     : "Idle";
                 GUILayout.Label($"<size=13><color=#{ColorUtility.ToHtmlStringRGB(sc)}>● {st}</color></size>", _small);
+                // Drill: show WHAT it's standing on — coverage drives its rate, so this is its whole story.
+                if (pbSel != null && pbSel.IsDrill)
+                {
+                    int pk = pbSel.CoveredPockets;
+                    GUILayout.Label($"<size=12><color=#9cf>Deposit: {pk} pocket{(pk == 1 ? "" : "s")} covered · ×{pbSel.Richness:0.0} rate · ~{pbSel.CoveredRemaining} {(pbSel.produces != null ? pbSel.produces.displayName : "")} left</color></size>", _small);
+                    if (pbSel.PowerDraw > 0 && PowerNet.Active && pbSel.DrillPowerFactor < 0.999f)
+                    {
+                        GUILayout.Label("<size=12><color=#fc6>⚡ Running at HALF speed — wire it to the grid for full power.</color></size>", _small);
+                        var dnode = pbSel.GetComponent<PowerNode>();
+                        if (dnode != null && dnode.links.Count == 0 && GUILayout.Button("<size=12>⚡ Connect to nearest pole/generator</size>", _btn))
+                        {
+                            PowerNode best = null; float bestSq = float.MaxValue;
+                            foreach (var n in PowerNode.All)
+                            {
+                                if (n == null || n == dnode || n.role == PowerNode.Role.Consumer || !n.CanLinkMore) continue;
+                                float sq = (n.Pos - dnode.Pos).sqrMagnitude;
+                                if (sq < bestSq) { bestSq = sq; best = n; }
+                            }
+                            if (best != null && dnode.Connect(best)) AudioManager.Click();
+                            else Toast.Show("<color=#ffb24d>No pole/generator within wire reach — place a Power Pole closer, then try again.</color>");
+                        }
+                    }
+                }
             }
 
             bool demo, close;
