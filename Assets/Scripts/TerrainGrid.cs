@@ -361,6 +361,86 @@ namespace Caveman
         /// by the full-screen map (M) to draw terrain under the fog. Null until the world is generated.</summary>
         public static Texture2D MapTex { get; private set; }
 
+        // ---- HAND-PAINTED terrain detail (optional): the bake samples painterly ground tiles per biome
+        //      (Resources/art/terrain/terrain_<biome>.png) instead of pure procedural grain. The per-cell
+        //      colour layer (coast sand, deposit stains, mountain cliff shading, biome edge blending) still
+        //      applies on top as a tint, so every existing terrain feature survives. Missing textures →
+        //      silent fallback to the procedural look. ----
+        public static bool UsePaintedTerrain = true;
+        private const float PaintedTileCells = 9f; // one texture tile spans this many world cells
+
+        private class TexSampler
+        {
+            public Color[] px; public int w, h; public Color inverseMean; // 1/mean per channel (detail normaliser)
+            public Color Sample(float u, float v)
+            {
+                u -= Mathf.Floor(u); v -= Mathf.Floor(v);
+                float x = u * w - 0.5f, y = v * h - 0.5f;
+                int x0 = Mathf.FloorToInt(x), y0 = Mathf.FloorToInt(y);
+                float fx = x - x0, fy = y - y0;
+                int xa = ((x0 % w) + w) % w, xb = (xa + 1) % w;
+                int ya = ((y0 % h) + h) % h, yb = (ya + 1) % h;
+                return Color.Lerp(Color.Lerp(px[ya * w + xa], px[ya * w + xb], fx),
+                                  Color.Lerp(px[yb * w + xa], px[yb * w + xb], fx), fy);
+            }
+        }
+        private static TexSampler[] _biomeTex; // by (int)Terrain; null entry = flat (Water)
+        private static bool _texLoadTried;
+
+        private static TexSampler LoadSampler(string name)
+        {
+            var t = Resources.Load<Texture2D>("art/terrain/" + name);
+            if (t == null) return null;
+            try
+            {
+                var px = t.GetPixels();
+                float mr = 0f, mg = 0f, mb = 0f;
+                for (int i = 0; i < px.Length; i++) { mr += px[i].r; mg += px[i].g; mb += px[i].b; }
+                float inv = 1f / Mathf.Max(1, px.Length);
+                mr *= inv; mg *= inv; mb *= inv;
+                return new TexSampler
+                {
+                    px = px, w = t.width, h = t.height,
+                    inverseMean = new Color(1f / Mathf.Max(0.05f, mr), 1f / Mathf.Max(0.05f, mg), 1f / Mathf.Max(0.05f, mb))
+                };
+            }
+            catch { return null; } // not readable → fallback
+        }
+
+        private static bool EnsureBiomeTextures()
+        {
+            if (_texLoadTried) return _biomeTex != null;
+            _texLoadTried = true;
+            var plains = LoadSampler("terrain_plains");
+            if (plains == null) return false; // pack not imported → procedural look
+            var forest = LoadSampler("terrain_forest") ?? plains;
+            var hills = LoadSampler("terrain_hills") ?? plains;
+            var mountain = LoadSampler("terrain_mountain") ?? hills;
+            _biomeTex = new TexSampler[5];
+            _biomeTex[(int)Terrain.Plains] = plains;
+            _biomeTex[(int)Terrain.Forest] = forest;
+            _biomeTex[(int)Terrain.Hills] = hills;
+            _biomeTex[(int)Terrain.Mountain] = mountain;
+            _biomeTex[(int)Terrain.Water] = null; // water keeps its flat colour (+ the shimmer overlay)
+            return true;
+        }
+
+        // Painted-detail factor for one cell at a world-space UV: the cell's biome tile, sampled at TWO
+        // octaves (base scale + a larger incommensurate scale, offset) so the seamless tile's repeat
+        // never lines up — kills the wallpaper/honeycomb pattern a single octave produces on big plains.
+        // Normalised by the tile's mean so it works as a MULTIPLIER over the per-cell tint layer.
+        private static Color PaintedDetail(int gx, int gy, float u, float v)
+        {
+            var s = _biomeTex[(int)MapAt(gx, gy)];
+            if (s == null) return Color.white;
+            var a = s.Sample(u, v);
+            var b2 = s.Sample(u * 0.4317f + 0.37f, v * 0.4317f + 0.71f); // 2nd octave: ~2.3× larger features
+            float r = (a.r * 0.62f + b2.r * 0.38f) * s.inverseMean.r;
+            float g = (a.g * 0.62f + b2.g * 0.38f) * s.inverseMean.g;
+            float b = (a.b * 0.62f + b2.b * 0.38f) * s.inverseMean.b;
+            return new Color(Mathf.Clamp(r, 0.35f, 1.9f), Mathf.Clamp(g, 0.35f, 1.9f), Mathf.Clamp(b, 0.35f, 1.9f));
+        }
+
         /// <summary>Bake the current map into a world-space sprite (call AFTER ClearAround edits). The bake is no
         /// longer a flat colour per cell: it adds a sandy COASTLINE rim, per-cell brightness/warmth MOTTLE, sparse
         /// bright FLECKS, and DITHERED biome edges, so each region reads as textured ground instead of a slab.</summary>
@@ -418,9 +498,11 @@ namespace Caveman
                     cellCol[idx] = c;
                 }
 
-            // Pass 2 — the sharp high-res surface: each texel = its cell's colour + FINE per-texel grain (a few
-            // px of brightness wander, sparse bright flecks = grass/pebble highlights, sparse dark specks = dirt/
-            // shade). Point-filtered so it reads as detailed natural ground, not a soft wash.
+            // Pass 2 — the sharp high-res surface: each texel = its cell's colour + detail. Detail is either
+            // the HAND-PAINTED biome tile (sampled in world space, cross-blended at biome borders with the
+            // same bilinear weights as the tint) or the procedural grain fallback. Painted mode keeps a
+            // whisper of grain on top so the ground still sparkles.
+            bool painted = UsePaintedTerrain && EnsureBiomeTextures();
             int tw = _size * ss;
             float inv = 1f / ss;
             var px = new Color[tw * tw];
@@ -435,10 +517,30 @@ namespace Caveman
                     float ax = Mathf.Clamp01(fcx - x0), ay = Mathf.Clamp01(fcy - y0);
                     Color b = Color.Lerp(Color.Lerp(cellCol[y0 * _size + x0], cellCol[y0 * _size + x1], ax),
                                          Color.Lerp(cellCol[y1 * _size + x0], cellCol[y1 * _size + x1], ax), ay);
-                    float g = 0.90f + 0.18f * CellHash(tx, ty, 20);
-                    float f = CellHash(tx, ty, 21);
-                    if (f > 0.975f) g *= 1.18f;            // bright fleck
-                    else if (f < 0.025f) g *= 0.84f;       // dark speck
+                    float g, f;
+                    if (painted)
+                    {
+                        // Painted detail, cross-faded between the 4 corner cells' biome tiles (same weights as
+                        // the tint blend) so texture borders melt exactly where the colours do.
+                        float u = fcx / PaintedTileCells, v = fcy / PaintedTileCells;
+                        float w00 = (1f - ax) * (1f - ay), w10 = ax * (1f - ay), w01 = (1f - ax) * ay, w11 = ax * ay;
+                        Color d00 = PaintedDetail(x0, y0, u, v), d10 = PaintedDetail(x1, y0, u, v);
+                        Color d01 = PaintedDetail(x0, y1, u, v), d11 = PaintedDetail(x1, y1, u, v);
+                        float dr = d00.r * w00 + d10.r * w10 + d01.r * w01 + d11.r * w11;
+                        float dg = d00.g * w00 + d10.g * w10 + d01.g * w01 + d11.g * w11;
+                        float db = d00.b * w00 + d10.b * w10 + d01.b * w01 + d11.b * w11;
+                        b = new Color(b.r * dr, b.g * dg, b.b * db, 1f);
+                        g = 0.97f + 0.06f * CellHash(tx, ty, 20); // whisper of grain over the paint
+                        f = CellHash(tx, ty, 21);
+                        if (f > 0.99f) g *= 1.10f;
+                    }
+                    else
+                    {
+                        g = 0.90f + 0.18f * CellHash(tx, ty, 20);
+                        f = CellHash(tx, ty, 21);
+                        if (f > 0.975f) g *= 1.18f;            // bright fleck
+                        else if (f < 0.025f) g *= 0.84f;       // dark speck
+                    }
                     px[ty * tw + tx] = new Color(Mathf.Clamp01(b.r * g), Mathf.Clamp01(b.g * g), Mathf.Clamp01(b.b * g), 1f);
                 }
             var tex = new Texture2D(tw, tw, TextureFormat.RGBA32, false) { filterMode = FilterMode.Point, wrapMode = TextureWrapMode.Clamp };
