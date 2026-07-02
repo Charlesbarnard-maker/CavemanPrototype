@@ -447,7 +447,11 @@ namespace Caveman
         public static void SpawnRenderer()
         {
             if (_map == null) return;
-            int ss = _size > 900 ? 2 : 4; // SUPERSAMPLE: bake several texels per cell so fine grain is crisp (POINT-filtered, sharp) rather than a blurry 1px-per-cell smear. Lower for huge worlds.
+            // SUPERSAMPLE: texels baked per cell. Painted mode gets MORE (6) because up close the painted
+            // detail is the whole point; the texture is bilinear-filtered so close zoom reads as soft
+            // brushwork instead of hard texel squares. Lower for huge worlds (memory).
+            bool paintedPre = UsePaintedTerrain && EnsureBiomeTextures();
+            int ss = _size > 900 ? (paintedPre ? 3 : 2) : (paintedPre ? 6 : 4);
 
             // DEPOSIT GROUND-STAINS: tint the ground under ore/oil clusters so a deposit reads as one
             // contiguous FIELD (the thing a drill is placed on), not loose boulders. Nodes exist by bake
@@ -502,7 +506,7 @@ namespace Caveman
             // the HAND-PAINTED biome tile (sampled in world space, cross-blended at biome borders with the
             // same bilinear weights as the tint) or the procedural grain fallback. Painted mode keeps a
             // whisper of grain on top so the ground still sparkles.
-            bool painted = UsePaintedTerrain && EnsureBiomeTextures();
+            bool painted = paintedPre;
             int tw = _size * ss;
             float inv = 1f / ss;
             var px = new Color[tw * tw];
@@ -543,7 +547,10 @@ namespace Caveman
                     }
                     px[ty * tw + tx] = new Color(Mathf.Clamp01(b.r * g), Mathf.Clamp01(b.g * g), Mathf.Clamp01(b.b * g), 1f);
                 }
-            var tex = new Texture2D(tw, tw, TextureFormat.RGBA32, false) { filterMode = FilterMode.Point, wrapMode = TextureWrapMode.Clamp };
+            // Painted mode filters BILINEAR: up close the ground reads as soft brushwork, not texel squares.
+            // The procedural fallback keeps the original crisp Point-filtered grain.
+            var tex = new Texture2D(tw, tw, TextureFormat.RGBA32, false)
+            { filterMode = painted ? FilterMode.Bilinear : FilterMode.Point, wrapMode = TextureWrapMode.Clamp };
             tex.SetPixels(px);
             tex.Apply();
             MapTex = tex; // covers _size world units; pixel for world cell c ≈ (c+Half)*ss
