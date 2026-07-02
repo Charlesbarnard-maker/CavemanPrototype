@@ -148,10 +148,11 @@ namespace Caveman
             }
         }
 
+        private float _statusWarnT; // debounce: a caution shows only after the problem persists (no blink)
         private void UpdateStatus()
         {
             if (_statusDot == null) _statusDot = Status.MakeDot(transform);
-            Status.Apply(_statusDot, StatusColor);
+            Status.Apply(_statusDot, Status.Debounce(StatusColor, ref _statusWarnT));
         }
 
         private void UpdateVisual()

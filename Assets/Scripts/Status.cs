@@ -38,6 +38,17 @@ namespace Caveman
             dot.transform.localScale = Vector3.one * (0.32f * pulse);
         }
 
+        /// <summary>Debounce a status colour so the caution glyph appears only after a problem has PERSISTED
+        /// `dwell` seconds — stops the glyphs blinking on/off (christmas-lights) when buildings briefly toggle
+        /// state each production cycle. Healthy / paused states pass through instantly. Mirrors the belt warning.</summary>
+        public static Color Debounce(Color live, ref float warnT, float dwell = 2f)
+        {
+            bool problem = live != Working && live != Idle;
+            if (!problem) { warnT = 0f; return live; }
+            warnT += Time.deltaTime;
+            return warnT >= dwell ? live : Working; // pre-dwell: report "healthy" so Apply keeps the glyph hidden
+        }
+
         // ---- "Can upgrade now" badge: a green ⬆ that bobs over a building you can afford to upgrade. ----
         public static SpriteRenderer MakeUpgradeBadge(Transform parent)
         {

@@ -499,10 +499,11 @@ namespace Caveman
 
         private static bool _powerHintShown; // one-time onboarding when a machine first needs power
         public static void ResetPowerHint() => _powerHintShown = false;
+        private float _statusWarnT; // debounce: a caution shows only after the problem persists (no blink)
         private void UpdateStatus()
         {
             if (_statusDot == null) _statusDot = Status.MakeDot(transform);
-            Status.Apply(_statusDot, StatusColor);
+            Status.Apply(_statusDot, Status.Debounce(StatusColor, ref _statusWarnT));
             if (_upgradeBadge == null) _upgradeBadge = Status.MakeUpgradeBadge(transform);
             Status.ApplyUpgradeBadge(_upgradeBadge, CanUpgradeNow);
             if (!_powerHintShown && NoPower)
