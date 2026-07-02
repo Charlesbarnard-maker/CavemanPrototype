@@ -721,7 +721,8 @@ namespace Caveman
             // horizontal and a vertical orientation, so a Station can straddle a north–south track lane.
             bool hasPorts = def.kind == BuildingKind.Collector || def.kind == BuildingKind.Workshop
                             || def.kind == BuildingKind.Storage || def.kind == BuildingKind.Research;
-            bool canRotate = hasPorts || def.kind == BuildingKind.Depot || def.kind == BuildingKind.Power;
+            bool canRotate = hasPorts || def.kind == BuildingKind.Depot || def.kind == BuildingKind.Power
+                             || def.kind == BuildingKind.Arm; // R aims which way the crane swings
             if (canRotate && kb != null && kb.rKey.wasPressedThisFrame) BuildDir = Belt.RotateCW(BuildDir);
 
             EffFoot(def, BuildDir, out int ew, out int eh); // footprint after rotation (swaps W/H when turned vertical)
@@ -1049,7 +1050,8 @@ namespace Caveman
                     || h.GetComponent<WorkshopBuilding>() || h.GetComponent<Depot>()
                     || h.GetComponent<PowerPlant>() || h.GetComponent<WaterPump>() || h.GetComponent<Battery>()
                     || (includePoles && h.GetComponent<PowerPole>() != null) // poles block placement, not movement
-                    || h.GetComponent<ResearchBuilding>() || h.GetComponent<Garage>() || h.GetComponent<ConstructionSite>()) return true;
+                    || h.GetComponent<ResearchBuilding>() || h.GetComponent<Garage>()
+                    || h.GetComponent<CraneArm>() || h.GetComponent<ConstructionSite>()) return true;
             }
             return false;
         }
@@ -1938,10 +1940,11 @@ namespace Caveman
             var bat = Selected.GetComponent<Battery>();
             var wp = Selected.GetComponent<WaterPump>();
             var rsb = Selected.GetComponent<ResearchBuilding>();
+            var armSel = Selected.GetComponent<CraneArm>();
             BuildingDefinition rdef = pb != null ? pb.def : sb != null ? sb.def
                 : wb != null ? wb.def : dpo != null ? dpo.def : pp != null ? pp.def
                 : pole != null ? pole.def : bat != null ? bat.def
-                : wp != null ? wp.def : rsb != null ? rsb.def : null;
+                : wp != null ? wp.def : rsb != null ? rsb.def : armSel != null ? armSel.def : null;
             if (rdef == null) return;
 
             // Return any stored/buffered goods to the player's hands so demolishing never SILENTLY
@@ -1992,6 +1995,7 @@ namespace Caveman
             var br = go.GetComponent<Bridge>(); if (br != null) return br.def;
             var rt = go.GetComponent<RailTile>(); if (rt != null) return rt.def;
             var cs = go.GetComponent<ConstructionSite>(); if (cs != null) return cs.def;
+            var arm = go.GetComponent<CraneArm>(); if (arm != null) return arm.def;
             var pi = go.GetComponent<Pipe>();
             if (pi != null) { foreach (var d in buildables) if (d != null && d.kind == BuildingKind.Pipe && d.splitter == pi.isSplitter && d.merger == pi.isMerger) return d; }
             var sg = go.GetComponent<Signal>();
@@ -2025,6 +2029,7 @@ namespace Caveman
                               || hit.GetComponent<Belt>() != null
                               || hit.GetComponent<RailTile>() != null
                               || hit.GetComponent<Signal>() != null
+                              || hit.GetComponent<CraneArm>() != null
                               || hit.GetComponent<ConstructionSite>() != null;
             return isBuilding ? hit.gameObject : null;
         }

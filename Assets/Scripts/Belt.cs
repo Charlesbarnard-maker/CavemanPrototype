@@ -103,6 +103,20 @@ namespace Caveman
         public ItemDefinition item => _items.Count > 0 ? _items[0].def : null; // lead item TYPE
         public int count => _items.Count;
 
+        /// <summary>A CRANE ARM's tap into the line: take the LEAD item if it's within claw range
+        /// (p ≥ 0.5) and the claw will accept it. Works mid-line (steals from a through-belt) and at a
+        /// dead end alike. Downstream items simply close the gap next sim step.</summary>
+        internal bool TryTakeLead(System.Func<ItemDefinition, bool> accepts, out ItemDefinition def)
+        {
+            def = null;
+            if (_items.Count == 0) return false;
+            var lead = _items[0];
+            if (lead.p < 0.5f || lead.def == null || (accepts != null && !accepts(lead.def))) return false;
+            def = lead.def;
+            _items.RemoveAt(0);
+            return true;
+        }
+
         // --- Save/load: the raw params below (dir, interval, DisplayName, junction flags, undergroundExit,
         //     filterItems) are already public; these expose the private pieces the save system also needs. ---
         internal IReadOnlyList<BeltItem> ItemsForSave => _items;

@@ -1189,12 +1189,14 @@ namespace Caveman
             var pnode = sel.GetComponent<PowerNode>();
             var garage = sel.GetComponent<Garage>();
             var blt = sel.GetComponent<Belt>();
+            var armC = sel.GetComponent<CraneArm>();
             string name = wb != null ? wb.def.displayName : pbSel != null ? pbSel.def.displayName
                 : sb != null ? sb.def.displayName
                 : dp != null ? dp.def.displayName : resB != null ? resB.def.displayName
                 : pwr != null ? pwr.def.displayName : pole != null ? pole.def.displayName
                 : bat != null ? bat.def.displayName
                 : garage != null ? garage.def.displayName
+                : armC != null ? armC.def.displayName
                 : cs != null ? cs.def.displayName : blt != null ? blt.DisplayName : "Building";
             GUILayout.Label($"<b>{name}</b>", _s);
 
@@ -1204,6 +1206,34 @@ namespace Caveman
             // FILTER BELT — a visible whitelist picker (the old behaviour, silently adopting the first
             // item to arrive, was an invisible rule nobody could discover or change).
             if (blt != null && blt.isFilter) DrawFilterPicker(blt);
+
+            // CRANE ARM — swing stats, what's in the claw, the Gantry filter, and its power state.
+            if (armC != null)
+            {
+                GUILayout.Label($"<size=13>Swings <b>{armC.grabSize}</b> items every <b>{armC.cycleTime:0.0}s</b> · reach <b>{armC.reach}</b></size>", _small);
+                GUILayout.Label($"<size=12><color=#bbb>Grabs from BEHIND → drops in FRONT (R aims while placing). Holding: {(armC.held != null && armC.heldCount > 0 ? $"{armC.heldCount}× {armC.held.displayName}" : "nothing")}</color></size>", _small);
+                if (armC.HasFilterUI) DrawFilterList(armC.filterItems, "FILTER — the claw grabs ONLY the ticked items:");
+                if (armC.PowerDraw > 0 && PowerNet.Active)
+                {
+                    var anode = armC.GetComponent<PowerNode>();
+                    if (anode != null && anode.links.Count == 0)
+                    {
+                        GUILayout.Label("<size=12><color=#fc6>⚡ Running at HALF speed — wire it to the grid for full power.</color></size>", _small);
+                        if (GUILayout.Button("<size=12>⚡ Connect to nearest pole/generator</size>", _btn))
+                        {
+                            PowerNode best = null; float bestSq = float.MaxValue;
+                            foreach (var n in PowerNode.All)
+                            {
+                                if (n == null || n == anode || n.role == PowerNode.Role.Consumer || !n.CanLinkMore) continue;
+                                float sq = (n.Pos - anode.Pos).sqrMagnitude;
+                                if (sq < bestSq) { bestSq = sq; best = n; }
+                            }
+                            if (best != null && anode.Connect(best)) AudioManager.Click();
+                            else Toast.Show("<color=#ffb24d>No pole/generator within wire reach — place a Power Pole closer, then try again.</color>");
+                        }
+                    }
+                }
+            }
 
             // Plain-language status line for producers (the "understandable bottleneck" cue).
             if (wb != null || pbSel != null)
@@ -2239,8 +2269,14 @@ namespace Caveman
 
         // Whitelist picker for a selected FILTER belt: tick up to 5 item types it passes.
         private void DrawFilterPicker(Belt blt)
+            => DrawFilterList(blt.filterItems, "FILTER — passes only the ticked items (max 5):",
+                              "nothing ticked = adopts the first item that arrives");
+
+        // Shared whitelist picker (filter belts + Gantry crane arms): tick up to 5 of the items the
+        // factory currently produces.
+        private void DrawFilterList(List<ItemDefinition> filterItems, string caption, string emptyHint = "nothing ticked = no filter")
         {
-            GUILayout.Label("<size=12><color=#9cf>FILTER — passes only the ticked items (max 5):</color></size>", _small);
+            GUILayout.Label($"<size=12><color=#9cf>{caption}</color></size>", _small);
             var cands = new List<ItemDefinition>();
             void AddC(ItemDefinition i) { if (i != null && !i.isLiquid && !cands.Contains(i)) cands.Add(i); }
             foreach (var p in ProductionBuilding.All) if (p != null) AddC(p.produces);
@@ -2250,17 +2286,17 @@ namespace Caveman
             GUILayout.BeginHorizontal();
             foreach (var it in cands)
             {
-                bool on = blt.filterItems.Contains(it);
+                bool on = filterItems.Contains(it);
                 if (GUILayout.Button($"<size=11>{(on ? "☑" : "☐")} {it.displayName}</size>", _btn, GUILayout.Width(118)))
                 {
-                    if (on) blt.filterItems.Remove(it);
-                    else if (blt.filterItems.Count < 5) blt.filterItems.Add(it);
+                    if (on) filterItems.Remove(it);
+                    else if (filterItems.Count < 5) filterItems.Add(it);
                 }
                 if (++col % 2 == 0) { GUILayout.EndHorizontal(); GUILayout.BeginHorizontal(); }
             }
             GUILayout.EndHorizontal();
-            if (blt.filterItems.Count == 0)
-                GUILayout.Label("<size=11><color=#888>nothing ticked = adopts the first item that arrives</color></size>", _small);
+            if (filterItems.Count == 0)
+                GUILayout.Label($"<size=11><color=#888>{emptyHint}</color></size>", _small);
         }
 
         private static string CompassDir(Vector3 d)

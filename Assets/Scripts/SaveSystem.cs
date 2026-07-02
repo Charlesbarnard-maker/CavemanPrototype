@@ -17,7 +17,7 @@ namespace Caveman
     /// </summary>
     public static class SaveSystem
     {
-        public const int Version = 3; // v2 added the fog mask; v3 adds in-progress construction sites
+        public const int Version = 4; // v2 fog mask · v3 construction sites · v4 crane arms + title-matched objectives
 
         /// <summary>The most recently written save slot in [0, maxSlots), or -1 if none — drives Continue
         /// (which should prefer the freshest save, including the autosave slot).</summary>
@@ -167,6 +167,7 @@ namespace Caveman
             WriteRoutes(w, depotIndex);
             WritePowerWires(w);
             WriteSites(w); // v3: buildings still under construction (they'd silently vanish otherwise)
+            WriteArms(w);  // v4: crane arms
         }
 
         // ============================== LOAD ==============================
@@ -189,7 +190,7 @@ namespace Caveman
                 ReadResearch(r);
                 int peak = r.ReadInt32();
                 Colony.Instance?.LoadRestore(age, peak);
-                ReadObjectives(r);
+                ReadObjectives(r, ver);
                 ReadPlayer(r);
 
                 // world
@@ -218,6 +219,7 @@ namespace Caveman
                 ReadRoutes(r);
                 ReadPowerWires(r);
                 if (ver >= 3) ReadSites(r); // v2 saves simply had no site data
+                if (ver >= 4) ReadArms(r);  // crane arms
 
                 PlayerController.RecomputeGarageSlots();
                 Debug.Log($"[SaveSystem] Loaded slot {slot}.");
@@ -252,6 +254,7 @@ namespace Caveman
             DestroyComps(Garage.All);
             DestroyComps(ResourceNode.All);
             DestroyComps(Belt.AllBelts);
+            DestroyComps(CraneArm.All);
             DestroyComps(PipeNet.Pipes.Values);
             DestroyComps(Signal.All.Values);
             DestroyComps(PowerWire.All);
@@ -326,21 +329,33 @@ namespace Caveman
             if (Research.Tree != null) foreach (var n in Research.Tree) if (n != null) n.purchased = purchased.Contains(n.id);
         }
 
+        // v4+: quests are saved by TITLE, not index, so the quest list can grow/reorder between game
+        // versions without misaligning the claimed flags in older saves.
         private static void WriteObjectives(BinaryWriter w)
         {
             var obj = Objectives.Instance;
             if (obj == null || obj.quests == null) { w.Write(0); w.Write(false); return; }
             w.Write(obj.quests.Count);
-            foreach (var q in obj.quests) w.Write(q.claimed);
+            foreach (var q in obj.quests) { w.Write(q.title ?? ""); w.Write(q.claimed); }
             w.Write(obj.Won);
         }
-        private static void ReadObjectives(BinaryReader r)
+        private static void ReadObjectives(BinaryReader r, int ver)
         {
             int n = r.ReadInt32();
-            var claimed = new bool[n];
-            for (int i = 0; i < n; i++) claimed[i] = r.ReadBoolean();
-            bool won = r.ReadBoolean();
-            Objectives.Instance?.LoadRestore(claimed, won);
+            if (ver >= 4)
+            {
+                var map = new Dictionary<string, bool>();
+                for (int i = 0; i < n; i++) { string t = r.ReadString(); bool c = r.ReadBoolean(); map[t] = c; }
+                bool won = r.ReadBoolean();
+                Objectives.Instance?.LoadRestoreByTitle(map, won);
+            }
+            else // legacy index-aligned flags
+            {
+                var claimed = new bool[n];
+                for (int i = 0; i < n; i++) claimed[i] = r.ReadBoolean();
+                bool won = r.ReadBoolean();
+                Objectives.Instance?.LoadRestore(claimed, won);
+            }
         }
 
         private static void WritePlayer(BinaryWriter w)
@@ -977,6 +992,44 @@ namespace Caveman
                 if (def == null) continue;
                 var site = ConstructionSite.Spawn(def, pos, dir); // cost was already paid pre-save
                 if (site != null) site.buildProgress = progress;  // resume where the build left off
+            }
+        }
+
+        // ---------------- crane arms (v4) ----------------
+        private static void WriteArms(BinaryWriter w)
+        {
+            var list = CraneArm.All;
+            w.Write(list.Count);
+            foreach (var a in list)
+            {
+                w.Write(a != null && a.def != null ? a.def.displayName : "");
+                WVec(w, a != null ? a.transform.position : Vector3.zero);
+                WDir(w, a != null ? a.dir : Belt.Dir.E);
+                int fn = a != null ? a.filterItems.Count : 0;
+                w.Write(fn);
+                if (a != null) foreach (var f in a.filterItems) w.Write(f != null ? f.id : "");
+                WItem(w, a != null ? a.held : null);
+                w.Write(a != null ? a.heldCount : 0);
+            }
+        }
+        private static void ReadArms(BinaryReader r)
+        {
+            int n = r.ReadInt32();
+            for (int i = 0; i < n; i++)
+            {
+                var def = SaveRegistry.Building(r.ReadString());
+                var pos = RVec(r);
+                var dir = RDir(r);
+                int fn = r.ReadInt32();
+                var filters = new List<ItemDefinition>(fn);
+                for (int k = 0; k < fn; k++) { var it = SaveRegistry.Item(r.ReadString()); if (it != null) filters.Add(it); }
+                var held = RItem(r);
+                int heldN = r.ReadInt32();
+                if (def == null) continue;
+                var arm = CraneArm.Spawn(def, pos, dir);
+                arm.filterItems.Clear();
+                arm.filterItems.AddRange(filters);
+                if (held != null && heldN > 0) { arm.held = held; arm.heldCount = heldN; }
             }
         }
 

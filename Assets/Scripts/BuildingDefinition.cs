@@ -79,6 +79,7 @@ namespace Caveman
         Signal,    // a rail signal — one-way + block control for train planning
         Research,  // a Research Lodge: consumes crafted research items into research points
         Garage,    // parks the player's bought MOUNTS — buy/switch your ride from its panel
+        Arm,       // a CRANE ARM: swings item stacks between belts/buildings across a 1-2 cell reach
     }
 
     /// <summary>Data for a placeable structure.</summary>

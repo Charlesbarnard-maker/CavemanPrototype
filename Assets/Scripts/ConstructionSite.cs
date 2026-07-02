@@ -320,6 +320,7 @@ namespace Caveman
                 case BuildingKind.Pump: WaterPump.Spawn(def, pos); break;
                 case BuildingKind.Research: ResearchBuilding.Spawn(def, pos, outDir); break;
                 case BuildingKind.Garage: Garage.Spawn(def, pos); break;
+                case BuildingKind.Arm: CraneArm.Spawn(def, pos, outDir); break;
                 default: ProductionBuilding.Spawn(def, pos, outDir); break;
             }
         }

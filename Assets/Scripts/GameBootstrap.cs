@@ -534,6 +534,34 @@ namespace Caveman
             monumentBldg.description = "ENDGAME: feed an Engine + Jewelry + 6 Bricks per Monument Block (it draws on your deepest chains — the Engineering Lab and the Jeweler). Make 10 to WIN. Needs Power — a 40-draw megasink that strains the grid.";
             warehouse.description = "Warehouse — stores ONE resource of your choice (Stone, Ore, Planks, anything). It adopts the first item a belt delivers, or pick it in the panel. This one building replaces a separate store per resource.";
 
+            // --- CRANE ARMS: the game's stylised "inserter" — a heavy counterweighted beam that swings a
+            //     small STACK of items between belts/buildings. What belts can't do: reach over a 1–2 cell
+            //     gap, lift over port sides, filtered pulls off a mixed line (Gantry). OPTIONAL layer —
+            //     belts alone always work. interval = s/swing · outputPerCycle = grab · searchRadius = reach.
+            var swingCrane = ScriptableObject.CreateInstance<BuildingDefinition>();
+            swingCrane.displayName = "Swing Crane"; swingCrane.kind = BuildingKind.Arm; swingCrane.unlockAge = 1;
+            swingCrane.requiredTech = "cranes"; swingCrane.menuCategory = "Belts";
+            swingCrane.interval = 2.2f; swingCrane.outputPerCycle = 2; swingCrane.searchRadius = 1;
+            swingCrane.color = new Color(0.62f, 0.47f, 0.30f); // timber + counterweight
+            swingCrane.cost = new List<ItemAmount> { new ItemAmount(planks, 4), new ItemAmount(stone, 2) };
+            swingCrane.description = "SWING CRANE — a slow, heavy timber arm that GRABS 2 items from the cell BEHIND it and swings them to the cell in FRONT (R aims it). Lifts over port sides and feeds machines a belt can't touch. ~55/min — the optimisation tool, not a belt replacement.";
+            var gearedCrane = ScriptableObject.CreateInstance<BuildingDefinition>();
+            gearedCrane.displayName = "Geared Crane"; gearedCrane.kind = BuildingKind.Arm; gearedCrane.unlockAge = 3;
+            gearedCrane.requiredTech = "cranes"; gearedCrane.menuCategory = "Belts";
+            gearedCrane.interval = 1.6f; gearedCrane.outputPerCycle = 3; gearedCrane.searchRadius = 2;
+            gearedCrane.color = new Color(0.62f, 0.66f, 0.72f); // iron gearing
+            gearedCrane.cost = new List<ItemAmount> { new ItemAmount(planks, 4), new ItemAmount(metal, 3) };
+            gearedCrane.description = "GEARED CRANE — iron gearing swings 3 items per cycle and REACHES 2 CELLS, grabbing from the nearer or farther cell behind and dropping up to 2 cells ahead. ~110/min.";
+            var gantryArm = ScriptableObject.CreateInstance<BuildingDefinition>();
+            gantryArm.displayName = "Gantry Arm"; gantryArm.kind = BuildingKind.Arm; gantryArm.unlockAge = 4;
+            gantryArm.requiredTech = "cranes"; gantryArm.menuCategory = "Belts";
+            gantryArm.interval = 1.2f; gantryArm.outputPerCycle = 5; gantryArm.searchRadius = 2;
+            gantryArm.filter = true;      // whitelist picker in its panel — sort a mixed line by grabbing selectively
+            gantryArm.powerDraw = 10;     // powered: unwired = half speed (the drill rule)
+            gantryArm.color = new Color(0.55f, 0.70f, 0.85f); // powered steel
+            gantryArm.cost = new List<ItemAmount> { new ItemAmount(steel, 4), new ItemAmount(bronzeGear, 2) };
+            gantryArm.description = "GANTRY ARM — a powered steel arm: 5 items per swing, reach 2, and a FILTER (pick what it may grab in its panel — pull just the Iron off a mixed line). Draws 10 power; unwired it runs at half speed. ~250/min.";
+
             // --- RESEARCH SYSTEM: the progression spine. Each age is unlocked by crafting that
             //     tier's RESEARCH ITEM (a multi-input factory product) and delivering it to a
             //     Research Lodge, which converts items → research points. Gathering earns nothing;
@@ -603,6 +631,7 @@ namespace Caveman
                 new Research.Tech { id = "geared_belts", name = "Geared Belts",  cost = 40,  prereq = "bronze", unlocks = new List<BuildingDefinition>{ gearedBelt }, desc = "The Geared Belt (240/min — 2× a Conveyor) for high-throughput lines." },
                 new Research.Tech { id = "steel_belts",  name = "Steel Belts",   cost = 80,  prereq = "iron",   unlocks = new List<BuildingDefinition>{ steelBelt },  desc = "The Steel Belt (480/min — the fastest tier) for the densest late-game lines." },
                 new Research.Tech { id = "smart_logistics", name = "Smart Logistics", cost = 30, prereq = "bronze", unlocks = new List<BuildingDefinition>{ undergroundBelt, filterBelt, prioritySplitter, conditionalGate, elevatedRail }, desc = "Mid-game logistics tools: the UNDERGROUND BELT + ELEVATED TRACK (cross belts and rail over/under each other), FILTER BELT (sort a mixed line by item), PRIORITY SPLITTER (overflow routing), and GATE BELT (stop over-filling a buffer)." },
+                new Research.Tech { id = "cranes", name = "Crane Arms", cost = 15, prereq = "tribal", unlocks = new List<BuildingDefinition>{ swingCrane, gearedCrane, gantryArm }, desc = "Counterweighted CRANE ARMS swing small STACKS of items between belts and machines — they reach over 1–2 cell gaps, lift over port sides, and (at the powered Gantry tier) FILTER what they grab. The optimisation layer: belts alone always work, cranes make a layout tighter. Higher tiers arrive with the Iron and Industrial ages." },
                 new Research.Tech { id = "renewables", name = "Renewable Power", cost = 60, prereq = "iron", unlocks = new List<BuildingDefinition>{ windmill, solar }, requiredBuildings = new List<BuildingDefinition>{ advancedSmelter, toolmaker }, desc = "Unlock the WINDMILL (Iron) and SOLAR PANEL (Industrial) — fuel-free power, but their output VARIES (wind gusts, solar follows daylight), so lean on Batteries. Built from Steel + Gears (+ Machine Parts) — grow the lines first." },
                 new Research.Tech { id = "rail_transport", name = "Rail Transport", cost = 18, prereq = "tribal", unlocks = new List<BuildingDefinition>{ depot, rail, signal, twoWaySignal }, desc = "Unlock TRAINS: build Stations, lay Track + Signals, then run route vehicles (Donkey Cart → Ox Cart → … → Train) between Stations to haul goods across the map." },
                 new Research.Tech { id = "boats", name = "Boats", cost = 40, prereq = "bronze", unlocks = new List<BuildingDefinition>{ harbour, liquidHarbour }, desc = "Unlock BOATS: build Harbours on the shore and ship cargo — and a Liquid Harbour for fluids — across water between them." },
@@ -707,7 +736,8 @@ namespace Caveman
               ideaBench, scrollMaker, draftingTable, engineeringLab, researchLodge,
               // Logistics — belt tier ladder (wooden→conveyor→geared→steel) + junctions + smart-logistics tools + transport
               woodBelt, fastBelt, gearedBelt, steelBelt, splitter, merger,
-              undergroundBelt, filterBelt, prioritySplitter, conditionalGate, depot, rail, elevatedRail, signal, twoWaySignal, bridge, harbour, liquidHarbour,
+              undergroundBelt, filterBelt, prioritySplitter, conditionalGate, swingCrane, gearedCrane, gantryArm,
+              depot, rail, elevatedRail, signal, twoWaySignal, bridge, harbour, liquidHarbour,
               // Liquids — pipes carry oil/water (never belts); splitter/merger junctions; Oil Well pumps oil, Water Pump pumps water, Booster relays pressure
               pipe, pipeSplitter, pipeMerger, pump, booster, oilWell,
               // Storage — basic open-air piles (1 in/1 out) for raws (Woodpile / Stockpile / Clay / Brick),
@@ -846,6 +876,7 @@ namespace Caveman
                 new Quest { age = 1, title = "Build a Kiln and fire 15 Bricks (Clay + Charcoal)", done = () => Have(bricks) >= 15, progress = () => (Have(bricks), 15), reward = () => carriedInv.Add(clay, 20), rewardText = "+20 Clay", highlightBuilding = kiln },
                 new Quest { age = 1, title = "Electricity! Build a Wood Generator and wire it to a machine", done = () => AnyGenWired(), reward = () => carriedInv.Add(planks, 12), rewardText = "+12 Planks", highlightBuilding = woodGen },
                 new Quest { age = 1, title = "Make a Study Scroll (Bricks + Planks → Scroll Maker)", done = () => Have(studyScroll) >= 1 || AgeNow() >= 2, reward = () => carriedInv.Add(planks, 12), rewardText = "+12 Planks", highlightBuilding = scrollMaker },
+                new Quest { age = 1, title = "Research Crane Arms and place a Swing Crane",        done = () => CraneArm.All.Count >= 1, reward = () => carriedInv.Add(planks, 8), rewardText = "+8 Planks", highlightBuilding = swingCrane },
                 new Quest { age = 1, title = "Research the Bronze Age",                        done = () => AgeNow() >= 2,           reward = () => carriedInv.Add(stone, 30),  rewardText = "+30 Stone" },
                 // ── Bronze Age (2) ──  (now the metal age: copper + smelting)
                 new Quest { age = 2, title = "Build the Copper chain: a Copper Mine + a Basic Smelter (set to Copper)", done = () => HasWorkshopOf(copper), reward = () => carriedInv.Add(copper, 8), rewardText = "+8 Copper", highlightBuilding = copperMine },

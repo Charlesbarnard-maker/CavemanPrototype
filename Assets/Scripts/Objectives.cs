@@ -109,6 +109,18 @@ namespace Caveman
             Won = won;
             _poppedForAge = int.MaxValue; // don't re-pop centre-screen reveals for ages already progressed past
         }
+
+        /// <summary>Save/load (v4+): restore claimed flags by quest TITLE, so the quest list can grow or
+        /// reorder between game versions without misaligning older saves. Unknown titles are ignored;
+        /// brand-new quests simply start unclaimed.</summary>
+        internal void LoadRestoreByTitle(Dictionary<string, bool> claimed, bool won)
+        {
+            if (claimed != null)
+                foreach (var q in quests)
+                    if (q != null && q.title != null && claimed.TryGetValue(q.title, out var c)) q.claimed = c;
+            Won = won;
+            _poppedForAge = int.MaxValue;
+        }
     }
 
     /// <summary>Transient on-screen messages (objective complete, age reached, …).</summary>
