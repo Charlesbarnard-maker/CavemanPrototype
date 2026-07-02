@@ -19,6 +19,26 @@ fixed — verified in the RUNNING player (mouse click + scancode keyboard + scre
   synthetic keys — inject with SCANCODE (`keybd_event` flag 0x08), not plain VK.
 
 ---
+## 📌 FULL-REVIEW FIX BATCH (2026-07-02 — 3 waves, all compile-clean, NOT yet playtested)
+A design review (see the session) found dead content, broken quests and unvalidated balance; all fixed in
+three commits: `4fee61f` (wave 1), `966a650` (wave 2), `92d0169` (wave 3).
+- **W1 — truth:** 4 broken quests fixed (hand-mine counter via `PlayerGatherer.HandGathered`; wired-generator
+  check; Industrial-power + Industry-1000 conditions; Stockpile highlight) — quest COUNT/ORDER unchanged so
+  saved claimed-flags align. Dead content PURGED (10 survival items, 15 never-buildable defs, `autoStore`/
+  `foodValue`/`connectRange`/`supplyRange`/`WorldGrid.Roads`/`Colony.Starving+Thirsty`). Feed-rate RULE: every
+  machine feedable by its own age's belt — Charcoal Burner/Potter/Circuit/Jeweler retimed (60/min inputs);
+  route-vehicle costs on the ×3.5 economy; upgrade ladders for Gem Mine/Refinery/Jeweler/Eng Lab/research
+  crafters. **Splitter side-output → merger stall FIXED** in `Belt.MergerPull` (+ splitter `_blocked` check).
+- **W2 — safety:** AUTOSAVE (slot 4, every 5 min + on quit; Continue loads newest incl. auto); two-click
+  overwrite confirm; save v3 serializes in-progress ConstructionSites; Place/Deny placement sounds wired;
+  DESIGN.md superseded-banner.
+- **W3 — game feel:** P = production/consumption stats panel (new `ProductionStats` consumption meter);
+  K = alerts panel (problems nearest-first w/ compass); Q = pipette; filter-belt whitelist picker panel;
+  one-click "connect to nearest pole" on unwired machines; day/night ambient tint off `Colony.Daylight`.
+- **PLAYTEST:** all of the above is compile-clean but unplayed — first session should exercise: the new
+  Stone-age quest flow, a splitter side-feeding a merger, P/K/Q hotkeys, filter picker, autosave row, night tint.
+
+---
 ## 📌 SAVE/LOAD + GAME SHELL (2026-07-01 — branch `feature/save-load-and-shell`)
 Adds the whole missing "shell": **SAVE/LOAD**, a **MAIN MENU + PAUSE MENU**, **SETTINGS**, and **AUDIO** — so the game
 can be played across sessions for a full playthrough. Branched off `feature/depot-rail-research-polish` (= main + the
