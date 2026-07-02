@@ -32,6 +32,7 @@ namespace Caveman
             Garage.BuiltCount = 0; PlayerController.RecomputeGarageSlots();
             WorkshopBuilding.ResetPowerHint();
             PlayerGatherer.HandGathered = 0; // fresh game: the hand-mining tutorial counter starts at zero
+            ProductionStats.Reset();          // fresh game: clear the consumption-rate window
 
             // --- Items ---
             var stone = MakeItem("stone", "Stone", new Color(0.55f, 0.55f, 0.62f)); stone.noWarehouse = true; // has its own raw Stockpile

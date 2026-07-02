@@ -103,7 +103,11 @@ namespace Caveman
                 // A generator burns FUEL it's actually been fed — belt fuel into its cyan intake. No more
                 // silently draining your carried pile: out of belt-fed fuel → no power (the grid browns out).
                 if (fuel == null) _fueled = true; // (no current generator is fuel-free)
-                else _fueled = Buffer != null && Buffer.Count(fuel) >= fuelPerCycle && Buffer.RemoveUpTo(fuel, fuelPerCycle) >= fuelPerCycle;
+                else
+                {
+                    _fueled = Buffer != null && Buffer.Count(fuel) >= fuelPerCycle && Buffer.RemoveUpTo(fuel, fuelPerCycle) >= fuelPerCycle;
+                    if (_fueled) ProductionStats.RecordConsumed(fuel, fuelPerCycle); // stats panel: fuel burn
+                }
             }
             if (_sr != null)
                 _sr.color = _fueled ? _baseColor : Color.Lerp(_baseColor, Color.black, 0.55f);

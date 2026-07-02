@@ -117,6 +117,7 @@ namespace Caveman
                 var consumed = ConsumeOneResearchItem();
                 if (consumed != null)
                 {
+                    ProductionStats.RecordConsumed(consumed, 1); // stats panel: live consumption meter
                     int ppi = Research.PointsFor(consumed);
                     Research.Deliver(consumed, 1);
                     _pointsWindow += ppi; // accumulate POINTS for the throughput readout

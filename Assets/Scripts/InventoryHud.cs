@@ -118,8 +118,11 @@ namespace Caveman
         // Opening any of Build / Research / Guide / Help closes the others, so the player
         // focuses on a single system. The minimap is a world overlay, not a context panel,
         // so it's exempt. ---
-        private enum Panel { Build, Research, Guide, Help, Map, Lines, Objectives }
-        public void CloseAllPanels() { _showBuild = _showResearch = _showGuide = _showHelp = _showMap = _showLines = _showObjectives = false; }
+        private enum Panel { Build, Research, Guide, Help, Map, Lines, Objectives, Stats, Alerts }
+        private bool _showStats;   // per-item production/consumption rates (P)
+        private bool _showAlerts;  // every building with a sustained problem (K)
+        private Vector2 _statsScroll, _alertsScroll;
+        public void CloseAllPanels() { _showBuild = _showResearch = _showGuide = _showHelp = _showMap = _showLines = _showObjectives = _showStats = _showAlerts = false; }
         /// <summary>True while any full-screen HUD panel is open — GameMenu checks this to route the Esc key.</summary>
         public bool AnyPanelOpen => ModalOpen;
         private void TogglePanel(Panel p)
@@ -142,10 +145,12 @@ namespace Caveman
                 case Panel.Map: _showMap = true; _mapZoom = 1f; _mapPan = Vector2.zero; break; // open fitting the whole world
                 case Panel.Lines: _showLines = true; break;
                 case Panel.Objectives: _showObjectives = true; break;
+                case Panel.Stats: _showStats = true; break;
+                case Panel.Alerts: _showAlerts = true; break;
             }
         }
         // A full-screen "mode" panel is up — used to dim the world and hide competing widgets.
-        private bool ModalOpen => _showResearch || _showGuide || _showHelp || _showMap || _showLines || _showObjectives;
+        private bool ModalOpen => _showResearch || _showGuide || _showHelp || _showMap || _showLines || _showObjectives || _showStats || _showAlerts;
 
         void Update()
         {
@@ -170,6 +175,8 @@ namespace Caveman
             if (kb.tKey.wasPressedThisFrame) TogglePanel(Panel.Research);
             if (kb.lKey.wasPressedThisFrame) TogglePanel(Panel.Lines); // global transport-line overview
             if (kb.jKey.wasPressedThisFrame) TogglePanel(Panel.Objectives); // the quest journal (multiple goals at once)
+            if (kb.pKey.wasPressedThisFrame) TogglePanel(Panel.Stats);      // per-item production/consumption rates
+            if (kb.kKey.wasPressedThisFrame) TogglePanel(Panel.Alerts);     // every problem building, sorted by distance
             // Esc-to-close panels is now handled centrally by GameMenu (so Esc can also open the pause menu).
 
             // QoL: one-time "research available" toast when a tree node first becomes affordable.
@@ -199,6 +206,7 @@ namespace Caveman
 
             // Cache the resource totals once per frame (OnGUI runs twice/frame).
             if (gatherer != null) _totals = Economy.Totals(gatherer.Inventory);
+            ProductionStats.Tick(); // roll the consumption-rate window for the P stats panel
 
             // Cache the bottleneck/monument scan once per frame too (DrawStatus runs every OnGUI pass).
             _starvedCount = 0; _waitingCount = 0; _backedCount = 0; _hasMonument = false;
@@ -331,7 +339,26 @@ namespace Caveman
             if (gatherer == null) return;
             // Warm vignette over the world, drawn first (in true screen space) so the HUD panels stay on top of it.
             if (Event.current.type == EventType.Repaint)
+            {
                 GUI.DrawTexture(new Rect(0f, 0f, Screen.width, Screen.height), Vignette());
+                // DAY/NIGHT ambient: the world cools and darkens as the sun sets (Colony.Daylight already
+                // drives Solar panels — now it's visible). Subtle by design (max ~22% moonlit blue at deep
+                // night) so the factory stays readable; dawn/dusk get a brief warm blush at the transition.
+                float dl = Colony.Daylight;
+                float night = 1f - Mathf.SmoothStep(0f, 1f, dl);            // 0 midday → 1 deep night
+                if (night > 0.01f)
+                {
+                    GUI.color = new Color(0.07f, 0.10f, 0.22f, 0.22f * night); // cool moonlight wash
+                    GUI.DrawTexture(new Rect(0f, 0f, Screen.width, Screen.height), Texture2D.whiteTexture);
+                }
+                float dusk = 4f * dl * (1f - dl);                            // peaks at the day/night crossover
+                if (dusk > 0.5f)
+                {
+                    GUI.color = new Color(0.95f, 0.55f, 0.25f, 0.06f * dusk); // golden-hour blush
+                    GUI.DrawTexture(new Rect(0f, 0f, Screen.width, Screen.height), Texture2D.whiteTexture);
+                }
+                GUI.color = Color.white;
+            }
             // Scale the whole HUD to a 1080-tall reference canvas so it fits + stays un-overlapped on smaller
             // monitors. At/above 1080 the matrix is identity → no change on normal/large screens. Mouse hit-tests
             // (Event.current.mousePosition + logical rects) are transformed by the matrix, so clicks stay correct.
@@ -392,6 +419,8 @@ namespace Caveman
             if (_showMap) DrawMapScreen();
             if (_showLines) DrawLinesPanel();
             if (_showObjectives) DrawObjectivesPanel();
+            if (_showStats) DrawStatsPanel();
+            if (_showAlerts) DrawAlertsPanel();
             if (_paused) GUI.Label(new Rect(0, 60, _vw, 60), "<b>PAUSED</b>  <size=18>(space)</size>", _big);
 
             // Block world clicks when the cursor is over an interactive panel. A modal mode
@@ -1164,6 +1193,10 @@ namespace Caveman
             // GARAGE — buy age-gated mounts + pick which to ride (the limited mount garage).
             if (garage != null) DrawGaragePanel();
 
+            // FILTER BELT — a visible whitelist picker (the old behaviour, silently adopting the first
+            // item to arrive, was an invisible rule nobody could discover or change).
+            if (blt != null && blt.isFilter) DrawFilterPicker(blt);
+
             // Plain-language status line for producers (the "understandable bottleneck" cue).
             if (wb != null || pbSel != null)
             {
@@ -1264,7 +1297,23 @@ namespace Caveman
                 {
                     var ps = wb.PowerStatus;
                     if (ps == WorkshopBuilding.PowerState.Unwired)
+                    {
                         GUILayout.Label("<size=12><color=#6cf>⚡ Not connected to the power grid</color> — select this machine (or a Power Pole) → <b>Connect wire</b> → click a Generator/Pole.</size>", _small);
+                        // One-click hookup: wire straight to the nearest pole/generator/battery in reach.
+                        var node = wb.GetComponent<PowerNode>();
+                        if (node != null && GUILayout.Button("<size=12>⚡ Connect to nearest pole/generator</size>", _btn))
+                        {
+                            PowerNode best = null; float bestSq = float.MaxValue;
+                            foreach (var n in PowerNode.All)
+                            {
+                                if (n == null || n == node || n.role == PowerNode.Role.Consumer || !n.CanLinkMore) continue;
+                                float sq = (n.Pos - node.Pos).sqrMagnitude;
+                                if (sq < bestSq) { bestSq = sq; best = n; }
+                            }
+                            if (best != null && node.Connect(best)) AudioManager.Click();
+                            else Toast.Show("<color=#ffb24d>No pole/generator within wire reach — place a Power Pole closer, then try again.</color>");
+                        }
+                    }
                     else if (ps == WorkshopBuilding.PowerState.GridDead)
                         GUILayout.Label("<size=12><color=#c9f>⚡ Grid out of power</color> — it's wired, but the network generates nothing. Build/fuel a Generator, or add a Battery.</size>", _small);
                     else if (ps == WorkshopBuilding.PowerState.Brownout)
@@ -2053,6 +2102,135 @@ namespace Caveman
 
             GUILayout.EndScrollView();
             GUILayout.EndArea();
+        }
+
+        // P — per-item production vs consumption (per minute, ~4s smoothing) + what's in store. THE
+        // factory-game decision screen: a red net on an item says exactly where to expand next.
+        private void DrawStatsPanel()
+        {
+            float w = 560f, h = Mathf.Min(_vh - 70f, 620f);
+            var r = new Rect(_vw / 2f - w / 2f, _vh / 2f - h / 2f, w, h);
+            PanelBg(r);
+            GUILayout.BeginArea(new Rect(r.x + 16, r.y + 12, r.width - 32, r.height - 24));
+            GUILayout.Label("<size=22><b>Production</b></size>   <size=13><color=#bbb>(per minute, ~4s window · P to close)</color></size>", _s);
+
+            var prod = new Dictionary<ItemDefinition, float>();
+            foreach (var p in ProductionBuilding.All) if (p != null && p.produces != null && p.RatePerMin > 0.01f) { prod.TryGetValue(p.produces, out var v); prod[p.produces] = v + p.RatePerMin; }
+            foreach (var wq in WorkshopBuilding.All) if (wq != null && wq.output != null && wq.RatePerMin > 0.01f) { prod.TryGetValue(wq.output, out var v); prod[wq.output] = v + wq.RatePerMin; }
+            var cons = ProductionStats.ConsumedPerMin;
+            var keys = new List<ItemDefinition>(prod.Keys);
+            foreach (var kv in cons) if (kv.Value > 0.01f && !keys.Contains(kv.Key)) keys.Add(kv.Key);
+            keys.Sort((a, b) => string.Compare(a.displayName, b.displayName, System.StringComparison.Ordinal));
+
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("<size=12><color=#bbb>Item</color></size>", _small, GUILayout.Width(160));
+            GUILayout.Label("<size=12><color=#9f9>+ /min</color></size>", _small, GUILayout.Width(75));
+            GUILayout.Label("<size=12><color=#f99>− /min</color></size>", _small, GUILayout.Width(75));
+            GUILayout.Label("<size=12><color=#bbb>net</color></size>", _small, GUILayout.Width(75));
+            GUILayout.Label("<size=12><color=#bbb>stored</color></size>", _small, GUILayout.Width(75));
+            GUILayout.EndHorizontal();
+
+            _statsScroll = GUILayout.BeginScrollView(_statsScroll);
+            if (keys.Count == 0)
+                GUILayout.Label("<size=13><color=#cfcfcf>Nothing measured yet — rates appear as machines run.</color></size>", _small);
+            foreach (var it in keys)
+            {
+                prod.TryGetValue(it, out float pr);
+                float cr = cons.TryGetValue(it, out var cv) ? cv : 0f;
+                float net = pr - cr;
+                int stored = _totals != null && _totals.TryGetValue(it, out var sv) ? sv : 0;
+                string netCol = net > 0.05f ? "9f9" : net < -0.05f ? "f99" : "ddd";
+                GUILayout.BeginHorizontal();
+                GUILayout.Label($"<size=12><color=#{ColorUtility.ToHtmlStringRGB(it.color)}>{it.displayName}</color></size>", _small, GUILayout.Width(160));
+                GUILayout.Label($"<size=12>{pr:0.#}</size>", _small, GUILayout.Width(75));
+                GUILayout.Label($"<size=12>{cr:0.#}</size>", _small, GUILayout.Width(75));
+                GUILayout.Label($"<size=12><color=#{netCol}>{net:+0.#;-0.#;0}</color></size>", _small, GUILayout.Width(75));
+                GUILayout.Label($"<size=12>{stored}</size>", _small, GUILayout.Width(75));
+                GUILayout.EndHorizontal();
+            }
+            GUILayout.EndScrollView();
+            GUILayout.EndArea();
+        }
+
+        // K — every building with a live problem, nearest first, with a compass bearing from the
+        // player. The base-wide answer to "something's amber somewhere" without walking the map.
+        private void DrawAlertsPanel()
+        {
+            float w = 560f, h = Mathf.Min(_vh - 70f, 620f);
+            var r = new Rect(_vw / 2f - w / 2f, _vh / 2f - h / 2f, w, h);
+            PanelBg(r);
+            GUILayout.BeginArea(new Rect(r.x + 16, r.y + 12, r.width - 32, r.height - 24));
+
+            var rows = new List<(float dist, string text)>();
+            Vector3 me = gatherer != null ? gatherer.transform.position : Vector3.zero;
+            void Add(Component c, string nm, string what, string col)
+            {
+                Vector3 d = c.transform.position - me;
+                string dir = CompassDir(d);
+                rows.Add((d.magnitude, $"<size=13><color=#{col}>●</color> <b>{nm}</b> — {what}  <color=#888>({d.magnitude:0}m {dir})</color></size>"));
+            }
+            foreach (var p in ProductionBuilding.All)
+            {
+                if (p == null || p.def == null) continue;
+                var sc = p.StatusColor;
+                if (sc == Status.Starved) Add(p, p.def.displayName, "out of resource — patch ran dry", "f66");
+                else if (sc == Status.BackedUp) Add(p, p.def.displayName, "output full — belt it away", "fc6");
+            }
+            foreach (var wq in WorkshopBuilding.All)
+            {
+                if (wq == null || wq.def == null) continue;
+                if (wq.NoPower) { Add(wq, wq.def.displayName, "NO POWER — wire it to a grid", "f44"); continue; }
+                var sc = wq.StatusColor;
+                if (sc == Status.Waiting) Add(wq, wq.def.displayName, $"waiting on inputs ({wq.MissingText()})", "fa6");
+                else if (sc == Status.BackedUp) Add(wq, wq.def.displayName, "output full — belt it away", "fc6");
+            }
+            foreach (var pp in PowerPlant.All)
+                if (pp != null && pp.def != null && !pp.renewable && pp.fuel != null && !pp.Fueled)
+                    Add(pp, pp.def.displayName, $"out of fuel — belt {pp.fuel.displayName} into its intake", "f66");
+
+            rows.Sort((a, b) => a.dist.CompareTo(b.dist));
+            GUILayout.Label($"<size=22><b>Alerts</b></size>   <size=13><color=#bbb>({rows.Count} issue{(rows.Count == 1 ? "" : "s")} · nearest first · K to close)</color></size>", _s);
+            _alertsScroll = GUILayout.BeginScrollView(_alertsScroll);
+            if (rows.Count == 0)
+                GUILayout.Label("<size=14><color=#9f9>All clear — every machine is running (or calmly idle).</color></size>", _small);
+            int shown = 0;
+            foreach (var (dist, text) in rows) { GUILayout.Label(text, _small); if (++shown >= 60) break; }
+            GUILayout.EndScrollView();
+            GUILayout.EndArea();
+        }
+
+        // Whitelist picker for a selected FILTER belt: tick up to 5 item types it passes.
+        private void DrawFilterPicker(Belt blt)
+        {
+            GUILayout.Label("<size=12><color=#9cf>FILTER — passes only the ticked items (max 5):</color></size>", _small);
+            var cands = new List<ItemDefinition>();
+            void AddC(ItemDefinition i) { if (i != null && !i.isLiquid && !cands.Contains(i)) cands.Add(i); }
+            foreach (var p in ProductionBuilding.All) if (p != null) AddC(p.produces);
+            foreach (var wq in WorkshopBuilding.All) if (wq != null) AddC(wq.output);
+            cands.Sort((a, b) => string.Compare(a.displayName, b.displayName, System.StringComparison.Ordinal));
+            int col = 0;
+            GUILayout.BeginHorizontal();
+            foreach (var it in cands)
+            {
+                bool on = blt.filterItems.Contains(it);
+                if (GUILayout.Button($"<size=11>{(on ? "☑" : "☐")} {it.displayName}</size>", _btn, GUILayout.Width(118)))
+                {
+                    if (on) blt.filterItems.Remove(it);
+                    else if (blt.filterItems.Count < 5) blt.filterItems.Add(it);
+                }
+                if (++col % 2 == 0) { GUILayout.EndHorizontal(); GUILayout.BeginHorizontal(); }
+            }
+            GUILayout.EndHorizontal();
+            if (blt.filterItems.Count == 0)
+                GUILayout.Label("<size=11><color=#888>nothing ticked = adopts the first item that arrives</color></size>", _small);
+        }
+
+        private static string CompassDir(Vector3 d)
+        {
+            if (d.sqrMagnitude < 1f) return "here";
+            float a = Mathf.Atan2(d.y, d.x) * Mathf.Rad2Deg; // 0 = east
+            string[] dirs = { "E", "NE", "N", "NW", "W", "SW", "S", "SE" };
+            return dirs[Mathf.RoundToInt(((a + 360f) % 360f) / 45f) % 8];
         }
 
         private void DrawGuide()

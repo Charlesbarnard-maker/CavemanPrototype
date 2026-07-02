@@ -337,6 +337,7 @@ namespace Caveman
             foreach (var c in inputs)
             {
                 if (c.item == null) continue;
+                ProductionStats.RecordConsumed(c.item, c.amount); // stats panel: live consumption meter
                 int need = c.amount - InBuffer.RemoveUpTo(c.item, c.amount);
                 if (need <= 0) continue;
                 if (Economy.LocalProduction) AdjacentConsume(c.item, need);

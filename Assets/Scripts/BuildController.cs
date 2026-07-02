@@ -434,6 +434,15 @@ namespace Caveman
                 else if (PendingIndex < 0) DemolishSelected(); // nothing hovered: fall back to selection
             }
 
+            // PIPETTE (QoL): Q picks the building under the cursor straight into placement mode —
+            // clone part of a setup without hunting through the build menu (Factorio's Q).
+            if (kb.qKey.wasPressedThisFrame && mouse != null && !InventoryHud.PointerOverUI && PendingIndex < 0)
+            {
+                var pdefUnder = DefOf(BuildingGOUnderCursor(mouse));
+                int idx = pdefUnder != null ? buildables.IndexOf(pdefUnder) : -1;
+                if (idx >= 0) { BeginPlacement(idx); AudioManager.Click(); }
+            }
+
             if (PendingIndex >= 0)
             {
                 var pk = buildables[PendingIndex] != null ? buildables[PendingIndex].kind : BuildingKind.Collector;
@@ -1943,6 +1952,33 @@ namespace Caveman
                 int moved = Carried.Add(kv.Key, kv.Value);
                 if (moved > 0) inv.RemoveUpTo(kv.Key, moved);
             }
+        }
+
+        // The menu definition a placed thing was built from (for the Q pipette). Belts/pipes/signals
+        // don't carry a def reference, so they resolve by matching a buildable's flags/name.
+        private BuildingDefinition DefOf(GameObject go)
+        {
+            if (go == null) return null;
+            var pb = go.GetComponent<ProductionBuilding>(); if (pb != null) return pb.def;
+            var wb = go.GetComponent<WorkshopBuilding>(); if (wb != null) return wb.def;
+            var sb = go.GetComponent<StorageBuilding>(); if (sb != null) return sb.def;
+            var dp = go.GetComponent<Depot>(); if (dp != null) return dp.def;
+            var pp = go.GetComponent<PowerPlant>(); if (pp != null) return pp.def;
+            var pl = go.GetComponent<PowerPole>(); if (pl != null) return pl.def;
+            var bt = go.GetComponent<Battery>(); if (bt != null) return bt.def;
+            var gr = go.GetComponent<Garage>(); if (gr != null) return gr.def;
+            var wp = go.GetComponent<WaterPump>(); if (wp != null) return wp.def;
+            var rb = go.GetComponent<ResearchBuilding>(); if (rb != null) return rb.def;
+            var br = go.GetComponent<Bridge>(); if (br != null) return br.def;
+            var rt = go.GetComponent<RailTile>(); if (rt != null) return rt.def;
+            var cs = go.GetComponent<ConstructionSite>(); if (cs != null) return cs.def;
+            var pi = go.GetComponent<Pipe>();
+            if (pi != null) { foreach (var d in buildables) if (d != null && d.kind == BuildingKind.Pipe && d.splitter == pi.isSplitter && d.merger == pi.isMerger) return d; }
+            var sg = go.GetComponent<Signal>();
+            if (sg != null) { foreach (var d in buildables) if (d != null && d.kind == BuildingKind.Signal && d.bothWaySignal == sg.bothWays) return d; }
+            var bl = go.GetComponent<Belt>();
+            if (bl != null) { foreach (var d in buildables) if (d != null && d.displayName == bl.DisplayName) return d; }
+            return null;
         }
 
         private GameObject BuildingGOUnderCursor(Mouse mouse)
