@@ -31,6 +31,7 @@ namespace Caveman
         private GameObject _ghost;
         private SpriteRenderer _ghostSr;
         private readonly List<GameObject> _depotGhostTiles = new(); // per-cell blueprint tiles for 3×1 depots
+        private readonly List<GameObject> _armGhostCells = new();   // crane placement: tinted GRAB/DROP cell highlights
         private bool _dragging;
         private Vector2Int _dragLast;
 
@@ -693,6 +694,7 @@ namespace Caveman
             _ugAwaitingExit = false;  // a pending underground tunnel shouldn't carry into a new tool
             HideUndergroundGuides();
             HideDepotGhost();         // leftover depot blueprint tiles shouldn't carry into a new tool
+            HideArmGhost();           // ...nor crane grab/drop cell highlights
             EnsureGhost();
         }
 
@@ -782,6 +784,8 @@ namespace Caveman
             _ghostSr.color = validTint;
             if (isDepot) UpdateDepotGhost(def, world, ew, eh, BuildDir == Belt.Dir.N || BuildDir == Belt.Dir.S, validTint);
             else HideDepotGhost();
+            if (def.kind == BuildingKind.Arm) UpdateArmGhost(def, world);
+            else HideArmGhost();
 
             // Intentional placement: ONE building per deliberate click (no hold-drag spam —
             // that's reserved for belts/mass infrastructure). Stays in placement mode so you
@@ -846,6 +850,46 @@ namespace Caveman
                 if (_depotGhostTiles[i] != null && _depotGhostTiles[i].activeSelf) _depotGhostTiles[i].SetActive(false);
         }
 
+        // While placing a CRANE ARM: tint the actual GRAB cell(s) cyan and DROP cell(s) green (scaled by
+        // its reach), so which way it works — and how far — is unmissable before you commit. R re-aims.
+        private void UpdateArmGhost(BuildingDefinition def, Vector3 center)
+        {
+            int reach = Mathf.Max(1, Mathf.RoundToInt(def.searchRadius));
+            var cell = Belt.CellOf(center);
+            int used = 0;
+            for (int side = 0; side < 2; side++) // 0 = grab (behind, cyan), 1 = drop (ahead, green)
+            {
+                var step = Belt.Step(side == 0 ? Belt.Opposite(BuildDir) : BuildDir);
+                for (int d = 1; d <= reach; d++)
+                {
+                    if (used >= _armGhostCells.Count)
+                    {
+                        var g = new GameObject("ArmGhostCell");
+                        var gsr = g.AddComponent<SpriteRenderer>();
+                        gsr.sprite = PlaceholderArt.Square();
+                        gsr.sortingOrder = 19; // under the ghost + port markers
+                        _armGhostCells.Add(g);
+                    }
+                    var go = _armGhostCells[used++];
+                    if (!go.activeSelf) go.SetActive(true);
+                    go.transform.position = new Vector3(cell.x + step.x * d, cell.y + step.y * d, 0f);
+                    go.transform.localScale = new Vector3(0.92f, 0.92f, 1f);
+                    float fade = 1f - 0.35f * (d - 1); // farther reach cells draw fainter
+                    go.GetComponent<SpriteRenderer>().color = side == 0
+                        ? new Color(0.35f, 0.70f, 1f, 0.28f * fade)   // cyan — grabs from here
+                        : new Color(0.25f, 0.95f, 0.35f, 0.28f * fade); // green — drops here
+                }
+            }
+            for (int k = used; k < _armGhostCells.Count; k++)
+                if (_armGhostCells[k].activeSelf) _armGhostCells[k].SetActive(false);
+        }
+
+        private void HideArmGhost()
+        {
+            for (int i = 0; i < _armGhostCells.Count; i++)
+                if (_armGhostCells[i] != null && _armGhostCells[i].activeSelf) _armGhostCells[i].SetActive(false);
+        }
+
         // Show the ghost's I/O markers PER EDGE CELL (so a 2×2 warehouse previews 2 outputs +
         // 2 inputs, exactly like the built building): green output arrows on BuildDir, cyan
         // input notches on the opposite side. Hidden for kinds with no belt I/O.
@@ -860,9 +904,10 @@ namespace Caveman
                 return;
             }
             bool hasOut = def.kind == BuildingKind.Collector || def.kind == BuildingKind.Workshop
-                          || def.kind == BuildingKind.Storage;
+                          || def.kind == BuildingKind.Storage || def.kind == BuildingKind.Arm; // crane: green arrow = DROP side
             bool hasIn = def.kind == BuildingKind.Workshop || def.kind == BuildingKind.Storage
-                         || def.kind == BuildingKind.Research; // Lodge = input only
+                         || def.kind == BuildingKind.Research  // Lodge = input only
+                         || def.kind == BuildingKind.Arm;      // crane: cyan notch = GRAB side
             bool multiIn = def.kind == BuildingKind.Workshop && def.inputs != null && def.inputs.Count > 1;
 
             _ghostOutSides[0] = BuildDir;
@@ -1898,6 +1943,7 @@ namespace Caveman
             if (_ghost != null) _ghost.SetActive(false);
             HideGhostPorts();
             HideDepotGhost();
+            HideArmGhost();
         }
 
         public bool CanAfford(BuildingDefinition def) => def != null && Economy.CanAfford(def.cost, Carried);
