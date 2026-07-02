@@ -4,6 +4,21 @@ A running record so progress/problems don't get lost. Newest first. Move items t
 **Fixed** when done. Maintained alongside the code — see DESIGN.md for the roadmap.
 
 ---
+## 📌 STANDALONE BUILD + input fix (2026-07-01)
+The game now builds as a **standalone Windows player** (`Caveman.GameBuilder.BuildWindows` → default Downloads, or
+env var `CAVEMAN_BUILD_OUT`; user's copy is on the Desktop). Its saves live in the player's own persistentDataPath
+(`AppData\LocalLow\CavemanDev\Caveman Prototype`), isolated from the project. Two **build-only** bugs were found and
+fixed — verified in the RUNNING player (mouse click + scancode keyboard + screen capture), not just compile-clean:
+- **IMGUI dead in a build:** `activeInputHandler` was `1` (New Input System only) → legacy input off → IMGUI's
+  `Event.current` mouse events aren't generated in a PLAYER (they still work in the editor, which is why it slipped
+  through). Set to **`2` (Both)** in ProjectSettings — IMGUI gets clicks, the new system keeps driving hotkeys.
+- **Menu ate its own clicks:** `GameMenu` drew a full-screen "swallow stray clicks" `GUI.Button` BEFORE the panel;
+  in IMGUI the first control drawn consumes the click, so no menu button ever fired. Moved it AFTER the panel.
+- **Verified in the player:** New Game starts a game (mouse), B opens the build menu (keyboard), Esc opens the pause
+  menu with the Save/Load slots. GOTCHA for future headless testing: Unity's new Input System ignores VK-only
+  synthetic keys — inject with SCANCODE (`keybd_event` flag 0x08), not plain VK.
+
+---
 ## 📌 SAVE/LOAD + GAME SHELL (2026-07-01 — branch `feature/save-load-and-shell`)
 Adds the whole missing "shell": **SAVE/LOAD**, a **MAIN MENU + PAUSE MENU**, **SETTINGS**, and **AUDIO** — so the game
 can be played across sessions for a full playthrough. Branched off `feature/depot-rail-research-polish` (= main + the

@@ -15,11 +15,14 @@ namespace Caveman
     public static class GameBuilder
     {
         const string Scene = "Assets/UnitySave.unity";
-        const string OutDir = @"C:\Users\charl\Downloads\CavemanPrototype";
+        const string OutDirDefault = @"C:\Users\charl\Downloads\CavemanPrototype";
         const string Exe = "CavemanPrototype.exe";
 
         public static void BuildWindows()
         {
+            // Output folder: env var CAVEMAN_BUILD_OUT if set (so I can retarget without editing code), else Downloads.
+            string outDir = System.Environment.GetEnvironmentVariable("CAVEMAN_BUILD_OUT");
+            if (string.IsNullOrEmpty(outDir)) outDir = OutDirDefault;
             // Identity drives the window title + the save-file folder (AppData\LocalLow\<company>\<product>).
             PlayerSettings.companyName = "CavemanDev";
             PlayerSettings.productName = "Caveman Prototype";
@@ -27,11 +30,11 @@ namespace Caveman
             // Make the game scene the startup + index 0 (so GameMenu's "Restart" scene-reload works in the build).
             EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(Scene, true) };
 
-            Directory.CreateDirectory(OutDir);
+            Directory.CreateDirectory(outDir);
             var opts = new BuildPlayerOptions
             {
                 scenes = new[] { Scene },
-                locationPathName = Path.Combine(OutDir, Exe),
+                locationPathName = Path.Combine(outDir, Exe),
                 target = BuildTarget.StandaloneWindows64,
                 targetGroup = BuildTargetGroup.Standalone,
                 options = BuildOptions.None,

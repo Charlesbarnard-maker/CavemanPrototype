@@ -69,7 +69,6 @@ namespace Caveman
             GUI.color = new Color(0f, 0f, 0f, 0.75f);
             GUI.DrawTexture(new Rect(0, 0, UnityEngine.Screen.width, UnityEngine.Screen.height), Texture2D.whiteTexture);
             GUI.color = Color.white;
-            GUI.Button(new Rect(0, 0, UnityEngine.Screen.width, UnityEngine.Screen.height), GUIContent.none, GUIStyle.none); // swallow stray clicks
 
             switch (_screen)
             {
@@ -77,6 +76,11 @@ namespace Caveman
                 case Screen.Pause: DrawPause(); break;
                 case Screen.Settings: DrawSettings(); break;
             }
+
+            // Swallow clicks that MISSED a menu button — drawn AFTER the panel so the panel's own buttons get the
+            // event first (IMGUI gives the click to the first control drawn that contains it; a full-screen button
+            // drawn BEFORE the panel would eat every press — that was the "buttons don't work" bug).
+            GUI.Button(new Rect(0, 0, UnityEngine.Screen.width, UnityEngine.Screen.height), GUIContent.none, GUIStyle.none);
         }
 
         private Rect Panel(float w, float h) =>
