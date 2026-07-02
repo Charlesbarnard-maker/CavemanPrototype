@@ -45,11 +45,13 @@ namespace Caveman
         internal float RegenTimerForSave => _regenTimer;
         internal Color BaseColorForSave => _baseColor;
         internal float BaseScaleForSave => _baseScale.x;
-        /// <summary>Load: force the remaining amount + regen phase (Awake set _amount = capacity for a fresh
-        /// node; a loaded node overrides it here). Re-applies the depletion scale/tint.</summary>
+        /// <summary>Load: restore the EXACT saved remaining amount + regen phase. Deliberately NOT clamped to
+        /// capacity — a fresh node initialises to a default amount before its real (sometimes smaller) capacity is
+        /// assigned, so live nodes can legitimately sit a little over capacity; clamping here would make save/load
+        /// lossy (the round-trip self-test caught it). Re-applies the depletion scale/tint.</summary>
         internal void SetAmountForLoad(int amount, float regenTimer)
         {
-            _amount = Mathf.Clamp(amount, 0, capacity);
+            _amount = Mathf.Max(0, amount);
             _regenTimer = regenTimer;
             if (_sr != null) ApplyScale();
         }
