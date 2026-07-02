@@ -134,12 +134,14 @@ namespace Caveman
             _sr.color = Color.Lerp(spent, _baseColor, Mathf.Clamp01(0.25f + 0.75f * f));
         }
 
-        /// <summary>Brighten the patch when the player can target it.</summary>
-        public void SetHighlighted(bool on)
+        /// <summary>Highlight the patch under the cursor. reachable = a bright white glow ("click to mine");
+        /// out of reach = a cool blue glow ("there's a resource here — walk closer").</summary>
+        public void SetHighlighted(bool on, bool reachable = true)
         {
             if (_sr == null) return;
             _highlighted = on;
-            if (on) _sr.color = Color.Lerp(_baseColor, Color.white, 0.45f);
+            if (on) _sr.color = reachable ? Color.Lerp(_baseColor, Color.white, 0.45f)
+                                          : Color.Lerp(_baseColor, new Color(0.55f, 0.75f, 1f), 0.4f);
             else ApplyTint(capacity > 0 ? (float)_amount / capacity : 0f); // restore depletion shade
         }
     }

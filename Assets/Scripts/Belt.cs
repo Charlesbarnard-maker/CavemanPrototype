@@ -89,6 +89,8 @@ namespace Caveman
 
         private bool _connected;    // snapshot: goods on this belt can ultimately reach a real sink
         private bool _blocked;      // the lead reached the exit edge but could not hand off
+        private float _warnT;       // how long a problem has PERSISTED — gates the warning tint (no flicker)
+        private const float WarnDelay = 2f; // a belt must be stuck this long before it shows red/yellow
 
         private static readonly Dictionary<Vector2Int, Belt> Grid = new();
 
@@ -690,13 +692,20 @@ namespace Caveman
         // =======================================================================================
         void Update()
         {
-            // Belt colour reads the bottleneck at a glance:
-            //   red    = dead end (no sink ahead), yellow = backed up (lead can't move on),
-            //   base   = flowing or empty (an empty connected belt = an upstream/supply issue).
+            // Belt colour reads the bottleneck at a glance: red = dead end (no sink ahead), yellow = backed up
+            // (lead can't move on), base = flowing/empty. A problem must PERSIST for WarnDelay before it tints —
+            // otherwise a belt that blocks for a split second each time its workshop takes an input would flicker
+            // a warning every second (the annoying flash on the Idea Bench feed line).
             if (_sr != null)
-                _sr.color = !_connected ? new Color(0.62f, 0.24f, 0.24f)      // red — dead end
-                          : _blocked   ? new Color(0.85f, 0.66f, 0.18f)        // yellow — backed up downstream
-                          : _baseColor;                                         // brown — ok
+            {
+                bool deadEnd = !_connected;
+                bool problem = deadEnd || _blocked;
+                _warnT = problem ? _warnT + Time.deltaTime : 0f;
+                _sr.color = _warnT >= WarnDelay
+                    ? (deadEnd ? new Color(0.62f, 0.24f, 0.24f)    // red — sustained dead end
+                               : new Color(0.85f, 0.66f, 0.18f))   // yellow — sustained backup
+                    : _baseColor;                                   // brown — ok / flowing / brief hiccup
+            }
 
             // Underground ends use a fixed entrance/exit sprite (role decided at pairing); plain belts pick
             // their sprite from TIER + SHAPE so a run reads per-age and corners visibly connect; splitters/

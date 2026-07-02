@@ -932,9 +932,11 @@ namespace Caveman
                 for (int j = 0; j < h; j++)
                 {
                     var c = new Vector2Int(a.x + i, a.y + j);
-                    // Pipes aren't "solid", but a building dropped on one would overlap/break it — so a pipe
-                    // cell blocks placement too (you clear the pipe first). Keeps liquids & buildings disjoint.
-                    if (CellOccupied(new Vector3(c.x, c.y, 0f)) || WorldGrid.IsReserved(c) || PipeNet.At(c) != null) return true;
+                    // Pipes and belts aren't "solid", but a building dropped on one would overlap it and render
+                    // ON TOP (looking like the belt runs under the building) — so a pipe OR belt cell blocks
+                    // placement too (clear it first). Keeps liquids / conveyors / buildings disjoint.
+                    if (CellOccupied(new Vector3(c.x, c.y, 0f)) || WorldGrid.IsReserved(c)
+                        || PipeNet.At(c) != null || Belt.At(c) != null) return true;
                 }
             return false;
         }
@@ -1415,7 +1417,10 @@ namespace Caveman
                     }
                     return; // upgraded in place — keep direction + carried items
                 }
-                existing.SetDir(d);
+                // Junctions (splitter/merger) and special belts (filter/gate/underground) keep the orientation
+                // they were PLACED with — dragging a belt into their side must never spin them around.
+                if (!existing.isSplitter && !existing.isMerger && !existing.isFilter && !existing.isGate && !existing.underground)
+                    existing.SetDir(d);
                 return;
             }
             if (!TerrainGrid.BeltAllowed(cell)) return; // water only if bridged

@@ -18,6 +18,8 @@ namespace Caveman
 
         private Camera _cam;
         private ResourceNode _highlighted;
+        private bool _minedHintShown;   // one-time "click to mine" nudge
+        private float _farWarnT = -99f;  // rate-limits the out-of-reach warning
 
         void Awake() => _cam = Camera.main;
 
@@ -43,21 +45,38 @@ namespace Caveman
             bool inReach = node != null &&
                            Vector2.Distance(transform.position, node.transform.position) <= reach;
 
-            // Keep exactly one node highlighted at a time.
-            ResourceNode target = inReach ? node : null;
-            if (target != _highlighted)
+            // Highlight the node under the cursor — bright when in reach (click to mine), blue when out of reach
+            // (a resource is here, walk closer). Highlighting either way makes it clear resources are clickable.
+            if (node != _highlighted)
             {
                 if (_highlighted != null) _highlighted.SetHighlighted(false);
-                _highlighted = target;
-                if (_highlighted != null) _highlighted.SetHighlighted(true);
+                _highlighted = node;
+            }
+            if (_highlighted != null) _highlighted.SetHighlighted(true, inReach);
+
+            // One-time nudge the first time a resource is actually within reach, so mining-by-click is obvious.
+            if (inReach && !_minedHintShown)
+            {
+                _minedHintShown = true;
+                Toast.Show("<color=#cfe>⛏ Left-click a glowing resource to mine it by hand.</color>");
             }
 
-            if (inReach && mouse.leftButton.wasPressedThisFrame && node.Harvest(Inventory))
+            if (mouse.leftButton.wasPressedThisFrame && node != null)
             {
-                node.Nudge(); // chop recoil wobble — makes the manual hit feel responsive
-                // Floating "+1 <item>" so what you gathered (and how much) is clear at a glance.
-                if (node.yields != null)
-                    GatherPopup.Show(node.transform.position, $"+1 {node.yields.displayName}", node.yields.color);
+                if (inReach)
+                {
+                    if (node.Harvest(Inventory))
+                    {
+                        node.Nudge(); // chop recoil wobble — makes the manual hit feel responsive
+                        if (node.yields != null)
+                            GatherPopup.Show(node.transform.position, $"+1 {node.yields.displayName}", node.yields.color);
+                    }
+                }
+                else if (Time.unscaledTime - _farWarnT > 1.2f) // clicked a resource that's out of reach
+                {
+                    _farWarnT = Time.unscaledTime;
+                    GatherPopup.Show(node.transform.position, "Too far — move closer", new Color(1f, 0.55f, 0.4f));
+                }
             }
         }
     }
