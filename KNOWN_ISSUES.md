@@ -4,6 +4,45 @@ A running record so progress/problems don't get lost. Newest first. Move items t
 **Fixed** when done. Maintained alongside the code — see DESIGN.md for the roadmap.
 
 ---
+## 📌 NEW-THREAD HANDOFF — current state (2026-07-02, end of the "full review + extraction + cranes + painted terrain" session)
+Pinned pointer for a fresh thread. Branch **`feature/save-load-and-shell` @ `92d3464`**, pushed, tree clean —
+~20 commits of work on top of the depot/rail branch; consider MERGING TO MAIN once the playthrough validates it.
+**The user is running a FULL PLAYTHROUGH on the Desktop standalone** (`C:\Users\charl\Desktop\CavemanPrototype\`,
+built from HEAD, boot-verified) — **do NOT rebuild or touch the Desktop copy unless asked.**
+
+**Shipped this session (all compile-clean; standalone boots clean):**
+1. **Full design review** → fix waves: 4 broken quests repaired (hand-mine counter, wired-generator checks,
+   Industry 1000, Stockpile highlight) · dead survival content PURGED (10 items, 15 buildings, dead fields) ·
+   feed-rate balance rule (every machine feedable by its own age's belt) · vehicle costs ×3.5 · upgrade ladders
+   completed · autosave (slot 3, 5-min + quit) + overwrite confirm + Continue-loads-newest · construction sites
+   survive saves (v3) · placement/deny sounds · stats panel (P) + alerts (K) + pipette (Q) + filter-belt picker +
+   one-click wiring · day/night tint · splitter-side→merger stall FIXED (MergerPull recognises splitter side lanes).
+2. **Hybrid extraction**: Copper/Iron/Gem Mines are DRILLS (`def.drill`) — must be placed ON deposits
+   (footprint+1 ring, placement + BindCoverage mirror each other), coverage scales rate ×0.8–1.6, round-robin
+   depletion, stop-when-dry (no rebind), MachineWorkFX arm instead of workers, powerDraw 10–15 with
+   **unwired = half speed** via new `IPowerConsumer` (PowerNode.consumer generalised). Oil = pressure model
+   (flow scales with remaining, 25% floor, never takes the last unit, fields regen 1 → permanent trickle; kills
+   the Monument fuel soft-lock). Ore/oil fields get baked GROUND STAINS. Organic collectors (wood/stone/clay)
+   untouched — worker crews are the identity.
+3. **Crane arms** (`CraneArm.cs`, BuildingKind.Arm): optional heavy "inserter" — Swing (Tribal 2/2.2s r1) /
+   Geared (Iron 3/1.6s r2) / Gantry (Industrial 5/1.2s r2 + filter + power). Real swing state machine (park →
+   wait-to-grab → carry visibly → wait-at-sink with red-amber blocked pulse), lattice-boom art with cable/claw,
+   grab/drop CELL HIGHLIGHTS during placement + port markers. One "cranes" tech (15, tribal) + showcase quest.
+   Save v4; **objectives now restore by TITLE** (quest list can change without breaking saves).
+4. **Painted terrain**: bake samples hand-painted biome tiles (`Assets/Resources/art/terrain/terrain_*.png`,
+   from the Handpainted Grass pack — 4 PNGs only) at TWO octaves (kills tile repeat), 6 texels/cell + BILINEAR
+   in painted mode (soft brushwork up close), procedural fallback intact (`TerrainGrid.UsePaintedTerrain`).
+   `TerrainLookCompare.Run` bakes headless before/after PNGs. Decor rescaled small+dense (0.26–0.42, Step 2, 26k).
+   8 asset packs downloaded in the Asset Store cache (2 pending: Pavement/Metal); only the handpainted one imported.
+
+**NOT yet interactively verified (the playthrough is the test):** drills/cranes/painted-terrain in motion, new
+quests, oil trickle pacing, age gates (24/60/80/80 deliveries — THE tuning knob), crane swing feel (2.2s).
+**Queued next:** Tier-1 art juice (URP 2D lights + machine smoke/steam — biggest visual win, pairs with day/night) ·
+per-age playtime instrumentation for the balance pass · in-place line editing · save slot names · P3 planning/ghost
+layer (BUILD_SYSTEMS.md §4). Old saves: load fine, but pre-drill mines placed NEAR (not on) deposits wake up dead —
+recommend fresh game (told the user).
+
+---
 ## 📌 STANDALONE BUILD + input fix (2026-07-01)
 The game now builds as a **standalone Windows player** (`Caveman.GameBuilder.BuildWindows` → default Downloads, or
 env var `CAVEMAN_BUILD_OUT`; user's copy is on the Desktop). Its saves live in the player's own persistentDataPath
