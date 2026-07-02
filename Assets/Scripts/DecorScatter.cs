@@ -8,8 +8,8 @@ namespace Caveman
     /// Density is front-loaded near spawn and the total is hard-capped, so cost is bounded on any map size.</summary>
     public static class DecorScatter
     {
-        private const int Step = 3;        // one candidate cell per Step×Step block (denser, small props → a fuller meadow)
-        private const int MaxSprites = 16000;
+        private const int Step = 2;        // one candidate cell per Step×Step block — small props, MANY of them (a full meadow)
+        private const int MaxSprites = 26000;
         private const int SortOrder = -80;
 
         public static void Populate()
@@ -92,7 +92,7 @@ namespace Caveman
             go.transform.SetParent(root, false);
             float ox = (TerrainGrid.CellHash(x, y, 16) - 0.5f) * 0.85f, oy = (TerrainGrid.CellHash(x, y, 17) - 0.5f) * 0.85f;
             go.transform.position = new Vector3(x + ox, y + oy, 0f);
-            float sc = 0.42f + 0.24f * TerrainGrid.CellHash(x, y, 18); // small + a little variety, so props sit INTO the meadow rather than standing out
+            float sc = 0.26f + 0.16f * TerrainGrid.CellHash(x, y, 18); // SMALL (0.26–0.42) — ground cover that sits INTO the painted meadow, not on top of it
             go.transform.localScale = new Vector3(sc, sc, 1f);
             var sr = go.AddComponent<SpriteRenderer>();
             sr.sprite = sprite;
