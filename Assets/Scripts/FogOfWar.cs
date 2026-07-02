@@ -52,6 +52,45 @@ namespace Caveman
             _tex.Apply();
         }
 
+        // --- Save/load: persist the exact explored mask (1 bit/pixel, run-length encoded — early game is
+        //     almost all fog, so this is tiny) so a loaded game keeps exactly what was explored, no more, no less. ---
+        public static void SaveTo(System.IO.BinaryWriter w)
+        {
+            var f = Instance;
+            w.Write(f != null && f._px != null);
+            if (f == null || f._px == null) return;
+            w.Write(f.res);
+            int n = f._px.Length;
+            w.Write(n);
+            int i = 0;
+            while (i < n)
+            {
+                bool ex = f._px[i].a == 0;
+                int run = 1;
+                while (i + run < n && (f._px[i + run].a == 0) == ex) run++;
+                w.Write(ex); w.Write(run);
+                i += run;
+            }
+        }
+
+        public static void LoadFrom(System.IO.BinaryReader r)
+        {
+            if (!r.ReadBoolean()) return;
+            int savedRes = r.ReadInt32();
+            int n = r.ReadInt32();
+            var f = Instance;
+            bool apply = f != null && f._px != null && savedRes == f.res && n == f._px.Length;
+            int i = 0;
+            while (i < n)
+            {
+                bool ex = r.ReadBoolean();
+                int run = r.ReadInt32();
+                for (int k = 0; k < run && i < n; k++, i++)
+                    if (apply) f._px[i] = ex ? Clear : Fog;
+            }
+            if (apply) { f._tex.SetPixels32(f._px); f._tex.Apply(); }
+        }
+
         /// <summary>Has this world position been revealed? (cheap array lookup)</summary>
         public bool IsExplored(Vector3 worldPos)
         {

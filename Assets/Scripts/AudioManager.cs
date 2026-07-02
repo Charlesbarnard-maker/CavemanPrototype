@@ -82,23 +82,57 @@ namespace Caveman
             return clip;
         }
 
-        // A soft, slow ambient pad. Frequencies (and the swell LFO) complete a WHOLE number of cycles over the
-        // 8-second buffer, so the loop is seamless with no click at the seam. Kept quiet — a bed, not a tune.
+        // A procedural FACTORY-AMBIENT bed (no audio assets): a low industrial drone + a slow chord pad that
+        // swells, a soft MACHINE PULSE on the beat, and metallic TICKS / steam-hiss on the off-beat — so it reads
+        // as "the factory is working" without a driving tune. Every frequency (and the swell) is snapped to the
+        // loop length, and the beat divides it evenly, so the 16s buffer repeats seamlessly (no click at the seam).
         private static AudioClip Ambient()
         {
-            const float dur = 8f;
-            int n = Mathf.RoundToInt(dur * Rate);
+            const float loop = 16f;
+            int n = Mathf.RoundToInt(loop * Rate);
             var data = new float[n];
-            float[] partials = { 110f, 165f, 220f }; // A2 + fifth + octave — all integer cycles over 8s
+            float Snap(float f) => Mathf.Round(f * loop) / loop; // whole cycles per loop → seamless
+
+            // Deterministic low-level noise for the metallic tick (fixed seed → identical every run + every loop).
+            var rng = new System.Random(4242);
+            var noise = new float[n];
+            for (int i = 0; i < n; i++) noise[i] = (float)(rng.NextDouble() * 2.0 - 1.0);
+
+            float d1 = Snap(55f), d2 = Snap(110f);                          // sub drone (A1 + A2)
+            float p1 = Snap(220f), p2 = Snap(261.63f), p3 = Snap(329.63f);  // A3 / C4 / E4 pad (a-minor-ish)
+            float swellF = Snap(0.0625f);                                   // one slow swell per loop
+            float m1 = Snap(1760f), m2 = Snap(2637f);                       // metallic partials
+            const float beat = 1.0f;   // a calm ~60 BPM industrial heartbeat (divides 16s exactly)
+            float thumpF = Snap(58f);
+
             for (int i = 0; i < n; i++)
             {
                 float t = i / (float)Rate;
-                float lfo = 0.6f + 0.4f * Mathf.Sin(2f * Mathf.PI * 0.125f * t); // one swell per loop → seamless
                 float s = 0f;
-                for (int k = 0; k < partials.Length; k++) s += Mathf.Sin(2f * Mathf.PI * partials[k] * t) / (k + 2f);
-                data[i] = Mathf.Clamp(s * 0.16f * lfo, -1f, 1f);
+
+                // low industrial drone
+                s += 0.11f * Mathf.Sin(2f * Mathf.PI * d1 * t) + 0.07f * Mathf.Sin(2f * Mathf.PI * d2 * t);
+
+                // slow chord pad that swells across the loop
+                float swell = 0.35f + 0.35f * Mathf.Sin(2f * Mathf.PI * swellF * t);
+                s += swell * (0.055f * Mathf.Sin(2f * Mathf.PI * p1 * t)
+                            + 0.045f * Mathf.Sin(2f * Mathf.PI * p2 * t)
+                            + 0.040f * Mathf.Sin(2f * Mathf.PI * p3 * t));
+
+                // machine pulse — a soft low thump on every beat
+                float tb = t - beat * Mathf.Floor(t / beat);
+                s += 0.14f * Mathf.Exp(-tb / 0.10f) * Mathf.Sin(2f * Mathf.PI * thumpF * t);
+
+                // metallic tick / steam hiss on the off-beat
+                float to = tb - beat * 0.5f; if (to < 0f) to += beat;
+                float tickEnv = Mathf.Exp(-to / 0.04f);
+                s += 0.045f * tickEnv * (0.6f * Mathf.Sin(2f * Mathf.PI * m1 * t)
+                                       + 0.4f * Mathf.Sin(2f * Mathf.PI * m2 * t)
+                                       + 0.5f * noise[i]);
+
+                data[i] = Mathf.Clamp(s * 0.9f, -1f, 1f);
             }
-            var clip = AudioClip.Create("ambient", n, 1, Rate, false);
+            var clip = AudioClip.Create("factory_ambient", n, 1, Rate, false);
             clip.SetData(data, 0);
             return clip;
         }

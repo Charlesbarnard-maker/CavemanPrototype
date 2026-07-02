@@ -17,7 +17,7 @@ namespace Caveman
     /// </summary>
     public static class SaveSystem
     {
-        public const int Version = 1;
+        public const int Version = 2; // v2 adds the fog-of-war explored mask (v1 saves load without it)
         private const uint Magic = 0x56535643; // 'CVSV'
 
         public static string SaveDir => Path.Combine(Application.persistentDataPath, "saves");
@@ -131,6 +131,7 @@ namespace Caveman
             // world
             TerrainGrid.SerializeTo(w);
             WriteNodes(w);
+            FogOfWar.SaveTo(w); // explored mask (v2+)
 
             // buildings — depots write an index map that routes reference
             var depotIndex = new Dictionary<Depot, int>();
@@ -180,6 +181,7 @@ namespace Caveman
                 TerrainGrid.DeserializeFrom(r);
                 TerrainGrid.RebuildRenderer();
                 ReadNodes(r);
+                if (ver >= 2) FogOfWar.LoadFrom(r); // restore exactly what was explored (v1 saves had no fog data)
 
                 // buildings
                 _loadDepots = new List<Depot>();
@@ -202,7 +204,6 @@ namespace Caveman
                 ReadPowerWires(r);
 
                 PlayerController.RecomputeGarageSlots();
-                FogOfWar.Instance?.RevealAll(); // a loaded base is already explored — don't hide it under fog
                 Debug.Log($"[SaveSystem] Loaded slot {slot}.");
                 Toast.Show("<color=#9f9>✔ Game loaded.</color>");
                 return true;
